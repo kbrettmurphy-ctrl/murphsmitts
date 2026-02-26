@@ -1,7 +1,7 @@
 :root{
   --bg: #dacab1;
   --navy: #092f4d;
-  --rust: #921a24;
+  --red: #921a24;
   --ink: #020b12;
   --black: #000;
   --creamText: #dacab1;
@@ -26,50 +26,66 @@ a:hover{text-decoration:underline}
   margin: 0 auto;
 }
 
-header{
-  position: sticky;
+/* HEADER OVER HERO (Squarespace-ish) */
+.site-header{
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 50;
-  background: rgba(218,202,177,.92);
+  background: rgba(2, 11, 18, 0.45);
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(2,11,18,.08);
+  border-bottom: 1px solid rgba(242,234,223,.10);
 }
 
-.navbar{
+.header-inner{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding: 14px 0;
-  gap: 14px;
+  padding: 16px 0;
+  gap: 18px;
 }
 
 .brand{
   display:flex;
   align-items:center;
   gap: 12px;
-  min-width: 220px;
+  min-width: 60px;
 }
 
 .brand img{
-  width: 46px;
-  height: 46px;
+  width: 54px;
+  height: 54px;
   border-radius: 999px;
   object-fit: cover;
 }
 
-.brand .title{
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  font-size: 18px;
+/* Centered nav like your Squarespace screenshot */
+.site-nav{
+  display:flex;
+  gap: 22px;
+  align-items:center;
+  justify-content:center;
+  flex: 1;
 }
 
-nav ul{
-  list-style:none;
-  display:flex;
-  gap: 18px;
-  padding:0;margin:0;
-  align-items:center;
+.site-nav a{
+  color: rgba(242,234,223,.85);
+  font-size: 14px;
+  padding: 8px 6px;
+  text-decoration: none;
 }
+
+.site-nav a.active,
+.site-nav a:hover{
+  color: rgba(242,234,223,1);
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+/* Right-side contact button */
+.actions{min-width: 140px; display:flex; justify-content:flex-end;}
+.btn-contact{ padding: 12px 18px; border-radius: 10px; }
 
 nav a{
   font-size: 14px;
@@ -109,7 +125,7 @@ nav a.active{
 .btn:active{transform: scale(.98)}
 
 .btn-primary{
-  background: var(--rust);
+  background: var(--red);
   color: var(--creamText);
 }
 .btn-primary:hover{filter: brightness(.92)}
@@ -120,44 +136,55 @@ nav a.active{
 }
 .btn-secondary:hover{filter: brightness(.92)}
 
-.hero {
+/* HERO FULL-BLEED + HEADER OVERLAY SPACE */
+.hero{
   position: relative;
-  min-height: 70vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
+  min-height: 92vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
 
-  background-image: url("../img/hero.jpeg");
+  /* IMPORTANT: correct path from assets/css/styles.css */
+  background-image: url("hero.jpeg");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
 }
 
-.hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
+/* Dark overlay like Squarespace */
+.hero::before{
+  content:"";
+  position:absolute;
+  inset:0;
   background: rgba(2, 11, 18, 0.55);
 }
 
-.hero-content {
+/* Push hero down so it doesn't hide behind the fixed header */
+.hero-content{
   position: relative;
   z-index: 1;
-  padding: 4rem 1rem;
-  color: #f2eee6;
+  color: rgba(242,234,223,0.92);
+  padding: 160px 0 120px; /* top accounts for fixed header */
 }
 
-.hero h1 {
-  font-size: clamp(2.5rem, 5vw, 4.5rem);
-  margin-bottom: 1rem;
+.hero h1{
+  font-size: clamp(2.6rem, 5vw, 4.6rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
 }
 
-.hero p {
-  max-width: 600px;
-  margin: 0 auto 2rem auto;
+.hero p{
+  max-width: 720px;
+  margin: 0 auto 30px;
+  opacity: .9;
 }
 
+/* Make the home page background irrelevant since hero is full-bleed */
+body.home{
+  background: #000;
+}
 .page{
   padding: 26px 0 56px;
 }
