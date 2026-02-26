@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
 
   <!-- keep the same version number you’re using everywhere -->
-  <link rel="stylesheet" href="assets/css/styles.css?v=12" />
+  <link rel="stylesheet" href="assets/css/styles.css?v=14" />
 </head>
 
 <body class="inner">
@@ -63,7 +63,7 @@
     </nav>
 
     <div class="mobile-menu-actions">
-      <a class="btn btn-primary" href="contact.html">Contact</a>
+      <a class="btn btn-primary btn-contact active" href="contact.html">Contact</a>
     </div>
   </div>
 </div>
@@ -77,13 +77,14 @@
     <!-- TOGGLE (no JS) -->
     <div class="card" style="margin-top:18px;">
       <div class="toggle">
-        <!-- default tab = Questions -->
-        <input class="toggle-input" type="radio" name="contactTabs" id="tab-questions" checked>
-        <label class="toggle-tab" for="tab-questions">Questions</label>
+        <!-- radios must be siblings of the panels for the CSS to work -->
+  <input class="toggle-input" type="radio" name="contactTabs" id="tab-questions" checked>
+  <input class="toggle-input" type="radio" name="contactTabs" id="tab-service">
 
-        <input class="toggle-input" type="radio" name="contactTabs" id="tab-service">
-        <label class="toggle-tab" for="tab-service">Service Request</label>
-      </div>
+        <div class="toggle">
+    <label class="toggle-tab" for="tab-questions">Questions</label>
+    <label class="toggle-tab" for="tab-service">Service Request</label>
+  </div>
 
       <!-- PANEL: QUESTIONS -->
       <section class="toggle-panel" data-panel="questions" aria-label="Questions form">
@@ -202,6 +203,7 @@
   <script src="assets/js/main.js"></script>
 </body>
 </html>
+
 
 
 
