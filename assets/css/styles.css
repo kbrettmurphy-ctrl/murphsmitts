@@ -137,7 +137,7 @@ nav a.active{
   padding: 54px 18px;
   background:
     linear-gradient(rgba(2,11,18,.58), rgba(2,11,18,.58)),
-    url("assets/img/hero.jpg") center/cover no-repeat;
+    url("assets/img/hero.jpeg") center/cover no-repeat;
 }
 
 .hero h1{
