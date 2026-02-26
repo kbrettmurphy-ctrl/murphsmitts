@@ -1,49 +1,20 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Murph’s Mitt Maintenance</title>
-  <meta name="description" content="Baseball & softball glove repair. Local drop-off and nationwide mail-in service." />
+---
+layout: default
+title: Murph’s Mitt Maintenance
+description: Baseball & softball glove repair. Local drop-off and nationwide mail-in service.
+nav: home
+body_class: home
+---
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- FULL WIDTH HERO -->
+<section class="hero" aria-label="Hero">
+  <div class="hero-content container">
+    <h1>Professional Glove<br>Relacing &amp; Restoration</h1>
+    <p>Baseball &amp; softball glove repair. Local drop-off and nationwide mail-in service.</p>
 
-  <link rel="stylesheet" href="assets/css/styles.css?v=14" />
-</head>
-
-<body class="home">
-
-  <div id="site-header"></div>
-
-  <!-- FULL WIDTH HERO -->
-  <section class="hero" aria-label="Hero">
-    <div class="hero-content container">
-      <h1>Professional Glove<br>Relacing &amp; Restoration</h1>
-      <p>Baseball &amp; softball glove repair. Local drop-off and nationwide mail-in service.</p>
-
-      <div class="cta">
-        <a class="btn btn-secondary" href="services.html">View Services</a>
-        <a class="btn btn-primary" href="contact.html?tab=service">Service Request</a>
-      </div>
+    <div class="cta">
+      <a class="btn btn-secondary" href="{{ '/services.html' | relative_url }}">View Services</a>
+      <a class="btn btn-primary" href="{{ '/contact.html?tab=service' | relative_url }}">Service Request</a>
     </div>
-  </section>
-
-  <div id="site-footer"></div>
-
-  <script src="assets/js/main.js"></script>
-</body>
-</html>
-
-
-
-
-
-
-
-
-
-
-
-
+  </div>
+</section>
