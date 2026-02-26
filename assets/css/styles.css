@@ -284,7 +284,7 @@ iframe{
 }
 
 /* =========================
-   FOOTER (Squarespace-style)
+   FOOTER (match Squarespace screenshot)
    ========================= */
 
 .site-footer{
@@ -302,35 +302,32 @@ iframe{
   font-size: 13px;
 }
 
+/* Left column */
 .footer-left{
   display:grid;
   gap: 10px;
 }
 
+/* Center column (icons + tagline underneath) */
 .footer-center{
-  display:flex;
-  justify-content:center;
+  display:grid;
+  justify-items:center;
+  gap: 10px;
 }
 
+/* Right column */
 .footer-right{
   text-align:right;
   display:grid;
-  gap: 8px;
+  gap: 10px;
   justify-items:end;
-}
-
-.footer-quote{
-  opacity: .9;
-}
-
-.footer-quote-left{
-  opacity:.9;
 }
 
 /* Icon row */
 .footer-icons{
   display:flex;
   align-items:center;
+  justify-content:center;
   gap: 14px;
 }
 
@@ -343,13 +340,18 @@ iframe{
   text-decoration:none;
   opacity:.9;
 }
-
 .footer-icons a:hover{ opacity: 1; }
 
 .footer-icons svg{
   width: 20px;
   height: 20px;
   fill: rgba(242,234,223,.88);
+}
+
+/* Taglines */
+.footer-tagline{
+  opacity: .9;
+  line-height: 1.25;
 }
 
 /* Mobile stack */
@@ -360,7 +362,6 @@ iframe{
   }
   .footer-left{ justify-items:center; }
   .footer-right{ text-align:center; justify-items:center; }
-  .footer-center{ order: 3; margin-top: 8px; }
 }
 
 /* =========================
