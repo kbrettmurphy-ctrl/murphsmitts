@@ -305,9 +305,10 @@ iframe{
 }
 
 /* =========================
-   FOOTER (SQUARESPACE-ISH, ONE SYSTEM ONLY)
-   Desktop: 3 columns (L/C/R) with taglines spread
+   FOOTER (MAKE IT WORK)
+   Desktop: 3 columns aligned on the SAME bottom row
    Mobile: copyright -> socials -> taglines stacked
+   Supports BOTH .social and legacy .footer-icons
    ========================= */
 
 footer{
@@ -317,47 +318,54 @@ footer{
   margin-top: 40px;
 }
 
-/* Desktop: 3 columns */
 .footer-inner{
   display:grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 18px;
-  align-items:end;              /* KEY: no “stairs” */
   font-size: 13px;
+
+  /* Prevent “stairs” by making columns equal height */
+  align-items: stretch;
 }
 
-/* Left */
-.footer-left{
-  text-align:left;
+/* Each column is a vertical stack where the tagline sits on the same baseline */
+.footer-left,
+.footer-center,
+.footer-right{
+  display:flex;
+  flex-direction:column;
+  min-height: 74px;            /* keeps the baseline consistent */
+}
+
+/* Push the tagline to the bottom of each column */
+.footer-left .footer-tagline,
+.footer-center .footer-tagline,
+.footer-right .footer-tagline{
+  margin-top: auto;
+}
+
+.footer-left{ text-align:left; align-items:flex-start; line-height: 1.35; }
+.footer-center{ text-align:center; align-items:center; }
+.footer-right{ text-align:right; align-items:flex-end; }
+
+.copyright{
   line-height: 1.35;
 }
 
-/* Center: socials + center tagline */
-.footer-center{
-  text-align:center;
+/* Social row: support BOTH class names */
+.social,
+.footer-icons{
   display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:flex-end;
-  gap: 10px;
-}
-
-/* Right */
-.footer-right{
-  text-align:right;
-}
-
-/* Social row: fix TikTok baseline */
-.social{
-  display:flex;
-  align-items:center;
+  align-items:center;          /* fixes “TikTok lower” */
   justify-content:center;
   gap: 14px;
   margin: 0;
   padding: 0;
 }
 
-.social a{
+/* Make links render consistently whether they contain SVGs OR plain text */
+.social a,
+.footer-icons a{
   display:inline-flex;
   align-items:center;
   justify-content:center;
@@ -366,16 +374,24 @@ footer{
   border-radius: 10px;
   text-decoration:none;
   color: rgba(242,234,223,.88);
+
+  /* This is what stops baseline weirdness for text icons */
+  line-height: 1;
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.social svg{
+/* If you DO use SVGs inside the links, they’ll show correctly */
+.social svg,
+.footer-icons svg{
   width: 20px;
   height: 20px;
-  display:block;     /* kills baseline weirdness */
-  fill: currentColor;/* uses the link color */
+  display:block;
+  fill: currentColor;
 }
 
-.social a:hover{
+.social a:hover,
+.footer-icons a:hover{
   opacity: 1;
   text-decoration:none;
 }
@@ -386,31 +402,28 @@ footer{
   line-height: 1.35;
 }
 
-/* If you still have a .footer-taglines wrapper somewhere, don’t break it */
-.footer-taglines{
-  display:grid;
-  gap: 8px;
-}
-
-/* Mobile footer order */
+/* Mobile: stack cleanly */
 @media (max-width: 980px){
   .footer-inner{
     grid-template-columns: 1fr;
     text-align:center;
     gap: 12px;
-    align-items:center;
+    align-items: center;
   }
 
   .footer-left,
+  .footer-center,
   .footer-right{
+    align-items:center;
     text-align:center;
+    min-height: 0;
   }
 
-  .footer-right{
-    display:flex;
-    flex-direction:column;
-    gap: 8px;
-    align-items:center;
+  /* On mobile you want them stacked, not forced to the bottom */
+  .footer-left .footer-tagline,
+  .footer-center .footer-tagline,
+  .footer-right .footer-tagline{
+    margin-top: 8px;
   }
 }
 
