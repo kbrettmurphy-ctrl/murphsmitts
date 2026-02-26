@@ -3,10 +3,12 @@
   --navy: #092f4d;
   --red: #921a24;
   --ink: #020b12;
-  --black: #000;
-  --creamText: #dacab1;
+  --creamText: #f2eee6;
+
   --max: 1120px;
   --radius: 18px;
+
+  --headerH: 86px;
 }
 
 *{box-sizing:border-box}
@@ -26,23 +28,24 @@ a:hover{text-decoration:underline}
   margin: 0 auto;
 }
 
-/* HEADER OVER HERO (Squarespace-ish) */
+/* =========================
+   SQUARESPACE-ISH HEADER
+   ========================= */
+
 .site-header{
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 0; left: 0; right: 0;
   z-index: 50;
   background: rgba(2, 11, 18, 0.45);
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(242,234,223,.10);
+  border-bottom: 1px solid rgba(242,234,223,.12);
 }
 
 .header-inner{
+  height: var(--headerH);
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding: 16px 0;
   gap: 18px;
 }
 
@@ -50,17 +53,16 @@ a:hover{text-decoration:underline}
   display:flex;
   align-items:center;
   gap: 12px;
-  min-width: 60px;
+  min-width: 72px;
 }
 
 .brand img{
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   border-radius: 999px;
   object-fit: cover;
 }
 
-/* Centered nav like your Squarespace screenshot */
 .site-nav{
   display:flex;
   gap: 22px;
@@ -74,6 +76,7 @@ a:hover{text-decoration:underline}
   font-size: 14px;
   padding: 8px 6px;
   text-decoration: none;
+  opacity: .95;
 }
 
 .site-nav a.active,
@@ -83,28 +86,15 @@ a:hover{text-decoration:underline}
   text-underline-offset: 6px;
 }
 
-/* Right-side contact button */
-.actions{min-width: 140px; display:flex; justify-content:flex-end;}
-.btn-contact{ padding: 12px 18px; border-radius: 10px; }
-
-nav a{
-  font-size: 14px;
-  opacity: .9;
-  padding: 8px 6px;
-  border-radius: 10px;
-}
-
-nav a.active{
-  text-decoration: underline;
-  text-underline-offset: 6px;
-  opacity: 1;
-}
-
 .actions{
+  min-width: 140px;
   display:flex;
-  gap: 10px;
-  align-items:center;
+  justify-content:flex-end;
 }
+
+/* =========================
+   BUTTONS
+   ========================= */
 
 .btn{
   display:inline-flex;
@@ -113,7 +103,7 @@ nav a.active{
   border: 0;
   cursor:pointer;
   font-weight: 600;
-  padding: 14px 18px;
+  padding: 14px 20px;
   border-radius: 12px;
   font-size: 14px;
   letter-spacing: .01em;
@@ -136,7 +126,20 @@ nav a.active{
 }
 .btn-secondary:hover{filter: brightness(.92)}
 
-/* HERO FULL-BLEED + HEADER OVERLAY SPACE */
+.btn-contact{
+  padding: 12px 18px;
+  border-radius: 10px;
+}
+
+/* =========================
+   HERO (FULL BLEED)
+   ========================= */
+
+/* helps avoid weird whitespace due to fixed header */
+body.home{
+  background: #000;
+}
+
 .hero{
   position: relative;
   min-height: 92vh;
@@ -145,14 +148,13 @@ nav a.active{
   justify-content:center;
   text-align:center;
 
-  /* IMPORTANT: correct path from assets/css/styles.css */
-  background-image: url("assets/img/hero.jpeg");
+  /* IMPORTANT: styles.css is in assets/css, so this is correct */
+  background-image: url("../img/hero.jpeg");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
 }
 
-/* Dark overlay like Squarespace */
 .hero::before{
   content:"";
   position:absolute;
@@ -160,12 +162,11 @@ nav a.active{
   background: rgba(2, 11, 18, 0.55);
 }
 
-/* Push hero down so it doesn't hide behind the fixed header */
 .hero-content{
   position: relative;
   z-index: 1;
   color: rgba(242,234,223,0.92);
-  padding: 160px 0 120px; /* top accounts for fixed header */
+  padding: calc(var(--headerH) + 110px) 0 120px;
 }
 
 .hero h1{
@@ -177,16 +178,23 @@ nav a.active{
 
 .hero p{
   max-width: 720px;
-  margin: 0 auto 30px;
+  margin: 0 auto 28px;
   opacity: .9;
 }
 
-/* Make the home page background irrelevant since hero is full-bleed */
-body.home{
-  background: #000;
+.cta{
+  display:flex;
+  gap: 14px;
+  justify-content:center;
+  flex-wrap: wrap;
 }
+
+/* =========================
+   PAGES (non-home)
+   ========================= */
+
 .page{
-  padding: 26px 0 56px;
+  padding: 110px 0 56px; /* leaves room for fixed header */
 }
 
 .page h1{
@@ -202,6 +210,7 @@ body.home{
   opacity: .92;
 }
 
+/* Cards / grids used on other pages */
 .split{
   display:grid;
   grid-template-columns: 1.1fr .9fr;
@@ -246,21 +255,7 @@ hr.rule{
   margin: 18px 0;
 }
 
-.process-step{
-  display:grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  margin: 18px 0 28px;
-}
-
-.process-step h2{
-  margin:0;
-  color: var(--navy);
-  font-weight: 600;
-}
-
-.process-step ul{margin:0;padding-left:18px}
-
+/* Gallery */
 .gallery-grid{
   display:grid;
   grid-template-columns: repeat(4, 1fr);
@@ -279,31 +274,7 @@ hr.rule{
 }
 .gallery-grid img:hover{transform: scale(1.01); filter: brightness(.98)}
 
-.lightbox{
-  position:fixed;
-  inset:0;
-  background: rgba(2,11,18,.86);
-  display:none;
-  align-items:center;
-  justify-content:center;
-  padding: 24px;
-  z-index: 999;
-}
-.lightbox.open{display:flex}
-.lightbox img{
-  max-width: min(1100px, 96vw);
-  max-height: 88vh;
-  border-radius: 16px;
-  border: 1px solid rgba(242,234,223,.18);
-}
-
-.contact-grid{
-  display:grid;
-  grid-template-columns: 1fr 1.2fr;
-  gap: 28px;
-  margin-top: 20px;
-}
-
+/* Contact iframe */
 iframe{
   width:100%;
   min-height: 720px;
@@ -312,11 +283,14 @@ iframe{
   background: rgba(242,234,223,.35);
 }
 
+/* =========================
+   FOOTER
+   ========================= */
+
 footer{
   background: var(--navy);
   color: rgba(242,234,223,.88);
   padding: 26px 0;
-  margin-top: 40px;
 }
 
 .footer-inner{
@@ -327,12 +301,8 @@ footer{
   font-size: 13px;
 }
 
-.footer-center{
-  text-align:center;
-}
-.footer-right{
-  text-align:right;
-}
+.footer-center{ text-align:center; }
+.footer-right{ text-align:right; }
 
 .social{
   display:flex;
@@ -343,11 +313,16 @@ footer{
 .social a{opacity:.9}
 .social a:hover{opacity:1;text-decoration:none}
 
-/* Responsive */
+/* =========================
+   RESPONSIVE
+   ========================= */
+
 @media (max-width: 980px){
   .split{grid-template-columns:1fr}
   .price-grid{grid-template-columns:1fr}
   .gallery-grid{grid-template-columns: repeat(2, 1fr)}
-  .contact-grid{grid-template-columns:1fr}
-  nav ul{display:none} /* keep it simple; can add hamburger later */
+
+  .site-nav{display:none} /* keep it simple, no hamburger right now */
+  .actions{min-width:auto}
+  .header-inner{justify-content:space-between}
 }
