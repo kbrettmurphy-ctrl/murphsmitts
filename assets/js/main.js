@@ -66,3 +66,24 @@
     }
   }
 })();
+
+async function loadPartial(id, url) {
+  const res = await fetch(url);
+  const html = await res.text();
+  document.getElementById(id).innerHTML = html;
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  // Load header + footer
+  await loadPartial("site-header", "/partials/header.html");
+  await loadPartial("site-footer", "/partials/footer.html");
+
+  // Set active nav link AFTER header loads
+  const links = document.querySelectorAll(".site-nav a");
+
+  links.forEach(link => {
+    if (link.href === window.location.href) {
+      link.classList.add("active");
+    }
+  });
+});
