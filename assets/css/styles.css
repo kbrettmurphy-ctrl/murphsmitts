@@ -350,7 +350,7 @@ iframe{
 .footer-icons a:hover{ opacity: 1; }
 
 .footer-icons a:last-child svg{
-  transform: translateY(-3px);
+  transform: translateY(-2px);
 }
 
 /* Taglines */
