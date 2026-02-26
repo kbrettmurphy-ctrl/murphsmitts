@@ -578,7 +578,7 @@ footer{
    ========================= */
 
 .menu-btn{
-  display:none; /* desktop hidden */
+  display:none; /* still hidden on desktop */
   width: 46px;
   height: 46px;
   border-radius: 12px;
@@ -586,17 +586,21 @@ footer{
   background: rgba(2, 11, 18, 0.25);
   backdrop-filter: blur(8px);
   cursor:pointer;
+
+  /* Proper stack */
+  display:flex;
+  flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .menu-btn span{
-  display:block;
   width: 22px;
   height: 2px;
   background: rgba(242,234,223,.92);
   border-radius: 999px;
+  display:block;
 }
 
 .mobile-menu{
