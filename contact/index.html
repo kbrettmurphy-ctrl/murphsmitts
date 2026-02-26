@@ -1,0 +1,93 @@
+---
+layout: default
+title: Contact
+description: Contact Murph’s Mitt Maintenance for questions or service requests.
+nav: contact
+body_class: inner
+---
+
+<main class="container page page-under-header">
+    <h1>Contact Me</h1>
+    <p class="lede">
+      Got a question? Use the quick form. Ready for glove work? Use the Service Request tab.
+    </p>
+
+    <!-- TOGGLE (no JS) -->
+<div class="card" style="margin-top:18px;">
+
+  <!-- radios must be siblings of the panels for the CSS to work -->
+  <input class="toggle-input" type="radio" name="contactTabs" id="tab-questions" checked>
+  <input class="toggle-input" type="radio" name="contactTabs" id="tab-service">
+
+  <div class="toggle">
+    <label class="toggle-tab" for="tab-questions">Questions</label>
+    <label class="toggle-tab" for="tab-service">Service Request</label>
+  </div>
+
+      <!-- PANEL: QUESTIONS -->
+      <section class="toggle-panel" data-panel="questions" aria-label="Questions form">
+        <h2 class="panel-title">General questions</h2>
+
+        <!-- Sends to your email via FormSubmit (no backend). Replace email if needed. -->
+        <form class="mm-form" action="https://formsubmit.co/murphsmitts@gmail.com" method="POST">
+          <input type="hidden" name="_subject" value="Murph’s Mitts: New Contact Message">
+          <input type="hidden" name="_captcha" value="false">
+
+          <div class="mm-grid-2">
+            <div class="mm-field">
+              <label for="first">First Name <span class="req">(required)</span></label>
+              <input id="first" name="First Name" required autocomplete="given-name" placeholder="First Name">
+            </div>
+
+            <div class="mm-field">
+              <label for="last">Last Name <span class="req">(required)</span></label>
+              <input id="last" name="Last Name" required autocomplete="family-name" placeholder="Last Name">
+            </div>
+          </div>
+
+          <div class="mm-field">
+            <label for="email">Email <span class="req">(required)</span></label>
+            <input id="email" type="email" name="Email" required autocomplete="email" placeholder="Email">
+          </div>
+
+          <div class="mm-field">
+            <label for="msg">Message <span class="req">(required)</span></label>
+            <textarea id="msg" name="Message" rows="6" required placeholder="What can I help with?"></textarea>
+          </div>
+
+          <div class="mm-actions">
+            <button class="btn btn-primary" type="submit">Submit</button>
+          </div>
+
+          <div class="note" style="margin-top:8px;">
+            If you’re ready for glove work, switch to <strong>Service Request</strong> so we can get started.
+          </div>
+        </form>
+
+        <div class="contact-mini">
+          <div class="contact-mini-title">Email</div>
+          <a class="contact-mini-link" href="mailto:murphsmitts@gmail.com">murphsmitts@gmail.com</a>
+
+          <div class="contact-mini-social">
+            <a href="https://www.facebook.com/murphsmitts" target="_blank" rel="noopener" aria-label="Facebook">f</a>
+            <a href="https://www.instagram.com/murphsmitts" target="_blank" rel="noopener" aria-label="Instagram">ig</a>
+            <a href="https://www.tiktok.com/@murphsmitts" target="_blank" rel="noopener" aria-label="TikTok">tt</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- PANEL: SERVICE REQUEST -->
+      <section class="toggle-panel" data-panel="service" aria-label="Service request form">
+        <h2 class="panel-title">Service request</h2>
+
+        <iframe
+          src="https://docs.google.com/forms/d/e/1FAIpQLSdqtE5a1pKifXvuR8sOlySfLVYHmIgn--CA4CWe2xhplFcg-Q/viewform"
+          title="Murph’s Mitt Maintenance Service Request"
+        ></iframe>
+
+        <div class="note" style="margin-top:10px;">
+          This form is intended for actual service requests (placing an order). Please direct general questions to the questions tab.
+        </div>
+      </section>
+    </div>
+  </main>
