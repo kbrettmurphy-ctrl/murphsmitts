@@ -464,10 +464,10 @@ footer{
   user-select:none;
 }
 
-#tab-questions:checked + label[for="tab-questions"],
-#tab-service:checked + label[for="tab-service"]{
+#tab-questions:checked ~ .toggle label[for="tab-questions"],
+#tab-service:checked ~ .toggle label[for="tab-service"]{
   background: var(--navy);
-  color: #dacab1e6;
+  color: #dacab1;
   border-color: rgba(242,234,223,.18);
 }
 
