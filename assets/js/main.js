@@ -67,23 +67,22 @@
   }
 })();
 
-async function loadPartial(id, url) {
-  const res = await fetch(url);
-  const html = await res.text();
-  document.getElementById(id).innerHTML = html;
-}
+// Start fetching immediately (runs as soon as the script loads)
+const headerPromise = fetch("/partials/header.html").then(r => r.text());
+const footerPromise = fetch("/partials/footer.html").then(r => r.text());
 
 document.addEventListener("DOMContentLoaded", async () => {
-  // Load header + footer
-  await loadPartial("site-header", "/partials/header.html");
-  await loadPartial("site-footer", "/partials/footer.html");
+  // Inject once DOM is ready
+  document.getElementById("site-header").innerHTML = await headerPromise;
+  document.getElementById("site-footer").innerHTML = await footerPromise;
 
-  // Set active nav link AFTER header loads
-  const links = document.querySelectorAll(".site-nav a");
+  // Set active nav link
+  const currentPath = window.location.pathname.replace(/\/$/, "");
 
-  links.forEach(link => {
-    if (link.href === window.location.href) {
-      link.classList.add("active");
+  document.querySelectorAll(".site-nav a").forEach(a => {
+    const linkPath = new URL(a.href).pathname.replace(/\/$/, "");
+    if (linkPath === currentPath) {
+      a.classList.add("active");
     }
   });
 });
