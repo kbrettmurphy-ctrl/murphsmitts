@@ -53,3 +53,16 @@
     if (e.key === 'Escape') closeMenu();
   });
 })();
+
+// Pre-select contact tab via URL
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get("tab");
+
+  if (tab === "service") {
+    const serviceRadio = document.getElementById("tab-service");
+    if (serviceRadio) {
+      serviceRadio.checked = true;
+    }
+  }
+})();
