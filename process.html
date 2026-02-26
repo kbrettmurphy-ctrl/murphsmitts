@@ -4,97 +4,106 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Process | Murph’s Mitt Maintenance</title>
+  <meta name="description" content="How Murph’s Mitt Maintenance works: request, restore, and return." />
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/styles.css" />
+
+  <!-- cache-bust so changes show up immediately -->
+  <link rel="stylesheet" href="assets/css/styles.css?v=10" />
 </head>
-<body>
-<header>
-  <div class="container navbar">
-    <a class="brand" href="index.html">
-      <img src="assets/img/logo.png" alt="Murph’s Mitt Maintenance logo">
-      <div class="title">Murph’s Mitt Maintenance</div>
-    </a>
-    <nav>
-      <ul>
-        <li><a href="index.html" data-page="index.html">Home</a></li>
-        <li><a href="services.html" data-page="services.html">Services</a></li>
-        <li><a href="process.html" data-page="process.html">Process</a></li>
-        <li><a href="about.html" data-page="about.html">About</a></li>
-        <li><a href="gallery.html" data-page="gallery.html">Gallery</a></li>
-      </ul>
-    </nav>
-    <div class="actions">
-      <a class="btn btn-primary" href="contact.html">Contact</a>
+
+<body class="inner">
+
+  <!-- MATCHING HEADER -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html" aria-label="Home">
+        <img src="assets/img/logo.png" alt="Murph’s Mitt Maintenance logo">
+      </a>
+
+      <nav class="site-nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="services.html">Services</a>
+        <a class="active" href="process.html">Process</a>
+        <a href="about.html">About</a>
+        <a href="gallery.html">Gallery</a>
+      </nav>
+
+      <div class="actions">
+        <a class="btn btn-secondary btn-contact" href="contact.html">Contact</a>
+      </div>
     </div>
-  </div>
-</header>
+  </header>
 
-<main class="container page">
-  <h1>How It Works</h1>
-  <p class="lede">Simple process. Professional results.</p>
+  <main class="container page page-under-header">
+    <h1>How It Works</h1>
+    <p class="lede">Simple process. Professional results.</p>
 
-  <div class="card">
-    <div class="process-step">
-      <h2>1. Submit Service Request</h2>
-      <ul>
-        <li>Request service using the Service Request button below.</li>
-        <li>Select the service(s) and lace color(s) you want, send photos of your glove (if you have them).</li>
-        <li>You will receive an email with a summary of work requested with a quote.</li>
-      </ul>
-    </div>
+    <div class="card">
+      <div class="process-step">
+        <h2>1. Submit Service Request</h2>
+        <ul>
+          <li>Request service using the Service Request button below.</li>
+          <li>Select the service(s) and lace color(s) you want, send photos of your glove (if you have them).</li>
+          <li>You will receive an email with a summary of work requested with a quote.</li>
+        </ul>
+      </div>
 
-    <hr class="rule">
+      <hr class="rule">
 
-    <div class="process-step">
-      <h2>2. I Restore Your Glove</h2>
-      <ul>
-        <li>Once you agree to price and service requested, I will:</li>
+      <div class="process-step">
+        <h2>2. I Restore Your Glove</h2>
+        <ul>
+          <li>Once you agree to price and service requested, I will:</li>
+        </ul>
         <ul>
           <li>Disassemble the glove</li>
-          <li>Thoroughly clean, condition with the highest quality products from The Craftsmans Works, then relace with only the best quality leather lace from Tennessee Tannery.</li>
+          <li>Thoroughly clean, condition with the highest quality products from The Craftsman’s Works, then relace with only the best quality leather lace from Tennessee Tannery.</li>
           <li>If any other work is needed or recommended after disassembly, I will contact you before moving forward.</li>
         </ul>
-      </ul>
+      </div>
+
+      <hr class="rule">
+
+      <div class="process-step">
+        <h2>3. Game-Ready Return</h2>
+        <ul>
+          <li>You will be contacted via email that your glove is ready.</li>
+          <li>Payment and pick-up / shipping details will be coordinated. <span class="note">Gloves will not be shipped until payment is received.</span></li>
+          <li>Tracking information will be provided in the “Completed” email for shipped orders.</li>
+        </ul>
+      </div>
     </div>
 
-    <hr class="rule">
-
-    <div class="process-step">
-      <h2>3. Game-Ready Return</h2>
-      <ul>
-        <li>You will be contacted via email that your glove is ready.</li>
-        <li>Payment and pick-up / shipping details will be coordinated. <span class="note">Gloves will not be shipped until payment is received.</span></li>
-        <li>Tracking information will be provided in the “Completed” email for shipped orders.</li>
-      </ul>
-    </div>
-
-    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px">
+    <!-- BUTTONS OUTSIDE THE CARD, 32px GAP -->
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:32px">
       <a class="btn btn-secondary" href="services.html">Price List</a>
       <a class="btn btn-primary" href="contact.html">Service Request</a>
     </div>
-  </div>
-</main>
+  </main>
 
-<footer>
-  <div class="container footer-inner">
-    <div>© 2026 Murph’s Mitt Maintenance<br/>All rights reserved.</div>
-    <div class="footer-center">
-      <div class="social">
-        <a href="https://www.facebook.com/murphsmitts" target="_blank" rel="noopener">Facebook</a>
-        <a href="https://www.instagram.com/murphsmitts" target="_blank" rel="noopener">Instagram</a>
-        <a href="https://www.tiktok.com/@murphsmitts" target="_blank" rel="noopener">TikTok</a>
+  <footer>
+    <div class="container footer-inner">
+      <div>© 2026 Murph’s Mitt Maintenance<br/>All rights reserved.</div>
+
+      <div class="footer-center">
+        <div class="social">
+          <a href="https://www.facebook.com/murphsmitts" target="_blank" rel="noopener">Facebook</a>
+          <a href="https://www.instagram.com/murphsmitts" target="_blank" rel="noopener">Instagram</a>
+          <a href="https://www.tiktok.com/@murphsmitts" target="_blank" rel="noopener">TikTok</a>
+        </div>
+      </div>
+
+      <div class="footer-right">
+        <div>Broken gloves deserve redemption.</div>
+        <div>Cheap laces deserve consequences.</div>
+        <div>Some Octobers should come with an asterisk.</div>
       </div>
     </div>
-    <div class="footer-right">
-      <div>Broken gloves deserve redemption.</div>
-      <div>Cheap laces deserve consequences.</div>
-      <div>Some Octobers should come with an asterisk.</div>
-    </div>
-  </div>
-</footer>
+  </footer>
 
-<script src="assets/js/main.js"></script>
+  <script src="assets/js/main.js"></script>
 </body>
 </html>
