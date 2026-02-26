@@ -116,13 +116,13 @@ a:hover{text-decoration:underline}
 
 .btn-primary{
   background: var(--red);
-  color: var(--creamText);
+  color: var(--bg);
 }
 .btn-primary:hover{filter: brightness(.92)}
 
 .btn-secondary{
   background: var(--navy);
-  color: var(--creamText);
+  color: var(--bg);
 }
 .btn-secondary:hover{filter: brightness(.92)}
 
@@ -317,7 +317,7 @@ iframe{
 
 footer{
   background: var(--navy);
-  color: rgba(242,234,223,.88);
+  color: #dacab1e6;
   padding: 22px 0;
   margin-top: 40px;
 }
@@ -372,7 +372,7 @@ footer{
   height: 34px;
   border-radius: 10px;
   text-decoration:none;
-  color: rgba(242,234,223,.88);
+  color: #dacab1e6;
   line-height: 0; /* kills baseline drift */
 }
 
@@ -467,7 +467,7 @@ footer{
 #tab-questions:checked + label[for="tab-questions"],
 #tab-service:checked + label[for="tab-service"]{
   background: var(--navy);
-  color: rgba(242,234,223,.92);
+  color: #dacab1e6;
   border-color: rgba(242,234,223,.18);
 }
 
@@ -502,7 +502,7 @@ footer{
   border-radius: 12px;
   border: 1px solid rgba(242,234,223,.20);
   background: var(--navy);
-  color: rgba(242,234,223,.92);
+  color: #dacab1e6;
   font: inherit;
   outline: none;
 }
@@ -583,7 +583,7 @@ footer{
   height: 46px;
   border-radius: 12px;
   border: 1px solid rgba(242,234,223,.18);
-  background: rgba(2, 11, 18, 0.25);
+  background: #092f4d4d;
   backdrop-filter: blur(8px);
   cursor:pointer;
 
@@ -597,7 +597,7 @@ footer{
 .menu-btn span{
   width: 22px;
   height: 2px;
-  background: rgba(242,234,223,.92);
+  background: #dacab1e6;
   border-radius: 999px;
   display:block;
 }
