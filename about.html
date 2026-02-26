@@ -4,104 +4,117 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>About | Murph’s Mitt Maintenance</title>
+  <meta name="description" content="About Brett Murphy and Murph’s Mitt Maintenance." />
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/styles.css" />
+
+  <!-- cache-bust so you actually see the header changes -->
+  <link rel="stylesheet" href="assets/css/styles.css?v=11" />
 </head>
-<body>
-<header>
-  <div class="container navbar">
-    <a class="brand" href="index.html">
-      <img src="assets/img/logo.png" alt="Murph’s Mitt Maintenance logo">
-      <div class="title">Murph’s Mitt Maintenance</div>
-    </a>
-    <nav>
-      <ul>
-        <li><a href="index.html" data-page="index.html">Home</a></li>
-        <li><a href="services.html" data-page="services.html">Services</a></li>
-        <li><a href="process.html" data-page="process.html">Process</a></li>
-        <li><a href="about.html" data-page="about.html">About</a></li>
-        <li><a href="gallery.html" data-page="gallery.html">Gallery</a></li>
-      </ul>
-    </nav>
-    <div class="actions">
-      <a class="btn btn-primary" href="contact.html">Contact</a>
-    </div>
-  </div>
-</header>
 
-<main class="container page">
-  <h1>About Me</h1>
+<body class="inner">
 
-  <div class="split">
-    <div class="card">
-      <p class="lede">
-        I’m Brett — if you’ve made it this far without figuring out my last name…well, anyway — active duty Marine, 20 years in — zero more to go — and I’ve been around baseball even longer. One of those has taught me patience. The other has tested it.
-      </p>
+  <!-- MATCHING HEADER (same as Home/Services) -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html" aria-label="Home">
+        <img src="assets/img/logo.png" alt="Murph’s Mitt Maintenance logo">
+      </a>
 
-      <p>
-        I grew up in the DFW metroplex, which means I’m a Texas Rangers fan. We’re not discussing 2011. Some people have trust issues. I have October. I’ve moved on. Mostly. 2023 helped. Flags fly forever.
-      </p>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="services.html">Services</a>
+        <a href="process.html">Process</a>
+        <a class="active" href="about.html">About</a>
+        <a href="gallery.html">Gallery</a>
+      </nav>
 
-      <p>
-        Baseball’s been part of my life for as long as I can remember — playing, coaching, overanalyzing, and occasionally pretending I didn’t just pull a hamstring trying to relive the glory days.
-      </p>
-
-      <p>
-        In 2022, during a Little League championship game I was coaching, my son’s glove blew out. He loved that glove. I looked at the price of a new one and briefly considered selling a kidney. Instead, I taught myself how to relace it.
-      </p>
-
-      <p>That one repair turned into a full-blown obsession.</p>
-
-      <p>
-        Turns out gloves aren’t just leather and string. They’re break-in, feel, superstition, and the only thing between you and a line drive reminding you why reflexes matter.
-      </p>
-
-      <p>
-        I don’t coach anymore. At some point your kid stops listening to you and needs someone else to tell him the exact same things you’ve been saying for years. I’m told this is “normal.” I remain skeptical.
-      </p>
-
-      <p>
-        Now I restore gloves with the same mindset I’ve carried for two decades: attention to detail, no shortcuts, and zero interest in doing something halfway. I’m not a factory. I’m not mass-producing repairs. It’s just me — and occasionally my son if he has nothing better to do — rebuilding tools that matter to the people who use them.
-      </p>
-
-      <p>
-        Born and raised in DFW. Living in Surf City, NC. Planning to stay. Still watching and spending too much money on baseball. Still fixing what can be saved. And still refusing to buy a new glove if the old one just needs someone patient enough to bring it back.
-      </p>
-    </div>
-
-    <div class="card">
-      <h2 style="margin-top:0;color:var(--navy)">The short version</h2>
-      <ul>
-        <li>Local drop-off (Surf City, NC)</li>
-        <li>Nationwide mail-in service</li>
-        <li>Relace, clean/condition, repairs, padding, web swaps</li>
-      </ul>
-      <hr class="rule">
-      <a class="btn btn-primary" href="contact.html">Service Request</a>
-    </div>
-  </div>
-</main>
-
-<footer>
-  <div class="container footer-inner">
-    <div>© 2026 Murph’s Mitt Maintenance<br/>All rights reserved.</div>
-    <div class="footer-center">
-      <div class="social">
-        <a href="https://www.facebook.com/murphsmitts" target="_blank" rel="noopener">Facebook</a>
-        <a href="https://www.instagram.com/murphsmitts" target="_blank" rel="noopener">Instagram</a>
-        <a href="https://www.tiktok.com/@murphsmitts" target="_blank" rel="noopener">TikTok</a>
+      <div class="actions">
+        <a class="btn btn-secondary btn-contact" href="contact.html">Contact</a>
       </div>
     </div>
-    <div class="footer-right">
-      <div>Broken gloves deserve redemption.</div>
-      <div>Cheap laces deserve consequences.</div>
-      <div>Some Octobers should come with an asterisk.</div>
-    </div>
-  </div>
-</footer>
+  </header>
 
-<script src="assets/js/main.js"></script>
+  <main class="container page page-under-header">
+    <h1>About Me</h1>
+
+    <div class="split">
+      <!-- LEFT: MAIN COPY -->
+      <div class="card">
+        <p class="lede">
+          I’m Brett — if you’ve made it this far without figuring out my last name…well, anyway — active duty Marine, 20 years in — zero more to go — and I’ve been around baseball even longer. One of those has taught me patience. The other has tested it.
+        </p>
+
+        <p>
+          I grew up in the DFW metroplex, which means I’m a Texas Rangers fan. We’re not discussing 2011. Some people have trust issues. I have October. I’ve moved on. Mostly. 2023 helped. Flags fly forever.
+        </p>
+
+        <p>
+          Baseball’s been part of my life for as long as I can remember — playing, coaching, overanalyzing, and occasionally pretending I didn’t just pull a hamstring trying to relive the glory days.
+        </p>
+
+        <p>
+          In 2022, during a Little League championship game I was coaching, my son’s glove blew out. He loved that glove. I looked at the price of a new one and briefly considered selling a kidney. Instead, I taught myself how to relace it.
+        </p>
+
+        <p>That one repair turned into a full-blown obsession.</p>
+
+        <p>
+          Turns out gloves aren’t just leather and string. They’re break-in, feel, superstition, and the only thing between you and a line drive reminding you why reflexes matter.
+        </p>
+
+        <p>
+          I don’t coach anymore. At some point your kid stops listening to you and needs someone else to tell him the exact same things you’ve been saying for years. I’m told this is “normal.” I remain skeptical.
+        </p>
+
+        <p>
+          Now I restore gloves with the same mindset I’ve carried for two decades: attention to detail, no shortcuts, and zero interest in doing something halfway. I’m not a factory. I’m not mass-producing repairs. It’s just me — and occasionally my son if he has nothing better to do — rebuilding tools that matter to the people who use them.
+        </p>
+
+        <p>
+          Born and raised in DFW. Living in Surf City, NC. Planning to stay. Still watching and spending too much money on baseball. Still fixing what can be saved. And still refusing to buy a new glove if the old one just needs someone patient enough to bring it back.
+        </p>
+      </div>
+
+      <!-- RIGHT: PHOTO PLACEHOLDER + BUTTON -->
+      <div class="card" style="display:flex;flex-direction:column;gap:14px">
+        <img
+          src="assets/img/about-placeholder.jpg"
+          alt="Brett working on a glove"
+          style="width:100%;border-radius:14px;border:1px solid rgba(2,11,18,.12);object-fit:cover;aspect-ratio: 4 / 5;"
+        />
+
+        <a class="btn btn-primary" href="contact.html">Service Request</a>
+
+        <div class="note" style="opacity:.85">
+          Replace <strong>about-placeholder.jpg</strong> with your photo in <strong>assets/img/</strong>.
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div>© 2026 Murph’s Mitt Maintenance<br/>All rights reserved.</div>
+
+      <div class="footer-center">
+        <div class="social">
+          <a href="https://www.facebook.com/murphsmitts" target="_blank" rel="noopener">Facebook</a>
+          <a href="https://www.instagram.com/murphsmitts" target="_blank" rel="noopener">Instagram</a>
+          <a href="https://www.tiktok.com/@murphsmitts" target="_blank" rel="noopener">TikTok</a>
+        </div>
+      </div>
+
+      <div class="footer-right">
+        <div>Broken gloves deserve redemption.</div>
+        <div>Cheap laces deserve consequences.</div>
+        <div>Some Octobers should come with an asterisk.</div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
 </body>
 </html>
