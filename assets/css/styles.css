@@ -349,6 +349,10 @@ iframe{
 }
 .footer-icons a:hover{ opacity: 1; }
 
+.footer-icons a:last-child svg{
+  transform: translateY(-1px);
+}
+
 /* Taglines */
 .footer-tagline{
   opacity: .9;
