@@ -17,26 +17,55 @@
 
   <!-- Overlay header (Squarespace-ish) -->
   <header class="site-header">
-    <div class="container header-inner">
+  <div class="container header-inner">
 
+    <a class="brand" href="index.html" aria-label="Home">
+      <img src="assets/img/logo.png" alt="Murph’s Mitt Maintenance logo">
+    </a>
+
+    <nav class="site-nav" aria-label="Primary navigation">
+      <a href="index.html" class="active">Home</a>
+      <a href="services.html">Services</a>
+      <a href="process.html">Process</a>
+      <a href="about.html">About</a>
+      <a href="gallery.html">Gallery</a>
+    </nav>
+
+    <div class="actions">
+      <a class="btn btn-primary btn-contact" href="contact.html">Contact</a>
+    </div>
+
+    <!-- Mobile hamburger -->
+    <button class="menu-btn" type="button" aria-label="Open menu" data-menu-open>
+      <span></span><span></span><span></span>
+    </button>
+
+  </div>
+</header>
+
+<!-- Mobile menu overlay -->
+<div class="mobile-menu" data-mobile-menu aria-hidden="true">
+  <div class="mobile-menu-inner">
+    <div class="mobile-menu-top">
       <a class="brand" href="index.html" aria-label="Home">
         <img src="assets/img/logo.png" alt="Murph’s Mitt Maintenance logo">
       </a>
-
-      <nav class="site-nav" aria-label="Primary navigation">
-        <a href="index.html" class="active">Home</a>
-        <a href="services.html">Services</a>
-        <a href="process.html">Process</a>
-        <a href="about.html">About</a>
-        <a href="gallery.html">Gallery</a>
-      </nav>
-
-      <div class="actions">
-        <a class="btn btn-primary btn-contact" href="contact.html">Contact</a>
-      </div>
-
+      <button class="mobile-close" type="button" aria-label="Close menu" data-menu-close>×</button>
     </div>
-  </header>
+
+    <nav class="mobile-links" aria-label="Mobile navigation">
+      <a href="index.html" class="active">Home</a>
+      <a href="services.html">Services</a>
+      <a href="process.html">Process</a>
+      <a href="about.html">About</a>
+      <a href="gallery.html">Gallery</a>
+    </nav>
+
+    <div class="mobile-menu-actions">
+      <a class="btn btn-primary" href="contact.html">Contact</a>
+    </div>
+  </div>
+</div>
 
   <!-- FULL WIDTH HERO -->
   <section class="hero" aria-label="Hero">
@@ -86,6 +115,7 @@
   <script src="assets/js/main.js"></script>
 </body>
 </html>
+
 
 
 
