@@ -350,7 +350,7 @@ footer{
 /* Social row: fix TikTok baseline */
 .social{
   display:flex;
-  align-items:center;           /* KEY: level icons */
+  align-items:center;
   justify-content:center;
   gap: 14px;
   margin: 0;
@@ -366,7 +366,13 @@ footer{
   border-radius: 10px;
   text-decoration:none;
   color: rgba(242,234,223,.88);
-  line-height: 1;
+}
+
+.social svg{
+  width: 20px;
+  height: 20px;
+  display:block;     /* kills baseline weirdness */
+  fill: currentColor;/* uses the link color */
 }
 
 .social a:hover{
