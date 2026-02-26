@@ -328,27 +328,26 @@ iframe{
 /* Icon row */
 .footer-icons{
   display:flex;
-  align-items:center;
+  align-items:center;      /* vertically center all icons */
   justify-content:center;
-  gap: 14px;
+  gap: 18px;
 }
 
 .footer-icons a{
-  display:inline-flex;
-  align-items:center;
+  display:flex;
+  align-items:center;      /* force SVG center */
   justify-content:center;
-  width: 28px;
-  height: 28px;
-  text-decoration:none;
-  opacity:.9;
+  width: 32px;
+  height: 32px;
 }
-.footer-icons a:hover{ opacity: 1; }
 
 .footer-icons svg{
   width: 20px;
   height: 20px;
+  display:block;           /* removes inline SVG baseline shift */
   fill: rgba(242,234,223,.88);
 }
+.footer-icons a:hover{ opacity: 1; }
 
 /* Taglines */
 .footer-tagline{
