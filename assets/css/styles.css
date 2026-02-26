@@ -388,6 +388,10 @@ footer{
   text-decoration:none;
 }
 
+.social a[aria-label="TikTok"] svg {
+  transform: translateY(-2px);
+}
+
 /* Mobile tagline stack hidden on desktop */
 .footer-taglines{ display:none; }
 
