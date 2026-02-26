@@ -12,6 +12,9 @@
 
   <!-- cache-bust so changes show up -->
   <link rel="stylesheet" href="assets/css/styles.css?v=14" />
+  <!-- PRELOAD HEADER AND FOOTER WHEN PAGE RENDERS -->
+  <link rel="preload" href="/partials/header.html" as="fetch" crossorigin>
+  <link rel="preload" href="/partials/footer.html" as="fetch" crossorigin>
 </head>
 
 <body class="inner">
@@ -104,6 +107,7 @@
   <script src="assets/js/main.js"></script>
 </body>
 </html>
+
 
 
 
