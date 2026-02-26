@@ -2,8 +2,8 @@
   <header class="site-header">
   <div class="container header-inner">
 
-    <a class="brand" href="index.html" aria-label="Home">
-      <img src="assets/img/logo.png" alt="Murph’s Mitt Maintenance logo">
+    <a class="brand" href="{{ '/' | relative_url }}" aria-label="Home">
+     <img src="{{ '/assets/img/logo.png' | relative_url }}" alt="Murph’s Mitt Maintenance logo">
     </a>
 
     <nav class="site-nav" aria-label="Primary navigation">
@@ -30,22 +30,22 @@
 <div class="mobile-menu" data-mobile-menu aria-hidden="true">
   <div class="mobile-menu-inner">
     <div class="mobile-menu-top">
-      <a class="brand" href="index.html" aria-label="Home">
-        <img src="assets/img/logo.png" alt="Murph’s Mitt Maintenance logo">
+      <a class="brand" href="{{ '/' | relative_url }}" aria-label="Home">
+       <img src="{{ '/assets/img/logo.png' | relative_url }}" alt="Murph’s Mitt Maintenance logo">
       </a>
       <button class="mobile-close" type="button" aria-label="Close menu" data-menu-close>×</button>
     </div>
 
     <nav class="mobile-links" aria-label="Mobile navigation">
-      <a href="index.html">Home</a>
-      <a href="services.html">Services</a>
-      <a href="process.html">Process</a>
-      <a href="about.html">About</a>
-      <a href="gallery.html">Gallery</a>
-    </nav>
+     <a href="{{ '/' | relative_url }}" class="{% if page.nav == 'home' %}active{% endif %}">Home</a>
+     <a href="{{ '/services/' | relative_url }}" class="{% if page.nav == 'services' %}active{% endif %}">Services</a>
+     <a href="{{ '/process/' | relative_url }}" class="{% if page.nav == 'process' %}active{% endif %}">Process</a>
+     <a href="{{ '/about/' | relative_url }}" class="{% if page.nav == 'about' %}active{% endif %}">About</a>
+     <a href="{{ '/gallery/' | relative_url }}" class="{% if page.nav == 'gallery' %}active{% endif %}">Gallery</a>
+   </nav>
 
-    <div class="mobile-menu-actions">
-      <a class="btn btn-primary" href="contact.html">Contact</a>
-    </div>
+   <div class="mobile-menu-actions">
+     <a class="btn btn-primary {% if page.nav == 'contact' %}active{% endif %}" href="{{ '/contact/' | relative_url }}">Contact</a>
+   </div>
   </div>
 </div>
