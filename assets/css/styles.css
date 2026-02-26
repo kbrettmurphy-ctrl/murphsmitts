@@ -423,6 +423,14 @@ footer{
     text-align:center;
     align-items:center;
   }
+  
+  .about-photo{
+    height: 240px;          /* feels like a banner */
+    padding: 12px;
+  }
+  .about-photo img{
+    height: 100%;
+  }
 
   .footer-left,
   .footer-center,
