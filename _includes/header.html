@@ -7,16 +7,16 @@
     </a>
 
     <nav class="site-nav" aria-label="Primary navigation">
-      <a href="index.html">Home</a>
-      <a href="services.html">Services</a>
-      <a href="process.html">Process</a>
-      <a href="about.html">About</a>
-      <a href="gallery.html">Gallery</a>
-    </nav>
+     <a href="{{ '/' | relative_url }}" class="{% if page.nav == 'home' %}active{% endif %}">Home</a>
+     <a href="{{ '/services/' | relative_url }}" class="{% if page.nav == 'services' %}active{% endif %}">Services</a>
+     <a href="{{ '/process/' | relative_url }}" class="{% if page.nav == 'process' %}active{% endif %}">Process</a>
+     <a href="{{ '/about/' | relative_url }}" class="{% if page.nav == 'about' %}active{% endif %}">About</a>
+     <a href="{{ '/gallery/' | relative_url }}" class="{% if page.nav == 'gallery' %}active{% endif %}">Gallery</a>
+   </nav>
 
-    <div class="actions">
-      <a class="btn btn-primary btn-contact" href="contact.html">Contact</a>
-    </div>
+   <div class="actions">
+     <a class="btn btn-primary btn-contact {% if page.nav == 'contact' %}active{% endif %}" href="{{ '/contact/' | relative_url }}">Contact</a>
+   </div>
 
     <!-- Mobile hamburger -->
     <button class="menu-btn" type="button" aria-label="Open menu" data-menu-open>
