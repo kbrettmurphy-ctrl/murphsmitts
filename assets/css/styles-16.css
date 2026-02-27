@@ -209,7 +209,7 @@ body.home{ background: #000; }
 }
 
 .page h1{
-  font-size: clamp(34px, 4vw, 54px);
+  font-size: clamp(24px, 4vw, 34px);
   letter-spacing: -0.03em;
   margin: 22px 0 14px;
   color: var(--navy);
@@ -255,7 +255,7 @@ body.home{ background: #000; }
   margin: 0 0 10px;
   color: var(--navy);
   font-weight: 600;
-  font-size: 20px;
+  font-size: 16px;
 }
 
 .price ul{
@@ -362,8 +362,8 @@ hr.rule{
   color:white;
   border:1px solid rgba(218, 202, 177,.18);
   font-size:40px;
-  width:58px;
-  height:58px;
+  width:48px;
+  height:48px;
   border-radius:50%;
   cursor:pointer;
   display:flex;
@@ -780,7 +780,7 @@ footer{
 }
 
 .mobile-links a{
-  font-size: 32px;
+  font-size: 24px;
   font-weight: 500;
   color: var(--ink);
   text-decoration:none;
