@@ -1,19 +1,66 @@
 // =========================
 // Gallery lightbox
 // =========================
-(() => {
+(function () {
+  const images = Array.from(document.querySelectorAll(".gallery-grid img"));
   const lb = document.querySelector(".lightbox");
-  if (!lb) return;
+  if (!lb || !images.length) return;
 
   const lbImg = lb.querySelector("img");
-  document.querySelectorAll(".gallery-grid img").forEach(img => {
-    img.addEventListener("click", () => {
-      lbImg.src = img.src;
-      lb.classList.add("open");
-    });
+  const prevBtn = lb.querySelector(".lb-prev");
+  const nextBtn = lb.querySelector(".lb-next");
+
+  let currentIndex = 0;
+
+  function openLightbox(index) {
+    currentIndex = index;
+    lbImg.src = images[currentIndex].src;
+    lb.classList.add("open");
+  }
+
+  function closeLightbox() {
+    lb.classList.remove("open");
+  }
+
+  function showNext() {
+    currentIndex = (currentIndex + 1) % images.length;
+    lbImg.src = images[currentIndex].src;
+  }
+
+  function showPrev() {
+    currentIndex = (currentIndex - 1 + images.length) % images.length;
+    lbImg.src = images[currentIndex].src;
+  }
+
+  images.forEach((img, index) => {
+    img.addEventListener("click", () => openLightbox(index));
   });
 
-  lb.addEventListener("click", () => lb.classList.remove("open"));
+  nextBtn.addEventListener("click", showNext);
+  prevBtn.addEventListener("click", showPrev);
+
+  lb.addEventListener("click", (e) => {
+    if (e.target === lb) closeLightbox();
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (!lb.classList.contains("open")) return;
+    if (e.key === "Escape") closeLightbox();
+    if (e.key === "ArrowRight") showNext();
+    if (e.key === "ArrowLeft") showPrev();
+  });
+
+  // Swipe support (mobile)
+  let startX = 0;
+  lb.addEventListener("touchstart", e => {
+    startX = e.touches[0].clientX;
+  });
+
+  lb.addEventListener("touchend", e => {
+    let endX = e.changedTouches[0].clientX;
+    if (startX - endX > 50) showNext();
+    if (endX - startX > 50) showPrev();
+  });
 })();
 
 // =========================
