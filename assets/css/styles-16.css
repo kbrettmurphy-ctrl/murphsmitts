@@ -314,8 +314,8 @@ hr.rule{
   position: absolute;
   top: calc(24px + env(safe-area-inset-top));
   right: calc(24px + env(safe-area-inset-right));
-  width: 50px;              /* bigger target */
-  height: 50px;
+  width: 52px;              /* bigger target */
+  height: 52px;
   border-radius: 14px;
   border: 1px solid rgba(242,234,223,.22);
   background: rgba(9,47,77,.55);
