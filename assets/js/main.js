@@ -1,7 +1,7 @@
 // =========================
 // Gallery lightbox (slider)
 // =========================
-document.addEventListener("DOMContentLoaded", () => {
+function initGalleryLightbox() {
   const thumbs = Array.from(document.querySelectorAll(".gallery-grid img"));
   if (!thumbs.length) return;
 
@@ -15,7 +15,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const closeBtn = lb.querySelector(".lb-close");
   const counter = lb.querySelector(".lb-counter");
 
-  // If any of these are missing, bail instead of crashing the whole file
   if (!track || !viewport || !prevBtn || !nextBtn || !closeBtn) return;
 
   let index = 0;
@@ -24,11 +23,10 @@ document.addEventListener("DOMContentLoaded", () => {
   let dragging = false;
   let dx = 0;
 
-  // Build slides once
   track.innerHTML = "";
   const slides = thumbs.map(img => {
     const slideImg = document.createElement("img");
-    slideImg.src = img.currentSrc || img.src; // handles responsive sources too
+    slideImg.src = img.currentSrc || img.src;
     slideImg.alt = img.alt || "Gallery image";
     slideImg.draggable = false;
     track.appendChild(slideImg);
@@ -49,14 +47,14 @@ document.addEventListener("DOMContentLoaded", () => {
   function open(i) {
     index = i;
     lb.classList.add("open");
-    document.body.style.overflow = "hidden"; // don’t piggyback on menu-open
+    document.body.style.overflow = "hidden";
     goTo(index, false);
     requestAnimationFrame(() => goTo(index, true));
   }
 
   function close() {
     lb.classList.remove("open");
-    document.body.style.overflow = ""; // restore scroll
+    document.body.style.overflow = "";
   }
 
   function next() { goTo(index + 1); }
@@ -68,12 +66,10 @@ document.addEventListener("DOMContentLoaded", () => {
   prevBtn.addEventListener("click", (e) => { e.stopPropagation(); prev(); });
   closeBtn.addEventListener("click", (e) => { e.stopPropagation(); close(); });
 
-  // Click outside viewport closes
   lb.addEventListener("click", (e) => {
     if (!viewport.contains(e.target)) close();
   });
 
-  // Keyboard support
   window.addEventListener("keydown", (e) => {
     if (!lb.classList.contains("open")) return;
     if (e.key === "Escape") close();
@@ -81,7 +77,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "ArrowLeft") prev();
   });
 
-  // Touch swipe with scroll prevention
   lb.addEventListener("touchstart", (e) => {
     if (!lb.classList.contains("open")) return;
     dragging = true;
@@ -120,7 +115,14 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   updateCounter();
-});
+}
+
+// Run now if possible (Cloudflare can load JS late), otherwise wait
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initGalleryLightbox);
+} else {
+  initGalleryLightbox();
+}
 
 // =========================
 // Mobile menu toggle
