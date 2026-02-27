@@ -312,8 +312,8 @@ hr.rule{
 /* Close button */
 .lb-close{
   position: absolute;
-  top: calc(14px + env(safe-area-inset-top));
-  right: calc(14px + env(safe-area-inset-right));
+  top: calc(24px + env(safe-area-inset-top));
+  right: calc(24px + env(safe-area-inset-right));
   width: 50px;              /* bigger target */
   height: 50px;
   border-radius: 14px;
