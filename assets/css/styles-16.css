@@ -328,26 +328,21 @@ hr.rule{
 .lb-viewport{
   width: min(1100px, 96vw);
   height: 88vh;
-  overflow:hidden;
-  border-radius: 16px;
-  border: 1px solid rgba(242,234,223,.18);
-  background: rgba(0,0,0,.2);
+  overflow: hidden;
 }
 
-/* Track that slides */
 .lb-track{
-  height:100%;
-  display:flex;
-  transition: transform .28s ease;
-  will-change: transform;
+  height: 100%;
+  display: flex;
+  flex-wrap: nowrap;     /* KEY */
 }
 
-.lb-track img{
-  width: 100%;
+.lb-track > img{
+  flex: 0 0 100% !important;  /* KEY: each slide = full viewport width */
+  width: 100% !important;
   height: 100%;
-  flex: 0 0 100%;
   object-fit: contain;
-  background: transparent;
+  display: block;
 }
 
 /* Prev/Next buttons */
