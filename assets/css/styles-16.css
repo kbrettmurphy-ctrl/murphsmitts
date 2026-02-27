@@ -155,7 +155,9 @@ body.home{ background: #000; }
 
 .hero{
   position: relative;
-  min-height: 92vh;
+  /*min-height: 92vh;*/
+  min-height: 100vh;   /* fallback */
+  min-height: 100svh;  /* mobile-safe */
   display:flex;
   align-items:center;
   justify-content:center;
