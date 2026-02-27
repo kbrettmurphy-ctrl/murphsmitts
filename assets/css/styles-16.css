@@ -153,6 +153,11 @@ a:hover{text-decoration:underline}
 
 body.home{ background: #000; }
 
+/* Home only: let the hero own the screen (footer goes below fold) */
+body.home main{
+  flex: 0;          /* stop shrinking main to make room for footer */
+}
+
 .hero{
   position: relative;
   /*min-height: 92vh;*/
