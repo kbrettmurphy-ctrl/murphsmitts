@@ -40,8 +40,19 @@ body_class: inner
     </div>
 
     <div class="lightbox" aria-hidden="true">
+      <button class="lb-close" aria-label="Close">×</button>
+
       <button class="lb-prev" aria-label="Previous image">‹</button>
-      <img src="" alt="Expanded gallery image">
+
+      <div class="lb-viewport">
+        <div class="lb-track"></div>
+      </div>
+
       <button class="lb-next" aria-label="Next image">›</button>
+
+      <div class="lb-hint" aria-hidden="true">
+        Swipe or use arrows
+        <span class="lb-counter"></span>
+      </div>
     </div>
   </main>
