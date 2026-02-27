@@ -709,7 +709,6 @@ body.menu-open{ overflow:hidden; }
   .gallery-grid{grid-template-columns: repeat(2, 1fr)}
   .about-photo { height: 300px; padding: 12px; }
   .about-photo img { height: 100%; }
-  .split{ grid-template-columns:1fr }
 
   /* Header behavior on mobile */
   .site-nav{display:none;}
