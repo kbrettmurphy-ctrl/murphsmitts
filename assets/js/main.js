@@ -2,65 +2,122 @@
 // Gallery lightbox
 // =========================
 (function () {
-  const images = Array.from(document.querySelectorAll(".gallery-grid img"));
+  const thumbs = Array.from(document.querySelectorAll(".gallery-grid img"));
   const lb = document.querySelector(".lightbox");
-  if (!lb || !images.length) return;
+  if (!lb || !thumbs.length) return;
 
-  const lbImg = lb.querySelector("img");
+  const track = lb.querySelector(".lb-track");
+  const viewport = lb.querySelector(".lb-viewport");
   const prevBtn = lb.querySelector(".lb-prev");
   const nextBtn = lb.querySelector(".lb-next");
+  const closeBtn = lb.querySelector(".lb-close");
+  const counter = lb.querySelector(".lb-counter");
 
-  let currentIndex = 0;
+  let index = 0;
+  let startX = 0;
+  let startY = 0;
+  let dragging = false;
+  let dx = 0;
 
-  function openLightbox(index) {
-    currentIndex = index;
-    lbImg.src = images[currentIndex].src;
+  // Build slides once
+  track.innerHTML = "";
+  const slides = thumbs.map(img => {
+    const slideImg = document.createElement("img");
+    slideImg.src = img.src;
+    slideImg.alt = img.alt || "Gallery image";
+    slideImg.draggable = false;
+    track.appendChild(slideImg);
+    return slideImg;
+  });
+
+  function updateCounter() {
+    if (counter) counter.textContent = `${index + 1} / ${slides.length}`;
+  }
+
+  function goTo(i, animate = true) {
+    index = (i + slides.length) % slides.length;
+    track.style.transition = animate ? "transform .28s ease" : "none";
+    track.style.transform = `translateX(${-index * 100}%)`;
+    updateCounter();
+  }
+
+  function open(i) {
+    index = i;
     lb.classList.add("open");
+    document.body.classList.add("menu-open"); // reuse your existing "no scroll" class
+    goTo(index, false);
+    requestAnimationFrame(() => goTo(index, true));
   }
 
-  function closeLightbox() {
+  function close() {
     lb.classList.remove("open");
+    document.body.classList.remove("menu-open");
   }
 
-  function showNext() {
-    currentIndex = (currentIndex + 1) % images.length;
-    lbImg.src = images[currentIndex].src;
-  }
+  function next() { goTo(index + 1); }
+  function prev() { goTo(index - 1); }
 
-  function showPrev() {
-    currentIndex = (currentIndex - 1 + images.length) % images.length;
-    lbImg.src = images[currentIndex].src;
-  }
+  thumbs.forEach((img, i) => img.addEventListener("click", () => open(i)));
 
-  images.forEach((img, index) => {
-    img.addEventListener("click", () => openLightbox(index));
-  });
+  nextBtn.addEventListener("click", (e) => { e.stopPropagation(); next(); });
+  prevBtn.addEventListener("click", (e) => { e.stopPropagation(); prev(); });
+  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); close(); });
 
-  nextBtn.addEventListener("click", showNext);
-  prevBtn.addEventListener("click", showPrev);
-
+  // Click outside viewport closes
   lb.addEventListener("click", (e) => {
-    if (e.target === lb) closeLightbox();
+    if (!viewport.contains(e.target)) close();
   });
 
+  // Keyboard support
   window.addEventListener("keydown", (e) => {
     if (!lb.classList.contains("open")) return;
-    if (e.key === "Escape") closeLightbox();
-    if (e.key === "ArrowRight") showNext();
-    if (e.key === "ArrowLeft") showPrev();
+    if (e.key === "Escape") close();
+    if (e.key === "ArrowRight") next();
+    if (e.key === "ArrowLeft") prev();
   });
 
-  // Swipe support (mobile)
-  let startX = 0;
-  lb.addEventListener("touchstart", e => {
+  // Touch swipe with scroll prevention
+  lb.addEventListener("touchstart", (e) => {
+    if (!lb.classList.contains("open")) return;
+    dragging = true;
     startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    dx = 0;
+    track.style.transition = "none";
+  }, { passive: false });
+
+  lb.addEventListener("touchmove", (e) => {
+    if (!dragging) return;
+
+    const x = e.touches[0].clientX;
+    const y = e.touches[0].clientY;
+    dx = x - startX;
+    const dy = y - startY;
+
+    // If it’s mostly horizontal, prevent page scroll.
+    if (Math.abs(dx) > Math.abs(dy)) {
+      e.preventDefault(); // stops page scrolling
+      // drag amount as a percentage of viewport width
+      const w = viewport.clientWidth || 1;
+      const pct = (dx / w) * 100;
+      track.style.transform = `translateX(${(-index * 100) + pct}%)`;
+    }
+  }, { passive: false });
+
+  lb.addEventListener("touchend", () => {
+    if (!dragging) return;
+    dragging = false;
+
+    const w = viewport.clientWidth || 1;
+    const threshold = w * 0.18; // swipe ~18% of width to change slide
+
+    // Snap decision
+    if (dx < -threshold) next();
+    else if (dx > threshold) prev();
+    else goTo(index); // snap back
   });
 
-  lb.addEventListener("touchend", e => {
-    let endX = e.changedTouches[0].clientX;
-    if (startX - endX > 50) showNext();
-    if (endX - startX > 50) showPrev();
-  });
+  updateCounter();
 })();
 
 // =========================
