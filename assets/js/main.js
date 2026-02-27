@@ -99,9 +99,8 @@ function initGalleryLightbox() {
 
     if (Math.abs(dx) > Math.abs(dy)) {
       e.preventDefault();
-      const w = viewport.clientWidth || 1;
-      const pct = (dx / w) * 100;
-      track.style.transform = `translateX(${(-index * 100) + pct}%)`;
+      const w = viewport.getBoundingClientRect().width || 1;
+      track.style.transform = `translateX(${(-index * w) + dx}px)`;
     }
   }, { passive: false });
 
