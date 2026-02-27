@@ -90,12 +90,13 @@ a:hover{text-decoration:underline}
   font-size: 14px;
   padding: 8px 6px;
   text-decoration: none;
-  opacity: .95;
+  /* opacity: .95; */
 }
 
 .site-nav a.active,
 .site-nav a:hover{
   color: var(--bg);
+  filter: brightness(130%);
   text-decoration: underline;
   text-underline-offset: 6px;
 }
