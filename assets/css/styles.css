@@ -229,6 +229,11 @@ body.home{ background: #000; }
   align-items:start;
 }
 
+/* About page split ratios (desktop) */
+.about-split{
+  grid-template-columns: 1.45fr .55fr;
+}
+
 .card{
   background: rgba(242,234,223,.35);
   border: 1px solid rgba(2,11,18,.10);
@@ -704,6 +709,7 @@ body.menu-open{ overflow:hidden; }
   .gallery-grid{grid-template-columns: repeat(2, 1fr)}
   .about-photo { height: 240px; padding: 12px; }
   .about-photo img { height: 100%; }
+  .split{ grid-template-columns:1fr }
 
   /* Header behavior on mobile */
   .site-nav{display:none;}
