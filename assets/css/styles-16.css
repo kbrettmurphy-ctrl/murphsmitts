@@ -197,6 +197,7 @@ body.home main{
 }
 
 .hero p{
+  font-size: clamp(1.0rem, 5vw, 1.7rem);
   max-width: 720px;
   margin: 0 auto 28px;
   filter:brightness(110%);
