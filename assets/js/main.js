@@ -1,10 +1,12 @@
 // =========================
-// Gallery lightbox
+// Gallery lightbox (slider)
 // =========================
-(function () {
+document.addEventListener("DOMContentLoaded", () => {
   const thumbs = Array.from(document.querySelectorAll(".gallery-grid img"));
+  if (!thumbs.length) return;
+
   const lb = document.querySelector(".lightbox");
-  if (!lb || !thumbs.length) return;
+  if (!lb) return;
 
   const track = lb.querySelector(".lb-track");
   const viewport = lb.querySelector(".lb-viewport");
@@ -12,6 +14,9 @@
   const nextBtn = lb.querySelector(".lb-next");
   const closeBtn = lb.querySelector(".lb-close");
   const counter = lb.querySelector(".lb-counter");
+
+  // If any of these are missing, bail instead of crashing the whole file
+  if (!track || !viewport || !prevBtn || !nextBtn || !closeBtn) return;
 
   let index = 0;
   let startX = 0;
@@ -23,7 +28,7 @@
   track.innerHTML = "";
   const slides = thumbs.map(img => {
     const slideImg = document.createElement("img");
-    slideImg.src = img.src;
+    slideImg.src = img.currentSrc || img.src; // handles responsive sources too
     slideImg.alt = img.alt || "Gallery image";
     slideImg.draggable = false;
     track.appendChild(slideImg);
@@ -44,14 +49,14 @@
   function open(i) {
     index = i;
     lb.classList.add("open");
-    document.body.classList.add("menu-open"); // reuse your existing "no scroll" class
+    document.body.style.overflow = "hidden"; // don’t piggyback on menu-open
     goTo(index, false);
     requestAnimationFrame(() => goTo(index, true));
   }
 
   function close() {
     lb.classList.remove("open");
-    document.body.classList.remove("menu-open");
+    document.body.style.overflow = ""; // restore scroll
   }
 
   function next() { goTo(index + 1); }
@@ -94,10 +99,8 @@
     dx = x - startX;
     const dy = y - startY;
 
-    // If it’s mostly horizontal, prevent page scroll.
     if (Math.abs(dx) > Math.abs(dy)) {
-      e.preventDefault(); // stops page scrolling
-      // drag amount as a percentage of viewport width
+      e.preventDefault();
       const w = viewport.clientWidth || 1;
       const pct = (dx / w) * 100;
       track.style.transform = `translateX(${(-index * 100) + pct}%)`;
@@ -109,16 +112,15 @@
     dragging = false;
 
     const w = viewport.clientWidth || 1;
-    const threshold = w * 0.18; // swipe ~18% of width to change slide
+    const threshold = w * 0.18;
 
-    // Snap decision
     if (dx < -threshold) next();
     else if (dx > threshold) prev();
-    else goTo(index); // snap back
+    else goTo(index);
   });
 
   updateCounter();
-})();
+});
 
 // =========================
 // Mobile menu toggle
