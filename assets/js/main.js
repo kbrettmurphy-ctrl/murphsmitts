@@ -39,13 +39,11 @@ function initGalleryLightbox() {
 
   function goTo(i, animate = true) {
   index = (i + slides.length) % slides.length;
-
-  const w = viewport.getBoundingClientRect().width || 1;
-
+  const step = 100 / slides.length;          // <-- KEY
   track.style.transition = animate ? "transform .28s ease" : "none";
-  track.style.transform = `translateX(${-index * w}px)`;
+  track.style.transform = `translateX(${-index * step}%)`;
   updateCounter();
-}
+  }
 
   function open(i) {
     index = i;
