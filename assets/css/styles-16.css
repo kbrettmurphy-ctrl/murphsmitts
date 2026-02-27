@@ -192,7 +192,7 @@ body.home{ background: #000; }
 .hero p{
   max-width: 720px;
   margin: 0 auto 28px;
-  opacity: .9;
+  filter:brightness(110%);
 }
 
 .cta{
