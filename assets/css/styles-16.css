@@ -314,6 +314,32 @@ hr.rule{
   border: 1px solid rgba(242,234,223,.18);
 }
 
+.lb-prev,
+.lb-next{
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  background: rgba(0,0,0,.5);
+  color:white;
+  border:none;
+  font-size:40px;
+  width:60px;
+  height:60px;
+  border-radius:50%;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.lb-prev{ left:24px; }
+.lb-next{ right:24px; }
+
+.lb-prev:hover,
+.lb-next:hover{
+  background: rgba(0,0,0,.7);
+}
+
 /* =========================
    IFRAMES (service request embed)
    ========================= */
