@@ -670,6 +670,29 @@ footer{
   text-decoration:none;
 }
 
+.contact-social-icons{
+  display:flex;
+  gap:18px;
+  margin-top:14px;
+  align-items:center;
+}
+
+.contact-social-icons a{
+  display:inline-flex;
+}
+
+.contact-social-icons img{
+  width:38px;      /* adjust if you want bigger */
+  height:auto;
+  display:block;
+  transition: transform .18s ease, opacity .18s ease;
+}
+
+.contact-social-icons a:hover img{
+  transform: translateY(-3px);
+  opacity:.85;
+}
+
 /* Match iframe look in toggle panels */
 .toggle-panel iframe{
   width:100%;
