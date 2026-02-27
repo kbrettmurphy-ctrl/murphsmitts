@@ -39,11 +39,14 @@ function initGalleryLightbox() {
 
   function goTo(i, animate = true) {
   index = (i + slides.length) % slides.length;
-  const step = 100 / slides.length;          // <-- KEY
+
+  const w = viewport.getBoundingClientRect().width || 1;
+
   track.style.transition = animate ? "transform .28s ease" : "none";
-  track.style.transform = `translateX(${-index * step}%)`;
+  track.style.transform = `translateX(${-index * w}px)`;
+
   updateCounter();
-  }
+}
 
   function open(i) {
     index = i;
@@ -88,31 +91,36 @@ function initGalleryLightbox() {
   }, { passive: false });
 
   lb.addEventListener("touchmove", (e) => {
-    if (!dragging) return;
+  if (!dragging) return;
 
-    const x = e.touches[0].clientX;
-    const y = e.touches[0].clientY;
-    dx = x - startX;
-    const dy = y - startY;
+  const x = e.touches[0].clientX;
+  const y = e.touches[0].clientY;
+  dx = x - startX;
+  const dy = y - startY;
 
-    if (Math.abs(dx) > Math.abs(dy)) {
-      e.preventDefault();
-      const w = viewport.getBoundingClientRect().width || 1;
-      track.style.transform = `translateX(${(-index * w) + dx}px)`;
-    }
-  }, { passive: false });
+  if (Math.abs(dx) > Math.abs(dy)) {
+    e.preventDefault();
+
+    const w = viewport.getBoundingClientRect().width || 1;
+    track.style.transform = `translateX(${(-index * w) + dx}px)`;
+  }
+}, { passive: false });
 
   lb.addEventListener("touchend", () => {
-    if (!dragging) return;
-    dragging = false;
+  if (!dragging) return;
+  dragging = false;
 
-    const w = viewport.clientWidth || 1;
-    const threshold = w * 0.18;
+  const w = viewport.getBoundingClientRect().width || 1;
+  const threshold = w * 0.18;
 
-    if (dx < -threshold) next();
-    else if (dx > threshold) prev();
-    else goTo(index);
-  });
+  if (dx < -threshold) {
+    goTo(index + 1);
+  } else if (dx > threshold) {
+    goTo(index - 1);
+  } else {
+    goTo(index);
+  }
+});
 
   updateCounter();
 }
