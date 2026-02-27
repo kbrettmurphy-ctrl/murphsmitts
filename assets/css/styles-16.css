@@ -682,8 +682,8 @@ footer{
 }
 
 .contact-social-icons img{
-  width:38px;      /* adjust if you want bigger */
-  height:auto;
+  width:auto;      /* adjust if you want bigger */
+  height:38px;
   display:block;
   transition: transform .18s ease, opacity .18s ease;
 }
