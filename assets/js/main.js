@@ -38,11 +38,14 @@ function initGalleryLightbox() {
   }
 
   function goTo(i, animate = true) {
-    index = (i + slides.length) % slides.length;
-    track.style.transition = animate ? "transform .28s ease" : "none";
-    track.style.transform = `translateX(${-index * 100}%)`;
-    updateCounter();
-  }
+  index = (i + slides.length) % slides.length;
+
+  const w = viewport.getBoundingClientRect().width || 1;
+
+  track.style.transition = animate ? "transform .28s ease" : "none";
+  track.style.transform = `translateX(${-index * w}px)`;
+  updateCounter();
+}
 
   function open(i) {
     index = i;
