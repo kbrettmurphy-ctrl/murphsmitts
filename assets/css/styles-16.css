@@ -334,12 +334,14 @@ hr.rule{
 .lb-track{
   height: 100%;
   display: flex;
-  flex-wrap: nowrap;     /* KEY */
+  flex-wrap: nowrap;
+  width: 100%;                 /* ADD */
 }
 
-.lb-track > img{
-  flex: 0 0 100% !important;  /* KEY: each slide = full viewport width */
+.lb-track img{                 /* change > img to img */
+  flex: 0 0 100% !important;
   width: 100% !important;
+  min-width: 100% !important;  /* ADD: this is the “stop showing two” rule */
   height: 100%;
   object-fit: contain;
   display: block;
