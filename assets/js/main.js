@@ -113,13 +113,9 @@ function initGalleryLightbox() {
   const w = viewport.getBoundingClientRect().width || 1;
   const threshold = w * 0.18;
 
-  if (dx < -threshold) {
-    goTo(index + 1);
-  } else if (dx > threshold) {
-    goTo(index - 1);
-  } else {
-    goTo(index);
-  }
+  if (dx < -threshold) next();
+  else if (dx > threshold) prev();
+  else goTo(index);
 });
 
   updateCounter();
