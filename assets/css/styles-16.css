@@ -52,7 +52,7 @@ a:hover{text-decoration:underline}
   z-index: 50;
   background: rgba(2, 11, 18, 0.45);
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(242,234,223,.12);
+  border-bottom: 1px solid rgba(218, 202, 177, .12);
 }
 
 .header-inner{
@@ -86,7 +86,7 @@ a:hover{text-decoration:underline}
 }
 
 .site-nav a{
-  color: rgba(242,234,223,.85);
+  color: rgba(218, 202, 177, .85);
   font-size: 14px;
   padding: 8px 6px;
   text-decoration: none;
@@ -95,7 +95,7 @@ a:hover{text-decoration:underline}
 
 .site-nav a.active,
 .site-nav a:hover{
-  color: rgba(242,234,223,1);
+  color: var(--bg);
   text-decoration: underline;
   text-underline-offset: 6px;
 }
@@ -176,7 +176,7 @@ body.home{ background: #000; }
 .hero-content{
   position: relative;
   z-index: 1;
-  color: rgba(242,234,223,0.92);
+  color: rgba(218, 202, 177,0.92);
   padding: calc(var(--headerH) + 110px) 0 120px;
 }
 
@@ -235,7 +235,7 @@ body.home{ background: #000; }
 }
 
 .card{
-  background: rgba(242,234,223,.35);
+  background: rgba(218, 202, 177,.35);
   border: 1px solid rgba(2,11,18,.10);
   border-radius: 16px;
   padding: 18px 18px;
@@ -317,7 +317,7 @@ hr.rule{
   width: 52px;              /* bigger target */
   height: 52px;
   border-radius: 14px;
-  border: 1px solid rgba(242,234,223,.22);
+  border: 1px solid rgba(218, 202, 177,.22);
   background: rgba(146,26,36,.55);
   color: #dacab1;
   font-size: 30px;
@@ -360,7 +360,7 @@ hr.rule{
   transform:translateY(-50%);
   background: rgba(0,0,0,.45);
   color:white;
-  border:1px solid rgba(242,234,223,.18);
+  border:1px solid rgba(218, 202, 177,.18);
   font-size:40px;
   width:58px;
   height:58px;
@@ -388,8 +388,8 @@ hr.rule{
   padding:10px 14px;
   border-radius:999px;
   background: rgba(0,0,0,.45);
-  color: rgba(242,234,223,.92);
-  border:1px solid rgba(242,234,223,.18);
+  color: rgba(218, 202, 177,.92);
+  border:1px solid rgba(218, 202, 177,.18);
   font-size: 13px;
   display:flex;
   gap:10px;
@@ -408,7 +408,7 @@ iframe{
   min-height: 720px;
   border: 1px solid rgba(2,11,18,.12);
   border-radius: 16px;
-  background: rgba(242,234,223,.35);
+  background: rgba(218, 202, 177,.35);
 }
 
 /* =========================
@@ -564,7 +564,7 @@ footer{
   padding: 12px 16px;
   border-radius: 12px;
   border: 1px solid rgba(2,11,18,.16);
-  background: rgba(242,234,223,.35);
+  background: rgba(218, 202, 177,.35);
   color: var(--ink);
   font-weight: 600;
   cursor: pointer;
@@ -575,7 +575,7 @@ footer{
 #tab-service:checked ~ .toggle label[for="tab-service"]{
   background: var(--navy);
   color: #dacab1;
-  border-color: rgba(242,234,223,.18);
+  border-color: rgba(218, 202, 177,.18);
 }
 
 .toggle-panel{ display:none; }
@@ -607,7 +607,7 @@ footer{
   width:100%;
   padding: 12px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(242,234,223,.20);
+  border: 1px solid rgba(218, 202, 177,.20);
   background: var(--navy);
   color: #dacab1e6;
   font: inherit;
@@ -618,12 +618,12 @@ footer{
 
 .mm-field input::placeholder,
 .mm-field textarea::placeholder{
-  color: rgba(242,234,223,.65);
+  color: rgba(218, 202, 177,.65);
 }
 
 .mm-field input:focus,
 .mm-field textarea:focus{
-  border-color: rgba(242,234,223,.45);
+  border-color: rgba(218, 202, 177,.45);
 }
 
 .mm-actions{
@@ -699,7 +699,7 @@ footer{
   min-height: 820px;
   border: 1px solid rgba(2,11,18,.12);
   border-radius: 16px;
-  background: rgba(242,234,223,.35);
+  background: rgba(218, 202, 177,.35);
 }
 
 /* =========================
@@ -712,7 +712,7 @@ footer{
   width: 46px;
   height: 46px;
   border-radius: 12px;
-  border: 1px solid rgba(242,234,223,.18);
+  border: 1px solid rgba(218, 202, 177,.18);
   background: #092f4d4d;
   backdrop-filter: blur(8px);
   cursor:pointer;
@@ -760,7 +760,7 @@ footer{
   height: 46px;
   border-radius: 12px;
   border: 1px solid rgba(2,11,18,.12);
-  background: rgba(242,234,223,.35);
+  background: rgba(218, 202, 177,.35);
   cursor:pointer;
   font-size: 26px;
   line-height: 1;
