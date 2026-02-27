@@ -179,7 +179,7 @@ body.home main{
   content:"";
   position:absolute;
   inset:0;
-  background: rgba(2, 11, 18, 0.55);
+  background: rgba(2, 11, 18, 0.6);
 }
 
 .hero-content{
