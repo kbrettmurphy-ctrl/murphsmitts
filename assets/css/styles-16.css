@@ -286,6 +286,15 @@ hr.rule{
   margin: 18px 0;
 }
 
+.content-link {
+  color: #0645ad;
+  text-decoration: underline;
+}
+
+.content-link:hover {
+  color: #032d6b;
+}
+
 /* =========================
    GALLERY
    ========================= */
