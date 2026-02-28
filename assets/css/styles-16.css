@@ -837,3 +837,8 @@ body.menu-open{ overflow:hidden; }
 
   .header-inner{justify-content:space-between}
 }
+
+/* Home: remove the seam between hero and footer */
+body.home footer{
+  margin-top: 0;
+}
