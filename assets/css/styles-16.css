@@ -425,13 +425,14 @@ hr.rule{
 }
 
 /* =========================
-   Lace Hover Overlay
+   Lace Hover / Tap Overlay
    ========================= */
 
 .lace-item{
   position: relative;
   overflow: hidden;
   border-radius: 14px;
+  cursor: pointer;
 }
 
 .lace-item img{
@@ -440,7 +441,6 @@ hr.rule{
   border-radius: 14px;
 }
 
-/* The overlay */
 .lace-label{
   position:absolute;
   inset:0;
@@ -448,8 +448,8 @@ hr.rule{
   align-items:center;
   justify-content:center;
 
-  background: rgba(9,47,77,.75); /* navy overlay */
-  color: var(--bg);              /* cream text */
+  background: rgba(9,47,77,.75);
+  color: var(--bg);
 
   font-size: 16px;
   font-weight: 600;
@@ -464,9 +464,10 @@ hr.rule{
   opacity:1;
 }
 
-/* Mobile tap */
-.lace-item:active .lace-label{
+/* Mobile active state */
+.lace-item.show-label .lace-label{
   opacity:1;
+}
 }
 /* =========================
    IFRAMES (service request embed)
