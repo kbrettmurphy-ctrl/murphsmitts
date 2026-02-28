@@ -425,12 +425,13 @@ hr.rule{
 }
 
 /* =========================
-   Lace Hover Labels
+   Lace Hover Overlay
    ========================= */
 
 .lace-item{
   position: relative;
-  cursor: pointer;
+  overflow: hidden;
+  border-radius: 14px;
 }
 
 .lace-item img{
@@ -439,33 +440,31 @@ hr.rule{
   border-radius: 14px;
 }
 
+/* The overlay */
 .lace-label{
   position:absolute;
-  bottom:10px;
-  left:50%;
-  transform: translateX(-50%);
-  padding: 6px 12px;
-  border-radius: 999px;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
 
-  background: rgba(9,47,77,.92); /* navy */
-  color: var(--bg); /* cream */
+  background: rgba(9,47,77,.75); /* navy overlay */
+  color: var(--bg);              /* cream text */
 
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: .02em;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: .03em;
 
   opacity:0;
-  transition: opacity .18s ease, transform .18s ease;
-  pointer-events:none;
+  transition: opacity .2s ease;
 }
 
 /* Desktop hover */
 .lace-item:hover .lace-label{
   opacity:1;
-  transform: translateX(-50%) translateY(-2px);
 }
 
-/* Mobile tap support */
+/* Mobile tap */
 .lace-item:active .lace-label{
   opacity:1;
 }
