@@ -172,3 +172,35 @@ if (document.readyState === "loading") {
   const serviceRadio = document.getElementById("tab-service");
   if (serviceRadio) serviceRadio.checked = true;
 })();
+
+// =========================
+// Lace tap toggle (mobile)
+// =========================
+(() => {
+  const laceItems = document.querySelectorAll(".lace-item");
+  if (!laceItems.length) return;
+
+  laceItems.forEach(item => {
+    item.addEventListener("click", () => {
+
+      // If already open, close it
+      if (item.classList.contains("show-label")) {
+        item.classList.remove("show-label");
+        return;
+      }
+
+      // Close others
+      laceItems.forEach(i => i.classList.remove("show-label"));
+
+      // Open this one
+      item.classList.add("show-label");
+    });
+  });
+
+  // Tap outside closes any open label
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".lace-item")) {
+      laceItems.forEach(i => i.classList.remove("show-label"));
+    }
+  });
+})();
