@@ -158,6 +158,8 @@ body.home main{
   flex: 0;          /* stop shrinking main to make room for footer */
 }
 
+body.home .hero{min-height:100vh; min-height:100svh;}
+body.home .footer{margin-top:0;}
 .hero{
   position: relative;
   /*min-height: 92vh;*/
