@@ -295,8 +295,12 @@ hr.rule{
   color: #032d6b;
 }
 
-#faq, #Lace-Colors {
+#faq {
   scroll-margin-top: 120px;
+}
+
+#Lace-Colors {
+  scroll-margin-top: 180px;
 }
 
 /* =========================
