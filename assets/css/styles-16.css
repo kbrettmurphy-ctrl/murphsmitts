@@ -425,6 +425,51 @@ hr.rule{
 }
 
 /* =========================
+   Lace Hover Labels
+   ========================= */
+
+.lace-item{
+  position: relative;
+  cursor: pointer;
+}
+
+.lace-item img{
+  display:block;
+  width:100%;
+  border-radius: 14px;
+}
+
+.lace-label{
+  position:absolute;
+  bottom:10px;
+  left:50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 999px;
+
+  background: rgba(9,47,77,.92); /* navy */
+  color: var(--bg); /* cream */
+
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .02em;
+
+  opacity:0;
+  transition: opacity .18s ease, transform .18s ease;
+  pointer-events:none;
+}
+
+/* Desktop hover */
+.lace-item:hover .lace-label{
+  opacity:1;
+  transform: translateX(-50%) translateY(-2px);
+}
+
+/* Mobile tap support */
+.lace-item:active .lace-label{
+  opacity:1;
+}
+/* =========================
    IFRAMES (service request embed)
    ========================= */
 
