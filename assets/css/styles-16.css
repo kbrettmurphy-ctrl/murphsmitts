@@ -601,6 +601,60 @@ footer{
   line-height: 1.35;
 }
 
+/* =========================
+   FOOTER BADGE (vet.png)
+   Desktop: right column above October tagline
+   Mobile: under social icons, above stacked taglines
+   ========================= */
+
+.footer-badge{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.footer-badge img{
+  display:block;
+  height:auto;
+  max-width: 180px;           /* desktop size cap */
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.25));
+}
+
+/* Only show the correct badge per breakpoint */
+.footer-badge-mobile{ display:none; }
+.footer-badge-desktop{ display:flex; }
+
+/* Desktop right column: keep it aligned and not random */
+.footer-right .footer-badge{
+  justify-content:flex-end;
+  margin-bottom: 8px;         /* space before October tagline */
+}
+
+/* Mobile: badge goes under social icons, smaller */
+@media (max-width: 980px){
+  .footer-badge-desktop{ display:none; }
+  .footer-badge-mobile{
+    display:flex;
+    margin-top: 10px;
+    margin-bottom: 8px;
+  }
+
+  .footer-badge img{
+    max-width: 220px;         /* safe width on mobile */
+    width: min(220px, 82vw);
+  }
+
+  /* Reduce gap between tag lines */
+  .footer-taglines{
+    gap: 6px;                 /* was 10px */
+    margin-top: 6px;
+  }
+
+  .footer-tagline{
+    line-height: 1.25;        /* tighter, cleaner */
+  }
+}
+
 /* Mobile footer: order + layout */
 @media (max-width: 980px){
   .footer-inner{
