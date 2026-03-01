@@ -633,6 +633,26 @@ footer{
   .footer-right{ order: 4; display:none; }
 }
 
+.veteran-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 14px;
+
+  background: var(--navy);
+  color: var(--bg);
+
+  border: 2px solid var(--navy);       /* outer navy */
+  box-shadow: 0 0 0 3px var(--red);    /* red ring */
+
+  border-radius: 999px;
+
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  opacity: .9;
+}
+
 /* =========================
    CONTACT PAGE: TOGGLE + FORM
    ========================= */
