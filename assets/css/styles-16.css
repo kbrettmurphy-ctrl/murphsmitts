@@ -289,15 +289,9 @@ body.home .footer{margin-top:0;}
   margin-top: 22px;
 }
 
-.price h2{
-  margin: 0 0 10px;
-  color: var(--navy);
-  font-weight: 600;
-  font-size: 16px;
-}
-
-/* ✅ FIX: Process h2 matches Services (.price h2) exactly */
-.process-step h2{
+.price h2,
+.process-step h2,
+.card h2{
   margin: 0 0 10px;
   color: var(--navy);
   font-weight: 600;
