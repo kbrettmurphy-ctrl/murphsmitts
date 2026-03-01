@@ -634,23 +634,28 @@ footer{
 }
 
 /* =========================
-   Veteran badge (matches reference)
-   - Outer stroke: cream
-   - Gap ring: YOUR red #921a24
-   - Inner stroke: cream
-   - Fill: navy
+   Veteran badge (reference style)
+   Outer: cream stroke
+   Gap ring: red (#921a24)
+   Inner: cream stroke
+   Fill: navy
+   IMPORTANT: force fit-content so it doesn't stretch ugly
    ========================= */
 
 .veteran-badge{
   --vb-cream: rgba(218,202,177,.95);
   --vb-cream2: rgba(218,202,177,.65);
   --vb-navy: var(--navy);
-  --vb-red: #921a24; /* your red ring */
+  --vb-red: #921a24;
 
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 14px;
+
+  width: max-content;      /* ✅ prevents grid stretching */
+  max-width: 100%;
+  margin: 0 auto;          /* ✅ centers when in mobile grid */
 
   padding: 12px 18px;
   border-radius: 16px;
@@ -659,14 +664,11 @@ footer{
   background: var(--vb-navy);
   color: var(--vb-cream);
 
-  /* Outer cream stroke */
-  border: 3px solid var(--vb-cream2);
-
-  /* Keeps pseudo borders crisp */
+  border: 3px solid var(--vb-cream2); /* outer cream stroke */
   overflow: hidden;
 }
 
-/* Red ring (the “gap” you asked for) */
+/* Red gap ring */
 .veteran-badge::before{
   content:"";
   position:absolute;
@@ -676,33 +678,29 @@ footer{
   pointer-events:none;
 }
 
-/* Inner cream stroke + fill */
+/* Inner cream stroke + navy fill */
 .veteran-badge::after{
   content:"";
   position:absolute;
   inset: 10px;
   border-radius: 10px;
-
   background: var(--vb-navy);
   border: 2px solid var(--vb-cream2);
-
   pointer-events:none;
 }
 
-/* Keep text above border layers */
+/* keep content above pseudo borders */
 .veteran-badge > *{
   position: relative;
   z-index: 1;
 }
 
-/* Star */
 .vb-star{
   font-size: 20px;
   line-height: 1;
   color: var(--vb-cream);
 }
 
-/* Word stack */
 .vb-words{
   display:flex;
   flex-direction:column;
@@ -717,7 +715,6 @@ footer{
   text-transform: uppercase;
 }
 
-/* OWNED line with side dashes */
 .vb-bottom{
   display:flex;
   align-items:center;
@@ -733,7 +730,6 @@ footer{
   opacity: .95;
 }
 
-/* The little horizontal dashes */
 .vb-line{
   width: 28px;
   height: 2px;
@@ -741,8 +737,18 @@ footer{
   border-radius: 999px;
 }
 
-/* Mobile: a touch smaller so it doesn’t hog the footer */
+/* Show/hide per breakpoint */
+.veteran-badge--mobile{ display:none; }
+.veteran-badge--desktop{ display:inline-flex; }
+
 @media (max-width: 980px){
+  .veteran-badge--desktop{ display:none; }
+  .veteran-badge--mobile{ display:inline-flex; }
+
+  /* tighter tagline spacing on mobile (you asked) */
+  .footer-taglines{ gap: 6px; }
+
+  /* make badge a touch smaller on mobile */
   .veteran-badge{
     padding: 10px 16px;
     border-radius: 15px;
