@@ -635,7 +635,7 @@ footer{
   .footer-badge-desktop{ display:none; }
   .footer-badge-mobile{
     display:flex;
-    margin-top: 10px;
+    margin-top: 6px;
     margin-bottom: 0px;
   }
 
