@@ -1,3 +1,12 @@
+/* ==========================================================
+   Murph’s Mitts — styles-16.css
+   Changes in this drop-in:
+   - FIX: Remove stray "}" after lace overlay (was breaking CSS)  [oai_citation:3‡styles-16.css.txt](sediment://file_00000000d65c71fda0f15b565322f73b)
+   - ADD: .process-step h2 matches .price h2  [oai_citation:4‡styles-16.css](sediment://file_00000000ef0871f8be8359a58436e33c)
+   - ADD: About photo taller + adjustable crop (object-position)
+   - ORGANIZE: Comments/section headers only (no rule reordering)
+   ========================================================== */
+
 :root{
   --bg: #dacab1;
   --navy: #092f4d;
@@ -10,6 +19,10 @@
 
   --headerH: 86px;
 }
+
+/* =========================
+   BASE / RESET
+   ========================= */
 
 *{box-sizing:border-box}
 html {
@@ -43,7 +56,7 @@ a:hover{text-decoration:underline}
 }
 
 /* =========================
-   SQUARESPACE-ISH HEADER
+   HEADER
    ========================= */
 
 .site-header{
@@ -148,7 +161,7 @@ a:hover{text-decoration:underline}
 }
 
 /* =========================
-   HERO (FULL BLEED)
+   HERO
    ========================= */
 
 body.home{ background: #000; }
@@ -162,7 +175,6 @@ body.home .hero{min-height:100vh; min-height:100svh;}
 body.home .footer{margin-top:0;}
 .hero{
   position: relative;
-  /*min-height: 92vh;*/
   min-height: 100vh;   /* fallback */
   min-height: 100svh;  /* mobile-safe */
   display:flex;
@@ -170,7 +182,6 @@ body.home .footer{margin-top:0;}
   justify-content:center;
   text-align:center;
 
-  /* styles.css is in assets/css */
   background-image: url("../img/hero.jpeg");
   background-size: cover;
   background-position: center;
@@ -253,8 +264,23 @@ body.home .footer{margin-top:0;}
   padding: 18px 18px;
 }
 
-.about-photo { padding: 14px; }
-.about-photo img { width: 100%; height: 100%; display: block; object-fit: cover; }
+/* =========================
+   ABOUT PHOTO (taller + controllable crop)
+   - Taller: adjust height below
+   - Crop position: tweak object-position %
+   ========================= */
+
+.about-photo { 
+  padding: 14px; 
+  height: 520px;              /* <-- taller photo on desktop */
+}
+.about-photo img { 
+  width: 100%; 
+  height: 100%; 
+  display: block; 
+  object-fit: cover; 
+  object-position: 50% 35%;    /* <-- move what part shows (X% Y%). Example: 50% 10% */
+}
 
 .price-grid{
   display:grid;
@@ -264,6 +290,14 @@ body.home .footer{margin-top:0;}
 }
 
 .price h2{
+  margin: 0 0 10px;
+  color: var(--navy);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* ✅ FIX: Process h2 matches Services (.price h2) exactly */
+.process-step h2{
   margin: 0 0 10px;
   color: var(--navy);
   font-weight: 600;
@@ -468,7 +502,7 @@ hr.rule{
 .lace-item.show-label .lace-label{
   opacity:1;
 }
-}
+
 /* =========================
    IFRAMES (service request embed)
    ========================= */
@@ -482,14 +516,7 @@ iframe{
 }
 
 /* =========================
-   FOOTER (ONE SYSTEM ONLY)
-   Desktop: 3 columns, taglines spread L/C/R, aligned
-   Mobile: copyright -> socials -> stacked taglines
-   Requires your footer HTML that includes:
-   - .footer-left .copyright + .tagline-desktop
-   - .footer-center .social + .tagline-desktop
-   - .footer-right .tagline-desktop
-   - .footer-taglines (mobile stack)
+   FOOTER
    ========================= */
 
 footer{
@@ -611,7 +638,7 @@ footer{
 }
 
 /* =========================
-   CONTACT PAGE: TOGGLE + FORM (Squarespace-ish)
+   CONTACT PAGE: TOGGLE + FORM
    ========================= */
 
 .toggle{
@@ -773,8 +800,7 @@ footer{
 }
 
 /* =========================
-   MOBILE MENU (Squarespace-ish)
-   Requires the HTML button + overlay you already added
+   MOBILE MENU
    ========================= */
 
 .menu-btn{
@@ -878,13 +904,15 @@ footer{
 body.menu-open{ overflow:hidden; }
 
 /* =========================
-   RESPONSIVE (ONE BLOCK ONLY)
+   RESPONSIVE
    ========================= */
 
 @media (max-width: 980px){
   .split{grid-template-columns:1fr}
   .price-grid{grid-template-columns:1fr}
   .gallery-grid{grid-template-columns: repeat(2, 1fr)}
+
+  /* About photo on mobile (keeps your existing behavior) */
   .about-photo { height: 40vh; max-height: 320px; padding: 12px;}
   .about-photo img { height: 100%; }
 
