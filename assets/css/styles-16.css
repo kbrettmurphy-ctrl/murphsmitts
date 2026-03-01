@@ -682,7 +682,7 @@ footer{
     order: 3;
     display:grid;
     gap: 4px;
-    margin-top: 6px;
+    margin-top: 0px;
   }
   .footer-right{ order: 4; display:none; }
 }
