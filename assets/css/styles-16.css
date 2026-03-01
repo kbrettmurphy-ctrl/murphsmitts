@@ -1038,3 +1038,12 @@ body.home footer{
   flex-wrap: wrap;
   margin-top: 18px;
 }
+@media (max-width: 980px){
+
+  .card img[alt*="Certified"]{
+    margin: 0 auto 16px auto;
+    display: block;
+  }
+
+}
+
