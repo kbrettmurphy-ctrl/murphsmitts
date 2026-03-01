@@ -616,7 +616,7 @@ footer{
 .footer-badge img{
   display:block;
   height:auto;
-  max-width: 180px;           /* desktop size cap */
+  max-width: 100px;           /* desktop size cap */
   filter: drop-shadow(0 2px 6px rgba(0,0,0,.25));
 }
 
