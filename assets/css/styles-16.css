@@ -640,8 +640,8 @@ footer{
   }
 
   .footer-badge img{
-    max-width: 220px;         /* safe width on mobile */
-    width: min(220px, 82vw);
+    max-width: 140px;         /* safe width on mobile */
+    width: auto;
   }
 
   /* Reduce gap between tag lines */
