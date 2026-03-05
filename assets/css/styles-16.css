@@ -963,7 +963,7 @@ body.menu-open{ overflow:hidden; }
   .gallery-grid{grid-template-columns: repeat(2, 1fr)}
 
   /* About photo on mobile (keeps your existing behavior) */
-  .about-photo { height: 40vh; max-height: 320px; padding: 12px;}
+  .about-photo { height: 50vh; max-height: 320px; padding: 12px;}
   .about-photo img { height: 100%; }
 
   /* Header behavior on mobile */
