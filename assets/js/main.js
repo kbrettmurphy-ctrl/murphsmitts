@@ -23,6 +23,11 @@ function initGalleryLightbox() {
   let dragging = false;
   let dx = 0;
 
+  thumbs.forEach(img => {
+    img.draggable = false;
+    img.addEventListener("dragstart", (e) => e.preventDefault());
+  });
+
   track.innerHTML = "";
   const slides = thumbs.map(img => {
     const slideImg = document.createElement("img");
@@ -64,9 +69,24 @@ function initGalleryLightbox() {
   function prev() { goTo(index - 1); }
 
   thumbs.forEach((img, i) => {
-    img.addEventListener("click", () => {
-      console.log("thumb clicked", i);
-      open(i);
+    let moved = false;
+    let downX = 0;
+    let downY = 0;
+
+    img.addEventListener("pointerdown", (e) => {
+      downX = e.clientX;
+      downY = e.clientY;
+      moved = false;
+    });
+
+    img.addEventListener("pointermove", (e) => {
+      if (Math.abs(e.clientX - downX) > 8 || Math.abs(e.clientY - downY) > 8) {
+        moved = true;
+      }
+    });
+
+    img.addEventListener("pointerup", () => {
+      if (!moved) open(i);
     });
   });
 
