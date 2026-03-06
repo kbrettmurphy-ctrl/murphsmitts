@@ -1,12 +1,15 @@
 // =========================
 // Gallery lightbox (slider)
 // =========================
+// =========================
+// Gallery lightbox (slider)
+// =========================
 function initGalleryLightbox() {
   const thumbs = Array.from(document.querySelectorAll(".gallery-grid img, .gallery-strip img"));
   if (!thumbs.length) return;
 
   const lb = document.querySelector(".lightbox");
-  if (!lb || lb.dataset.bound === "true") return;
+  if (!lb) return;
 
   const track = lb.querySelector(".lb-track");
   const viewport = lb.querySelector(".lb-viewport");
@@ -23,11 +26,13 @@ function initGalleryLightbox() {
   let dragging = false;
   let dx = 0;
 
+  // prevent native image dragging
   thumbs.forEach(img => {
     img.draggable = false;
     img.addEventListener("dragstart", (e) => e.preventDefault());
   });
 
+  // build lightbox slides once
   track.innerHTML = "";
   const slides = thumbs.map(img => {
     const slideImg = document.createElement("img");
@@ -50,71 +55,74 @@ function initGalleryLightbox() {
     updateCounter();
   }
 
-  function open(i) {
+  function openLightbox(i) {
     index = i;
     lb.classList.add("open");
     lb.setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
     goTo(index, false);
-    requestAnimationFrame(() => goTo(index, true));
   }
 
-  function close() {
+  function closeLightbox() {
     lb.classList.remove("open");
     lb.setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
   }
 
-  function next() { goTo(index + 1); }
-  function prev() { goTo(index - 1); }
+  function next() {
+    goTo(index + 1);
+  }
 
+  function prev() {
+    goTo(index - 1);
+  }
+
+  // plain click binding
   thumbs.forEach((img, i) => {
-    let moved = false;
-    let downX = 0;
-    let downY = 0;
-
-    img.addEventListener("pointerdown", (e) => {
-      downX = e.clientX;
-      downY = e.clientY;
-      moved = false;
-    });
-
-    img.addEventListener("pointermove", (e) => {
-      if (Math.abs(e.clientX - downX) > 8 || Math.abs(e.clientY - downY) > 8) {
-        moved = true;
-      }
-    });
-
-    img.addEventListener("pointerup", () => {
-      if (!moved) open(i);
+    img.addEventListener("click", (e) => {
+      e.preventDefault();
+      openLightbox(i);
     });
   });
 
-  nextBtn.addEventListener("click", (e) => { e.stopPropagation(); next(); });
-  prevBtn.addEventListener("click", (e) => { e.stopPropagation(); prev(); });
-  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); close(); });
+  nextBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    next();
+  });
+
+  prevBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    prev();
+  });
+
+  closeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeLightbox();
+  });
 
   lb.addEventListener("click", (e) => {
-    if (!viewport.contains(e.target)) close();
+    if (!viewport.contains(e.target)) closeLightbox();
   });
 
   window.addEventListener("keydown", (e) => {
     if (!lb.classList.contains("open")) return;
-    if (e.key === "Escape") close();
+
+    if (e.key === "Escape") closeLightbox();
     if (e.key === "ArrowRight") next();
     if (e.key === "ArrowLeft") prev();
   });
 
-  lb.addEventListener("touchstart", (e) => {
+  // swipe inside lightbox only
+  viewport.addEventListener("touchstart", (e) => {
     if (!lb.classList.contains("open")) return;
     dragging = true;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     dx = 0;
     track.style.transition = "none";
-  }, { passive: false });
+  }, { passive: true });
 
-  lb.addEventListener("touchmove", (e) => {
+  viewport.addEventListener("touchmove", (e) => {
     if (!dragging) return;
 
     const x = e.touches[0].clientX;
@@ -123,13 +131,12 @@ function initGalleryLightbox() {
     const dy = y - startY;
 
     if (Math.abs(dx) > Math.abs(dy)) {
-      e.preventDefault();
       const w = viewport.getBoundingClientRect().width || 1;
       track.style.transform = `translateX(${(-index * w) + dx}px)`;
     }
-  }, { passive: false });
+  }, { passive: true });
 
-  lb.addEventListener("touchend", () => {
+  viewport.addEventListener("touchend", () => {
     if (!dragging) return;
     dragging = false;
 
@@ -141,8 +148,17 @@ function initGalleryLightbox() {
     else goTo(index);
   });
 
+  window.addEventListener("resize", () => {
+    if (lb.classList.contains("open")) goTo(index, false);
+  });
+
   updateCounter();
-  lb.dataset.bound = "true";
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initGalleryLightbox);
+} else {
+  initGalleryLightbox();
 }
 
 function bootGalleryLightbox() {
