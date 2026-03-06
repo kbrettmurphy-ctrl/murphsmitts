@@ -84,8 +84,8 @@ a:hover{text-decoration:underline}
 }
 
 .brand img{
-  width: 48px;
-  height: 48px;
+  height: clamp(48px, 4vw, 66px);
+  width: auto;
   border-radius: 999px;
   object-fit: cover;
 }
