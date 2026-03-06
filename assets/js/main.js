@@ -6,7 +6,7 @@ function initGalleryLightbox() {
   if (!thumbs.length) return;
 
   const lb = document.querySelector(".lightbox");
-  if (!lb) return;
+  if (!lb || lb.dataset.bound === "true") return;
 
   const track = lb.querySelector(".lb-track");
   const viewport = lb.querySelector(".lb-viewport");
@@ -38,19 +38,17 @@ function initGalleryLightbox() {
   }
 
   function goTo(i, animate = true) {
-  index = (i + slides.length) % slides.length;
-
-  const w = viewport.getBoundingClientRect().width || 1;
-
-  track.style.transition = animate ? "transform .28s ease" : "none";
-  track.style.transform = `translateX(${-index * w}px)`;
-
-  updateCounter();
-}
+    index = (i + slides.length) % slides.length;
+    const w = viewport.getBoundingClientRect().width || 1;
+    track.style.transition = animate ? "transform .28s ease" : "none";
+    track.style.transform = `translateX(${-index * w}px)`;
+    updateCounter();
+  }
 
   function open(i) {
     index = i;
     lb.classList.add("open");
+    lb.setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
     goTo(index, false);
     requestAnimationFrame(() => goTo(index, true));
@@ -58,13 +56,19 @@ function initGalleryLightbox() {
 
   function close() {
     lb.classList.remove("open");
+    lb.setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
   }
 
   function next() { goTo(index + 1); }
   function prev() { goTo(index - 1); }
 
-  thumbs.forEach((img, i) => img.addEventListener("click", () => open(i)));
+  thumbs.forEach((img, i) => {
+    img.addEventListener("click", () => {
+      console.log("thumb clicked", i);
+      open(i);
+    });
+  });
 
   nextBtn.addEventListener("click", (e) => { e.stopPropagation(); next(); });
   prevBtn.addEventListener("click", (e) => { e.stopPropagation(); prev(); });
@@ -91,41 +95,45 @@ function initGalleryLightbox() {
   }, { passive: false });
 
   lb.addEventListener("touchmove", (e) => {
-  if (!dragging) return;
+    if (!dragging) return;
 
-  const x = e.touches[0].clientX;
-  const y = e.touches[0].clientY;
-  dx = x - startX;
-  const dy = y - startY;
+    const x = e.touches[0].clientX;
+    const y = e.touches[0].clientY;
+    dx = x - startX;
+    const dy = y - startY;
 
-  if (Math.abs(dx) > Math.abs(dy)) {
-    e.preventDefault();
-
-    const w = viewport.getBoundingClientRect().width || 1;
-    track.style.transform = `translateX(${(-index * w) + dx}px)`;
-  }
-}, { passive: false });
+    if (Math.abs(dx) > Math.abs(dy)) {
+      e.preventDefault();
+      const w = viewport.getBoundingClientRect().width || 1;
+      track.style.transform = `translateX(${(-index * w) + dx}px)`;
+    }
+  }, { passive: false });
 
   lb.addEventListener("touchend", () => {
-  if (!dragging) return;
-  dragging = false;
+    if (!dragging) return;
+    dragging = false;
 
-  const w = viewport.getBoundingClientRect().width || 1;
-  const threshold = w * 0.18;
+    const w = viewport.getBoundingClientRect().width || 1;
+    const threshold = w * 0.18;
 
-  if (dx < -threshold) next();
-  else if (dx > threshold) prev();
-  else goTo(index);
-});
+    if (dx < -threshold) next();
+    else if (dx > threshold) prev();
+    else goTo(index);
+  });
 
   updateCounter();
+  lb.dataset.bound = "true";
 }
 
-// Run now if possible (Cloudflare can load JS late), otherwise wait
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initGalleryLightbox);
-} else {
+function bootGalleryLightbox() {
   initGalleryLightbox();
+  window.setTimeout(initGalleryLightbox, 150);
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootGalleryLightbox);
+} else {
+  bootGalleryLightbox();
 }
 
 // =========================
