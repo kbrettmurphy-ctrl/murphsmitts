@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>{% if page.title %}{{ page.title }} | {% endif %}Murph’s Mitt Maintenance</title>
+  <meta name="description" content="{% if page.description %}{{ page.description }}{% else %}Baseball & softball glove repair. Local drop-off and nationwide mail-in service.{% endif %}" />
+  <meta property="og:title" content="{% if page.title %}{{ page.title }} | {% endif %}Murph’s Mitt Maintenance" />
+  <meta property="og:description" content="{% if page.description %}{{ page.description }}{% else %}Professional baseball glove relacing and restoration. Local drop-off and nationwide mail-in service.{% endif %}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="{{ page.url | absolute_url }}" />
+  <meta property="og:image" content="{{ '/assets/img/social-preview.jpg' | absolute_url }}" />
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{% if page.title %}{{ page.title }} | {% endif %}Murph’s Mitt Maintenance">
+  <meta name="twitter:description" content="{% if page.description %}{{ page.description }}{% else %}Professional baseball glove relacing and restoration service.{% endif %}">
+  <meta name="twitter:image" content="{{ '/assets/img/social-preview.jpg' | absolute_url }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Favicon -->
+  <!-- Favicon -->
+  <link rel="icon" href="{{ '/assets/img/favicon/favicon.ico' | relative_url }}" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="{{ '/assets/img/favicon/favicon.svg' | relative_url }}">
+  <link rel="icon" type="image/png" sizes="96x96" href="{{ '/assets/img/favicon/favicon-96x96.png' | relative_url }}">
+  <link rel="apple-touch-icon" href="{{ '/assets/img/favicon/apple-touch-icon.png' | relative_url }}">
+  <link rel="manifest" href="{{ '/assets/img/favicon/site.webmanifest' | relative_url }}">
+  
+  <link rel="stylesheet" href="{{ '/assets/css/styles-16.css' | relative_url }}?v={{ site.time }}">
+</head>
+
+<body class="{{ page.body_class | default: 'inner' }}">
+  {% include header.html %}
+
+  {{ content }}
+
+  {% include footer.html %}
+
+  <script data-cfasync="false" src="{{ '/assets/js/main.js?v=26' | relative_url }}"></script>
+</body>
+</html>
