@@ -573,6 +573,74 @@ hr.rule{
 }
 
 /* =========================
+   HORIZONTAL SCROLL STRIPS
+   ========================= */
+
+.gallery-strip,
+.lace-strip{
+  display: flex;
+  gap: 14px;
+  margin-top: 18px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 10px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.gallery-strip::-webkit-scrollbar,
+.lace-strip::-webkit-scrollbar{
+  height: 10px;
+}
+
+.gallery-strip::-webkit-scrollbar-thumb,
+.lace-strip::-webkit-scrollbar-thumb{
+  background: rgba(9,47,77,.45);
+  border-radius: 999px;
+}
+
+.gallery-strip img{
+  flex: 0 0 auto;
+  width: clamp(220px, 28vw, 340px);
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid rgba(2,11,18,.12);
+  cursor: zoom-in;
+  scroll-snap-align: start;
+  transition: transform .12s ease, filter .15s ease;
+}
+
+.gallery-strip img:hover{
+  transform: scale(1.01);
+  filter: brightness(.98);
+}
+
+.lace-strip .lace-item{
+  flex: 0 0 auto;
+  width: clamp(150px, 18vw, 210px);
+  scroll-snap-align: start;
+}
+
+.lace-strip .lace-item img{
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+@media (max-width: 980px){
+  .gallery-strip img{
+    width: 72vw;
+    max-width: 320px;
+  }
+
+  .lace-strip .lace-item{
+    width: 44vw;
+    max-width: 190px;
+  }
+}
+
+/* =========================
    Lace Hover / Tap Overlay
    ========================= */
 
