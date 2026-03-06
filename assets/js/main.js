@@ -107,7 +107,12 @@ function initGalleryLightbox() {
   });
 
   lb.addEventListener("click", (e) => {
-    if (!viewport.contains(e.target)) closeLightbox();
+    const activeImg = track.children[index];
+    if (!activeImg) return;
+
+    if (!activeImg.contains(e.target)) {
+      closeLightbox();
+    }
   });
 
   window.addEventListener("keydown", (e) => {
