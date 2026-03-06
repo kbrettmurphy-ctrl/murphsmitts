@@ -1,9 +1,6 @@
 // =========================
 // Gallery lightbox (slider)
 // =========================
-// =========================
-// Gallery lightbox (slider)
-// =========================
 function initGalleryLightbox() {
   const thumbs = Array.from(document.querySelectorAll(".gallery-grid img, .gallery-strip img"));
   if (!thumbs.length) return;
