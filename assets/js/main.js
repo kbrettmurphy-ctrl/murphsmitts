@@ -1,224 +1,47 @@
-// =========================
-// Gallery lightbox (slider)
-// =========================
-function initGalleryLightbox() {
-  const lb = document.querySelector(".lightbox");
-  if (!lb || lb.dataset.bound === "true") return;
-
-  const track = lb.querySelector(".lb-track");
-  const viewport = lb.querySelector(".lb-viewport");
-  const prevBtn = lb.querySelector(".lb-prev");
-  const nextBtn = lb.querySelector(".lb-next");
-  const closeBtn = lb.querySelector(".lb-close");
-  const counter = lb.querySelector(".lb-counter");
-
-  if (!track || !viewport || !prevBtn || !nextBtn || !closeBtn) return;
-
-  let index = 0;
-  let slides = [];
-  let activeThumbs = [];
-
-  let pointerDownThumb = null;
-  let pointerDownX = 0;
-  let pointerDownY = 0;
-  let pointerMoved = false;
-
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let dragging = false;
-  let dx = 0;
-
-  function updateCounter() {
-    if (counter) {
-      counter.textContent = slides.length ? `${index + 1} / ${slides.length}` : "";
-    }
-  }
-
-  function goTo(i, animate = true) {
-    if (!slides.length) return;
-
-    index = (i + slides.length) % slides.length;
-    const w = viewport.getBoundingClientRect().width || 1;
-
-    track.style.transition = animate ? "transform .28s ease" : "none";
-    track.style.transform = `translateX(${-index * w}px)`;
-
-    updateCounter();
-  }
-
-  function buildSlides(thumbs) {
-    activeThumbs = thumbs;
-    track.innerHTML = "";
-
-    slides = thumbs.map((img) => {
-      const slideImg = document.createElement("img");
-      slideImg.src = img.currentSrc || img.src;
-      slideImg.alt = img.alt || "Gallery image";
-      slideImg.draggable = false;
-      track.appendChild(slideImg);
-      return slideImg;
-    });
-  }
-
-  function openFromThumb(img) {
-    const gallery = img.closest(".gallery-grid, .gallery-strip");
-    if (!gallery) return;
-
-    const thumbs = Array.from(gallery.querySelectorAll("img"));
-    const clickedIndex = thumbs.indexOf(img);
-    if (clickedIndex === -1) return;
-
-    buildSlides(thumbs);
-
-    lb.classList.add("open");
-    lb.setAttribute("aria-hidden", "false");
-    document.body.style.overflow = "hidden";
-
-    goTo(clickedIndex, false);
-  }
-
-  function closeLightbox() {
-    lb.classList.remove("open");
-    lb.setAttribute("aria-hidden", "true");
-    document.body.style.overflow = "";
-  }
-
-  function next() {
-    goTo(index + 1);
-  }
-
-  function prev() {
-    goTo(index - 1);
-  }
-
-  // prevent native browser image drag
-  document.addEventListener("dragstart", (e) => {
-    const img = e.target.closest(".gallery-grid img, .gallery-strip img");
-    if (img) e.preventDefault();
-  });
-
-  // pointer-based thumb opening so strips still scroll but taps open
-  document.addEventListener("pointerdown", (e) => {
-    const img = e.target.closest(".gallery-grid img, .gallery-strip img");
-    if (!img || img.closest(".lightbox")) return;
-
-    pointerDownThumb = img;
-    pointerDownX = e.clientX;
-    pointerDownY = e.clientY;
-    pointerMoved = false;
-  });
-
-  document.addEventListener("pointermove", (e) => {
-    if (!pointerDownThumb) return;
-
-    if (
-      Math.abs(e.clientX - pointerDownX) > 10 ||
-      Math.abs(e.clientY - pointerDownY) > 10
-    ) {
-      pointerMoved = true;
-    }
-  });
-
-  document.addEventListener("pointerup", (e) => {
-    if (!pointerDownThumb) return;
-
-    const img = e.target.closest(".gallery-grid img, .gallery-strip img");
-    const shouldOpen = img && img === pointerDownThumb && !pointerMoved;
-
-    const thumbToOpen = shouldOpen ? pointerDownThumb : null;
-
-    pointerDownThumb = null;
-    pointerMoved = false;
-
-    if (thumbToOpen) {
-      openFromThumb(thumbToOpen);
-    }
-  });
-
-  document.addEventListener("pointercancel", () => {
-    pointerDownThumb = null;
-    pointerMoved = false;
-  });
-
-  prevBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    prev();
-  });
-
-  nextBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    next();
-  });
-
-  closeBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    closeLightbox();
-  });
-
-  lb.addEventListener("click", (e) => {
-    if (!viewport.contains(e.target)) closeLightbox();
-  });
-
-  window.addEventListener("keydown", (e) => {
-    if (!lb.classList.contains("open")) return;
-
-    if (e.key === "Escape") closeLightbox();
-    if (e.key === "ArrowLeft") prev();
-    if (e.key === "ArrowRight") next();
-  });
-
-  // swipe inside lightbox only
-  viewport.addEventListener("touchstart", (e) => {
-    if (!lb.classList.contains("open")) return;
-
-    dragging = true;
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    dx = 0;
-    track.style.transition = "none";
-  }, { passive: true });
-
-  viewport.addEventListener("touchmove", (e) => {
-    if (!dragging) return;
-
-    const x = e.touches[0].clientX;
-    const y = e.touches[0].clientY;
-    dx = x - touchStartX;
-    const dy = y - touchStartY;
-
-    if (Math.abs(dx) > Math.abs(dy)) {
-      const w = viewport.getBoundingClientRect().width || 1;
-      track.style.transform = `translateX(${(-index * w) + dx}px)`;
-    }
-  }, { passive: true });
-
-  viewport.addEventListener("touchend", () => {
-    if (!dragging) return;
-    dragging = false;
-
-    const w = viewport.getBoundingClientRect().width || 1;
-    const threshold = w * 0.18;
-
-    if (dx < -threshold) next();
-    else if (dx > threshold) prev();
-    else goTo(index);
-  });
-
-  window.addEventListener("resize", () => {
-    if (lb.classList.contains("open")) {
-      goTo(index, false);
-    }
-  });
-
-  updateCounter();
-  lb.dataset.bound = "true";
+.gallery-thumb{
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  flex: 0 0 320px;
+  width: 320px;
+  height: 320px;
+  cursor: zoom-in;
+  scroll-snap-align: start;
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initGalleryLightbox);
-} else {
-  initGalleryLightbox();
+.gallery-thumb img{
+  display: block;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid rgba(2,11,18,.12);
+  transition: transform .12s ease, filter .15s ease;
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  pointer-events: none;
 }
+
+.gallery-thumb:hover img{
+  transform: scale(1.01);
+  filter: brightness(.98);
+}
+
+@media (max-width: 980px){
+  .gallery-thumb{
+    flex-basis: 72vw;
+    width: 72vw;
+    height: 72vw;
+    max-width: 320px;
+    max-height: 320px;
+  }
+}
+
 // =========================
 // Mobile menu toggle
 // =========================
