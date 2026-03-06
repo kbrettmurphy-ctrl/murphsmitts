@@ -1237,11 +1237,11 @@ body.home footer{
   gap: 18px;
 }
 
-@media (min-width: 900px){
-  .reviews .reviews-grid{
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
+/* @media (min-width: 900px){ */
+  /* .reviews .reviews-grid{ */
+    /* grid-template-columns: repeat(3, minmax(0, 1fr)); */
+  /* } */
+/* } */
 
 .reviews .review-card{
   background: rgba(255,255,255,.35);
@@ -1250,6 +1250,8 @@ body.home footer{
   padding: 18px 18px 16px;
   display:flex;
   flex-direction:column;
+  max-width: 240px;
+  margin: 0 auto;
 }
 
 .reviews .review-stars{
