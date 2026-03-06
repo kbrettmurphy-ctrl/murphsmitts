@@ -612,27 +612,53 @@ hr.rule{
   border-radius: 999px;
 }
 
-/* Gallery thumbnails */
-.gallery-strip img{
-  display: block;
+.gallery-strip img:hover{
+  transform: scale(1.01);
+  filter: brightness(.98);
+}
+
+.gallery-thumb{
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
   flex: 0 0 320px;
   width: 320px;
   height: 320px;
+  cursor: zoom-in;
+  scroll-snap-align: start;
+}
+
+.gallery-thumb img{
+  display: block;
+  width: 100%;
+  height: 100%;
   aspect-ratio: 1 / 1;
   object-fit: cover;
   border-radius: 14px;
   border: 1px solid rgba(2,11,18,.12);
-  cursor: zoom-in;
-  scroll-snap-align: start;
   transition: transform .12s ease, filter .15s ease;
   -webkit-user-drag: none;
   user-select: none;
   -webkit-touch-callout: none;
+  pointer-events: none;
 }
 
-.gallery-strip img:hover{
+.gallery-thumb:hover img{
   transform: scale(1.01);
   filter: brightness(.98);
+}
+
+@media (max-width: 980px){
+  .gallery-thumb{
+    flex-basis: 72vw;
+    width: 72vw;
+    height: 72vw;
+    max-width: 320px;
+    max-height: 320px;
+  }
 }
 
 /* Lace swatches */
@@ -651,14 +677,6 @@ hr.rule{
 }
 
 @media (max-width: 980px){
-  .gallery-strip img{
-    flex-basis: 72vw;
-    width: 72vw;
-    height: 72vw;
-    max-width: 320px;
-    max-height: 320px;
-  }
-
   .lace-strip .lace-item{
     flex-basis: 120px;
     width: 120px;
