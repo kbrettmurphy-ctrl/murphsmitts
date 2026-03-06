@@ -17,7 +17,7 @@
   --max: 1320px;
   --radius: 18px;
 
-  --headerH: 86px;
+  --headerH: 76px;
 }
 
 /* =========================
@@ -84,8 +84,8 @@ a:hover{text-decoration:underline}
 }
 
 .brand img{
-  width: 66px;
-  height: 66px;
+  width: 56px;
+  height: 56px;
   border-radius: 999px;
   object-fit: cover;
 }
