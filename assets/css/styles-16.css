@@ -428,26 +428,31 @@ hr.rule{
 
 /* Slider viewport */
 .lb-viewport{
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
   position: relative;
+  width: fit-content;
+  max-width: 90vw;
+  height: fit-content;
+  max-height: 80vh;
+  overflow: hidden;
+  margin: 0 auto;
 }
 
 .lb-track{
-  height: 100%;
   display: flex;
   flex-wrap: nowrap;
-  width: 100%;                 /* ADD */
+  align-items: center;
+  height: 100%;
 }
 
-.lb-track img{                 /* change > img to img */
-  flex: 0 0 100% !important;
-  width: 100% !important;
-  min-width: 100% !important;  /* ADD: this is the “stop showing two” rule */
-  height: 100%;
+.lb-track img{
+  flex: 0 0 100%;
+  width: auto;
+  max-width: 90vw;
+  height: auto;
+  max-height: 80vh;
   object-fit: contain;
   display: block;
+  margin: 0 auto;
 }
 
 /* Prev/Next buttons */
