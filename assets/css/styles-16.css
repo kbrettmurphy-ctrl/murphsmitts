@@ -1253,7 +1253,6 @@ body.home footer{
   max-width: clamp(240px, 100%, 420px);
   margin: 0 auto;
 }
-}
 
 .reviews .review-stars{
   color: var(--red);
