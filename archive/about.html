@@ -14,7 +14,7 @@ body_class: inner
     <h1>About Me</h1>
 
     <!-- Widen left column and stretch items to equal height -->
-    <div class="split" style="grid-template-columns: 1.45fr .55fr; align-items: stretch;">
+    <div class="split about-split" style="align-items: stretch;">
       <!-- LEFT: MAIN COPY -->
       <div class="card" style="height:100%;">
         <p class="lede">
@@ -22,7 +22,7 @@ body_class: inner
         </p>
 
         <p>
-          I grew up in the DFW metroplex, which means I’m a Texas Rangers fan. We’re not discussing 2011. Some people have trust issues. I have October. I’ve moved on. Mostly. 2023 helped. Flags fly forever.
+          I grew up in the DFW metroplex, which means I’m a Texas Rangers fan. We’re not discussing 2011. Some people have trust issues. I have October. I’ve moved on. Mostly. <a href="https://youtu.be/vEXwbr8rjPo?si=7NiVjp5oiBmPYB8R" class="content-link" target="_blank" rel="noopener noreferrer">2023 helped</a>. Flags fly forever.
         </p>
 
         <p>
@@ -53,29 +53,12 @@ body_class: inner
       </div>
 
       <!-- RIGHT: PHOTO, SAME HEIGHT AS TEXT -->
-      <div class="card" style="padding:14px; height:100%;">
+      <div class="card about-photo">
         <img
-          src="assets/img/me.jpeg"
+          src="{{ '/assets/img/brett.jpeg' | relative_url }}"
           alt="Brett Murphy"
           style="width:100%; height:100%; display:block; border-radius:14px; border:1px solid rgba(2,11,18,.12); object-fit:cover;"
         />
       </div>
     </div>
   </main>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
