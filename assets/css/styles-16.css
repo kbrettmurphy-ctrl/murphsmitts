@@ -99,7 +99,7 @@ a:hover{text-decoration:underline}
   line-height: 1.15;
 }
 
-@media (max-width: 700px){
+@media (max-width: 770px){
   .brand{
     display:flex;
     align-items:center;
