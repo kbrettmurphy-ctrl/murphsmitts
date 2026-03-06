@@ -463,9 +463,9 @@ hr.rule{
   transform:translateY(-50%);
   z-index: 1001;
   background: rgba(0,0,0,.45);
-  color:white;
+  color:var(--bg);
   border:1px solid rgba(218, 202, 177,.18);
-  font-size:40px;
+  font-size:20px;
   width:48px;
   height:48px;
   border-radius:50%;
