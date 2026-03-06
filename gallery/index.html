@@ -7,33 +7,51 @@ body_class: inner
 ---
 
 <main class="container page page-under-header">
-    <h1>Before &amp; After</h1>
-    <p class="lede">A small selection of gloves that showed up hopeless and left with a second chance.</p>
+  <h1>Before &amp; After</h1>
+  <p class="lede">A small selection of gloves that showed up hopeless and left with a second chance.</p>
 
-    <div class="gallery-strip">
-      {% for item in site.data.gallery %}
-        <img
-          src="{{ '/assets/img/beforeafter/' | append: item.file | relative_url }}"
-          alt="{{ item.alt | escape }}"
-          loading="lazy"
-          decoding="async">
-      {% endfor %}
+  {% assign categories = 
+    "catcher|Catcher’s Mitts,
+     first-base|First Base Mitts,
+     fielding|Fielding Gloves,
+     custom|Custom Color Relaces,
+     vintage|Vintage" | split: "," %}
+
+  {% for entry in categories %}
+    {% assign parts = entry | strip | split: "|" %}
+    {% assign key = parts[0] %}
+    {% assign label = parts[1] %}
+    {% assign items = site.data.gallery | where: "category", key %}
+
+    {% if items.size > 0 %}
+      <section class="gallery-group">
+        <h2>{{ label }}</h2>
+
+        <div class="gallery-strip">
+          {% for item in items %}
+            <img
+              src="{{ '/assets/img/beforeafter/' | append: item.file | relative_url }}"
+              alt="{{ item.alt | escape }}"
+              loading="lazy"
+              decoding="async">
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+  {% endfor %}
+
+  <div class="lightbox" aria-hidden="true">
+    <button class="lb-close" aria-label="Close">×</button>
+    <button class="lb-prev" aria-label="Previous image">‹</button>
+
+    <div class="lb-viewport">
+      <div class="lb-track"></div>
     </div>
 
-    <div class="lightbox" aria-hidden="true">
-      <button class="lb-close" aria-label="Close">×</button>
+    <button class="lb-next" aria-label="Next image">›</button>
 
-      <button class="lb-prev" aria-label="Previous image">‹</button>
-
-      <div class="lb-viewport">
-        <div class="lb-track"></div>
-      </div>
-
-      <button class="lb-next" aria-label="Next image">›</button>
-
-      <div class="lb-hint" aria-hidden="true">
-        
-        <span class="lb-counter"></span>
-      </div>
+    <div class="lb-hint" aria-hidden="true">
+      <span class="lb-counter"></span>
     </div>
-  </main>
+  </div>
+</main>
