@@ -624,6 +624,9 @@ hr.rule{
   cursor: zoom-in;
   scroll-snap-align: start;
   transition: transform .12s ease, filter .15s ease;
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .gallery-strip img:hover{
