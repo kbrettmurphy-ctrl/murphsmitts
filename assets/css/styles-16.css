@@ -107,8 +107,15 @@ a:hover{text-decoration:underline}
 
   .brand-text{
     display:block;
-    color: #092f4de6;
     max-width: 170px;
+  }
+  
+  .site-header .brand-text{
+    color:#dacab1e6;
+  }
+
+  .mobile-menu .brand-text{
+    color:#092f4d;
   }
 }
 
