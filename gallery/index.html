@@ -11,54 +11,13 @@ body_class: inner
     <p class="lede">A small selection of gloves that showed up hopeless and left with a second chance.</p>
 
     <div class="gallery-grid">
-        <img src="{{ '/assets/img/beforeafter/ba47.JPG' | relative_url }}" alt="Rawlings R9 full clean and conditioning with navy and dark red lace">
-        <img src="{{ '/assets/img/beforeafter/ba27.jpg' | relative_url }}" alt="Rawlings first base mitt full red, white, and blue relace and conditioning">
-        <img src="{{ '/assets/img/beforeafter/ba26.jpg' | relative_url }}" alt="All-Star Catchers mitt full relace with green and yellow lace">
-        <img src="{{ '/assets/img/beforeafter/ba28.jpg' | relative_url }}" alt="Mizuno MVP Prime full relace and conditioning with red, white, and blue lace">
-        <img src="{{ '/assets/img/beforeafter/ba29.jpg' | relative_url }}" alt="Tigress Pro full relace and condition with black lace">
-        <img src="{{ '/assets/img/beforeafter/ba00.jpg' | relative_url }}" alt="Before and after 0">
-        <img src="{{ '/assets/img/beforeafter/ba01.jpeg' | relative_url }}" alt="Before and after 1">
-        <img src="{{ '/assets/img/beforeafter/ba02.jpeg' | relative_url }}" alt="Before and after 2">
-        <img src="{{ '/assets/img/beforeafter/ba03.jpg' | relative_url }}" alt="Before and after 3">
-        <img src="{{ '/assets/img/beforeafter/ba04.jpg' | relative_url }}" alt="Before and after 4">
-        <img src="{{ '/assets/img/beforeafter/ba05.jpg' | relative_url }}" alt="Before and after 5">
-        <img src="{{ '/assets/img/beforeafter/ba06.jpg' | relative_url }}" alt="Before and after 6">
-        <img src="{{ '/assets/img/beforeafter/ba07.jpg' | relative_url }}" alt="Before and after 7">
-        <img src="{{ '/assets/img/beforeafter/ba08.jpg' | relative_url }}" alt="Before and after 8">
-        <img src="{{ '/assets/img/beforeafter/ba09.jpg' | relative_url }}" alt="Before and after 9">
-        <img src="{{ '/assets/img/beforeafter/ba10.jpg' | relative_url }}" alt="Before and after 10">
-        <img src="{{ '/assets/img/beforeafter/ba11.jpg' | relative_url }}" alt="Before and after 11">
-        <img src="{{ '/assets/img/beforeafter/ba30.jpg' | relative_url }}" alt="Rawlings GG Elite full service with green lace">
-        <img src="{{ '/assets/img/beforeafter/ba31.jpg' | relative_url }}" alt="Rawlings GG Elite full service with red lace">
-        <img src="{{ '/assets/img/beforeafter/ba32.jpg' | relative_url }}" alt="Marucci Acadia series catchers mitt full service with carolina blue lace">
-        <img src="{{ '/assets/img/beforeafter/ba33.jpg' | relative_url }}" alt="Rawlings first base mitt full service with royal blue lace">
-        <img src="{{ '/assets/img/beforeafter/ba34.jpg' | relative_url }}" alt="44 pro custom glove full service with black lace">
-        <img src="{{ '/assets/img/beforeafter/ba35.jpg' | relative_url }}" alt="Nokona AMG 175K full restoration with black lace">
-        <img src="{{ '/assets/img/beforeafter/ba36.jpg' | relative_url }}" alt="Mizuno Pro full service with camel lace">
-        <img src="{{ '/assets/img/beforeafter/ba37.jpg' | relative_url }}" alt="Rawlings first base mitt full clean and condition with royal blue lace">
-        <img src="{{ '/assets/img/beforeafter/ba46.jpg' | relative_url }}" alt="Rawlings Heart of the Hide full clean and condition with red lace">
-        <img src="{{ '/assets/img/beforeafter/ba38.jpg' | relative_url }}" alt="Rawlings glove full clean and condition with baby blue, pink, and white lace">
-        <img src="{{ '/assets/img/beforeafter/ba39.jpg' | relative_url }}" alt="Easton Professional softball glove full clean and condition with tan lace">
-        <img src="{{ '/assets/img/beforeafter/ba40.jpg' | relative_url }}" alt="Rawlings R9 full clean and condition with yellow lace">
-        <img src="{{ '/assets/img/beforeafter/ba41.jpg' | relative_url }}" alt="Rawlings GG Elite full clean and condition with pink, white, and baby blue lace">
-        <img src="{{ '/assets/img/beforeafter/ba42.jpg' | relative_url }}" alt="Wilson A2000 catchers mitt full clean and condition with black lace">
-        <img src="{{ '/assets/img/beforeafter/ba43.jpg' | relative_url }}" alt="44 Pro Custom baseball glove full clean and condition with white lace">
-        <img src="{{ '/assets/img/beforeafter/ba44.jpg' | relative_url }}" alt="Wilson A2000 softball first base mitt full clean and condition with red lace">   
-        <img src="{{ '/assets/img/beforeafter/ba12.jpg' | relative_url }}" alt="Before and after 12">
-        <img src="{{ '/assets/img/beforeafter/ba13.jpg' | relative_url }}" alt="Before and after 13">
-        <img src="{{ '/assets/img/beforeafter/ba14.jpeg' | relative_url }}" alt="Before and after 14">
-        <img src="{{ '/assets/img/beforeafter/ba15.jpeg' | relative_url }}" alt="Before and after 15">
-        <img src="{{ '/assets/img/beforeafter/ba16.jpeg' | relative_url }}" alt="Before and after 16">
-        <img src="{{ '/assets/img/beforeafter/ba17.jpeg' | relative_url }}" alt="Before and after 17">
-        <img src="{{ '/assets/img/beforeafter/ba18.jpeg' | relative_url }}" alt="Before and after 18">
-        <img src="{{ '/assets/img/beforeafter/ba19.jpeg' | relative_url }}" alt="Before and after 19">
-        <img src="{{ '/assets/img/beforeafter/ba20.jpeg' | relative_url }}" alt="Before and after 20">
-        <img src="{{ '/assets/img/beforeafter/ba21.jpeg' | relative_url }}" alt="Before and after 21">
-        <img src="{{ '/assets/img/beforeafter/ba22.jpeg' | relative_url }}" alt="Before and after 22">
-        <img src="{{ '/assets/img/beforeafter/ba23.jpeg' | relative_url }}" alt="Before and after 23">
-        <img src="{{ '/assets/img/beforeafter/ba24.jpeg' | relative_url }}" alt="Before and after 24">
-        <img src="{{ '/assets/img/beforeafter/ba25.jpeg' | relative_url }}" alt="Before and after 25">
-        <img src="{{ '/assets/img/beforeafter/ba45.jpg' | relative_url }}" alt="Mizuno softball catchers mitt full clean and condition with carolina blue lace">
+      {% for item in site.data.gallery %}
+        <img
+          src="{{ '/assets/img/beforeafter/' | append: item.file | relative_url }}"
+          alt="{{ item.alt | escape }}"
+          loading="lazy"
+          decoding="async">
+      {% endfor %}
     </div>
 
     <div class="lightbox" aria-hidden="true">
