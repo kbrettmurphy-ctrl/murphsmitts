@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Gallery
+title: Glove Relace Photos
 description: Glove restoration before and after photos.
 nav: gallery
 body_class: inner
@@ -11,18 +11,29 @@ body_class: inner
     <p class="lede">A small selection of gloves that showed up hopeless and left with a second chance.</p>
 
     <div class="gallery-grid">
-      <img src="assets/img/beforeafter/ba01.jpg" alt="Before and after 1">
-      <img src="assets/img/beforeafter/ba02.jpg" alt="Before and after 2">
-      <img src="assets/img/beforeafter/ba03.jpg" alt="Before and after 3">
-      <img src="assets/img/beforeafter/ba04.jpg" alt="Before and after 4">
-      <img src="assets/img/beforeafter/ba05.jpg" alt="Before and after 5">
-      <img src="assets/img/beforeafter/ba06.jpg" alt="Before and after 6">
-      <img src="assets/img/beforeafter/ba07.jpg" alt="Before and after 7">
-      <img src="assets/img/beforeafter/ba08.jpg" alt="Before and after 8">
+      {% for item in site.data.gallery %}
+        <img
+          src="{{ '/assets/img/beforeafter/' | append: item.file | relative_url }}"
+          alt="{{ item.alt | escape }}"
+          loading="lazy"
+          decoding="async">
+      {% endfor %}
     </div>
 
     <div class="lightbox" aria-hidden="true">
-      <img src="" alt="Expanded gallery image">
+      <button class="lb-close" aria-label="Close">×</button>
+
+      <button class="lb-prev" aria-label="Previous image">‹</button>
+
+      <div class="lb-viewport">
+        <div class="lb-track"></div>
+      </div>
+
+      <button class="lb-next" aria-label="Next image">›</button>
+
+      <div class="lb-hint" aria-hidden="true">
+        
+        <span class="lb-counter"></span>
+      </div>
     </div>
   </main>
-
