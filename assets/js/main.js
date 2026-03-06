@@ -204,3 +204,12 @@ if (document.readyState === "loading") {
     }
   });
 })();
+
+// =========================
+// Disable right-click on protected images
+// =========================
+(() => {
+  document.querySelectorAll(".no-save").forEach(img => {
+    img.addEventListener("contextmenu", e => e.preventDefault());
+  });
+})();
