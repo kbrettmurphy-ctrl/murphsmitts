@@ -17,7 +17,7 @@
   --max: 1320px;
   --radius: 18px;
 
-  --headerH: 66px;
+  --headerH: clamp(66px, 6vw, 86px);
 }
 
 /* =========================
@@ -69,7 +69,8 @@ a:hover{text-decoration:underline}
 }
 
 .header-inner{
-  height: var(--headerH);
+  min-height: var(--headerH);
+  padding: 8px 0;
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -84,7 +85,7 @@ a:hover{text-decoration:underline}
 }
 
 .brand img{
-  height: clamp(48px, 4vw, 66px);
+  height: clamp(46px, 4vw, 66px);
   width: auto;
   border-radius: 999px;
   object-fit: cover;
