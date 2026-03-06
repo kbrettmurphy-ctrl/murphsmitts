@@ -428,8 +428,8 @@ hr.rule{
 
 /* Slider viewport */
 .lb-viewport{
-  width: min(1100px, 96vw);
-  height: 70vh;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   position: relative;
 }
