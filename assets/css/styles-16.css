@@ -381,6 +381,17 @@ hr.rule{
 }
 .gallery-grid img:hover{transform: scale(1.01); filter: brightness(.98)}
 
+.gallery-group{
+  margin-top: 34px;
+}
+
+.gallery-group h2{
+  margin: 0 0 12px;
+  color: var(--navy);
+  font-weight: 600;
+  font-size: clamp(20px, 3vw, 28px);
+}
+
 .lightbox{
   position:fixed;
   inset:0;
