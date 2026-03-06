@@ -1200,8 +1200,10 @@ body.menu-open{ overflow:hidden; }
   /* About photo on mobile (keeps your existing behavior) */
   .about-photo { height: 50vh; max-height: 320px; padding: 12px;}
   .about-photo img { height: 100%; }
+}
 
-  /* Header behavior on mobile */
+@media (max-width: 700px){
+   /* Header behavior on mobile */
   .site-nav{display:none;}
   .actions{display:none;}
   .menu-btn{display:flex;}
