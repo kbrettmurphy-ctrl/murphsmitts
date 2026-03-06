@@ -10,7 +10,7 @@ body_class: inner
     <h1>Before &amp; After</h1>
     <p class="lede">A small selection of gloves that showed up hopeless and left with a second chance.</p>
 
-    <div class="gallery-grid">
+    <div class="gallery-strip">
       {% for item in site.data.gallery %}
         <img
           src="{{ '/assets/img/beforeafter/' | append: item.file | relative_url }}"
