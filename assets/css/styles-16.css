@@ -625,8 +625,8 @@ hr.rule{
   padding: 0;
   margin: 0;
   flex: 0 0 320px;
-  width: 320px;
-  height: 320px;
+  width: 240px;
+  height: 240px;
   cursor: zoom-in;
   scroll-snap-align: start;
 }
@@ -656,8 +656,8 @@ hr.rule{
     flex-basis: 72vw;
     width: 72vw;
     height: 72vw;
-    max-width: 320px;
-    max-height: 320px;
+    max-width: 240px;
+    max-height: 240px;
   }
 }
 
