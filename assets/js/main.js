@@ -18,13 +18,20 @@ function initGalleryLightbox() {
   let slides = [];
   let activeThumbs = [];
 
+  let pointerDownThumb = null;
+  let pointerDownX = 0;
+  let pointerDownY = 0;
+  let pointerMoved = false;
+
   let touchStartX = 0;
   let touchStartY = 0;
   let dragging = false;
   let dx = 0;
 
   function updateCounter() {
-    if (counter) counter.textContent = slides.length ? `${index + 1} / ${slides.length}` : "";
+    if (counter) {
+      counter.textContent = slides.length ? `${index + 1} / ${slides.length}` : "";
+    }
   }
 
   function goTo(i, animate = true) {
@@ -84,34 +91,63 @@ function initGalleryLightbox() {
     goTo(index - 1);
   }
 
-  // Prevent native image dragging on gallery thumbs
+  // prevent native browser image drag
   document.addEventListener("dragstart", (e) => {
-    const img = e.target.closest("img");
-    if (!img) return;
-    if (img.matches(".gallery-grid img, .gallery-strip img")) {
-      e.preventDefault();
+    const img = e.target.closest(".gallery-grid img, .gallery-strip img");
+    if (img) e.preventDefault();
+  });
+
+  // pointer-based thumb opening so strips still scroll but taps open
+  document.addEventListener("pointerdown", (e) => {
+    const img = e.target.closest(".gallery-grid img, .gallery-strip img");
+    if (!img || img.closest(".lightbox")) return;
+
+    pointerDownThumb = img;
+    pointerDownX = e.clientX;
+    pointerDownY = e.clientY;
+    pointerMoved = false;
+  });
+
+  document.addEventListener("pointermove", (e) => {
+    if (!pointerDownThumb) return;
+
+    if (
+      Math.abs(e.clientX - pointerDownX) > 10 ||
+      Math.abs(e.clientY - pointerDownY) > 10
+    ) {
+      pointerMoved = true;
     }
   });
 
-  // Delegated click handler for all gallery thumbs
-  document.addEventListener("click", (e) => {
-    const img = e.target.closest("img");
-    if (!img) return;
-    if (!img.matches(".gallery-grid img, .gallery-strip img")) return;
-    if (img.closest(".lightbox")) return;
+  document.addEventListener("pointerup", (e) => {
+    if (!pointerDownThumb) return;
 
-    e.preventDefault();
-    openFromThumb(img);
+    const img = e.target.closest(".gallery-grid img, .gallery-strip img");
+    const shouldOpen = img && img === pointerDownThumb && !pointerMoved;
+
+    const thumbToOpen = shouldOpen ? pointerDownThumb : null;
+
+    pointerDownThumb = null;
+    pointerMoved = false;
+
+    if (thumbToOpen) {
+      openFromThumb(thumbToOpen);
+    }
   });
 
-  nextBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    next();
+  document.addEventListener("pointercancel", () => {
+    pointerDownThumb = null;
+    pointerMoved = false;
   });
 
   prevBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     prev();
+  });
+
+  nextBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    next();
   });
 
   closeBtn.addEventListener("click", (e) => {
@@ -127,11 +163,11 @@ function initGalleryLightbox() {
     if (!lb.classList.contains("open")) return;
 
     if (e.key === "Escape") closeLightbox();
-    if (e.key === "ArrowRight") next();
     if (e.key === "ArrowLeft") prev();
+    if (e.key === "ArrowRight") next();
   });
 
-  // Swipe inside lightbox only
+  // swipe inside lightbox only
   viewport.addEventListener("touchstart", (e) => {
     if (!lb.classList.contains("open")) return;
 
@@ -183,7 +219,6 @@ if (document.readyState === "loading") {
 } else {
   initGalleryLightbox();
 }
-
 // =========================
 // Mobile menu toggle
 // =========================
