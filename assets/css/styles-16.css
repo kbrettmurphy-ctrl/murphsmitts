@@ -1129,3 +1129,8 @@ body.home footer{
   flex-wrap: wrap;
   margin-top: 18px;
 }
+
+.no-save{
+  user-select:none;
+  -webkit-user-drag:none;
+}
