@@ -598,6 +598,7 @@ hr.rule{
   padding-bottom: 10px;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
 }
 
 .gallery-strip::-webkit-scrollbar,
