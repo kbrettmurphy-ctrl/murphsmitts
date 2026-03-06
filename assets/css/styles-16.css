@@ -465,7 +465,8 @@ hr.rule{
   background: rgba(0,0,0,.45);
   color:var(--bg);
   border:1px solid rgba(218, 202, 177,.18);
-  font-size:14px;
+  font-size:20px;
+  font-weight: 700;
   width:48px;
   height:48px;
   border-radius:50%;
