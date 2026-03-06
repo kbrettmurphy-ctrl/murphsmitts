@@ -16,8 +16,6 @@ function initGalleryLightbox() {
 
   let index = 0;
   let slides = [];
-  let activeThumbs = [];
-
   let touchStartX = 0;
   let dragging = false;
   let dx = 0;
@@ -39,7 +37,6 @@ function initGalleryLightbox() {
   }
 
   function buildSlides(thumbButtons) {
-    activeThumbs = thumbButtons;
     track.innerHTML = "";
 
     slides = thumbButtons.map((btn) => {
@@ -57,7 +54,9 @@ function initGalleryLightbox() {
     const group = button.dataset.galleryGroup;
     if (!group) return;
 
-    const thumbs = Array.from(document.querySelectorAll(`.gallery-thumb[data-gallery-group="${group}"]`));
+    const thumbs = Array.from(
+      document.querySelectorAll(`.gallery-thumb[data-gallery-group="${group}"]`)
+    );
     const clickedIndex = thumbs.indexOf(button);
     if (clickedIndex === -1) return;
 
@@ -106,11 +105,12 @@ function initGalleryLightbox() {
     closeLightbox();
   });
 
+  // close when clicking anywhere outside the current image
   lb.addEventListener("click", (e) => {
     const activeImg = track.children[index];
     if (!activeImg) return;
 
-    if (!activeImg.contains(e.target)) {
+    if (e.target === lb || e.target === track || !activeImg.contains(e.target)) {
       closeLightbox();
     }
   });
