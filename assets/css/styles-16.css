@@ -1132,5 +1132,8 @@ body.home footer{
 
 .no-save{
   user-select:none;
+  -webkit-user-select:none;
   -webkit-user-drag:none;
+  -webkit-touch-callout:none;
+  pointer-events:none;
 }
