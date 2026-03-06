@@ -499,7 +499,7 @@ hr.rule{
   content:"→";
   position:absolute;
   top:50%;
-  right:-15px;
+  right:-18px;
   transform:translateY(-50%);
   font-size:22px;
   line-height:1;
