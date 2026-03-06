@@ -90,6 +90,27 @@ a:hover{text-decoration:underline}
   object-fit: cover;
 }
 
+.brand-text{
+  display:none;
+  color: #dacab1e6;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+@media (max-width: 980px){
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .brand-text{
+    display:block;
+    max-width: 170px;
+  }
+}
+
 .site-nav{
   display:flex;
   gap: 22px;
