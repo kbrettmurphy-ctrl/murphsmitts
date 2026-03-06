@@ -457,13 +457,15 @@ hr.rule{
 .process-gallery{
   display:grid;
   grid-template-columns:repeat(5,1fr);
-  gap:14px;
-  margin:22px 0 32px;
+  gap:18px;
+  margin:24px 0 34px;
+  position:relative;
 }
 
 .process-gallery figure{
   margin:0;
   text-align:center;
+  position:relative;
 }
 
 .process-gallery img{
@@ -480,6 +482,18 @@ hr.rule{
   font-weight:600;
   letter-spacing:.03em;
   color:var(--ink-light);
+}
+
+/* arrows between steps */
+.process-gallery figure:not(:last-child)::after{
+  content:"→";
+  position:absolute;
+  right:-12px;
+  top:50%;
+  transform:translateY(-50%);
+  font-size:20px;
+  color:var(--ink-light);
+  opacity:.6;
 }
 
 /* =========================
@@ -1070,6 +1084,9 @@ body.home footer{
 @media (max-width:800px){
   .process-gallery{
     grid-template-columns:repeat(2,1fr);
+  }
+  .process-gallery figure::after{
+    display:none;
   }
   .process-gallery img{
     height:140px;
