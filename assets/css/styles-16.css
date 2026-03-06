@@ -800,7 +800,7 @@ footer{
   border-radius: 12px;
   border: 1px solid rgba(2,11,18,.16);
   background: rgba(218, 202, 177,.35);
-  color: var(--ink);
+  color: var(--navy);
   font-weight: 600;
   cursor: pointer;
   user-select:none;
