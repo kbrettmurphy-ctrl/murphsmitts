@@ -17,7 +17,7 @@
   --max: 1320px;
   --radius: 18px;
 
-  --headerH: clamp(66px, 6vw, 86px);
+  --headerH: clamp(66px, 6vw, 96px);
 }
 
 /* =========================
@@ -85,7 +85,7 @@ a:hover{text-decoration:underline}
 }
 
 .brand img{
-  height: clamp(46px, 4vw, 66px);
+  height: clamp(46px, 4vw, 76px);
   width: auto;
   border-radius: 999px;
   object-fit: cover;
