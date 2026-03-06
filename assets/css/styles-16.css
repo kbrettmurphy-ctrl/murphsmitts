@@ -431,6 +431,7 @@ hr.rule{
   width: min(1100px, 96vw);
   height: 88vh;
   overflow: hidden;
+  position: relative;
 }
 
 .lb-track{
@@ -455,6 +456,7 @@ hr.rule{
   position:absolute;
   top:50%;
   transform:translateY(-50%);
+  z-index: 1001;
   background: rgba(0,0,0,.45);
   color:white;
   border:1px solid rgba(218, 202, 177,.18);
@@ -467,8 +469,8 @@ hr.rule{
   align-items:center;
   justify-content:center;
 }
-.lb-prev{ left:18px; }
-.lb-next{ right:18px; }
+.lb-prev{ left:8px; }
+.lb-next{ right:8px; }
 
 .lb-prev:hover,
 .lb-next:hover,
