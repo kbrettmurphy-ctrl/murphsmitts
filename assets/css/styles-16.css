@@ -1101,6 +1101,8 @@ body.home footer{
   border: 1px solid rgba(0,0,0,.10);
   border-radius: 18px;
   padding: 18px 18px 16px;
+  display:flex;
+  flex-direction:column;
 }
 
 .reviews .review-stars{
@@ -1113,6 +1115,7 @@ body.home footer{
 .reviews .review-text{
   margin: 0 0 12px;
   line-height: 1.6;
+   flex:1;
 }
 
 .reviews .review-meta{
