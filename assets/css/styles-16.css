@@ -491,7 +491,7 @@ hr.rule{
   font-weight:700;
   letter-spacing:.03em;
   text-align:center;
-  color:var(--navy;
+  color:var(--navy);
 }
 
 /* arrows between image boxes only */
@@ -503,7 +503,7 @@ hr.rule{
   transform:translateY(-50%);
   font-size:22px;
   line-height:1;
-  color:var(--navy);
+  color:var(--ink-light);
   opacity:.65;
   z-index:2;
   pointer-events:none;
@@ -800,7 +800,7 @@ footer{
   border-radius: 12px;
   border: 1px solid rgba(2,11,18,.16);
   background: rgba(218, 202, 177,.35);
-  color: var(--navy);
+  color: var(--ink);
   font-weight: 600;
   cursor: pointer;
   user-select:none;
@@ -1016,7 +1016,7 @@ footer{
 .mobile-links a{
   font-size: 24px;
   font-weight: 500;
-  color: var(--navy);
+  color: var(--ink);
   text-decoration:none;
 }
 
