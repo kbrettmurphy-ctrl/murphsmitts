@@ -671,9 +671,8 @@ hr.rule{
 
 /* Lace swatches */
 .lace-strip .lace-item{
-  flex: 0 0 140px;
+  flex: 0 0 200px;
   width: 200px;
-  height: auto;
   scroll-snap-align: start;
 }
 
