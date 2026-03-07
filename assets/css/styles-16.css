@@ -1149,8 +1149,8 @@ footer{
 .mobile-menu .brand{
   display:flex;
   align-items:center;
-  gap: 12px;
-  min-width: 72px;
+  gap: 8px;
+  min-width: 100px;
 }
 
 .mobile-menu .brand img{
