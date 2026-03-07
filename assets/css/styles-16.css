@@ -670,27 +670,27 @@ hr.rule{
 /* Lace swatches */
 .lace-strip .lace-item{
   flex: 0 0 140px;
-  width: 140px;
+  width: 200px;
   scroll-snap-align: start;
 }
 
 .lace-strip .lace-item img{
   display: block;
-  width: 140px;
-  height: 140px;
+  width: 200px;
+  height: 200px;
   object-fit: cover;
   border-radius: 14px;
 }
 
 @media (max-width: 980px){
   .lace-strip .lace-item{
-    flex-basis: 120px;
-    width: 120px;
+    flex-basis: 200px;
+    width: 200px;
   }
 
   .lace-strip .lace-item img{
-    width: 120px;
-    height: 120px;
+    width: 200px;
+    height: 200px;
   }
 }
 
