@@ -673,6 +673,7 @@ hr.rule{
 .lace-strip .lace-item{
   flex: 0 0 140px;
   width: 200px;
+  height: auto;
   scroll-snap-align: start;
 }
 
