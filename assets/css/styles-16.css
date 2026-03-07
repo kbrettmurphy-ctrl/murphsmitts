@@ -93,7 +93,8 @@ a:hover{text-decoration:underline}
 
 .brand-text{
   display:none;
-  color: #092f4de6;
+  color: #navy;
+  filter: brightness(120%);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.15;
@@ -1165,7 +1166,7 @@ footer{
   display:block;
   max-width:none;
   color:#navy;
-  filter-brightness: (120%);
+  filter:brightness(120%);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.15;
