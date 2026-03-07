@@ -604,7 +604,7 @@ hr.rule{
   padding-bottom: 10px;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-x;
+  /*touch-action: pan-x;*/
 }
 
 .gallery-strip::-webkit-scrollbar,
@@ -650,7 +650,6 @@ hr.rule{
   user-select: none;
   -webkit-touch-callout: none;
   pointer-events: none;
-  touch-action: pan-y;
 }
 
 .gallery-thumb:hover img{
@@ -681,7 +680,6 @@ hr.rule{
   height: 200px;
   object-fit: cover;
   border-radius: 14px;
-  touch-action: pan-y;
 }
 
 @media (max-width: 980px){
