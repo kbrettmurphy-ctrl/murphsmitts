@@ -1097,7 +1097,7 @@ footer{
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  border: 1px solid rgba(218, 202, 177,.18);
+  border: 1px solid rgba(218, 202, 177,.00); /*no border */
   background: #092f4d00; /* 00 MAKES MENU BUTTON TRANSPARENT*/
   backdrop-filter: blur(8px);
   cursor:pointer;
@@ -1164,7 +1164,7 @@ footer{
 .mobile-menu .brand-text{
   display:block;
   max-width:none;
-  color:#092f4d;
+  color:#navy;
   font-size: 12px;
   font-weight: 600;
   line-height: 1.15;
