@@ -1122,7 +1122,7 @@ footer{
   position: fixed;
   inset: 0;
   z-index: 200;
-  background: #dacab180);
+  background: #dacab1A6);
   backdrop-filter: blur(10px);
   display:none;
 }
