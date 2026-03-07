@@ -1122,7 +1122,8 @@ footer{
   position: fixed;
   inset: 0;
   z-index: 200;
-  background: var(--bg);
+  background: #dacab180);
+  backdrop-filter: blur(10px);
   display:none;
 }
 
@@ -1173,10 +1174,10 @@ footer{
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  border: 1px solid rgba(2,11,18,.12);
-  background: rgba(218, 202, 177,.35);
+  border: 1px solid rgba(2,11,18,.00); /* no border */
+  background: rgba(218, 202, 177,.00); /*00 makes it see through*/
   cursor:pointer;
-  font-size: 26px;
+  font-size: 28px;
   line-height: 1;
   display:flex;
   align-items:center;
