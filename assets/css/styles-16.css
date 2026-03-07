@@ -63,7 +63,7 @@ a:hover{text-decoration:underline}
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 50;
-  background: rgba(2, 11, 18, 0.45);
+  background: #dacab173;
   backdrop-filter: blur(8px);
   border-bottom: 1px solid rgba(218, 202, 177, .12);
 }
