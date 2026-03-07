@@ -1200,6 +1200,7 @@ footer{
   font-size: 24px;
   font-weight: 500;
   color: var(--navy);
+  filter-brightness: (120%);
   text-decoration:none;
 }
 
