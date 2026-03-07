@@ -24,25 +24,25 @@ body_class: inner
     {% assign items = site.data.gallery | where: "category", key %}
 
     {% if items.size > 0 %}
-      <section class="gallery-group">
+      <section class="gallery-group" id="{{ key }}">
         <h2>{{ label }}</h2>
 
-       <div class="gallery-strip" data-gallery-group="{{ key }}">
-        {% for item in items %}
-          <button
-            class="gallery-thumb"
-            type="button"
-            data-gallery-group="{{ key }}"
-            data-gallery-index="{{ forloop.index0 }}"
-            aria-label="Open image: {{ item.alt | escape }}">
-            <img
-              src="{{ '/assets/img/beforeafter/' | append: item.file | relative_url }}"
-              alt="{{ item.alt | escape }}"
-              loading="lazy"
-              decoding="async">
-          </button>
-        {% endfor %}
-       </div>
+        <div class="gallery-strip" data-gallery-group="{{ key }}">
+          {% for item in items %}
+            <button
+              class="gallery-thumb"
+              type="button"
+              data-gallery-group="{{ key }}"
+              data-gallery-index="{{ forloop.index0 }}"
+              aria-label="Open image: {{ item.alt | escape }}">
+              <img
+                src="{{ '/assets/img/beforeafter/' | append: item.file | relative_url }}"
+                alt="{{ item.alt | escape }}"
+                loading="lazy"
+                decoding="async">
+            </button>
+          {% endfor %}
+        </div>
       </section>
     {% endif %}
   {% endfor %}
