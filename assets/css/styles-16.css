@@ -132,7 +132,8 @@ a:hover{text-decoration:underline}
 
 .site-nav a{
   font-weight: 600;
-  color: var(--red);
+  color: var(--navy);
+  text-shadow: 2px 2px var(--bg);
   filter: brightness(110%);
   font-size: 14px;
   padding: 8px 6px;
