@@ -65,7 +65,7 @@ a:hover{text-decoration:underline}
   z-index: 50;
   background: #dacab100;
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(218, 202, 177, .12);
+  /*border-bottom: 1px solid rgba(218, 202, 177, .12);*/
 }
 
 .header-inner{
