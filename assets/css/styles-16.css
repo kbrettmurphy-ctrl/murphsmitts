@@ -68,6 +68,10 @@ a:hover{text-decoration:underline}
   /*border-bottom: 1px solid rgba(218, 202, 177, .12);*/
 }
 
+body.home .site-header{
+  background: transparent;
+}
+
 .header-inner{
   min-height: var(--headerH);
   padding: 8px 0;
