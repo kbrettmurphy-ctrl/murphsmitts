@@ -650,6 +650,7 @@ hr.rule{
   user-select: none;
   -webkit-touch-callout: none;
   pointer-events: none;
+  touch-action: pan-y;
 }
 
 .gallery-thumb:hover img{
@@ -680,6 +681,7 @@ hr.rule{
   height: 200px;
   object-fit: cover;
   border-radius: 14px;
+  touch-action: pan-y;
 }
 
 @media (max-width: 980px){
@@ -995,7 +997,7 @@ footer{
   padding: 12px 12px;
   border-radius: 12px;
   border: 1px solid rgba(218, 202, 177,.20);
-  background: rgba(9,47,77,.85);
+  background: rgba(9,47,77,.9);
   color: #dacab1e6;
   font: inherit;
   outline: none;
