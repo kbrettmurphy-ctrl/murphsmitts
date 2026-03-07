@@ -1098,7 +1098,7 @@ footer{
   height: 46px;
   border-radius: 12px;
   border: 1px solid rgba(218, 202, 177,.18);
-  background: #092f4d4d;
+  background: #092f4d80;
   backdrop-filter: blur(8px);
   cursor:pointer;
 
