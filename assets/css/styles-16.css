@@ -271,18 +271,18 @@ body.home .footer{margin-top:0;}
   padding: 8px 0;
 }
 
-/* .trust-items{ */
-  /* display:grid; */
-  /* grid-template-columns: repeat(3, minmax(0, 1fr)); */
-  /* gap: 12px 18px; */
-  /* align-items:center; */
-/* } */
+.trust-items{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 18px;
+  align-items:center; */
+}
 
-/* .trust-item{ */
-  /* text-align:center; */
-  /* font-size: 15px; */
-  /* font-weight: 600; */
-/* } */
+.trust-item{
+  text-align:center;
+  font-size: 15px;
+  font-weight: 600;
+}
 
 /* Hero trust strip overrides */
 .hero-trust{
