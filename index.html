@@ -21,6 +21,17 @@ body_class: home
 
 <main class="home-sections">
 
+  <!-- TRUST SIGNALS -->
+  <section class="trust-strip" aria-label="Trust signals">
+    <div class="container">
+      <div class="trust-items">
+        <div class="trust-item">✓ Local drop-off in Surf City, NC</div>
+        <div class="trust-item">✓ Nationwide mail-in service</div>
+        <div class="trust-item">✓ High-quality glove lace &amp; leather care</div>
+      </div>
+    </div>
+  </section>
+
   <!-- BEFORE & AFTER -->
   <section class="home-section">
     <div class="container">
@@ -68,13 +79,26 @@ body_class: home
         </article>
 
         <article class="card home-service-card">
-          <h3>Deep Cleaning & Conditioning</h3>
+          <h3>Deep Cleaning &amp; Conditioning</h3>
           <p>Remove built-up dirt, restore moisture to the leather, and bring life back to gloves that feel dry or stiff.</p>
         </article>
       </div>
 
       <div class="home-actions">
         <a class="btn btn-secondary" href="{{ '/services/' | relative_url }}">View Services</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROCESS PREVIEW -->
+  <section class="home-section">
+    <div class="container">
+      <h2>The Restoration Process</h2>
+      <p class="lede">Every glove goes through a careful cleaning, conditioning, and relacing process designed to restore structure without ruining the break-in.</p>
+
+      <div class="home-actions">
+        <a class="btn btn-secondary" href="{{ '/process/' | relative_url }}">See the Full Process</a>
+        <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Start a Service Request</a>
       </div>
     </div>
   </section>
@@ -135,4 +159,3 @@ body_class: home
   </div>
 
 </main>
-
