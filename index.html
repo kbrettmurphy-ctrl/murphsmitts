@@ -19,4 +19,119 @@ body_class: home
   </div>
 </section>
 
+<main class="home-sections">
 
+  <!-- BEFORE & AFTER -->
+  <section class="home-section">
+    <div class="container">
+      <h2>Before &amp; After</h2>
+      <p class="lede">A few examples of gloves that showed up tired and left ready for another round.</p>
+
+      <div class="gallery-strip" data-gallery-group="home-featured">
+        {% assign featured = site.data.gallery | slice: 0, 6 %}
+        {% for item in featured %}
+          <button
+            class="gallery-thumb"
+            type="button"
+            data-gallery-group="home-featured"
+            data-gallery-index="{{ forloop.index0 }}"
+            aria-label="Open image: {{ item.alt | escape }}">
+            <img
+              src="{{ '/assets/img/beforeafter/' | append: item.file | relative_url }}"
+              alt="{{ item.alt | escape }}"
+              loading="lazy"
+              decoding="async">
+          </button>
+        {% endfor %}
+      </div>
+
+      <div class="home-actions">
+        <a class="btn btn-secondary" href="{{ '/gallery/' | relative_url }}">View Full Gallery</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- SERVICES OVERVIEW -->
+  <section class="home-section home-section-alt">
+    <div class="container">
+      <h2>What I Do</h2>
+
+      <div class="home-services-grid">
+        <article class="card home-service-card">
+          <h3>Full Relace &amp; Restoration</h3>
+          <p>Deep cleaning, conditioning, and complete relacing to get your glove back into game-ready shape.</p>
+        </article>
+
+        <article class="card home-service-card">
+          <h3>Custom Color Relacing</h3>
+          <p>Give your glove a fresh look with color combinations that stand out without sacrificing durability.</p>
+        </article>
+
+        <article class="card home-service-card">
+          <h3>Vintage Glove Revival</h3>
+          <p>Careful restoration work for older gloves that still deserve a second life.</p>
+        </article>
+      </div>
+
+      <div class="home-actions">
+        <a class="btn btn-secondary" href="{{ '/services/' | relative_url }}">View Services</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- REVIEWS -->
+  <section class="home-section">
+    <div class="container">
+      <h2>What Players Are Saying</h2>
+      <p class="lede">A few words from customers who trusted Murph’s Mitt Maintenance with their gloves.</p>
+
+      <div class="reviews-grid home-reviews-grid">
+        <article class="review-card">
+          <div class="review-stars" aria-label="5 out of 5 stars">★★★★★</div>
+          <p class="review-text">
+            "Huge shoutout to Murph's Mitt Maintenance for bringing my softball catcher’s glove back to life! The leather looks rich and refreshed, the pocket is perfectly formed again, and the new laces are tight, strong, and game-ready."
+          </p>
+          <div class="review-meta">— Sergio Vazquez · Google Review</div>
+        </article>
+
+        <article class="review-card">
+          <div class="review-stars" aria-label="5 out of 5 stars">★★★★★</div>
+          <p class="review-text">
+            "I had three gloves done by Murph's Mitt Maintenance. Each came back better than expected. I have had relacing done in the past, but there was no difference in the structure. That was not the case after getting the gloves back from Murph."
+          </p>
+          <div class="review-meta">— Beau Bilock · Google Review</div>
+        </article>
+
+        <article class="review-card">
+          <div class="review-stars" aria-label="5 out of 5 stars">★★★★★</div>
+          <p class="review-text">
+            "Very timely and professional service. Made my loose glove feel brand new yet still broke in. Fantastic service and customer service."
+          </p>
+          <div class="review-meta">— Joshua McGirl · Google Review</div>
+        </article>
+      </div>
+
+      <div class="home-actions">
+        <a class="btn btn-secondary" href="{{ '/services/#reviews' | relative_url }}">Read More Reviews</a>
+        <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Start a Service Request</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- LIGHTBOX -->
+  <div class="lightbox" aria-hidden="true">
+    <button class="lb-close" aria-label="Close">×</button>
+    <button class="lb-prev" aria-label="Previous image">←</button>
+
+    <div class="lb-viewport">
+      <div class="lb-track"></div>
+    </div>
+
+    <button class="lb-next" aria-label="Next image">→</button>
+
+    <div class="lb-hint" aria-hidden="true">
+      <span class="lb-counter"></span>
+    </div>
+  </div>
+
+</main>
