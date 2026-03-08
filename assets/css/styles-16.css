@@ -265,9 +265,9 @@ body.home .footer{margin-top:0;}
    ========================= */
 
 .trust-strip{
-  background: rgba(255,255,255,.14);
-  border-top: 1px solid rgba(9,47,77,.10);
-  border-bottom: 1px solid rgba(9,47,77,.10);
+  background: transparent;
+  /* border-top: 1px solid rgba(9,47,77,.10); */
+  /* border-bottom: 1px solid rgba(9,47,77,.10); */
   padding: 16px 0;
 }
 
@@ -282,7 +282,6 @@ body.home .footer{margin-top:0;}
   text-align:center;
   font-size: 15px;
   font-weight: 600;
-  color: var(--navy);
 }
 
 /* Hero trust strip overrides */
@@ -305,15 +304,15 @@ body.home .footer{margin-top:0;}
 
 @media (max-width: 700px){
   .hero-trust{
-    padding: 0;
+    padding: 6;
   }
   .hero-trust .trust-items{
     grid-template-columns: 1fr;
-    gap: 0;
+    gap: 4;
   }
   .hero-trust .trust-item{
     font-size: 12px;
-    line-height: 0.85;
+    line-height: 1;
     margin: 0;
   }
 }
