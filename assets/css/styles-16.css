@@ -267,20 +267,22 @@ body.home .footer{margin-top:0;}
   padding: 14px 0;
 }
 
-@media (max-width: 640px){
-
-  .hero-content{   /* tighten the hero spacing */
-    padding: calc(var(--headerH) + 70px) 0 120px;
+@media (max-width: 700px){
+  .hero-content{
+    padding: calc(var(--headerH) + 70px) 0 110px;
   }
-  .hero-trust{   /* make the trust strip thinner */
-    padding: 2px 0;
+  .hero-trust{
+    padding: 6px 0;
   }
-  .trust-items{   /* stack the trust items nicely */
+  .trust-items{
+    grid-template-columns: 1fr;
     gap: 2px;
-    font-size: .9rem;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
+  }
+  .trust-item{
+    font-size: 13px;
+    line-height: 1.15;
+    padding: 0;
+    margin: 0;
   }
 }
 
