@@ -363,8 +363,15 @@ hr.rule{
   color: #032d6b;
 }
 
-#faq, #Lace-Colors {
-  scroll-margin-top: 120px;
+#faq,
+#Lace-Colors,
+#reviews{
+  scroll-margin-top: calc(var(--headerH) + 24px);
+}
+
+.gallery-group{
+  margin-top: 34px;
+  scroll-margin-top: calc(var(--headerH) + 24px);
 }
 
 /* =========================
@@ -391,7 +398,6 @@ hr.rule{
 
 .gallery-group{
   margin-top: 34px;
-  scroll-margin-top: 110px;
 }
 
 .gallery-group h2{
