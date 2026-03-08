@@ -273,10 +273,10 @@ body.home .footer{margin-top:0;}
     padding: calc(var(--headerH) + 70px) 0 120px;
   }
   .hero-trust{   /* make the trust strip thinner */
-    padding: 8px 0;
+    padding: 2px 0;
   }
   .trust-items{   /* stack the trust items nicely */
-    gap: 6px;
+    gap: 2px;
     font-size: .9rem;
     flex-direction: column;
     align-items: center;
