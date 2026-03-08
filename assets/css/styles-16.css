@@ -254,6 +254,19 @@ body.home .footer{margin-top:0;}
   filter:brightness(110%);
 }
 
+.hero-trust{
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  background: rgba(9,47,77,.14);
+  backdrop-filter: blur(6px);
+  border-top: 1px solid rgba(218,202,177,.18);
+  border-bottom: 0;
+  padding: 14px 0;
+}
+
 .cta{
   display:flex;
   gap: 14px;
