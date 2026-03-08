@@ -257,7 +257,10 @@ body.home .footer{margin-top:0;}
 @media (max-width: 700px){
   .hero h1{
      font-size: clamp(2.0rem, 5vw, 3.0rem);
-  }  
+  }
+  .hero p{
+     font-size: clamp(0.8rem, 5vw, 1.7rem);
+  }
   .hero-content{
     padding: calc(var(--headerH) + 70px) 0 110px;
   }
