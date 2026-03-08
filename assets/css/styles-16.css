@@ -260,7 +260,7 @@ body.home .footer{margin-top:0;}
   right: 0;
   bottom: 0;
   z-index: 1;
-  background: rgba(9,47,77,.14);
+  background: rgba(9,47,77,.34);
   backdrop-filter: blur(6px);
   border-top: 1px solid rgba(218,202,177,.18);
   border-bottom: 0;
