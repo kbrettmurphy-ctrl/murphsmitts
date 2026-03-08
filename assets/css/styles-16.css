@@ -256,7 +256,7 @@ body.home .footer{margin-top:0;}
 
 @media (max-width: 700px){
   .hero h1{
-     font-size: clamp(1.6rem, 5vw, 2.6rem);
+     font-size: clamp(2.0rem, 5vw, 3.0rem);
   }  
   .hero-content{
     padding: calc(var(--headerH) + 70px) 0 110px;
