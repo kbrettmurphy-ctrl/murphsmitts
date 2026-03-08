@@ -272,7 +272,7 @@ body.home .footer{margin-top:0;}
     padding: calc(var(--headerH) + 70px) 0 110px;
   }
   .hero-trust{
-    padding: 4px 0;
+    padding: 0px 0;
   }
   .trust-items{
     grid-template-columns: 1fr;
