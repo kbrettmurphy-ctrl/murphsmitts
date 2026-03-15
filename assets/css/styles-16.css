@@ -141,7 +141,7 @@ body.home .site-header{
   font-size: 1rem;
   padding: 8px 6px;
   text-decoration: none;
-  -webkit-text-stroke: 1px var(--bg); /* Width and color of the stroke */
+  -webkit-text-stroke: .5px var(--bg); /* Width and color of the stroke */
   /* opacity: .95; */
 }
 /* body.home .site-nav a{ */
