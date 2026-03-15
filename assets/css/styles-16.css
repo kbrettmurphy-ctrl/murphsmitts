@@ -138,14 +138,14 @@ body.home .site-header{
   font-weight: 600;
   color: var(--navy);
   filter: brightness(110%);
-  font-size: 14px;
+  font-size: 1rem;
   padding: 8px 6px;
   text-decoration: none;
   /* opacity: .95; */
 }
-body.home .site-nav a{
-   color: var(--red);
-}
+/* body.home .site-nav a{ */
+   /* color: var(--red); */
+/* } */
 
 .site-nav a.active,
 .site-nav a:hover{
@@ -155,10 +155,10 @@ body.home .site-nav a{
   text-decoration: underline;
   text-underline-offset: 6px;
 }
-body.home .site-nav a.active,
-body.home .site-nav a:hover{
-   color: var(--red);
-}
+/* body.home .site-nav a.active, */
+/* body.home .site-nav a:hover{ */
+   /* color: var(--red); */
+/* } */
 
 .actions{
   min-width: 140px;
