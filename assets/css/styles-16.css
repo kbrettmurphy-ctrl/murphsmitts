@@ -828,24 +828,6 @@ hr.rule{
   transition: opacity .2s ease;
 }
 
-.lace-label1{
-  position:absolute;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-
-  background: rgba(9,47,77,.75);
-  color: var(--bg);
-
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: .03em;
-
-  opacity:0;
-  transition: opacity .2s ease;
-}
-
 /* Desktop hover */
 .lace-item:hover .lace-label{
   opacity:1;
