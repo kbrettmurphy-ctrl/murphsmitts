@@ -955,7 +955,7 @@ footer{
 .footer-badge img{
   display:block;
   height:auto;
-  max-width: 100px;           /* desktop size cap */
+  max-width: 75px;           /* desktop size cap */
   filter: drop-shadow(0 2px 6px rgba(0,0,0,.25));
 }
 
@@ -979,7 +979,7 @@ footer{
   }
 
   .footer-badge img{
-    max-width: 100px;         /* safe width on mobile */
+    max-width: 75px;         /* safe width on mobile */
     width: auto;
   }
 
