@@ -136,7 +136,7 @@ body.home .site-header{
 
 .site-nav a{
   font-weight: 600;
-  color: var(--navy);
+  color: var(--bg);
   filter: brightness(110%);
   font-size: 1rem;
   padding: 8px 6px;
@@ -150,7 +150,7 @@ body.home .site-header{
 .site-nav a.active,
 .site-nav a:hover{
   font-weight: 700;
-  color: var(--navy);
+  color: var(--bg);
   filter: brightness(130%);
   text-decoration: underline;
   text-underline-offset: 6px;
