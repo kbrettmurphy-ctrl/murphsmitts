@@ -1,1 +1,53 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Murph's Mitt Maintenance Admin</title>
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+  <div class="app">
+
+    <section id="loginView" class="view active">
+      <div class="card login-card">
+        <h1>Murph's Mitts Admin</h1>
+        <p class="muted">Enter your admin PIN.</p>
+        <input id="pinInput" type="password" inputmode="numeric" placeholder="PIN" />
+        <button id="loginBtn">Log In</button>
+        <p id="loginStatus" class="status"></p>
+      </div>
+    </section>
+
+    <section id="dashboardView" class="view">
+      <header class="topbar">
+        <div>
+          <h1>Orders</h1>
+          <p id="orderCount" class="muted"></p>
+        </div>
+        <button id="logoutBtn" class="secondary">Log Out</button>
+      </header>
+
+      <div class="toolbar">
+        <input id="searchInput" type="search" placeholder="Search by order #, name, email..." />
+      </div>
+
+      <div id="ordersList" class="orders-list"></div>
+    </section>
+
+    <section id="detailView" class="view">
+      <header class="topbar">
+        <button id="backBtn" class="secondary">Back</button>
+        <h1>Order Detail</h1>
+      </header>
+
+      <div id="orderDetail" class="detail-card"></div>
+    </section>
+
+  </div>
+
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
