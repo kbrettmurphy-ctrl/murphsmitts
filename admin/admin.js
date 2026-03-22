@@ -50,13 +50,21 @@ async function postJson(body, useAuth = false) {
     body: JSON.stringify(body)
   });
 
-  const data = await res.json();
+  const raw = await res.text();
+
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`Non-JSON response: ${raw.slice(0, 300) || "[empty response]"}`);
+  }
+
   if (!res.ok || !data.ok) {
     throw new Error(data.error || "Request failed");
   }
+
   return data;
 }
-
 function formatDate(value) {
   if (!value) return "";
   const d = new Date(value);
