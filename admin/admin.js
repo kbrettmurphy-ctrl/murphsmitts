@@ -38,17 +38,15 @@ function clearToken() {
 }
 
 async function postJson(body, useAuth = false) {
-  const headers = {
-    "Content-Type": "application/json"
-  };
-
   if (useAuth) {
-    headers["Authorization"] = `Bearer ${getToken()}`;
+    body._token = getToken();
   }
 
   const res = await fetch(API_BASE_URL, {
     method: "POST",
-    headers,
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8"
+    },
     body: JSON.stringify(body)
   });
 
