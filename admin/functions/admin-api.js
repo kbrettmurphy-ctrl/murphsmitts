@@ -9,15 +9,19 @@ export async function onRequestPost(context) {
       headers: {
         "Content-Type": "text/plain;charset=utf-8"
       },
-      body
+      body,
+      redirect: "follow"
     });
 
     const text = await resp.text();
+    const contentType = resp.headers.get("content-type") || "";
 
     return new Response(text, {
       status: resp.status,
       headers: {
-        "Content-Type": "application/json; charset=utf-8",
+        "Content-Type": contentType.includes("application/json")
+          ? "application/json; charset=utf-8"
+          : "text/plain; charset=utf-8",
         "Cache-Control": "no-store"
       }
     });
