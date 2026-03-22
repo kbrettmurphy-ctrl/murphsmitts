@@ -2,7 +2,7 @@ export async function onRequestPost(context) {
   try {
     const body = await context.request.text();
 
-    const gasUrl = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
+    const gasUrl = "https://script.google.com/macros/s/AKfycbxP6u0LhKFt0E9iyZqq0lOjK0S2ZQcfB386sf_fQWYL2abm2CvhLl9wNm1qaxW5oZTcBg/exec";
 
     const resp = await fetch(gasUrl, {
       method: "POST",
