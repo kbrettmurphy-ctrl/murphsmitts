@@ -235,12 +235,12 @@ button.secondary{
   text-align:center;
   /* letter-spacing:.2em; */
   color:var(--cream);
-  background:rgba(255,255,255,.05);
+  background:rgba(218,202,177,.05);
   outline:none;
 }
 
 .login-card input::placeholder{
-  color:rgba(9,47,77,.42);
+  color:rgba(9,47,77,.62);
   font-size:1rem;
 }
 
