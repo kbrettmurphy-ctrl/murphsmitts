@@ -171,7 +171,7 @@ function renderOrders(list) {
   ordersList.innerHTML = "";
 
   if (!list.length) {
-    ordersList.innerHTML = `<div class="card" style="padding:16px;">No matching orders.</div>`;
+    ordersList.innerHTML = `<div class="no-results">No matching orders.</div>`;
     return;
   }
 
@@ -180,62 +180,32 @@ function renderOrders(list) {
     card.className = "order-card clickable-card";
     card.tabIndex = 0;
 
-    const dateLabel = getCardDateLabel(order);
-    const dateValue = getCardDateValue(order);
+    const paidClass = String(order.paid || "").trim().toLowerCase() === "paid" ? "paid" : "unpaid";
 
     card.innerHTML = `
       <div class="order-top">
-        <div>
-          <strong>Order #${escapeHtml(order.orderNumber)}</strong><br>
-          <div>${escapeHtml(order.customerName || "")}</div>
-          <div class="muted">${escapeHtml(order.emailAddress || "")}</div>
+        <div class="order-main">
+          <div class="order-name">${escapeHtml(order.customerName || "")}</div>
+          <div class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</div>
         </div>
-        <div class="order-meta-date">
-          <div><strong>${escapeHtml(order.status || "")}</strong></div>
-          <div class="muted">${escapeHtml(dateLabel)}: ${escapeHtml(formatDate(dateValue))}</div>
-        </div>
+        <div class="order-status">${escapeHtml(order.status || "")}</div>
       </div>
 
-      <div class="badges">
-        <span class="badge">${escapeHtml(order.paid || "Unknown")}</span>
-        <span class="badge">${escapeHtml(order.dropOffMethod || "No delivery method")}</span>
-        ${order.estimatedCompletion ? `<span class="badge">Est: ${escapeHtml(formatDate(order.estimatedCompletion))}</span>` : ""}
+      <div class="action-row">
+        <button class="action-btn action-edit" type="button" aria-label="Edit">
+          <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+        <button class="action-btn action-email" type="button" aria-label="Email">
+          <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="m4 7 8 6 8-6"/></svg>
+        </button>
+        <button class="action-btn action-phone" type="button" aria-label="Call">
+          <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.08 4.18 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.63 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.15a2 2 0 0 1 2.11-.45c.83.3 1.71.51 2.61.63A2 2 0 0 1 22 16.92z"/></svg>
+        </button>
+        <button class="action-btn action-note" type="button" aria-label="Notes">
+          <svg viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+        </button>
       </div>
-
-      <div class="quick-actions"></div>
     `;
-
-    const quickWrap = card.querySelector(".quick-actions");
-    quickActionsForOrder(order).forEach(action => {
-      const btn = document.createElement("button");
-      btn.className = "secondary quick-btn";
-      btn.type = "button";
-      btn.textContent = action.label;
-
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-
-        const original = { ...order };
-        if (action.status) order.status = action.status;
-        if (action.paid) order.paid = action.paid;
-
-        applyFilters();
-
-        try {
-          const updates = {};
-          if (action.status) updates.status = action.status;
-          if (action.paid) updates.paid = action.paid;
-
-          await saveOrderUpdate(order.orderNumber, updates, false);
-        } catch (err) {
-          Object.assign(order, original);
-          applyFilters();
-          alert(err.message);
-        }
-      });
-
-      quickWrap.appendChild(btn);
-    });
 
     card.addEventListener("click", () => openOrder(order.orderNumber));
     card.addEventListener("keydown", (e) => {
@@ -243,6 +213,32 @@ function renderOrders(list) {
         e.preventDefault();
         openOrder(order.orderNumber);
       }
+    });
+
+    card.querySelector(".action-edit").addEventListener("click", (e) => {
+      e.stopPropagation();
+      openOrder(order.orderNumber);
+    });
+
+    card.querySelector(".action-email").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const email = String(order.emailAddress || "").trim();
+      if (email) window.location.href = `mailto:${email}`;
+    });
+
+    card.querySelector(".action-phone").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const phone = String(order.phoneNumber || "").trim();
+      if (phone) window.location.href = `tel:${phone}`;
+    });
+
+    card.querySelector(".action-note").addEventListener("click", (e) => {
+      e.stopPropagation();
+      openOrder(order.orderNumber);
+      setTimeout(() => {
+        const notesField = document.getElementById("editInternalNotes");
+        if (notesField) notesField.focus();
+      }, 50);
     });
 
     ordersList.appendChild(card);
