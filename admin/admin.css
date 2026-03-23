@@ -7,7 +7,7 @@
   --accent:#921a24;
   --chip:#eef2f5;
   --shadow:0 10px 30px rgba(0,0,0,.08);
-  --radius:16px;
+  --radius:20px;
   --menuW:260px;
 }
 
@@ -30,6 +30,9 @@ body{
   min-height:100vh;
 }
 
+/* =========================
+   Side menu
+   ========================= */
 .side-menu{
   position:fixed;
   top:0;
@@ -68,6 +71,7 @@ body{
   border-radius:50%;
   background:#092f4d;
   border:2px solid #921a24;
+  flex:0 0 auto;
 }
 
 .brand-title{
@@ -115,10 +119,13 @@ body{
   pointer-events:auto;
 }
 
+/* =========================
+   Main layout
+   ========================= */
 .main-panel{
   max-width:760px;
   margin:0 auto;
-  padding:16px;
+  padding:12px;
 }
 
 .view{
@@ -138,29 +145,53 @@ body{
   box-shadow:var(--shadow);
 }
 
+/* =========================
+   Login
+   ========================= */
 .login-card{
   margin-top:12vh;
   padding:20px;
 }
 
+.login-card h1{
+  margin:0 0 10px;
+  font-size:2rem;
+  line-height:1;
+}
+
+/* =========================
+   Topbar
+   ========================= */
 .topbar{
   display:flex;
   justify-content:space-between;
-  align-items:center;
+  align-items:flex-start;
   gap:12px;
   margin-bottom:16px;
 }
 
 .topbar-left{
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   gap:12px;
+  min-width:0;
+}
+
+.topbar h1,
+#viewTitle{
+  margin:0;
+  font-size:2.15rem;
+  line-height:.95;
+  letter-spacing:-0.02em;
 }
 
 .toolbar{
   margin-bottom:16px;
 }
 
+/* =========================
+   Form controls
+   ========================= */
 input,
 button,
 textarea,
@@ -170,6 +201,15 @@ select{
   border-radius:12px;
   border:1px solid var(--line);
   padding:14px;
+  appearance:none;
+  -webkit-appearance:none;
+}
+
+input,
+textarea,
+select{
+  background:#fff;
+  color:var(--ink);
 }
 
 button{
@@ -210,24 +250,41 @@ button.secondary{
   color:var(--muted);
 }
 
+/* =========================
+   Orders list
+   ========================= */
 .orders-list{
   display:grid;
   gap:12px;
 }
 
 .order-card{
-  padding:14px;
+  padding:12px;
+  border-radius:20px;
 }
 
-.order-card button{
-  margin-top:12px;
+.clickable-card{
+  cursor:pointer;
 }
 
 .order-top{
-  display:flex;
-  justify-content:space-between;
+  display:grid;
+  grid-template-columns: 1fr auto;
   gap:12px;
   align-items:start;
+}
+
+.order-top strong{
+  font-size:1.05rem;
+}
+
+.order-meta-date{
+  text-align:right;
+  min-width:110px;
+}
+
+.order-meta-date .muted{
+  line-height:1.2;
 }
 
 .badges{
@@ -238,27 +295,56 @@ button.secondary{
 }
 
 .badge{
-  display:inline-block;
+  display:inline-flex;
+  align-items:center;
   padding:6px 10px;
   border-radius:999px;
-  font-size:.85rem;
+  font-size:.8rem;
+  line-height:1;
   background:var(--chip);
   color:var(--ink);
+  white-space:nowrap;
 }
 
+.quick-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:14px;
+}
+
+.quick-btn{
+  width:auto;
+  padding:8px 12px;
+  border-radius:999px;
+  font-size:.92rem;
+  background:#e9eef4;
+  color:var(--ink);
+  border:none;
+  margin-top:0 !important;
+}
+
+.quick-btn:hover{
+  filter:brightness(.98);
+}
+
+/* =========================
+   Detail view
+   ========================= */
 .detail-card{
   padding:16px;
 }
 
 .detail-grid{
-  display:grid;
+  display:flex;
+  flex-direction:column;
   gap:12px;
 }
 
 .detail-block{
+  width:100%;
   border-top:1px solid var(--line);
   padding-top:12px;
-  width:100%;
 }
 
 .detail-block:first-child{
@@ -269,7 +355,7 @@ button.secondary{
 .label{
   font-size:.84rem;
   color:var(--muted);
-  margin-bottom:4px;
+  margin-bottom:6px;
 }
 
 .value{
@@ -277,25 +363,23 @@ button.secondary{
   word-break:break-word;
 }
 
-.clickable-card{
-  cursor:pointer;
+.detail-block input,
+.detail-block select,
+.detail-block textarea{
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
 }
 
-.quick-actions{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  margin-top:12px;
-}
-
-.quick-btn{
-  width:auto;
-  padding:10px 12px;
+textarea{
+  resize:vertical;
+  min-height:110px;
 }
 
 input[type="date"],
 input[type="number"],
 input[type="text"],
+input[type="search"],
 select,
 textarea{
   width:100%;
@@ -303,6 +387,9 @@ textarea{
   box-sizing:border-box;
 }
 
+/* =========================
+   Desktop
+   ========================= */
 @media (min-width: 900px){
   .side-menu{
     transform:none;
@@ -320,5 +407,67 @@ textarea{
 
   .mobile-only{
     display:none;
+  }
+
+  .topbar h1,
+  #viewTitle{
+    font-size:2.6rem;
+  }
+}
+
+/* =========================
+   Mobile polish
+   ========================= */
+@media (max-width: 640px){
+  .main-panel{
+    padding:12px;
+  }
+
+  .topbar{
+    align-items:flex-start;
+  }
+
+  .topbar-left{
+    align-items:flex-start;
+    min-width:0;
+    flex:1 1 auto;
+  }
+
+  .topbar h1,
+  #viewTitle{
+    font-size:2.15rem;
+    line-height:.95;
+    margin:0;
+  }
+
+  .order-top{
+    grid-template-columns: 1fr;
+  }
+
+  .order-meta-date{
+    text-align:left;
+    min-width:0;
+  }
+
+  .order-card{
+    padding:12px;
+  }
+
+  .quick-actions{
+    gap:10px;
+  }
+
+  .quick-btn{
+    flex:1 1 calc(50% - 10px);
+    text-align:center;
+  }
+
+  button.secondary{
+    padding:12px 14px;
+  }
+
+  .icon-btn{
+    min-width:44px;
+    padding:12px;
   }
 }
