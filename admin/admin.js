@@ -201,7 +201,7 @@ function renderOrders(list) {
         <button class="action-btn action-phone" type="button" aria-label="Call">
           <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.08 4.18 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.63 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.15a2 2 0 0 1 2.11-.45c.83.3 1.71.51 2.61.63A2 2 0 0 1 22 16.92z"/></svg>
         </button>
-        <button class="action-btn action-note" type="button" aria-label="Notes">
+        <button class="action-btn action-text" type="button" aria-label="Text">
           <svg viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
         </button>
       </div>
@@ -232,13 +232,10 @@ function renderOrders(list) {
       if (phone) window.location.href = `tel:${phone}`;
     });
 
-    card.querySelector(".action-note").addEventListener("click", (e) => {
+    card.querySelector(".action-text").addEventListener("click", (e) => {
       e.stopPropagation();
-      openOrder(order.orderNumber);
-      setTimeout(() => {
-        const notesField = document.getElementById("editInternalNotes");
-        if (notesField) notesField.focus();
-      }, 50);
+      const phone = String(order.phoneNumber || "").replace(/[^\d+]/g, "").trim();
+      if (phone) window.location.href = `sms:${phone}`;
     });
 
     ordersList.appendChild(card);
