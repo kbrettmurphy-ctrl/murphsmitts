@@ -193,7 +193,7 @@ function renderOrders(list) {
 
       <div class="action-row">
         <button class="action-btn action-edit" type="button" aria-label="Edit">
-          <svg viewBox="0 0 24 20"><path d="M12 18h8"/><path d="M16.5 2.5a2.1 2.1 0 0 1 3 3L7 17l-3 1 1-3Z"/></svg>
+          <svg viewBox="0 0 24 20"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
         </button>
         <button class="action-btn action-email" type="button" aria-label="Email">
           <svg viewBox="0 0 24 20"><path d="M4 4h16v16H4z"/><path d="m4 7 8 6 8-6"/></svg>
