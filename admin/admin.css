@@ -181,7 +181,7 @@ button.secondary{
 }
 
 .status{
-  color:#ff9aa4;
+  color:var(--red);
 }
 
 /* =========================
