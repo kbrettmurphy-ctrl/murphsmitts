@@ -231,10 +231,10 @@ button.secondary{
   border-radius:22px;
   border:2px solid rgba(9,47,77,.48);
   /*padding:14px 12px;*/
-  font-size:1.3rem;
+  font-size:1rem;
   text-align:center;
   /* letter-spacing:.2em; */
-  color:var(--cream);
+  color:var(--navy);
   background:rgba(218,202,177,.05);
   outline:none;
 }
