@@ -240,7 +240,8 @@ button.secondary{
 }
 
 .login-card input::placeholder{
-  color:rgba(218,202,177,.42);
+  color:rgba(9,47,77,.42);
+  font-size:1rem;
 }
 
 .login-card input:focus{
