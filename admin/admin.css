@@ -235,7 +235,7 @@ button.secondary{
   font-size:1rem;
   text-align:center;
   /* letter-spacing:.2em; */
-  color:var(--cream);
+  color:var(--navy);
   background:rgba(9,47,77,.25);
   outline:none;
 }
