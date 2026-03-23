@@ -209,7 +209,7 @@ button.secondary{
   border:1px solid rgba(218,202,177,.22);
   border-radius:24px;
   box-shadow:0 16px 34px rgba(0,0,0,.22);
-  padding:12px 16px 0 16px;
+  padding:12px 12px 0 12px;
 }
 
 .login-card h1{
@@ -516,18 +516,6 @@ button.secondary{
     border-top:1px solid var(--line);
   }
 
-  .order-card{
-    padding:18px 22px 16px;
-  }
-
-  .toolbar{
-    padding:12px 16px;
-  }
-
-  .topbar{
-    padding:12px 16px;
-  }
-
   .detail-card{
     max-width:860px;
     margin:0 auto;
@@ -537,71 +525,5 @@ button.secondary{
   .login-card{
     max-width:520px;
     margin-top:95px;
-    padding:12px 12px;
-  }
-
-  .login-card h1{
-    font-size:1.5rem;
-  }
-
-  .login-card input{
-    font-size:1.3rem;
-  }
-}
-
-/* =========================
-   MOBILE
-   ========================= */
-@media (max-width:640px){
-  .topbar{
-    padding:14px 14px 12px;
-  }
-
-  .topbar-left{
-    align-items:center;
-    gap:12px;
-  }
-
-  .topbar h1,
-  #viewTitle{
-    font-size:1.55rem;
-    line-height:1;
-  }
-
-  .toolbar{
-    padding:12px 14px;
-  }
-
-  .order-card{
-    padding:16px 14px 14px;
-  }
-
-  .order-top{
-    grid-template-columns: 1fr auto;
-    gap:12px;
-  }
-
-  .order-status{
-    font-size:.95rem;
-  }
-
-  .action-row{
-    gap:16px;
-  }
-
-  .detail-card{
-    padding:14px;
-  }
-
-  .login-card{
-    margin-top:60px;
-  }
-
-  .login-card h1{
-    font-size:1.5rem;
-  }
-
-  .login-card input{
-    font-size:1.3rem;
   }
 }
