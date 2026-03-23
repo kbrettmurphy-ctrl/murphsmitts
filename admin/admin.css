@@ -245,7 +245,7 @@ button.secondary{
 }
 
 .login-card input:focus{
-  border-color:var(--cream);
+  border-color:var(--navy);
   box-shadow:0 0 0 3px rgba(218,202,177,.10);
 }
 
