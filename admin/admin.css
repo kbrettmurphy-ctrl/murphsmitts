@@ -371,7 +371,7 @@ button.secondary{
   display:flex;
   justify-content:flex-end;
   gap:18px;
-  margin-top:16px;
+  margin-top:12px;
 }
 
 .action-btn{
@@ -389,7 +389,7 @@ button.secondary{
 
 .action-btn svg{
   width:24px;
-  height:24px;
+  height:20px;
   stroke:currentColor;
   fill:none;
   stroke-width:2;
