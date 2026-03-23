@@ -292,6 +292,16 @@ button.secondary{
   padding:10px 12px;
 }
 
+input[type="date"],
+input[type="number"],
+input[type="text"],
+select,
+textarea{
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+}
+
 @media (min-width: 900px){
   .side-menu{
     transform:none;
