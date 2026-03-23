@@ -412,7 +412,14 @@ async function saveCurrentOrderFromForm() {
     trackingNumber: document.getElementById("editTrackingNumber").value,
     carrier: document.getElementById("editCarrier").value,
     allowShipWithoutPayment: document.getElementById("editAllowShipWithoutPayment").value === "true",
-    internalNotes: document.getElementById("editInternalNotes").value
+    internalNotes: document.getElementById("editInternalNotes").value,
+
+    brandModel: document.getElementById("editBrandModel").value,
+    gloveType: document.getElementById("editGloveType").value,
+    webType: document.getElementById("editWebType").value,
+    servicesRequested: document.getElementById("editServicesRequested").value,
+    dropOffMethod: document.getElementById("editDropOffMethod").value,
+    gloveNotes: document.getElementById("editGloveNotes").value
   };
 
   const updated = await saveOrderUpdate(currentOrder.orderNumber, updates, true);
