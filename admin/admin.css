@@ -230,7 +230,7 @@ button.secondary{
   width:100%;
   border-radius:22px;
   border:2px solid rgba(218,202,177,.28);
-  padding:14px 12px;
+  /*padding:14px 12px;*/
   font-size:1.4rem;
   text-align:center;
   letter-spacing:.2em;
@@ -250,7 +250,7 @@ button.secondary{
 
 .login-card .status{
   min-height:16px;
-  margin-top:12px;
+  margin-top:0px;
 }
 
 /* =========================
