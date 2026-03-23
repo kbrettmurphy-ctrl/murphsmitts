@@ -233,7 +233,7 @@ button.secondary{
   /*padding:14px 12px;*/
   font-size:1.3rem;
   text-align:center;
-  letter-spacing:.2em;
+  /* letter-spacing:.2em; */
   color:var(--cream);
   background:rgba(255,255,255,.05);
   outline:none;
