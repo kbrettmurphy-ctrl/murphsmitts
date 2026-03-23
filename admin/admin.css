@@ -276,6 +276,22 @@ button.secondary{
   word-break:break-word;
 }
 
+.clickable-card{
+  cursor:pointer;
+}
+
+.quick-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+
+.quick-btn{
+  width:auto;
+  padding:10px 12px;
+}
+
 @media (min-width: 900px){
   .side-menu{
     transform:none;
