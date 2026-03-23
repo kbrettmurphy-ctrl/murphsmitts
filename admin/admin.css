@@ -472,7 +472,7 @@ button.secondary{
   color:var(--light-ink);
   border:2px solid #d1ccc2;
   border-radius:20px;
-  padding:16px 18px;
+  padding:12px 12px;
   font-size:1rem;
 }
 
