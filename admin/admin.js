@@ -322,32 +322,32 @@ function renderOrderDetail(order) {
 
       <div class="detail-block">
         <div class="label">Internal Notes</div>
-        <textarea id="editInternalNotes" rows="5"></textarea>
+        <textarea id="editInternalNotes" rows="4"></textarea>
       </div>
 
       <div class="detail-block">
         <div class="label">Brand / Model</div>
-        <div class="value">${escapeHtml(order.brandModel || "")}</div>
+        <input id="editBrandModel" type="text" />
       </div>
 
       <div class="detail-block">
         <div class="label">Glove Type</div>
-        <div class="value">${escapeHtml(order.gloveType || "")}</div>
+        <input id="editGloveType" type="text" />
       </div>
 
       <div class="detail-block">
         <div class="label">Web Type</div>
-        <div class="value">${escapeHtml(order.webType || "")}</div>
+        <input id="editWebType" type="text" />
       </div>
 
       <div class="detail-block">
         <div class="label">Services Requested</div>
-        <div class="value">${escapeHtml(order.servicesRequested || "")}</div>
+        <textarea id="editServicesRequested" rows="4"></textarea>
       </div>
 
       <div class="detail-block">
         <div class="label">Drop-Off Method</div>
-        <div class="value">${escapeHtml(order.dropOffMethod || "")}</div>
+        <input id="editDropOffMethod" type="text" />
       </div>
 
       <div class="detail-block">
@@ -362,7 +362,7 @@ function renderOrderDetail(order) {
 
       <div class="detail-block">
         <div class="label">Customer Notes</div>
-        <div class="value">${escapeHtml(order.gloveNotes || "")}</div>
+        <textarea id="editGloveNotes" rows="5"></textarea>
       </div>
 
       <div class="detail-block">
@@ -380,6 +380,13 @@ function renderOrderDetail(order) {
   document.getElementById("editCarrier").value = order.carrier || "";
   document.getElementById("editAllowShipWithoutPayment").value = order.allowShipWithoutPayment ? "true" : "false";
   document.getElementById("editInternalNotes").value = order.internalNotes || "";
+
+  document.getElementById("editBrandModel").value = order.brandModel || "";
+  document.getElementById("editGloveType").value = order.gloveType || "";
+  document.getElementById("editWebType").value = order.webType || "";
+  document.getElementById("editServicesRequested").value = order.servicesRequested || "";
+  document.getElementById("editDropOffMethod").value = order.dropOffMethod || "";
+  document.getElementById("editGloveNotes").value = order.gloveNotes || "";
 
   document.getElementById("saveOrderBtn").addEventListener("click", async () => {
     try {
