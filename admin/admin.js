@@ -6,7 +6,6 @@ const dashboardView = document.getElementById("dashboardView");
 const detailView = document.getElementById("detailView");
 
 const pinInput = document.getElementById("pinInput");
-const loginBtn = document.getElementById("loginBtn");
 const loginStatus = document.getElementById("loginStatus");
 
 const logoutBtn = document.getElementById("logoutBtn");
@@ -27,6 +26,7 @@ const navLinks = Array.from(document.querySelectorAll(".nav-link"));
 let allOrders = [];
 let activeView = "current";
 let currentOrder = null;
+let loginInProgress = false;
 
 function showView(view) {
   [loginView, dashboardView, detailView].forEach(v => v.classList.remove("active"));
@@ -147,25 +147,16 @@ function getCardDateLabel(order) {
 }
 
 function getCardDateValue(order) {
-  if (isCompletedOrder(order)) {
-    return order.dateCompleted || "";
-  }
-  return order.dateReceived || "";
+  return isCompletedOrder(order) ? (order.dateCompleted || "") : (order.dateReceived || "");
 }
 
 function quickActionsForOrder(order) {
   const status = String(order.status || "").trim().toLowerCase();
   const actions = [];
 
-  if (status !== "in progress") {
-    actions.push({ label: "In Progress", status: "In Progress" });
-  }
-  if (status !== "ready to go") {
-    actions.push({ label: "Ready to Go", status: "Ready to Go" });
-  }
-  if (status !== "completed") {
-    actions.push({ label: "Completed", status: "Completed" });
-  }
+  if (status !== "in progress") actions.push({ label: "In Progress", status: "In Progress" });
+  if (status !== "ready to go") actions.push({ label: "Ready to Go", status: "Ready to Go" });
+  if (status !== "completed") actions.push({ label: "Completed", status: "Completed" });
 
   actions.push({
     label: String(order.paid || "").trim().toLowerCase() === "paid" ? "Mark Unpaid" : "Mark Paid",
@@ -220,17 +211,29 @@ function renderOrders(list) {
       btn.className = "secondary quick-btn";
       btn.type = "button";
       btn.textContent = action.label;
+
       btn.addEventListener("click", async (e) => {
         e.stopPropagation();
+
+        const original = { ...order };
+        if (action.status) order.status = action.status;
+        if (action.paid) order.paid = action.paid;
+
+        applyFilters();
+
         try {
           const updates = {};
           if (action.status) updates.status = action.status;
           if (action.paid) updates.paid = action.paid;
+
           await saveOrderUpdate(order.orderNumber, updates, false);
         } catch (err) {
+          Object.assign(order, original);
+          applyFilters();
           alert(err.message);
         }
       });
+
       quickWrap.appendChild(btn);
     });
 
@@ -413,7 +416,6 @@ async function saveCurrentOrderFromForm() {
     carrier: document.getElementById("editCarrier").value,
     allowShipWithoutPayment: document.getElementById("editAllowShipWithoutPayment").value === "true",
     internalNotes: document.getElementById("editInternalNotes").value,
-
     brandModel: document.getElementById("editBrandModel").value,
     gloveType: document.getElementById("editGloveType").value,
     webType: document.getElementById("editWebType").value,
@@ -436,33 +438,31 @@ async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false) {
   }, true);
 
   const updatedOrder = data.order;
-
   const idx = allOrders.findIndex(o => String(o.orderNumber) === String(updatedOrder.orderNumber));
+
   if (idx !== -1) {
     allOrders[idx] = updatedOrder;
   } else {
     allOrders.push(updatedOrder);
   }
 
-  applyFilters();
-
   if (currentOrder && currentOrder.orderNumber === updatedOrder.orderNumber) {
     currentOrder = updatedOrder;
   }
 
-  if (stayOnDetail) {
-    return updatedOrder;
-  }
-
+  applyFilters();
   return updatedOrder;
 }
 
-async function login() {
+async function login(pinValue) {
+  if (loginInProgress) return;
+  loginInProgress = true;
   loginStatus.textContent = "Logging in...";
+
   try {
     const data = await postJson({
       action: "login",
-      pin: pinInput.value.trim()
+      pin: pinValue
     });
 
     setToken(data.token);
@@ -472,6 +472,10 @@ async function login() {
     showView(dashboardView);
   } catch (err) {
     loginStatus.textContent = err.message;
+    pinInput.value = "";
+    pinInput.focus();
+  } finally {
+    loginInProgress = false;
   }
 }
 
@@ -481,18 +485,15 @@ async function loadOrders() {
   applyFilters();
 }
 
-async function openOrder(orderNumber) {
-  try {
-    const data = await postJson({
-      action: "getOrder",
-      orderNumber
-    }, true);
-
-    renderOrderDetail(data.order);
-    showView(detailView);
-  } catch (err) {
-    alert(err.message);
+function openOrder(orderNumber) {
+  const order = allOrders.find(o => String(o.orderNumber) === String(orderNumber));
+  if (!order) {
+    alert("Order not found.");
+    return;
   }
+
+  renderOrderDetail(order);
+  showView(detailView);
 }
 
 function escapeHtml(str) {
@@ -503,9 +504,13 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
-loginBtn.addEventListener("click", login);
-pinInput.addEventListener("keydown", e => {
-  if (e.key === "Enter") login();
+pinInput.addEventListener("input", () => {
+  const digits = pinInput.value.replace(/\D/g, "").slice(0, 6);
+  pinInput.value = digits;
+
+  if (digits.length === 6) {
+    login(digits);
+  }
 });
 
 logoutBtn.addEventListener("click", () => {
