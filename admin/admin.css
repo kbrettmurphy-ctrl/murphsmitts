@@ -5,12 +5,10 @@
 
   --bg:#092f4d;
   --panel:#13293d;
-  --panel-2:#0f2335;
   --line:rgba(218,202,177,.22);
   --ink:#dacab1;
   --muted:rgba(218,202,177,.78);
   --green:#3e9b63;
-  --chip:#1b3750;
 
   --light-bg:#f4eee4;
   --light-panel:#fffdf9;
@@ -19,7 +17,6 @@
   --light-muted:#5f6b76;
 
   --shadow:0 10px 28px rgba(0,0,0,.18);
-  --radius:18px;
   --menuW:270px;
 }
 
@@ -34,13 +31,8 @@ html,body{
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
 
-body{
-  min-height:100vh;
-}
-
-.app-shell{
-  min-height:100vh;
-}
+body{ min-height:100vh; }
+.app-shell{ min-height:100vh; }
 
 /* =========================
    Side menu
@@ -60,9 +52,7 @@ body{
   box-shadow:0 0 30px rgba(0,0,0,.35);
 }
 
-.side-menu.open{
-  transform:translateX(0);
-}
+.side-menu.open{ transform:translateX(0); }
 
 .side-menu-header{
   display:flex;
@@ -143,13 +133,8 @@ body{
   background:var(--bg);
 }
 
-.view{
-  display:none;
-}
-
-.view.active{
-  display:block;
-}
+.view{ display:none; }
+.view.active{ display:block; }
 
 /* =========================
    Login
@@ -159,7 +144,7 @@ body{
   background:
     radial-gradient(circle at top left, rgba(218,202,177,.08), transparent 35%),
     linear-gradient(180deg, #092f4d 0%, #0d3c60 100%);
-  padding:18px;
+  padding:16px;
   display:flex;
   align-items:flex-start;
   justify-content:center;
@@ -168,34 +153,34 @@ body{
 .login-card{
   width:100%;
   max-width:420px;
-  margin:110px auto 0;
+  margin:78px auto 0;
   background:rgba(9,47,77,.96);
   border:1px solid rgba(218,202,177,.22);
   border-radius:24px;
   box-shadow:0 16px 34px rgba(0,0,0,.22);
-  padding:22px 18px;
+  padding:20px 16px;
 }
 
 .login-card h1{
   margin:0 0 12px;
   color:var(--cream);
-  font-size:1.95rem;
-  line-height:.98;
+  font-size:1.7rem;
+  line-height:1;
   letter-spacing:-0.03em;
 }
 
 .login-card .muted{
   color:rgba(218,202,177,.82);
-  font-size:1rem;
-  margin-bottom:16px;
+  font-size:.98rem;
+  margin-bottom:14px;
 }
 
 .login-card input{
   width:100%;
   border-radius:22px;
   border:2px solid rgba(218,202,177,.28);
-  padding:16px 14px;
-  font-size:1.65rem;
+  padding:14px 12px;
+  font-size:1.45rem;
   text-align:center;
   letter-spacing:.22em;
   color:var(--cream);
@@ -217,39 +202,6 @@ body{
   min-height:20px;
   margin-top:12px;
   color:#ff9aa4;
-}
-
-/* =========================
-   Mobile login tightening
-   ========================= */
-@media (max-width: 640px){
-  #loginView{
-    padding:16px;
-  }
-
-  .login-card{
-    max-width:100%;
-    margin:85px auto 0;
-    padding:20px 16px;
-    border-radius:22px;
-  }
-
-  .login-card h1{
-    font-size:1.65rem;
-    line-height:1;
-    margin-bottom:10px;
-  }
-
-  .login-card .muted{
-    font-size:.95rem;
-    margin-bottom:14px;
-  }
-
-  .login-card input{
-    font-size:1.45rem;
-    padding:14px 12px;
-    border-radius:20px;
-  }
 }
 
 /* =========================
@@ -322,9 +274,7 @@ select{
   font:inherit;
 }
 
-button{
-  cursor:pointer;
-}
+button{ cursor:pointer; }
 
 button.secondary,
 .icon-btn{
@@ -335,28 +285,15 @@ button.secondary,
   padding:12px 14px;
 }
 
-.icon-btn{
-  min-width:46px;
-}
-
-.mobile-only{
-  display:inline-flex;
-}
-
-.muted{
-  color:var(--muted);
-}
-
-.status{
-  color:var(--red);
-}
+.icon-btn{ min-width:46px; }
+.mobile-only{ display:inline-flex; }
+.muted{ color:var(--muted); }
+.status{ color:var(--red); }
 
 /* =========================
    Orders list
    ========================= */
-.orders-list{
-  display:block;
-}
+.orders-list{ display:block; }
 
 .order-card{
   background:var(--panel);
@@ -369,9 +306,7 @@ button.secondary,
   padding:18px 18px 16px;
 }
 
-.clickable-card{
-  cursor:pointer;
-}
+.clickable-card{ cursor:pointer; }
 
 .order-top{
   display:grid;
@@ -380,9 +315,7 @@ button.secondary,
   align-items:start;
 }
 
-.order-main{
-  min-width:0;
-}
+.order-main{ min-width:0; }
 
 .order-name{
   font-size:1.02rem;
@@ -398,13 +331,8 @@ button.secondary,
   margin-top:2px;
 }
 
-.order-number.paid{
-  color:var(--green);
-}
-
-.order-number.unpaid{
-  color:var(--red);
-}
+.order-number.paid{ color:var(--green); }
+.order-number.unpaid{ color:var(--red); }
 
 .order-status{
   text-align:right;
@@ -444,10 +372,6 @@ button.secondary,
   stroke-linejoin:round;
 }
 
-.action-btn:hover{
-  opacity:1;
-}
-
 .no-results{
   padding:20px 18px;
   color:var(--muted);
@@ -468,9 +392,7 @@ button.secondary,
   padding:6px 6px 14px;
 }
 
-#detailView .topbar h1{
-  color:var(--light-ink);
-}
+#detailView .topbar h1{ color:var(--light-ink); }
 
 .detail-card{
   background:var(--light-panel);
@@ -549,47 +471,41 @@ button.secondary,
    Desktop
    ========================= */
 @media (min-width: 900px){
-  .side-menu{
-    transform:none;
-  }
-
-  .menu-backdrop{
-    display:none;
-  }
+  .side-menu{ transform:none; }
+  .menu-backdrop{ display:none; }
 
   .main-panel{
     margin-left:var(--menuW);
     max-width:980px;
   }
 
-  .mobile-only{
-    display:none;
-  }
+  .mobile-only{ display:none; }
 
-  #dashboardView{
-    padding-bottom:24px;
-  }
-
-  .orders-list{
-    border-top:1px solid var(--line);
-  }
-
-  .order-card{
-    padding:20px 22px 18px;
-  }
-
-  .toolbar{
-    padding:16px 22px;
-  }
-
-  .topbar{
-    padding:16px 22px;
-  }
+  #dashboardView{ padding-bottom:24px; }
+  .orders-list{ border-top:1px solid var(--line); }
+  .order-card{ padding:20px 22px 18px; }
+  .toolbar{ padding:16px 22px; }
+  .topbar{ padding:16px 22px; }
 
   .detail-card{
     max-width:860px;
     margin:0 auto;
     padding:22px;
+  }
+
+  .login-card{
+    max-width:520px;
+    margin-top:110px;
+    padding:26px 22px;
+  }
+
+  .login-card h1{
+    font-size:2.2rem;
+  }
+
+  .login-card input{
+    font-size:1.8rem;
+    padding:16px 14px;
   }
 }
 
@@ -597,25 +513,6 @@ button.secondary,
    Mobile
    ========================= */
 @media (max-width: 640px){
-  .login-card{
-    margin-top:14vh;
-    padding:28px 22px;
-  }
-
-  .login-card h1{
-    font-size:2rem;
-    line-height:1.02;
-  }
-
-  .login-card .muted{
-    font-size:1rem;
-  }
-
-  .login-card input{
-    font-size:1.8rem;
-    padding:18px 16px;
-  }
-
   .topbar{
     padding:14px 14px 12px;
   }
