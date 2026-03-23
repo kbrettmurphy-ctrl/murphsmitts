@@ -199,7 +199,7 @@ function renderOrders(list) {
           <div>${escapeHtml(order.customerName || "")}</div>
           <div class="muted">${escapeHtml(order.emailAddress || "")}</div>
         </div>
-        <div style="text-align:right;">
+        <div class="order-meta-date">
           <div><strong>${escapeHtml(order.status || "")}</strong></div>
           <div class="muted">${escapeHtml(dateLabel)}: ${escapeHtml(formatDate(dateValue))}</div>
         </div>
