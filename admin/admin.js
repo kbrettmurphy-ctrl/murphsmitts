@@ -1,4 +1,3 @@
-
 const API_BASE_URL = window.MM_ADMIN_CONFIG.API_BASE_URL;
 const TOKEN_KEY = "mm_admin_token";
 
@@ -14,11 +13,19 @@ const logoutBtn = document.getElementById("logoutBtn");
 const searchInput = document.getElementById("searchInput");
 const ordersList = document.getElementById("ordersList");
 const orderCount = document.getElementById("orderCount");
+const viewTitle = document.getElementById("viewTitle");
 
 const backBtn = document.getElementById("backBtn");
 const orderDetail = document.getElementById("orderDetail");
 
+const sideMenu = document.getElementById("sideMenu");
+const menuBackdrop = document.getElementById("menuBackdrop");
+const menuBtn = document.getElementById("menuBtn");
+const closeMenuBtn = document.getElementById("closeMenuBtn");
+const navLinks = Array.from(document.querySelectorAll(".nav-link"));
+
 let allOrders = [];
+let activeView = "current";
 
 function showView(view) {
   [loginView, dashboardView, detailView].forEach(v => v.classList.remove("active"));
@@ -35,6 +42,16 @@ function setToken(token) {
 
 function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+}
+
+function openMenu() {
+  sideMenu.classList.add("open");
+  menuBackdrop.classList.add("show");
+}
+
+function closeMenu() {
+  sideMenu.classList.remove("open");
+  menuBackdrop.classList.remove("show");
 }
 
 async function postJson(body, useAuth = false) {
@@ -59,17 +76,60 @@ async function postJson(body, useAuth = false) {
     throw new Error(`Non-JSON response: ${raw.slice(0, 300) || "[empty response]"}`);
   }
 
-  if (!res.ok || !data.ok) {
+  if (!data.ok) {
     throw new Error(data.error || "Request failed");
   }
 
   return data;
 }
+
 function formatDate(value) {
   if (!value) return "";
   const d = new Date(value);
   if (isNaN(d)) return String(value);
   return d.toLocaleDateString();
+}
+
+function isCompletedOrder(order) {
+  return String(order.status || "").trim().toLowerCase() === "completed";
+}
+
+function getViewOrders() {
+  if (activeView === "completed") {
+    return allOrders.filter(isCompletedOrder);
+  }
+  return allOrders.filter(order => !isCompletedOrder(order));
+}
+
+function applyFilters() {
+  const q = searchInput.value.trim().toLowerCase();
+  let list = getViewOrders();
+
+  if (q) {
+    list = list.filter(order => {
+      return [
+        order.orderNumber,
+        order.customerName,
+        order.emailAddress,
+        order.phoneNumber,
+        order.status
+      ].some(v => String(v || "").toLowerCase().includes(q));
+    });
+  }
+
+  renderOrders(list);
+}
+
+function setActiveView(viewName) {
+  activeView = viewName;
+  viewTitle.textContent = viewName === "completed" ? "Completed" : "Current Orders";
+
+  navLinks.forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.view === viewName);
+  });
+
+  closeMenu();
+  applyFilters();
 }
 
 function renderOrders(list) {
@@ -87,7 +147,7 @@ function renderOrders(list) {
     card.innerHTML = `
       <div class="order-top">
         <div>
-          <strong>Order #${order.orderNumber}</strong><br>
+          <strong>Order #${escapeHtml(order.orderNumber)}</strong><br>
           <div>${escapeHtml(order.customerName || "")}</div>
           <div class="muted">${escapeHtml(order.emailAddress || "")}</div>
         </div>
@@ -100,7 +160,7 @@ function renderOrders(list) {
       <div class="badges">
         <span class="badge">${escapeHtml(order.paid || "Unknown")}</span>
         <span class="badge">${escapeHtml(order.dropOffMethod || "No delivery method")}</span>
-        ${order.estimatedCompletion ? `<span class="badge">Est: ${formatDate(order.estimatedCompletion)}</span>` : ""}
+        ${order.estimatedCompletion ? `<span class="badge">Est: ${escapeHtml(formatDate(order.estimatedCompletion))}</span>` : ""}
       </div>
 
       <button data-order="${escapeHtml(order.orderNumber)}">Open</button>
@@ -222,7 +282,7 @@ async function login() {
 async function loadOrders() {
   const data = await postJson({ action: "listOrders" }, true);
   allOrders = data.orders || [];
-  renderOrders(allOrders);
+  applyFilters();
 }
 
 async function openOrder(orderNumber) {
@@ -237,26 +297,6 @@ async function openOrder(orderNumber) {
   } catch (err) {
     alert(err.message);
   }
-}
-
-function filterOrders() {
-  const q = searchInput.value.trim().toLowerCase();
-  if (!q) {
-    renderOrders(allOrders);
-    return;
-  }
-
-  const filtered = allOrders.filter(order => {
-    return [
-      order.orderNumber,
-      order.customerName,
-      order.emailAddress,
-      order.phoneNumber,
-      order.status
-    ].some(v => String(v || "").toLowerCase().includes(q));
-  });
-
-  renderOrders(filtered);
 }
 
 function escapeHtml(str) {
@@ -277,8 +317,18 @@ logoutBtn.addEventListener("click", () => {
   showView(loginView);
 });
 
-searchInput.addEventListener("input", filterOrders);
+searchInput.addEventListener("input", applyFilters);
 backBtn.addEventListener("click", () => showView(dashboardView));
+
+menuBtn.addEventListener("click", openMenu);
+closeMenuBtn.addEventListener("click", closeMenu);
+menuBackdrop.addEventListener("click", closeMenu);
+
+navLinks.forEach(btn => {
+  btn.addEventListener("click", () => {
+    setActiveView(btn.dataset.view);
+  });
+});
 
 (async function init() {
   if (!getToken()) {
@@ -288,6 +338,7 @@ backBtn.addEventListener("click", () => showView(dashboardView));
 
   try {
     await loadOrders();
+    setActiveView(activeView);
     showView(dashboardView);
   } catch (err) {
     clearToken();
