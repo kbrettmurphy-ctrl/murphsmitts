@@ -234,8 +234,8 @@ button.secondary{
   font-size:1rem;
   text-align:center;
   /* letter-spacing:.2em; */
-  color:var(--navy);
-  background:rgba(218,202,177,.05);
+  color:var(--cream);
+  background:rgba(9,57,77,.05);
   outline:none;
 }
 
