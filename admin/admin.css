@@ -236,7 +236,7 @@ button.secondary{
   text-align:center;
   /* letter-spacing:.2em; */
   color:var(--cream);
-  background:rgba(9,57,77,.15);
+  background:rgba(9,47,77,.25);
   outline:none;
 }
 
