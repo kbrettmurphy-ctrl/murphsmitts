@@ -149,14 +149,21 @@ body{
    Login
    ========================= */
 .login-card{
-  margin-top:12vh;
-  padding:20px;
+  margin:16vh auto 0;
+  padding:22px;
+  max-width:460px;
 }
 
 .login-card h1{
   margin:0 0 10px;
   font-size:2rem;
   line-height:1;
+}
+
+.login-card input{
+  font-size:1.5rem;
+  text-align:center;
+  letter-spacing:.18em;
 }
 
 /* =========================
@@ -166,7 +173,7 @@ body{
   display:flex;
   justify-content:space-between;
   align-items:flex-start;
-  gap:12px;
+  gap:14px;
   margin-bottom:16px;
 }
 
@@ -175,6 +182,7 @@ body{
   align-items:flex-start;
   gap:12px;
   min-width:0;
+  flex:1 1 auto;
 }
 
 .topbar h1,
@@ -380,6 +388,7 @@ input[type="date"],
 input[type="number"],
 input[type="text"],
 input[type="search"],
+input[type="password"],
 select,
 textarea{
   width:100%;
@@ -424,7 +433,7 @@ textarea{
   }
 
   .topbar{
-    align-items:flex-start;
+    gap:10px;
   }
 
   .topbar-left{
@@ -435,7 +444,7 @@ textarea{
 
   .topbar h1,
   #viewTitle{
-    font-size:2.15rem;
+    font-size:1.95rem;
     line-height:.95;
     margin:0;
   }
@@ -463,11 +472,30 @@ textarea{
   }
 
   button.secondary{
+    width:auto;
+    min-width:88px;
     padding:12px 14px;
   }
 
   .icon-btn{
     min-width:44px;
     padding:12px;
+  }
+
+  .badge{
+    font-size:.78rem;
+  }
+
+  .login-card{
+    margin-top:14vh;
+    padding:20px;
+  }
+
+  .login-card h1{
+    font-size:1.9rem;
+  }
+
+  .login-card input{
+    font-size:1.4rem;
   }
 }
