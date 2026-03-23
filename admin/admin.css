@@ -89,6 +89,14 @@ body{
   flex:0 0 auto;
 }
 
+.brand-logo {
+  width: 38px;
+  height: 38px;
+  object-fit: contain; /* ensures it scales nicely */
+  border-radius: 50%; /* optional, only if you want it circular */
+  flex: 0 0 auto;
+}
+
 .brand-title{
   font-weight:700;
   color:var(--cream);
