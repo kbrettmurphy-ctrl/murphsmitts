@@ -258,6 +258,7 @@ button.secondary{
 .detail-block{
   border-top:1px solid var(--line);
   padding-top:12px;
+  width:100%;
 }
 
 .detail-block:first-child{
