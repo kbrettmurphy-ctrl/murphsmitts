@@ -432,6 +432,10 @@ async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false) {
 
   applyFilters();
 
+  if (currentOrder && currentOrder.orderNumber === updatedOrder.orderNumber) {
+    currentOrder = updatedOrder;
+  }
+
   if (stayOnDetail) {
     return updatedOrder;
   }
