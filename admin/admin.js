@@ -91,13 +91,15 @@ function formatDate(value) {
 }
 
 function isCompletedOrder(order) {
-  return String(order.status || "").trim().toLowerCase() === "completed";
+  const status = String(order.status || "").trim().toLowerCase();
+  return status === "completed" || status === "picked up";
 }
 
 function getViewOrders() {
   if (activeView === "completed") {
     return allOrders.filter(isCompletedOrder);
   }
+
   return allOrders.filter(order => !isCompletedOrder(order));
 }
 
