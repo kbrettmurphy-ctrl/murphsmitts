@@ -159,39 +159,43 @@ body{
   background:
     radial-gradient(circle at top left, rgba(218,202,177,.08), transparent 35%),
     linear-gradient(180deg, #092f4d 0%, #0d3c60 100%);
-  padding:24px;
+  padding:18px;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
 }
 
 .login-card{
-  max-width:620px;
-  margin:14vh auto 0;
+  width:100%;
+  max-width:420px;
+  margin:110px auto 0;
   background:rgba(9,47,77,.96);
-  border:1px solid rgba(218,202,177,.24);
-  border-radius:28px;
-  box-shadow:0 20px 40px rgba(0,0,0,.28);
-  padding:30px 28px;
+  border:1px solid rgba(218,202,177,.22);
+  border-radius:24px;
+  box-shadow:0 16px 34px rgba(0,0,0,.22);
+  padding:22px 18px;
 }
 
 .login-card h1{
-  margin:0 0 14px;
+  margin:0 0 12px;
   color:var(--cream);
-  font-size:2.4rem;
-  line-height:.95;
+  font-size:1.95rem;
+  line-height:.98;
   letter-spacing:-0.03em;
 }
 
 .login-card .muted{
   color:rgba(218,202,177,.82);
-  font-size:1.05rem;
-  margin-bottom:18px;
+  font-size:1rem;
+  margin-bottom:16px;
 }
 
 .login-card input{
   width:100%;
-  border-radius:24px;
-  border:2px solid rgba(218,202,177,.32);
-  padding:18px 20px;
-  font-size:2rem;
+  border-radius:22px;
+  border:2px solid rgba(218,202,177,.28);
+  padding:16px 14px;
+  font-size:1.65rem;
   text-align:center;
   letter-spacing:.22em;
   color:var(--cream);
@@ -200,19 +204,52 @@ body{
 }
 
 .login-card input::placeholder{
-  color:rgba(218,202,177,.45);
+  color:rgba(218,202,177,.42);
   letter-spacing:.22em;
 }
 
 .login-card input:focus{
   border-color:var(--cream);
-  box-shadow:0 0 0 3px rgba(218,202,177,.12);
+  box-shadow:0 0 0 3px rgba(218,202,177,.10);
 }
 
 .login-card .status{
   min-height:20px;
-  margin-top:14px;
+  margin-top:12px;
   color:#ff9aa4;
+}
+
+/* =========================
+   Mobile login tightening
+   ========================= */
+@media (max-width: 640px){
+  #loginView{
+    padding:16px;
+  }
+
+  .login-card{
+    max-width:100%;
+    margin:85px auto 0;
+    padding:20px 16px;
+    border-radius:22px;
+  }
+
+  .login-card h1{
+    font-size:1.65rem;
+    line-height:1;
+    margin-bottom:10px;
+  }
+
+  .login-card .muted{
+    font-size:.95rem;
+    margin-bottom:14px;
+  }
+
+  .login-card input{
+    font-size:1.45rem;
+    padding:14px 12px;
+    border-radius:20px;
+  }
 }
 
 /* =========================
