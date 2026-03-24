@@ -596,7 +596,9 @@ async function saveCurrentOrderFromForm() {
   const city = isLocal ? "" : val("editCity");
   const state = isLocal ? "" : val("editState");
   const zipCode = isLocal ? "" : val("editZipCode");
-
+  const trackingNumber = isLocal ? "" : val("editTrackingNumber");
+  const carrier = isLocal ? "" : val("editCarrier");
+  const allowShipWithoutPayment = isLocal ? "" : val("editAllowShipWithoutPayment")
   const primaryLaceColor = val("editPrimaryLaceColor");
   const secondaryLaceColor = val("editSecondaryLaceColor");
   const customLaceNotes = val("editCustomLaceNotes");
@@ -626,6 +628,9 @@ async function saveCurrentOrderFromForm() {
     updates.state = state;
     updates.zipCode = zipCode;
     updates.zip = zipCode;
+    updates.tracking = trackingNumber;
+    updates.trackingNumber = trackingNumber;
+    updates.carrier = carrier;
   }
 
   if (document.getElementById("editPrimaryLaceColor")) {
