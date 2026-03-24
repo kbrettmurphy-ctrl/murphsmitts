@@ -23,10 +23,10 @@
 
       <nav class="side-nav">
         <button class="nav-link active" data-view="current">Current Orders</button>
-        <button class="nav-link" data-view="waiting-on-parts">Waiting on Parts</button>
-        <button class="nav-link" data-view="estimate-sent">Estimate Sent</button>
-        <button class="nav-link" data-view="in-progress">In Progress</button>
-        <button class="nav-link" data-view="ready-to-go">Ready to Go</button>
+        <button class="nav-link" data-view="waiting">Waiting on Parts</button>
+        <button class="nav-link" data-view="estimate">Estimate Sent</button>
+        <button class="nav-link" data-view="progress">In Progress</button>
+        <button class="nav-link" data-view="ready">Ready to Go</button>
         <button class="nav-link" data-view="completed">Completed</button>
       </nav>
     </aside>
@@ -56,7 +56,7 @@
         </header>
 
         <div class="toolbar">
-          <input id="searchInput" type="search" placeholder="Search by order #, name, email, glove type..." />
+          <input id="searchInput" type="search" placeholder="Search by order #, name, email..." />
         </div>
 
         <div id="ordersList" class="orders-list"></div>
@@ -67,11 +67,8 @@
           <div class="topbar-left">
             <button id="backBtn" class="secondary">Back</button>
             <div>
-              <h1 id="detailTitle">Order Detail</h1>
+              <h1>Order Detail</h1>
             </div>
-          </div>
-          <div class="topbar-right">
-            <button id="saveHeaderBtn" class="primary-action" type="button">Save Changes</button>
           </div>
         </header>
 
