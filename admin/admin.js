@@ -329,7 +329,7 @@ function renderOrderDetail(order) {
         </select>
       </div>
 
-      <div class="detail-block">
+      <div class="detail-block full">
         <div class="label">Internal Notes</div>
         <textarea id="editInternalNotes" rows="4"></textarea>
       </div>
@@ -349,7 +349,7 @@ function renderOrderDetail(order) {
         <input id="editWebType" type="text" />
       </div>
 
-      <div class="detail-block">
+      <div class="detail-block full">
         <div class="label">Services Requested</div>
         <textarea id="editServicesRequested" rows="4"></textarea>
       </div>
@@ -373,7 +373,7 @@ function renderOrderDetail(order) {
         <div class="value">${escapeHtml(formatDate(order.dateCompleted))}</div>
       </div>
 
-      <div class="detail-block">
+      <div class="detail-block full">
         <div class="label">Customer Notes</div>
         <textarea id="editGloveNotes" rows="5"></textarea>
       </div>
