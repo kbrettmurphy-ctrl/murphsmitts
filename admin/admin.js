@@ -424,6 +424,14 @@ function renderOrderDetail(order) {
     ${renderSectionHeading("Shipping")}
 
     <div class="detail-block">
+       <div class="label">Allow Ship Without Payment</div>
+       <select id="editAllowShipWithoutPayment">
+         <option value="false">No</option>
+         <option value="true">Yes</option>
+       </select>
+    </div>
+
+    <div class="detail-block">
        <div class="label">Tracking Number</div>
        <input id="editTrackingNumber" type="text" />
     </div>
@@ -431,14 +439,6 @@ function renderOrderDetail(order) {
     <div class="detail-block">
        <div class="label">Carrier</div>
        <select id="editCarrier">${carrierOptions(order.carrier)}</select>
-    </div>
-
-    <div class="detail-block">
-       <div class="label">Allow Ship Without Payment</div>
-       <select id="editAllowShipWithoutPayment">
-         <option value="false">No</option>
-         <option value="true">Yes</option>
-       </select>
     </div>
       
     <div class="detail-block full">
