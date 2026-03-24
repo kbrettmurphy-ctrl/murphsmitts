@@ -63,12 +63,17 @@
       </section>
 
       <section id="detailView" class="view">
-        <header class="topbar">
+        <header class="topbar detail-topbar">
           <div class="topbar-left">
             <button id="backBtn" class="secondary">Back</button>
             <div>
               <h1>Order Detail</h1>
             </div>
+          </div>
+
+          <div class="detail-topbar-actions">
+            <p id="saveStatus" class="status" aria-live="polite"></p>
+            <button id="saveOrderBtn" type="button">Save Changes</button>
           </div>
         </header>
 
