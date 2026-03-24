@@ -140,8 +140,7 @@ body{
    MAIN LAYOUT
    ========================= */
 .main-panel{
-  /* max-width:920px; */
-  width:100%;
+  max-width:920px;  
   margin:0 auto;
   min-height:100vh;
   background:var(--bg);
@@ -515,7 +514,9 @@ button.secondary{
 
   .main-panel{
     margin-left:var(--menuW);
-    /* max-width:980px; */
+    max-width:none;
+    width:calc(100% - var(--menuW));
+    padding:0 20px;
   }
 
   .mobile-only{
@@ -527,9 +528,25 @@ button.secondary{
   }
 
   .detail-card{
-    max-width:860px;
-    margin:0 auto;
+    max-width:none;
+    width:100%;
+    margin:0;
     padding:14px;
+  }
+
+  .detail-grid{
+    display:grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap:16px 20px;
+  }
+
+  .detail-block{
+    border-top:none;
+    padding-top:0;
+  }
+
+  .detail-block.full{
+    grid-column:1 / -1;
   }
 
   .login-card{
