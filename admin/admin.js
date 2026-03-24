@@ -104,11 +104,25 @@ function isCompletedOrder(order) {
   return status === "completed" || status === "picked up";
 }
 
+function normalizeStatus(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function getViewOrders() {
-  if (activeView === "completed") {
-    return allOrders.filter(isCompletedOrder);
+  switch (activeView) {
+    case "completed":
+      return allOrders.filter(isCompletedOrder);
+    case "waiting":
+      return allOrders.filter(order => normalizeStatus(order.status) === "waiting on parts");
+    case "estimate":
+      return allOrders.filter(order => normalizeStatus(order.status) === "estimate sent");
+    case "progress":
+      return allOrders.filter(order => normalizeStatus(order.status) === "in progress");
+    case "ready":
+      return allOrders.filter(order => normalizeStatus(order.status) === "ready to go");
+    default:
+      return allOrders.filter(order => !isCompletedOrder(order));
   }
-  return allOrders.filter(order => !isCompletedOrder(order));
 }
 
 function applyFilters() {
@@ -130,9 +144,20 @@ function applyFilters() {
   renderOrders(list);
 }
 
+function getViewTitle(viewName) {
+  switch (viewName) {
+    case "waiting": return "Waiting on Parts";
+    case "estimate": return "Estimate Sent";
+    case "progress": return "In Progress";
+    case "ready": return "Ready to Go";
+    case "completed": return "Completed";
+    default: return "Current Orders";
+  }
+}
+
 function setActiveView(viewName) {
   activeView = viewName;
-  viewTitle.textContent = viewName === "completed" ? "Completed" : "Current Orders";
+  viewTitle.textContent = getViewTitle(viewName);
 
   navLinks.forEach(btn => {
     btn.classList.toggle("active", btn.dataset.view === viewName);
@@ -140,6 +165,11 @@ function setActiveView(viewName) {
 
   closeMenu();
   applyFilters();
+
+  if (detailView.classList.contains("active")) {
+    showView(dashboardView);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
 }
 
 function getCardDateLabel(order) {
@@ -242,7 +272,7 @@ function renderOrders(list) {
   });
 }
 
-function renderLaceField(label, value, alwaysShow = false) {
+function renderLaceField(label, id, value, alwaysShow = false) {
   const hasValue = value && String(value).trim() !== "";
 
   if (!hasValue && !alwaysShow) return "";
@@ -250,35 +280,66 @@ function renderLaceField(label, value, alwaysShow = false) {
   return `
     <div class="detail-block">
       <div class="label">${label}</div>
-      <div class="value">${escapeHtml(value || "")}</div>
+      <input id="${id}" type="text" value="${escapeAttr(value || "")}" />
     </div>
   `;
+}
+
+function renderSectionHeading(title) {
+  return `<div class="detail-section-title full">${escapeHtml(title)}</div>`;
+}
+
+function carrierOptions(current) {
+  const opts = ["", "USPS", "UPS", "FedEx"];
+  return opts.map(v =>
+    `<option value="${escapeAttr(v)}" ${v === (current || "") ? "selected" : ""}>${escapeHtml(v || "Select carrier")}</option>`
+  ).join("");
+}
+
+function gloveTypeOptions(current) {
+  const opts = ["", "Fielders Glove", "Catchers Mitt", "First Base Mitt"];
+  return opts.map(v =>
+    `<option value="${escapeAttr(v)}" ${v === (current || "") ? "selected" : ""}>${escapeHtml(v || "Select glove type")}</option>`
+  ).join("");
+}
+
+function webTypeOptions(current) {
+  const opts = ["", "I-Web", "H-Web", "Single Post Web", "Trapeze Web", "Modified Trapeze Web", "Basket (Fully Closed) Web"];
+  return opts.map(v =>
+    `<option value="${escapeAttr(v)}" ${v === (current || "") ? "selected" : ""}>${escapeHtml(v || "Select web type")}</option>`
+  ).join("");
+}
+
+function formatMoneyForInput(value) {
+  if (value === null || value === undefined || value === "") return "";
+  const num = Number(String(value).replace(/[^\d.-]/g, ""));
+  if (Number.isNaN(num)) return "";
+  return `$${num.toFixed(2)}`;
+}
+
+function parseMoneyInput(value) {
+  if (value === null || value === undefined || value === "") return "";
+  const num = Number(String(value).replace(/[^\d.-]/g, ""));
+  return Number.isNaN(num) ? "" : num.toFixed(2);
 }
 
 function renderOrderDetail(order) {
   currentOrder = order;
 
   orderDetail.innerHTML = `
+    <div class="detail-header-row full">
+      <div>
+        <div class="detail-order-number">Order #${escapeHtml(order.orderNumber || "")}</div>
+        <div class="detail-order-status">${escapeHtml(order.status || "Received")}</div>
+      </div>
+      <div class="detail-actions">
+        <button id="saveOrderBtn" type="button">Save Changes</button>
+        <p id="saveStatus" class="status"></p>
+      </div>
+    </div>
+
     <div class="detail-grid">
-      <div class="detail-block">
-        <div class="label">Order #</div>
-        <div class="value">${escapeHtml(order.orderNumber || "")}</div>
-      </div>
-
-      <div class="detail-block">
-        <div class="label">Customer</div>
-        <div class="value">${escapeHtml(order.customerName || "")}</div>
-      </div>
-
-      <div class="detail-block">
-        <div class="label">Phone</div>
-        <div class="value">${escapeHtml(order.phoneNumber || "")}</div>
-      </div>
-
-      <div class="detail-block">
-        <div class="label">Email</div>
-        <div class="value">${escapeHtml(order.emailAddress || "")}</div>
-      </div>
+      ${renderSectionHeading("Order Status")}
 
       <div class="detail-block">
         <div class="label">Status</div>
@@ -303,7 +364,7 @@ function renderOrderDetail(order) {
 
       <div class="detail-block">
         <div class="label">Price Quoted</div>
-        <input id="editPriceQuoted" type="number" step="0.01" />
+        <input id="editPriceQuoted" type="text" inputmode="decimal" placeholder="$0.00" />
       </div>
 
       <div class="detail-block">
@@ -318,7 +379,7 @@ function renderOrderDetail(order) {
 
       <div class="detail-block">
         <div class="label">Carrier</div>
-        <input id="editCarrier" type="text" />
+        <select id="editCarrier">${carrierOptions(order.carrier)}</select>
       </div>
 
       <div class="detail-block">
@@ -334,6 +395,25 @@ function renderOrderDetail(order) {
         <textarea id="editInternalNotes" rows="4"></textarea>
       </div>
 
+      ${renderSectionHeading("Customer")}
+
+      <div class="detail-block">
+        <div class="label">Customer</div>
+        <div class="value">${escapeHtml(order.customerName || "")}</div>
+      </div>
+
+      <div class="detail-block">
+        <div class="label">Phone</div>
+        <div class="value">${escapeHtml(order.phoneNumber || "")}</div>
+      </div>
+
+      <div class="detail-block full">
+        <div class="label">Email</div>
+        <div class="value">${escapeHtml(order.emailAddress || "")}</div>
+      </div>
+
+      ${renderSectionHeading("Glove Details")}
+
       <div class="detail-block">
         <div class="label">Brand / Model</div>
         <input id="editBrandModel" type="text" />
@@ -341,12 +421,17 @@ function renderOrderDetail(order) {
 
       <div class="detail-block">
         <div class="label">Glove Type</div>
-        <input id="editGloveType" type="text" />
+        <select id="editGloveType">${gloveTypeOptions(order.gloveType)}</select>
       </div>
 
       <div class="detail-block">
         <div class="label">Web Type</div>
-        <input id="editWebType" type="text" />
+        <select id="editWebType">${webTypeOptions(order.webType)}</select>
+      </div>
+
+      <div class="detail-block">
+        <div class="label">Drop-Off Method</div>
+        <input id="editDropOffMethod" type="text" />
       </div>
 
       <div class="detail-block full">
@@ -354,16 +439,18 @@ function renderOrderDetail(order) {
         <textarea id="editServicesRequested" rows="4"></textarea>
       </div>
 
-      ${renderLaceField("Primary Lace Color", order.primaryLaceColor, true)}
-      ${renderLaceField("Secondary Lace Color", order.secondaryLaceColor)}
-      ${renderLaceField("Custom Lace Notes", order.customLaceNotes)}
+      ${renderLaceField("Primary Lace Color", "editPrimaryLaceColor", order.primaryLaceColor, true)}
+      ${renderLaceField("Secondary Lace Color", "editSecondaryLaceColor", order.secondaryLaceColor, true)}
+      ${renderLaceField("Custom Lace Notes", "editCustomLaceNotes", order.customLaceNotes, true)}
 
-      <div class="detail-block">
-        <div class="label">Drop-Off Method</div>
-        <input id="editDropOffMethod" type="text" />
+      <div class="detail-block full">
+        <div class="label">Customer Notes</div>
+        <textarea id="editGloveNotes" rows="5"></textarea>
       </div>
 
-      <div class="detail-block">
+      ${renderSectionHeading("Shipping")}
+
+      <div class="detail-block full">
         <div class="label">Street Address</div>
         <input id="editStreetAddress" type="text" />
       </div>
@@ -392,38 +479,25 @@ function renderOrderDetail(order) {
         <div class="label">Date Completed</div>
         <div class="value">${escapeHtml(formatDate(order.dateCompleted))}</div>
       </div>
-
-      <div class="detail-block full">
-        <div class="label">Customer Notes</div>
-        <textarea id="editGloveNotes" rows="5"></textarea>
-      </div>
-
-      <div class="detail-block">
-        <button id="saveOrderBtn" type="button">Save Changes</button>
-        <p id="saveStatus" class="status"></p>
-      </div>
     </div>
   `;
 
   document.getElementById("editStatus").value = order.status || "Received";
   document.getElementById("editPaid").value = (String(order.paid || "").trim().toLowerCase() === "paid") ? "Paid" : "Unpaid";
-  document.getElementById("editPriceQuoted").value = order.priceQuoted ?? "";
+  document.getElementById("editPriceQuoted").value = formatMoneyForInput(order.priceQuoted);
   document.getElementById("editEstimatedCompletion").value = formatDateForInput(order.estimatedCompletion);
   document.getElementById("editTrackingNumber").value = order.trackingNumber || "";
-  document.getElementById("editCarrier").value = order.carrier || "";
   document.getElementById("editAllowShipWithoutPayment").value = order.allowShipWithoutPayment ? "true" : "false";
   document.getElementById("editInternalNotes").value = order.internalNotes || "";
 
   document.getElementById("editBrandModel").value = order.brandModel || "";
-  document.getElementById("editGloveType").value = order.gloveType || "";
-  document.getElementById("editWebType").value = order.webType || "";
   document.getElementById("editServicesRequested").value = order.servicesRequested || "";
   document.getElementById("editDropOffMethod").value = order.dropOffMethod || "";
-  document.getElementById("editStreetAddress").value = order.streetAddress || "";
+  document.getElementById("editStreetAddress").value = order.streetAddress || order.address || "";
   document.getElementById("editCity").value = order.city || "";
   document.getElementById("editState").value = order.state || "";
-  document.getElementById("editZipCode").value = order.zipCode || "";
-  document.getElementById("editGloveNotes").value = order.gloveNotes || "";
+  document.getElementById("editZipCode").value = order.zipCode || order.zip || "";
+  document.getElementById("editGloveNotes").value = order.gloveNotes || order.customerNotes || "";
 
   document.getElementById("saveOrderBtn").addEventListener("click", async () => {
     try {
@@ -441,10 +515,18 @@ async function saveCurrentOrderFromForm() {
   const saveStatus = document.getElementById("saveStatus");
   saveStatus.textContent = "Saving...";
 
+  const streetAddress = document.getElementById("editStreetAddress").value;
+  const city = document.getElementById("editCity").value;
+  const state = document.getElementById("editState").value;
+  const zipCode = document.getElementById("editZipCode").value;
+  const primaryLaceColor = document.getElementById("editPrimaryLaceColor")?.value || "";
+  const secondaryLaceColor = document.getElementById("editSecondaryLaceColor")?.value || "";
+  const customLaceNotes = document.getElementById("editCustomLaceNotes")?.value || "";
+
   const updates = {
     status: document.getElementById("editStatus").value,
     paid: document.getElementById("editPaid").value,
-    priceQuoted: document.getElementById("editPriceQuoted").value,
+    priceQuoted: parseMoneyInput(document.getElementById("editPriceQuoted").value),
     estimatedCompletion: document.getElementById("editEstimatedCompletion").value,
     trackingNumber: document.getElementById("editTrackingNumber").value,
     carrier: document.getElementById("editCarrier").value,
@@ -455,17 +537,26 @@ async function saveCurrentOrderFromForm() {
     webType: document.getElementById("editWebType").value,
     servicesRequested: document.getElementById("editServicesRequested").value,
     dropOffMethod: document.getElementById("editDropOffMethod").value,
-    streetAddress: document.getElementById("editStreetAddress").value,
-    city: document.getElementById("editCity").value,
-    state: document.getElementById("editState").value,
-    zipCode: document.getElementById("editZipCode").value,
-    gloveNotes: document.getElementById("editGloveNotes").value
+    streetAddress,
+    address: streetAddress,
+    city,
+    state,
+    zipCode,
+    zip: zipCode,
+    gloveNotes: document.getElementById("editGloveNotes").value,
+    customerNotes: document.getElementById("editGloveNotes").value,
+    primaryLaceColor,
+    lacePrimary: primaryLaceColor,
+    secondaryLaceColor,
+    laceAccent: secondaryLaceColor,
+    customLaceNotes
   };
 
   const updated = await saveOrderUpdate(currentOrder.orderNumber, updates, true);
   currentOrder = updated;
   renderOrderDetail(updated);
   document.getElementById("saveStatus").textContent = "Saved.";
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false) {
@@ -544,6 +635,13 @@ function openOrder(orderNumber) {
 
   renderOrderDetail(order);
   showView(detailView);
+  orderDetail.scrollTop = 0;
+  window.scrollTo({ top: 0, behavior: "instant" });
+
+  requestAnimationFrame(() => {
+    const detailTopbar = detailView.querySelector(".topbar");
+    if (detailTopbar) detailTopbar.scrollIntoView({ block: "start", behavior: "instant" });
+  });
 }
 
 function escapeHtml(str) {
@@ -552,6 +650,10 @@ function escapeHtml(str) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function escapeAttr(str) {
+  return escapeHtml(str).replace(/'/g, "&#39;");
 }
 
 pinInput.addEventListener("input", () => {
