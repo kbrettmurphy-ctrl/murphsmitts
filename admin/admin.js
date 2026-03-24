@@ -127,6 +127,14 @@ function parseMoneyInput(value) {
   return Number.isNaN(num) ? "" : num.toFixed(2);
 }
 
+function todayForInput() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function escapeHtml(str) {
   return String(str || "")
     .replace(/&/g, "&amp;")
@@ -226,15 +234,6 @@ function renderSectionHeading(title) {
 function renderFieldLike(label, value) {
   return `
     <div class="detail-block">
-      <div class="label">${escapeHtml(label)}</div>
-      <div class="field-like readonly">${escapeHtml(value || "")}</div>
-    </div>
-  `;
-}
-
-function renderFieldLikeFull(label, value) {
-  return `
-    <div class="detail-block full">
       <div class="label">${escapeHtml(label)}</div>
       <div class="field-like readonly">${escapeHtml(value || "")}</div>
     </div>
@@ -424,23 +423,23 @@ function renderOrderDetail(order) {
     ${renderSectionHeading("Shipping")}
 
     <div class="detail-block">
-       <div class="label">Allow Ship Without Payment</div>
-       <select id="editAllowShipWithoutPayment">
-         <option value="false">No</option>
-         <option value="true">Yes</option>
-       </select>
+      <div class="label">Allow Ship Without Payment</div>
+      <select id="editAllowShipWithoutPayment">
+        <option value="false">No</option>
+        <option value="true">Yes</option>
+      </select>
     </div>
 
     <div class="detail-block">
-       <div class="label">Tracking Number</div>
-       <input id="editTrackingNumber" type="text" />
+      <div class="label">Tracking Number</div>
+      <input id="editTrackingNumber" type="text" />
     </div>
 
     <div class="detail-block">
-       <div class="label">Carrier</div>
-       <select id="editCarrier">${carrierOptions(order.carrier)}</select>
+      <div class="label">Carrier</div>
+      <select id="editCarrier">${carrierOptions(order.carrier)}</select>
     </div>
-      
+
     <div class="detail-block full">
       <div class="label">Street Address</div>
       <input id="editStreetAddress" type="text" />
@@ -505,7 +504,11 @@ function renderOrderDetail(order) {
       </div>
 
       ${renderFieldLike("Date Received", formatDate(order.dateReceived))}
-      ${renderFieldLike("Date Completed", formatDate(order.dateCompleted))}
+
+      <div class="detail-block">
+        <div class="label">Date Completed</div>
+        <input id="editDateCompleted" type="date" />
+      </div>
 
       <div class="detail-block full">
         <div class="label">Internal Notes</div>
@@ -556,6 +559,7 @@ function renderOrderDetail(order) {
   document.getElementById("editPaid").value = normalizeText(order.paid) === "paid" ? "Paid" : "Unpaid";
   document.getElementById("editPriceQuoted").value = formatMoneyForInput(order.priceQuoted);
   document.getElementById("editEstimatedCompletion").value = formatDateForInput(order.estimatedCompletion);
+  document.getElementById("editDateCompleted").value = formatDateForInput(order.dateCompleted);
   document.getElementById("editInternalNotes").value = order.internalNotes || "";
 
   document.getElementById("editBrandModel").value = order.brandModel || "";
@@ -574,7 +578,7 @@ function renderOrderDetail(order) {
   if (customLaceEl) customLaceEl.value = customLaceNotes;
 
   if (!isLocal) {
-    document.getElementById("editTrackingNumber").value = order.trackingNumber || "";
+    document.getElementById("editTrackingNumber").value = order.trackingNumber || order.tracking || "";
     document.getElementById("editCarrier").value = order.carrier || "";
     document.getElementById("editAllowShipWithoutPayment").value = order.allowShipWithoutPayment ? "true" : "false";
     document.getElementById("editStreetAddress").value = order.streetAddress || order.address || "";
@@ -598,19 +602,25 @@ async function saveCurrentOrderFromForm() {
   const zipCode = isLocal ? "" : val("editZipCode");
   const trackingNumber = isLocal ? "" : val("editTrackingNumber");
   const carrier = isLocal ? "" : val("editCarrier");
-  const allowShipWithoutPayment = isLocal ? "" : val("editAllowShipWithoutPayment")
+  const allowShipWithoutPayment = isLocal ? false : (val("editAllowShipWithoutPayment") === "true");
+
   const primaryLaceColor = val("editPrimaryLaceColor");
   const secondaryLaceColor = val("editSecondaryLaceColor");
   const customLaceNotes = val("editCustomLaceNotes");
 
+  let dateCompleted = val("editDateCompleted");
+  const newStatus = val("editStatus");
+
+  if (newStatus === "Ready to Go" && !dateCompleted) {
+    dateCompleted = todayForInput();
+  }
+
   const updates = {
-    status: val("editStatus"),
+    status: newStatus,
     paid: val("editPaid"),
     priceQuoted: parseMoneyInput(val("editPriceQuoted")),
     estimatedCompletion: val("editEstimatedCompletion"),
-    trackingNumber: val("editTrackingNumber"),
-    carrier: val("editCarrier"),
-    allowShipWithoutPayment: val("editAllowShipWithoutPayment") === "true",
+    dateCompleted,
     internalNotes: val("editInternalNotes"),
     brandModel: val("editBrandModel"),
     gloveType: val("editGloveType"),
@@ -631,6 +641,12 @@ async function saveCurrentOrderFromForm() {
     updates.tracking = trackingNumber;
     updates.trackingNumber = trackingNumber;
     updates.carrier = carrier;
+    updates.allowShipWithoutPayment = allowShipWithoutPayment;
+  } else {
+    updates.tracking = "";
+    updates.trackingNumber = "";
+    updates.carrier = "";
+    updates.allowShipWithoutPayment = false;
   }
 
   if (document.getElementById("editPrimaryLaceColor")) {
