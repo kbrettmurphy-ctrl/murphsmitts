@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Murph's Mitt Maintenance Admin</title>
+  <link rel="stylesheet" href="admin.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="sideMenu" class="side-menu">
+      <div class="side-menu-header">
+        <div class="brand-row">
+          <img src="/assets/img/logo.png" alt="Murph's Mitt Maintenance logo" class="brand-logo">
+          <div>
+            <div class="brand-title">Murph's Mitts</div>
+            <div class="brand-subtitle">Admin</div>
+          </div>
+        </div>
+        <button id="closeMenuBtn" class="icon-btn mobile-only" aria-label="Close menu">✕</button>
+      </div>
+
+      <nav class="side-nav">
+        <button class="nav-link active" data-view="current">Current Orders</button>
+        <button class="nav-link" data-view="waiting-on-parts">Waiting on Parts</button>
+        <button class="nav-link" data-view="estimate-sent">Estimate Sent</button>
+        <button class="nav-link" data-view="in-progress">In Progress</button>
+        <button class="nav-link" data-view="ready-to-go">Ready to Go</button>
+        <button class="nav-link" data-view="completed">Completed</button>
+      </nav>
+    </aside>
+
+    <div id="menuBackdrop" class="menu-backdrop"></div>
+
+    <main class="main-panel">
+      <section id="loginView" class="view active">
+        <div class="card login-card">
+          <h1>Murph's Mitts Admin</h1>
+          <p class="muted">Enter PIN.</p>
+          <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="PIN" />
+          <p id="loginStatus" class="status"></p>
+        </div>
+      </section>
+
+      <section id="dashboardView" class="view">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="menuBtn" class="icon-btn" aria-label="Open menu">☰</button>
+            <div>
+              <h1 id="viewTitle">Current Orders</h1>
+              <p id="orderCount" class="muted"></p>
+            </div>
+          </div>
+          <button id="logoutBtn" class="secondary">Log Out</button>
+        </header>
+
+        <div class="toolbar">
+          <input id="searchInput" type="search" placeholder="Search by order #, name, email, glove type..." />
+        </div>
+
+        <div id="ordersList" class="orders-list"></div>
+      </section>
+
+      <section id="detailView" class="view">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="backBtn" class="secondary">Back</button>
+            <div>
+              <h1 id="detailTitle">Order Detail</h1>
+            </div>
+          </div>
+          <div class="topbar-right">
+            <button id="saveHeaderBtn" class="primary-action" type="button">Save Changes</button>
+          </div>
+        </header>
+
+        <div id="orderDetail" class="detail-card"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
