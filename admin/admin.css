@@ -578,6 +578,14 @@ button.secondary{
   border-radius:20px;
   padding:12px 12px;
   font-size:1rem;
+  line-height:1.2;
+  min-height:50px;
+}
+
+.detail-block select{
+  appearance:none;
+  -webkit-appearance:none;
+  -moz-appearance:none;
 }
 
 .detail-block .field-like{
