@@ -423,6 +423,24 @@ function renderOrderDetail(order) {
   const shippingSection = isLocal ? "" : `
     ${renderSectionHeading("Shipping")}
 
+    <div class="detail-block">
+       <div class="label">Tracking Number</div>
+       <input id="editTrackingNumber" type="text" />
+    </div>
+
+    <div class="detail-block">
+       <div class="label">Carrier</div>
+       <select id="editCarrier">${carrierOptions(order.carrier)}</select>
+    </div>
+
+    <div class="detail-block">
+       <div class="label">Allow Ship Without Payment</div>
+       <select id="editAllowShipWithoutPayment">
+         <option value="false">No</option>
+         <option value="true">Yes</option>
+       </select>
+    </div>
+      
     <div class="detail-block full">
       <div class="label">Street Address</div>
       <input id="editStreetAddress" type="text" />
@@ -484,24 +502,6 @@ function renderOrderDetail(order) {
       <div class="detail-block">
         <div class="label">Estimated Completion</div>
         <input id="editEstimatedCompletion" type="date" />
-      </div>
-
-      <div class="detail-block">
-        <div class="label">Tracking Number</div>
-        <input id="editTrackingNumber" type="text" />
-      </div>
-
-      <div class="detail-block">
-        <div class="label">Carrier</div>
-        <select id="editCarrier">${carrierOptions(order.carrier)}</select>
-      </div>
-
-      <div class="detail-block">
-        <div class="label">Allow Ship Without Payment</div>
-        <select id="editAllowShipWithoutPayment">
-          <option value="false">No</option>
-          <option value="true">Yes</option>
-        </select>
       </div>
 
       ${renderFieldLike("Date Received", formatDate(order.dateReceived))}
