@@ -108,6 +108,17 @@ function normalizeStatus(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function getViewTitle(viewName) {
+  switch (viewName) {
+    case "waiting": return "Waiting on Parts";
+    case "estimate": return "Estimate Sent";
+    case "progress": return "In Progress";
+    case "ready": return "Ready to Go";
+    case "completed": return "Completed";
+    default: return "Current Orders";
+  }
+}
+
 function getViewOrders() {
   switch (activeView) {
     case "completed":
@@ -144,17 +155,6 @@ function applyFilters() {
   renderOrders(list);
 }
 
-function getViewTitle(viewName) {
-  switch (viewName) {
-    case "waiting": return "Waiting on Parts";
-    case "estimate": return "Estimate Sent";
-    case "progress": return "In Progress";
-    case "ready": return "Ready to Go";
-    case "completed": return "Completed";
-    default: return "Current Orders";
-  }
-}
-
 function setActiveView(viewName) {
   activeView = viewName;
   viewTitle.textContent = getViewTitle(viewName);
@@ -168,7 +168,8 @@ function setActiveView(viewName) {
 
   if (detailView.classList.contains("active")) {
     showView(dashboardView);
-    window.scrollTo({ top: 0, behavior: "instant" });
+    orderDetail.scrollTop = 0;
+    window.scrollTo(0, 0);
   }
 }
 
@@ -289,25 +290,24 @@ function renderSectionHeading(title) {
   return `<div class="detail-section-title full">${escapeHtml(title)}</div>`;
 }
 
+function renderSelectOptions(current, options, placeholder = "") {
+  const vals = placeholder ? ["", ...options] : options;
+  return vals.map(v => {
+    const label = v || placeholder;
+    return `<option value="${escapeAttr(v)}" ${String(v) === String(current || "") ? "selected" : ""}>${escapeHtml(label)}</option>`;
+  }).join("");
+}
+
 function carrierOptions(current) {
-  const opts = ["", "USPS", "UPS", "FedEx"];
-  return opts.map(v =>
-    `<option value="${escapeAttr(v)}" ${v === (current || "") ? "selected" : ""}>${escapeHtml(v || "Select carrier")}</option>`
-  ).join("");
+  return renderSelectOptions(current, ["USPS", "UPS", "FedEx"], "Select carrier");
 }
 
 function gloveTypeOptions(current) {
-  const opts = ["", "Fielders Glove", "Catchers Mitt", "First Base Mitt"];
-  return opts.map(v =>
-    `<option value="${escapeAttr(v)}" ${v === (current || "") ? "selected" : ""}>${escapeHtml(v || "Select glove type")}</option>`
-  ).join("");
+  return renderSelectOptions(current, ["Fielders Glove", "Catchers Mitt", "First Base Mitt"], "Select glove type");
 }
 
 function webTypeOptions(current) {
-  const opts = ["", "I-Web", "H-Web", "Single Post Web", "Trapeze Web", "Modified Trapeze Web", "Basket (Fully Closed) Web"];
-  return opts.map(v =>
-    `<option value="${escapeAttr(v)}" ${v === (current || "") ? "selected" : ""}>${escapeHtml(v || "Select web type")}</option>`
-  ).join("");
+  return renderSelectOptions(current, ["I-Web", "H-Web", "Single Post Web", "Trapeze Web", "Modified Trapeze Web", "Basket (Fully Closed) Web"], "Select web type");
 }
 
 function formatMoneyForInput(value) {
@@ -556,7 +556,8 @@ async function saveCurrentOrderFromForm() {
   currentOrder = updated;
   renderOrderDetail(updated);
   document.getElementById("saveStatus").textContent = "Saved.";
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  orderDetail.scrollTop = 0;
+  window.scrollTo(0, 0);
 }
 
 async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false) {
@@ -616,7 +617,6 @@ async function loadOrders() {
     localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
 
   } catch (err) {
-    // fallback to cache
     const cached = localStorage.getItem("mm_orders_cache");
     if (cached) {
       allOrders = JSON.parse(cached);
@@ -636,11 +636,12 @@ function openOrder(orderNumber) {
   renderOrderDetail(order);
   showView(detailView);
   orderDetail.scrollTop = 0;
-  window.scrollTo({ top: 0, behavior: "instant" });
+  detailView.scrollTop = 0;
+  window.scrollTo(0, 0);
 
   requestAnimationFrame(() => {
-    const detailTopbar = detailView.querySelector(".topbar");
-    if (detailTopbar) detailTopbar.scrollIntoView({ block: "start", behavior: "instant" });
+    const topbar = detailView.querySelector(".topbar");
+    if (topbar) topbar.scrollIntoView({ block: "start" });
   });
 }
 
@@ -671,7 +672,11 @@ logoutBtn.addEventListener("click", () => {
 });
 
 searchInput.addEventListener("input", applyFilters);
-backBtn.addEventListener("click", () => showView(dashboardView));
+backBtn.addEventListener("click", () => {
+  showView(dashboardView);
+  orderDetail.scrollTop = 0;
+  window.scrollTo(0, 0);
+});
 
 menuBtn.addEventListener("click", openMenu);
 closeMenuBtn.addEventListener("click", closeMenu);
