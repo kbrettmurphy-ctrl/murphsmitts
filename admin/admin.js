@@ -364,6 +364,26 @@ function renderOrderDetail(order) {
       </div>
 
       <div class="detail-block">
+        <div class="label">Street Address</div>
+        <input id="editStreetAddress" type="text" />
+      </div>
+
+      <div class="detail-block">
+        <div class="label">City</div>
+        <input id="editCity" type="text" />
+      </div>
+
+      <div class="detail-block">
+        <div class="label">State</div>
+        <input id="editState" type="text" />
+      </div>
+
+      <div class="detail-block">
+        <div class="label">Zip Code</div>
+        <input id="editZipCode" type="text" />
+      </div>
+
+      <div class="detail-block">
         <div class="label">Date Received</div>
         <div class="value">${escapeHtml(formatDate(order.dateReceived))}</div>
       </div>
@@ -399,6 +419,10 @@ function renderOrderDetail(order) {
   document.getElementById("editWebType").value = order.webType || "";
   document.getElementById("editServicesRequested").value = order.servicesRequested || "";
   document.getElementById("editDropOffMethod").value = order.dropOffMethod || "";
+  document.getElementById("editStreetAddress").value = order.streetAddress || "";
+  document.getElementById("editCity").value = order.city || "";
+  document.getElementById("editState").value = order.state || "";
+  document.getElementById("editZipCode").value = order.zipCode || "";
   document.getElementById("editGloveNotes").value = order.gloveNotes || "";
 
   document.getElementById("saveOrderBtn").addEventListener("click", async () => {
@@ -431,6 +455,10 @@ async function saveCurrentOrderFromForm() {
     webType: document.getElementById("editWebType").value,
     servicesRequested: document.getElementById("editServicesRequested").value,
     dropOffMethod: document.getElementById("editDropOffMethod").value,
+    streetAddress: document.getElementById("editStreetAddress").value,
+    city: document.getElementById("editCity").value,
+    state: document.getElementById("editState").value,
+    zipCode: document.getElementById("editZipCode").value,
     gloveNotes: document.getElementById("editGloveNotes").value
   };
 
