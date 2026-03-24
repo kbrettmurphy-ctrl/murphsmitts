@@ -543,7 +543,6 @@ button.secondary{
   .detail-block{
     border-top:none;
     padding-top:0;
-    outline: 1px solid red;
   }
 
   .detail-block.full{
