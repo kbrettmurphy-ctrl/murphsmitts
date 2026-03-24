@@ -678,7 +678,7 @@ button.secondary{
    ========================= */
 @media (max-width: 899px){
   :root{
-    --topbarH:92px;
+    --topbarH:75px;
   }
 
   #detailView{
