@@ -2,7 +2,7 @@
   --cream:#dacab1;
   --navy:#092f4d;
   --red:#921a24;
-  --dark: #020b12;
+  --dark:#020b12;
 
   --bg:#092f4d;
   --panel:#13293d;
@@ -15,12 +15,16 @@
   --light-bg:#f4eee4;
   --light-panel:#fffdf9;
   --light-line:#d6c9b3;
+  --light-line-strong:#cbbba0;
   --light-ink:#092f4d;
-  --light-muted:#5f6b76;
+  --light-muted:#6f7a85;
 
   --shadow:0 10px 28px rgba(0,0,0,.18);
-  --menuW:270px;
+
+  /* narrowed desktop menu so labels fit without wrapping */
+  --menuW:236px;
   --radius:18px;
+  --topbarH:78px;
 }
 
 *{ box-sizing:border-box; }
@@ -31,7 +35,7 @@ html,body{
   min-height:100%;
   background:var(--bg);
   color:var(--ink);
-  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family:'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 body{
@@ -42,110 +46,15 @@ body{
   min-height:100vh;
 }
 
-/* view toggling */
+/* =========================
+   VIEW TOGGLING
+   ========================= */
 .view{ display:none; }
 .view.active{ display:block; }
 
 /* =========================
-   SIDE MENU
+   GLOBAL FORM / BUTTONS
    ========================= */
-.side-menu{
-  position:fixed;
-  top:0;
-  left:0;
-  bottom:0;
-  width:var(--menuW);
-  background:#081c2c;
-  color:var(--cream);
-  padding:18px 14px;
-  z-index:40;
-  transform:translateX(-100%);
-  transition:transform .2s ease;
-  box-shadow:0 0 30px rgba(0,0,0,.35);
-}
-
-.side-menu.open{
-  transform:translateX(0);
-}
-
-.side-menu-header{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  margin-bottom:20px;
-}
-
-.brand-row{
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-
-.brand-logo {
-  width: 40px;
-  height: 40px;
-  object-fit: contain;
-  flex: 0 0 auto;
-  display:block;
-}
-
-.brand-title{
-  font-weight:700;
-  color:var(--cream);
-  line-height:1.05;
-}
-
-.brand-subtitle{
-  font-size:.9rem;
-  color:rgba(218,202,177,.68);
-}
-
-.side-nav{
-  display:grid;
-  gap:8px;
-}
-
-.nav-link{
-  width:100%;
-  border:none;
-  background:transparent;
-  color:var(--cream);
-  text-align:left;
-  padding:12px 12px;
-  border-radius:12px;
-  font:inherit;
-  cursor:pointer;
-}
-
-.nav-link.active{
-  background:#13314c;
-}
-
-.menu-backdrop{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.42);
-  opacity:0;
-  pointer-events:none;
-  transition:opacity .2s ease;
-  z-index:30;
-}
-
-.menu-backdrop.show{
-  opacity:1;
-  pointer-events:auto;
-}
-
-/* =========================
-   MAIN LAYOUT
-   ========================= */
-.main-panel{
-  max-width:920px;  
-  margin:0 auto;
-  min-height:100vh;
-  background:var(--bg);
-}
-
 button,
 input,
 textarea,
@@ -155,6 +64,14 @@ select{
 
 button{
   cursor:pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible{
+  outline:3px solid rgba(9,47,77,.14);
+  outline-offset:2px;
 }
 
 .icon-btn,
@@ -183,6 +100,119 @@ button.secondary{
 
 .status{
   color:var(--red);
+  margin:0;
+}
+
+/* =========================
+   SIDE MENU
+   ========================= */
+.side-menu{
+  position:fixed;
+  top:0;
+  left:0;
+  bottom:0;
+  width:var(--menuW);
+  background:#081c2c;
+  color:var(--cream);
+  padding:18px 10px;
+  z-index:40;
+  transform:translateX(-100%);
+  transition:transform .2s ease;
+  box-shadow:0 0 30px rgba(0,0,0,.35);
+}
+
+.side-menu.open{
+  transform:translateX(0);
+}
+
+.side-menu-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:18px;
+}
+
+.brand-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+}
+
+.brand-logo{
+  width:40px;
+  height:40px;
+  object-fit:contain;
+  flex:0 0 auto;
+  display:block;
+}
+
+.brand-row > div{
+  min-width:0;
+}
+
+.brand-title{
+  font-weight:700;
+  color:var(--cream);
+  line-height:1.05;
+  font-size:1rem;
+  white-space:nowrap;
+}
+
+.brand-subtitle{
+  font-size:.86rem;
+  color:rgba(218,202,177,.68);
+  white-space:nowrap;
+}
+
+.side-nav{
+  display:grid;
+  gap:8px;
+}
+
+.nav-link{
+  width:100%;
+  border:none;
+  background:transparent;
+  color:var(--cream);
+  text-align:left;
+  padding:11px 12px;
+  border-radius:12px;
+  font:inherit;
+  font-size:.98rem;
+  line-height:1.2;
+  cursor:pointer;
+  white-space:nowrap;
+}
+
+.nav-link.active{
+  background:#13314c;
+}
+
+.menu-backdrop{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.42);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .2s ease;
+  z-index:30;
+}
+
+.menu-backdrop.show{
+  opacity:1;
+  pointer-events:auto;
+}
+
+/* =========================
+   MAIN LAYOUT
+   ========================= */
+.main-panel{
+  max-width:920px;
+  margin:0 auto;
+  min-height:100vh;
+  background:var(--bg);
 }
 
 /* =========================
@@ -210,7 +240,7 @@ button.secondary{
   border:1px solid var(--dark);
   border-radius:24px;
   box-shadow:0 16px 34px rgba(0,0,0,.22);
-  padding:12px 12px 0 12px;
+  padding:18px 16px 14px;
 }
 
 .login-card h1{
@@ -231,6 +261,7 @@ button.secondary{
   width:100%;
   border-radius:22px;
   border:2px solid rgba(9,47,77,.48);
+  padding:14px 12px;
   font-size:1rem;
   text-align:center;
   color:var(--navy);
@@ -333,7 +364,7 @@ button.secondary{
 
 .order-top{
   display:grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns:1fr auto;
   gap:12px;
   align-items:start;
 }
@@ -415,25 +446,68 @@ button.secondary{
   padding:0 12px 28px;
 }
 
-#detailView .topbar{
+/* sticky top bar exactly where save button belongs */
+#detailView .detail-topbar{
   position:sticky;
   top:0;
-  z-index:20;
+  z-index:25;
+  min-height:var(--topbarH);
   background:var(--light-bg);
   border-bottom:1px solid var(--light-line);
-  padding:10px 6px 12px;
+  padding:12px 6px;
 }
 
-#detailView .topbar h1{
+#detailView .detail-topbar h1{
   color:var(--light-ink);
 }
 
+#detailView .detail-topbar .secondary{
+  background:#244866;
+  color:var(--cream);
+}
+
+.detail-topbar-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:12px;
+  flex:0 0 auto;
+}
+
+.detail-topbar-actions .status{
+  min-height:20px;
+  font-size:.92rem;
+  color:var(--red);
+  text-align:right;
+}
+
+#saveOrderBtn{
+  width:auto;
+  min-width:172px;
+  padding:14px 20px;
+  border:none;
+  background:var(--navy);
+  color:var(--cream);
+  border-radius:18px;
+  font-weight:700;
+  white-space:nowrap;
+  flex:0 0 auto;
+}
+
+/* content card under sticky bar */
 .detail-card{
   background:var(--light-panel);
   border:1px solid var(--light-line);
   border-radius:22px;
   box-shadow:var(--shadow);
   padding:14px;
+  margin-top:14px;
+}
+
+.detail-grid{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
 }
 
 .detail-header-row{
@@ -441,40 +515,28 @@ button.secondary{
   align-items:flex-start;
   justify-content:space-between;
   gap:12px;
-  margin-bottom:16px;
+  margin-bottom:6px;
 }
 
 .detail-order-number{
-  font-size:1.1rem;
+  font-size:1.18rem;
   font-weight:700;
   color:var(--light-ink);
+  line-height:1.2;
 }
 
 .detail-order-status{
   margin-top:4px;
   color:var(--light-muted);
-  font-size:.95rem;
-}
-
-.detail-actions{
-  display:flex;
-  flex-direction:column;
-  align-items:flex-end;
-  gap:6px;
-}
-
-.detail-grid{
-  display:flex;
-  flex-direction:column;
-  gap:12px;
+  font-size:.96rem;
 }
 
 .detail-section-title{
   font-weight:700;
   color:var(--light-ink);
-  margin:8px 0 0;
-  padding-top:8px;
-  border-top:2px solid var(--light-line);
+  margin:6px 0 0;
+  padding-top:10px;
+  border-top:2px solid var(--light-line-strong);
 }
 
 .detail-section-title.full{
@@ -483,13 +545,10 @@ button.secondary{
 
 .detail-block{
   width:100%;
-  border-top:1px solid var(--light-line);
-  padding-top:12px;
 }
 
-.detail-block:first-child{
-  border-top:none;
-  padding-top:0;
+.detail-block.full{
+  width:100%;
 }
 
 .label{
@@ -502,11 +561,14 @@ button.secondary{
   white-space:pre-wrap;
   word-break:break-word;
   color:var(--light-ink);
+  line-height:1.45;
 }
 
+/* editable and readonly blocks can share the same visual shell */
 .detail-block input,
 .detail-block select,
-.detail-block textarea{
+.detail-block textarea,
+.detail-block .field-like{
   width:100%;
   max-width:100%;
   box-sizing:border-box;
@@ -518,27 +580,38 @@ button.secondary{
   font-size:1rem;
 }
 
+.detail-block .field-like{
+  min-height:50px;
+  display:flex;
+  align-items:center;
+}
+
 .detail-block textarea{
   resize:vertical;
   min-height:120px;
 }
 
 .detail-block input[type="date"]{
-  width: 100%;
-  display: block;
-  -webkit-appearance: none;
-  appearance: none;
+  width:100%;
+  display:block;
+  -webkit-appearance:none;
+  appearance:none;
 }
 
-#saveOrderBtn{
-  width:auto;
-  min-width:170px;
-  padding:14px 18px;
-  border:none;
-  background:var(--navy);
-  color:var(--cream);
-  border-radius:18px;
-  font-weight:700;
+.detail-block input[readonly],
+.detail-block textarea[readonly],
+.detail-block .field-like.readonly{
+  background:#f7f3eb;
+}
+
+.detail-divider{
+  border-top:2px solid var(--light-line-strong);
+  margin:2px 0 0;
+}
+
+/* utility in case JS wants to truly hide empty fields */
+.is-hidden{
+  display:none !important;
 }
 
 /* =========================
@@ -569,28 +642,20 @@ button.secondary{
   }
 
   .detail-card{
-    max-width:none;
     width:100%;
-    margin:0;
+    margin-top:14px;
     padding:14px;
   }
 
   .detail-grid{
     display:grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns:repeat(2, minmax(0, 1fr));
     gap:16px 20px;
   }
 
-  .detail-block{
-    border-top:none;
-    padding-top:0;
-  }
-
-  .detail-block.full{
-    grid-column:1 / -1;
-  }
-
-  .detail-header-row{
+  .detail-section-title.full,
+  .detail-block.full,
+  .detail-divider{
     grid-column:1 / -1;
   }
 
@@ -600,17 +665,48 @@ button.secondary{
   }
 }
 
+/* =========================
+   MOBILE
+   ========================= */
 @media (max-width: 899px){
-  .detail-header-row{
-    flex-direction:column;
-    align-items:stretch;
+  :root{
+    --topbarH:92px;
   }
 
-  .detail-actions{
+  #detailView{
+    padding:0 10px 24px;
+  }
+
+  #detailView .detail-topbar{
+    padding:10px 2px 12px;
+  }
+
+  .detail-topbar-actions{
+    flex-direction:column;
     align-items:stretch;
+    gap:8px;
+    width:100%;
+  }
+
+  .detail-topbar-actions .status{
+    text-align:left;
   }
 
   #saveOrderBtn{
     width:100%;
+  }
+
+  .topbar,
+  #detailView .detail-topbar{
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  .topbar-left{
+    width:100%;
+  }
+
+  .detail-card{
+    padding:12px;
   }
 }
