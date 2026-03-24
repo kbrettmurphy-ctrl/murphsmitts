@@ -483,6 +483,13 @@ button.secondary{
   min-height:120px;
 }
 
+.detail-block input[type="date"]{
+  width: 100%;
+  display: block;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 #saveOrderBtn{
   width:100%;
   padding:16px;
