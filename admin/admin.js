@@ -242,6 +242,19 @@ function renderOrders(list) {
   });
 }
 
+function renderLaceField(label, value, alwaysShow = false) {
+  const hasValue = value && String(value).trim() !== "";
+
+  if (!hasValue && !alwaysShow) return "";
+
+  return `
+    <div class="detail-block">
+      <div class="label">${label}</div>
+      <div class="value">${escapeHtml(value || "")}</div>
+    </div>
+  `;
+}
+
 function renderOrderDetail(order) {
   currentOrder = order;
 
@@ -340,6 +353,10 @@ function renderOrderDetail(order) {
         <div class="label">Services Requested</div>
         <textarea id="editServicesRequested" rows="4"></textarea>
       </div>
+
+      ${renderLaceField("Primary Lace Color", order.primaryLaceColor, true)}
+      ${renderLaceField("Secondary Lace Color", order.secondaryLaceColor)}
+      ${renderLaceField("Custom Lace Notes", order.customLaceNotes)}
 
       <div class="detail-block">
         <div class="label">Drop-Off Method</div>
@@ -461,8 +478,8 @@ async function login(pinValue) {
     setToken(data.token);
     pinInput.value = "";
     loginStatus.textContent = "";
-    await loadOrders();
     showView(dashboardView);
+    loadOrders();
   } catch (err) {
     loginStatus.textContent = err.message;
     pinInput.value = "";
@@ -473,8 +490,20 @@ async function login(pinValue) {
 }
 
 async function loadOrders() {
-  const data = await postJson({ action: "listOrders" }, true);
-  allOrders = data.orders || [];
+  try {
+    const data = await postJson({ action: "listOrders" }, true);
+    allOrders = data.orders || [];
+
+    localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
+
+  } catch (err) {
+    // fallback to cache
+    const cached = localStorage.getItem("mm_orders_cache");
+    if (cached) {
+      allOrders = JSON.parse(cached);
+    }
+  }
+
   applyFilters();
 }
 
