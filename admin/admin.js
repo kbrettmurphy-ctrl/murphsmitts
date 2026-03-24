@@ -556,9 +556,6 @@ function renderOrderDetail(order) {
   document.getElementById("editPaid").value = normalizeText(order.paid) === "paid" ? "Paid" : "Unpaid";
   document.getElementById("editPriceQuoted").value = formatMoneyForInput(order.priceQuoted);
   document.getElementById("editEstimatedCompletion").value = formatDateForInput(order.estimatedCompletion);
-  document.getElementById("editTrackingNumber").value = order.trackingNumber || "";
-  document.getElementById("editCarrier").value = order.carrier || "";
-  document.getElementById("editAllowShipWithoutPayment").value = order.allowShipWithoutPayment ? "true" : "false";
   document.getElementById("editInternalNotes").value = order.internalNotes || "";
 
   document.getElementById("editBrandModel").value = order.brandModel || "";
@@ -577,6 +574,9 @@ function renderOrderDetail(order) {
   if (customLaceEl) customLaceEl.value = customLaceNotes;
 
   if (!isLocal) {
+    document.getElementById("editTrackingNumber").value = order.trackingNumber || "";
+    document.getElementById("editCarrier").value = order.carrier || "";
+    document.getElementById("editAllowShipWithoutPayment").value = order.allowShipWithoutPayment ? "true" : "false";
     document.getElementById("editStreetAddress").value = order.streetAddress || order.address || "";
     document.getElementById("editCity").value = order.city || "";
     document.getElementById("editState").value = order.state || "";
