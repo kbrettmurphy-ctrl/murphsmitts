@@ -16,6 +16,8 @@ const viewTitle = document.getElementById("viewTitle");
 
 const backBtn = document.getElementById("backBtn");
 const orderDetail = document.getElementById("orderDetail");
+const saveOrderBtn = document.getElementById("saveOrderBtn");
+const saveStatusEl = document.getElementById("saveStatus");
 
 const sideMenu = document.getElementById("sideMenu");
 const menuBackdrop = document.getElementById("menuBackdrop");
@@ -28,6 +30,9 @@ let activeView = "current";
 let currentOrder = null;
 let loginInProgress = false;
 
+/* =========================
+   VIEW / MENU
+========================= */
 function showView(view) {
   [loginView, dashboardView, detailView].forEach(v => v.classList.remove("active"));
   view.classList.add("active");
@@ -55,6 +60,13 @@ function closeMenu() {
   menuBackdrop.classList.remove("show");
 }
 
+function clearSaveStatus() {
+  if (saveStatusEl) saveStatusEl.textContent = "";
+}
+
+/* =========================
+   API
+========================= */
 async function postJson(body, useAuth = false) {
   if (useAuth) body._token = getToken();
 
@@ -82,30 +94,66 @@ async function postJson(body, useAuth = false) {
   return data;
 }
 
+/* =========================
+   FORMAT / HELPERS
+========================= */
 function formatDate(value) {
   if (!value) return "";
   const d = new Date(value);
-  if (isNaN(d)) return String(value);
+  if (Number.isNaN(d.getTime())) return String(value);
   return d.toLocaleDateString();
 }
 
 function formatDateForInput(value) {
   if (!value) return "";
   const d = new Date(value);
-  if (isNaN(d)) return "";
+  if (Number.isNaN(d.getTime())) return "";
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
-function isCompletedOrder(order) {
-  const status = String(order.status || "").trim().toLowerCase();
-  return status === "completed" || status === "picked up";
+function formatMoneyForInput(value) {
+  if (value === null || value === undefined || value === "") return "";
+  const num = Number(String(value).replace(/[^\d.-]/g, ""));
+  if (Number.isNaN(num)) return "";
+  return `$${num.toFixed(2)}`;
+}
+
+function parseMoneyInput(value) {
+  if (value === null || value === undefined || value === "") return "";
+  const num = Number(String(value).replace(/[^\d.-]/g, ""));
+  return Number.isNaN(num) ? "" : num.toFixed(2);
+}
+
+function escapeHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escapeAttr(str) {
+  return escapeHtml(str).replace(/'/g, "&#39;");
 }
 
 function normalizeStatus(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function normalizeText(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function val(id) {
+  return document.getElementById(id)?.value || "";
+}
+
+function isCompletedOrder(order) {
+  const status = normalizeStatus(order.status);
+  return status === "completed" || status === "picked up";
 }
 
 function getViewTitle(viewName) {
@@ -136,6 +184,114 @@ function getViewOrders() {
   }
 }
 
+function looksLocalDropOff(order) {
+  const text = [
+    order.dropOffMethod,
+    order.deliveryMethod,
+    order.shippingMethod,
+    order.dropoffMethod
+  ].map(normalizeText).join(" ");
+
+  return (
+    text.includes("local") ||
+    text.includes("drop off") ||
+    text.includes("drop-off") ||
+    text.includes("pickup") ||
+    text.includes("pick up") ||
+    text.includes("meet up") ||
+    text.includes("meet-up")
+  ) && !text.includes("ship");
+}
+
+function hasMeaningfulValue(value) {
+  return String(value || "").trim() !== "";
+}
+
+function shouldShowPrimaryLace(order) {
+  return hasMeaningfulValue(order.primaryLaceColor) || hasMeaningfulValue(order.lacePrimary);
+}
+
+function shouldShowSecondaryLace(order) {
+  return hasMeaningfulValue(order.secondaryLaceColor) || hasMeaningfulValue(order.laceAccent);
+}
+
+function shouldShowCustomLaceNotes(order) {
+  return hasMeaningfulValue(order.customLaceNotes);
+}
+
+function renderSectionHeading(title) {
+  return `<div class="detail-section-title full">${escapeHtml(title)}</div>`;
+}
+
+function renderFieldLike(label, value) {
+  return `
+    <div class="detail-block">
+      <div class="label">${escapeHtml(label)}</div>
+      <div class="field-like readonly">${escapeHtml(value || "")}</div>
+    </div>
+  `;
+}
+
+function renderFieldLikeFull(label, value) {
+  return `
+    <div class="detail-block full">
+      <div class="label">${escapeHtml(label)}</div>
+      <div class="field-like readonly">${escapeHtml(value || "")}</div>
+    </div>
+  `;
+}
+
+function renderLaceInput(label, id, value) {
+  return `
+    <div class="detail-block">
+      <div class="label">${escapeHtml(label)}</div>
+      <input id="${escapeAttr(id)}" type="text" value="${escapeAttr(value || "")}" />
+    </div>
+  `;
+}
+
+function renderSelectOptions(current, options, placeholder = "") {
+  const values = placeholder ? ["", ...options] : options;
+  return values.map(v => {
+    const label = v || placeholder;
+    return `<option value="${escapeAttr(v)}" ${String(v) === String(current || "") ? "selected" : ""}>${escapeHtml(label)}</option>`;
+  }).join("");
+}
+
+function gloveTypeOptions(current) {
+  return renderSelectOptions(
+    current,
+    ["Fielders Glove", "Catchers Mitt", "First Base Mitt"],
+    "Select glove type"
+  );
+}
+
+function webTypeOptions(current) {
+  return renderSelectOptions(
+    current,
+    [
+      "I-Web",
+      "H-Web",
+      "Single Post Web",
+      "Trapeze Web",
+      "Modified Trapeze Web",
+      "Basket (Fully Closed) Web"
+    ],
+    "Select web type"
+  );
+}
+
+function carrierOptions(current) {
+  return renderSelectOptions(
+    current,
+    ["USPS", "UPS", "FedEx"],
+    "Select carrier"
+  );
+}
+
+/* =========================
+   FILTER / LIST
+========================= */
 function applyFilters() {
   const q = searchInput.value.trim().toLowerCase();
   let list = getViewOrders();
@@ -164,37 +320,15 @@ function setActiveView(viewName) {
   });
 
   closeMenu();
+  clearSaveStatus();
   applyFilters();
 
   if (detailView.classList.contains("active")) {
     showView(dashboardView);
     orderDetail.scrollTop = 0;
+    detailView.scrollTop = 0;
     window.scrollTo(0, 0);
   }
-}
-
-function getCardDateLabel(order) {
-  return isCompletedOrder(order) ? "Completed" : "Received";
-}
-
-function getCardDateValue(order) {
-  return isCompletedOrder(order) ? (order.dateCompleted || "") : (order.dateReceived || "");
-}
-
-function quickActionsForOrder(order) {
-  const status = String(order.status || "").trim().toLowerCase();
-  const actions = [];
-
-  if (status !== "in progress") actions.push({ label: "In Progress", status: "In Progress" });
-  if (status !== "ready to go") actions.push({ label: "Ready to Go", status: "Ready to Go" });
-  if (status !== "completed") actions.push({ label: "Completed", status: "Completed" });
-
-  actions.push({
-    label: String(order.paid || "").trim().toLowerCase() === "paid" ? "Mark Unpaid" : "Mark Paid",
-    paid: String(order.paid || "").trim().toLowerCase() === "paid" ? "Unpaid" : "Paid"
-  });
-
-  return actions.slice(0, 4);
 }
 
 function renderOrders(list) {
@@ -211,7 +345,7 @@ function renderOrders(list) {
     card.className = "order-card clickable-card";
     card.tabIndex = 0;
 
-    const paidClass = String(order.paid || "").trim().toLowerCase() === "paid" ? "paid" : "unpaid";
+    const paidClass = normalizeText(order.paid) === "paid" ? "paid" : "unpaid";
 
     card.innerHTML = `
       <div class="order-top">
@@ -273,72 +407,52 @@ function renderOrders(list) {
   });
 }
 
-function renderLaceField(label, id, value, alwaysShow = false) {
-  const hasValue = value && String(value).trim() !== "";
-
-  if (!hasValue && !alwaysShow) return "";
-
-  return `
-    <div class="detail-block">
-      <div class="label">${label}</div>
-      <input id="${id}" type="text" value="${escapeAttr(value || "")}" />
-    </div>
-  `;
-}
-
-function renderSectionHeading(title) {
-  return `<div class="detail-section-title full">${escapeHtml(title)}</div>`;
-}
-
-function renderSelectOptions(current, options, placeholder = "") {
-  const vals = placeholder ? ["", ...options] : options;
-  return vals.map(v => {
-    const label = v || placeholder;
-    return `<option value="${escapeAttr(v)}" ${String(v) === String(current || "") ? "selected" : ""}>${escapeHtml(label)}</option>`;
-  }).join("");
-}
-
-function carrierOptions(current) {
-  return renderSelectOptions(current, ["USPS", "UPS", "FedEx"], "Select carrier");
-}
-
-function gloveTypeOptions(current) {
-  return renderSelectOptions(current, ["Fielders Glove", "Catchers Mitt", "First Base Mitt"], "Select glove type");
-}
-
-function webTypeOptions(current) {
-  return renderSelectOptions(current, ["I-Web", "H-Web", "Single Post Web", "Trapeze Web", "Modified Trapeze Web", "Basket (Fully Closed) Web"], "Select web type");
-}
-
-function formatMoneyForInput(value) {
-  if (value === null || value === undefined || value === "") return "";
-  const num = Number(String(value).replace(/[^\d.-]/g, ""));
-  if (Number.isNaN(num)) return "";
-  return `$${num.toFixed(2)}`;
-}
-
-function parseMoneyInput(value) {
-  if (value === null || value === undefined || value === "") return "";
-  const num = Number(String(value).replace(/[^\d.-]/g, ""));
-  return Number.isNaN(num) ? "" : num.toFixed(2);
-}
-
+/* =========================
+   DETAIL
+========================= */
 function renderOrderDetail(order) {
   currentOrder = order;
+  clearSaveStatus();
 
-  orderDetail.innerHTML = `
-    <div class="detail-header-row full">
-      <div>
-        <div class="detail-order-number">Order #${escapeHtml(order.orderNumber || "")}</div>
-        <div class="detail-order-status">${escapeHtml(order.status || "Received")}</div>
-      </div>
-      <div class="detail-actions">
-        <button id="saveOrderBtn" type="button">Save Changes</button>
-        <p id="saveStatus" class="status"></p>
-      </div>
+  const isLocal = looksLocalDropOff(order);
+
+  const primaryLaceColor = order.primaryLaceColor || order.lacePrimary || "";
+  const secondaryLaceColor = order.secondaryLaceColor || order.laceAccent || "";
+  const customLaceNotes = order.customLaceNotes || "";
+
+  const shippingSection = isLocal ? "" : `
+    ${renderSectionHeading("Shipping")}
+
+    <div class="detail-block full">
+      <div class="label">Street Address</div>
+      <input id="editStreetAddress" type="text" />
     </div>
 
+    <div class="detail-block">
+      <div class="label">City</div>
+      <input id="editCity" type="text" />
+    </div>
+
+    <div class="detail-block">
+      <div class="label">State</div>
+      <input id="editState" type="text" />
+    </div>
+
+    <div class="detail-block">
+      <div class="label">Zip Code</div>
+      <input id="editZipCode" type="text" />
+    </div>
+  `;
+
+  orderDetail.innerHTML = `
     <div class="detail-grid">
+      ${renderSectionHeading("Order Summary")}
+
+      ${renderFieldLike("Order #", order.orderNumber || "")}
+      ${renderFieldLike("Customer", order.customerName || "")}
+      ${renderFieldLike("Phone", order.phoneNumber || "")}
+      ${renderFieldLike("Email", order.emailAddress || "")}
+
       ${renderSectionHeading("Order Status")}
 
       <div class="detail-block">
@@ -390,26 +504,12 @@ function renderOrderDetail(order) {
         </select>
       </div>
 
+      ${renderFieldLike("Date Received", formatDate(order.dateReceived))}
+      ${renderFieldLike("Date Completed", formatDate(order.dateCompleted))}
+
       <div class="detail-block full">
         <div class="label">Internal Notes</div>
         <textarea id="editInternalNotes" rows="4"></textarea>
-      </div>
-
-      ${renderSectionHeading("Customer")}
-
-      <div class="detail-block">
-        <div class="label">Customer</div>
-        <div class="value">${escapeHtml(order.customerName || "")}</div>
-      </div>
-
-      <div class="detail-block">
-        <div class="label">Phone</div>
-        <div class="value">${escapeHtml(order.phoneNumber || "")}</div>
-      </div>
-
-      <div class="detail-block full">
-        <div class="label">Email</div>
-        <div class="value">${escapeHtml(order.emailAddress || "")}</div>
       </div>
 
       ${renderSectionHeading("Glove Details")}
@@ -439,124 +539,115 @@ function renderOrderDetail(order) {
         <textarea id="editServicesRequested" rows="4"></textarea>
       </div>
 
-      ${renderLaceField("Primary Lace Color", "editPrimaryLaceColor", order.primaryLaceColor, true)}
-      ${renderLaceField("Secondary Lace Color", "editSecondaryLaceColor", order.secondaryLaceColor, true)}
-      ${renderLaceField("Custom Lace Notes", "editCustomLaceNotes", order.customLaceNotes, true)}
+      ${shouldShowPrimaryLace(order) ? renderLaceInput("Primary Lace Color", "editPrimaryLaceColor", primaryLaceColor) : ""}
+      ${shouldShowSecondaryLace(order) ? renderLaceInput("Secondary Lace Color", "editSecondaryLaceColor", secondaryLaceColor) : ""}
+      ${shouldShowCustomLaceNotes(order) ? renderLaceInput("Custom Lace Notes", "editCustomLaceNotes", customLaceNotes) : ""}
 
       <div class="detail-block full">
         <div class="label">Customer Notes</div>
         <textarea id="editGloveNotes" rows="5"></textarea>
       </div>
 
-      ${renderSectionHeading("Shipping")}
-
-      <div class="detail-block full">
-        <div class="label">Street Address</div>
-        <input id="editStreetAddress" type="text" />
-      </div>
-
-      <div class="detail-block">
-        <div class="label">City</div>
-        <input id="editCity" type="text" />
-      </div>
-
-      <div class="detail-block">
-        <div class="label">State</div>
-        <input id="editState" type="text" />
-      </div>
-
-      <div class="detail-block">
-        <div class="label">Zip Code</div>
-        <input id="editZipCode" type="text" />
-      </div>
-
-      <div class="detail-block">
-        <div class="label">Date Received</div>
-        <div class="value">${escapeHtml(formatDate(order.dateReceived))}</div>
-      </div>
-
-      <div class="detail-block">
-        <div class="label">Date Completed</div>
-        <div class="value">${escapeHtml(formatDate(order.dateCompleted))}</div>
-      </div>
+      ${shippingSection}
     </div>
   `;
 
   document.getElementById("editStatus").value = order.status || "Received";
-  document.getElementById("editPaid").value = (String(order.paid || "").trim().toLowerCase() === "paid") ? "Paid" : "Unpaid";
+  document.getElementById("editPaid").value = normalizeText(order.paid) === "paid" ? "Paid" : "Unpaid";
   document.getElementById("editPriceQuoted").value = formatMoneyForInput(order.priceQuoted);
   document.getElementById("editEstimatedCompletion").value = formatDateForInput(order.estimatedCompletion);
   document.getElementById("editTrackingNumber").value = order.trackingNumber || "";
+  document.getElementById("editCarrier").value = order.carrier || "";
   document.getElementById("editAllowShipWithoutPayment").value = order.allowShipWithoutPayment ? "true" : "false";
   document.getElementById("editInternalNotes").value = order.internalNotes || "";
 
   document.getElementById("editBrandModel").value = order.brandModel || "";
+  document.getElementById("editGloveType").value = order.gloveType || "";
+  document.getElementById("editWebType").value = order.webType || "";
   document.getElementById("editServicesRequested").value = order.servicesRequested || "";
   document.getElementById("editDropOffMethod").value = order.dropOffMethod || "";
-  document.getElementById("editStreetAddress").value = order.streetAddress || order.address || "";
-  document.getElementById("editCity").value = order.city || "";
-  document.getElementById("editState").value = order.state || "";
-  document.getElementById("editZipCode").value = order.zipCode || order.zip || "";
   document.getElementById("editGloveNotes").value = order.gloveNotes || order.customerNotes || "";
 
-  document.getElementById("saveOrderBtn").addEventListener("click", async () => {
-    try {
-      await saveCurrentOrderFromForm();
-    } catch (err) {
-      const saveStatus = document.getElementById("saveStatus");
-      if (saveStatus) saveStatus.textContent = err.message;
-    }
-  });
+  const primaryEl = document.getElementById("editPrimaryLaceColor");
+  const secondaryEl = document.getElementById("editSecondaryLaceColor");
+  const customLaceEl = document.getElementById("editCustomLaceNotes");
+
+  if (primaryEl) primaryEl.value = primaryLaceColor;
+  if (secondaryEl) secondaryEl.value = secondaryLaceColor;
+  if (customLaceEl) customLaceEl.value = customLaceNotes;
+
+  if (!isLocal) {
+    document.getElementById("editStreetAddress").value = order.streetAddress || order.address || "";
+    document.getElementById("editCity").value = order.city || "";
+    document.getElementById("editState").value = order.state || "";
+    document.getElementById("editZipCode").value = order.zipCode || order.zip || "";
+  }
 }
 
 async function saveCurrentOrderFromForm() {
   if (!currentOrder) return;
+  if (!saveStatusEl) return;
 
-  const saveStatus = document.getElementById("saveStatus");
-  saveStatus.textContent = "Saving...";
+  saveStatusEl.textContent = "Saving...";
 
-  const streetAddress = document.getElementById("editStreetAddress").value;
-  const city = document.getElementById("editCity").value;
-  const state = document.getElementById("editState").value;
-  const zipCode = document.getElementById("editZipCode").value;
-  const primaryLaceColor = document.getElementById("editPrimaryLaceColor")?.value || "";
-  const secondaryLaceColor = document.getElementById("editSecondaryLaceColor")?.value || "";
-  const customLaceNotes = document.getElementById("editCustomLaceNotes")?.value || "";
+  const isLocal = looksLocalDropOff(currentOrder);
+
+  const streetAddress = isLocal ? "" : val("editStreetAddress");
+  const city = isLocal ? "" : val("editCity");
+  const state = isLocal ? "" : val("editState");
+  const zipCode = isLocal ? "" : val("editZipCode");
+
+  const primaryLaceColor = val("editPrimaryLaceColor");
+  const secondaryLaceColor = val("editSecondaryLaceColor");
+  const customLaceNotes = val("editCustomLaceNotes");
 
   const updates = {
-    status: document.getElementById("editStatus").value,
-    paid: document.getElementById("editPaid").value,
-    priceQuoted: parseMoneyInput(document.getElementById("editPriceQuoted").value),
-    estimatedCompletion: document.getElementById("editEstimatedCompletion").value,
-    trackingNumber: document.getElementById("editTrackingNumber").value,
-    carrier: document.getElementById("editCarrier").value,
-    allowShipWithoutPayment: document.getElementById("editAllowShipWithoutPayment").value === "true",
-    internalNotes: document.getElementById("editInternalNotes").value,
-    brandModel: document.getElementById("editBrandModel").value,
-    gloveType: document.getElementById("editGloveType").value,
-    webType: document.getElementById("editWebType").value,
-    servicesRequested: document.getElementById("editServicesRequested").value,
-    dropOffMethod: document.getElementById("editDropOffMethod").value,
-    streetAddress,
-    address: streetAddress,
-    city,
-    state,
-    zipCode,
-    zip: zipCode,
-    gloveNotes: document.getElementById("editGloveNotes").value,
-    customerNotes: document.getElementById("editGloveNotes").value,
-    primaryLaceColor,
-    lacePrimary: primaryLaceColor,
-    secondaryLaceColor,
-    laceAccent: secondaryLaceColor,
-    customLaceNotes
+    status: val("editStatus"),
+    paid: val("editPaid"),
+    priceQuoted: parseMoneyInput(val("editPriceQuoted")),
+    estimatedCompletion: val("editEstimatedCompletion"),
+    trackingNumber: val("editTrackingNumber"),
+    carrier: val("editCarrier"),
+    allowShipWithoutPayment: val("editAllowShipWithoutPayment") === "true",
+    internalNotes: val("editInternalNotes"),
+    brandModel: val("editBrandModel"),
+    gloveType: val("editGloveType"),
+    webType: val("editWebType"),
+    servicesRequested: val("editServicesRequested"),
+    dropOffMethod: val("editDropOffMethod"),
+    gloveNotes: val("editGloveNotes"),
+    customerNotes: val("editGloveNotes")
   };
+
+  if (!isLocal) {
+    updates.streetAddress = streetAddress;
+    updates.address = streetAddress;
+    updates.city = city;
+    updates.state = state;
+    updates.zipCode = zipCode;
+    updates.zip = zipCode;
+  }
+
+  if (document.getElementById("editPrimaryLaceColor")) {
+    updates.primaryLaceColor = primaryLaceColor;
+    updates.lacePrimary = primaryLaceColor;
+  }
+
+  if (document.getElementById("editSecondaryLaceColor")) {
+    updates.secondaryLaceColor = secondaryLaceColor;
+    updates.laceAccent = secondaryLaceColor;
+  }
+
+  if (document.getElementById("editCustomLaceNotes")) {
+    updates.customLaceNotes = customLaceNotes;
+  }
 
   const updated = await saveOrderUpdate(currentOrder.orderNumber, updates, true);
   currentOrder = updated;
   renderOrderDetail(updated);
-  document.getElementById("saveStatus").textContent = "Saved.";
+  saveStatusEl.textContent = "Saved.";
   orderDetail.scrollTop = 0;
+  detailView.scrollTop = 0;
   window.scrollTo(0, 0);
 }
 
@@ -576,7 +667,7 @@ async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false) {
     allOrders.push(updatedOrder);
   }
 
-  if (currentOrder && currentOrder.orderNumber === updatedOrder.orderNumber) {
+  if (currentOrder && String(currentOrder.orderNumber) === String(updatedOrder.orderNumber)) {
     currentOrder = updatedOrder;
   }
 
@@ -584,6 +675,9 @@ async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false) {
   return updatedOrder;
 }
 
+/* =========================
+   AUTH / LOAD
+========================= */
 async function login(pinValue) {
   if (loginInProgress) return;
   loginInProgress = true;
@@ -599,7 +693,7 @@ async function login(pinValue) {
     pinInput.value = "";
     loginStatus.textContent = "";
     showView(dashboardView);
-    loadOrders();
+    await loadOrders();
   } catch (err) {
     loginStatus.textContent = err.message;
     pinInput.value = "";
@@ -613,9 +707,7 @@ async function loadOrders() {
   try {
     const data = await postJson({ action: "listOrders" }, true);
     allOrders = data.orders || [];
-
     localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
-
   } catch (err) {
     const cached = localStorage.getItem("mm_orders_cache");
     if (cached) {
@@ -634,29 +726,21 @@ function openOrder(orderNumber) {
   }
 
   renderOrderDetail(order);
+  clearSaveStatus();
   showView(detailView);
   orderDetail.scrollTop = 0;
   detailView.scrollTop = 0;
   window.scrollTo(0, 0);
 
   requestAnimationFrame(() => {
-    const topbar = detailView.querySelector(".topbar");
+    const topbar = detailView.querySelector(".detail-topbar");
     if (topbar) topbar.scrollIntoView({ block: "start" });
   });
 }
 
-function escapeHtml(str) {
-  return String(str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function escapeAttr(str) {
-  return escapeHtml(str).replace(/'/g, "&#39;");
-}
-
+/* =========================
+   EVENTS
+========================= */
 pinInput.addEventListener("input", () => {
   const digits = pinInput.value.replace(/\D/g, "").slice(0, 6);
   pinInput.value = digits;
@@ -668,15 +752,30 @@ pinInput.addEventListener("input", () => {
 
 logoutBtn.addEventListener("click", () => {
   clearToken();
+  currentOrder = null;
+  clearSaveStatus();
   showView(loginView);
 });
 
 searchInput.addEventListener("input", applyFilters);
+
 backBtn.addEventListener("click", () => {
+  clearSaveStatus();
   showView(dashboardView);
   orderDetail.scrollTop = 0;
+  detailView.scrollTop = 0;
   window.scrollTo(0, 0);
 });
+
+if (saveOrderBtn) {
+  saveOrderBtn.addEventListener("click", async () => {
+    try {
+      await saveCurrentOrderFromForm();
+    } catch (err) {
+      if (saveStatusEl) saveStatusEl.textContent = err.message;
+    }
+  });
+}
 
 menuBtn.addEventListener("click", openMenu);
 closeMenuBtn.addEventListener("click", closeMenu);
@@ -688,6 +787,9 @@ navLinks.forEach(btn => {
   });
 });
 
+/* =========================
+   INIT
+========================= */
 (async function init() {
   if (!getToken()) {
     showView(loginView);
