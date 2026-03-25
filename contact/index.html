@@ -68,13 +68,17 @@ body_class: inner
     }
 
     .service-form-wrap .mm-field label,
-    .service-form-wrap .group-label{
+    .service-form-wrap .group-label,
+    .service-form-wrap .lace-label{
       display: flex;
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
       font-size: 13px;
+      font-weight: 400;
       opacity: .92;
+      line-height: 1.35;
+      margin: 0;
     }
 
     .service-form-wrap .req-badge{
@@ -137,7 +141,8 @@ body_class: inner
     .service-form-wrap .mm-field input[type="email"],
     .service-form-wrap .mm-field input[type="tel"],
     .service-form-wrap .mm-field textarea,
-    .service-form-wrap .mm-field select{
+    .service-form-wrap .mm-field select,
+    .service-form-wrap .lace-col select{
       width: 100%;
       min-height: 56px;
       height: 56px;
@@ -167,7 +172,8 @@ body_class: inner
 
     .service-form-wrap .mm-field input:focus,
     .service-form-wrap .mm-field textarea:focus,
-    .service-form-wrap .mm-field select:focus{
+    .service-form-wrap .mm-field select:focus,
+    .service-form-wrap .lace-col select:focus{
       border-color: rgba(9,47,77,.42);
       box-shadow: 0 0 0 3px rgba(9,47,77,.08);
     }
@@ -248,41 +254,36 @@ body_class: inner
       background: rgba(146,26,36,.04);
     }
 
-    /* Lace selector alignment fix */
+    /* Lace selector alignment fix without stupid empty space */
     .lace-grid{
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 24px;
+      gap: 36px;
       align-items: start;
     }
 
     .lace-col{
       display: grid;
-      grid-template-rows: auto minmax(48px, auto) auto;
+      gap: 8px;
       align-content: start;
     }
 
-    .lace-col .lace-label-row{
-      min-height: 34px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-bottom: 8px;
-    }
-
     .lace-col .lace-note{
-      min-height: 38px;
-      display: flex;
-      align-items: flex-end;
       color: rgba(2,11,18,.72);
       line-height: 1.45;
       font-style: italic;
-      margin-bottom: 8px;
+      min-height: 0;
+      margin: 0 0 8px;
     }
 
     .lace-col .lace-note.is-empty{
       visibility: hidden;
+      margin: 0 0 8px;
+      line-height: 1.45;
+    }
+
+    .lace-col .lace-note.is-empty::before{
+      content: "placeholder";
     }
 
     @media (max-width: 820px){
@@ -310,17 +311,21 @@ body_class: inner
       }
 
       .lace-col{
-        grid-template-rows: auto auto auto;
-        margin-bottom: 14px;
+        margin-bottom: 16px;
       }
 
       .lace-col:last-child{
         margin-bottom: 0;
       }
 
-      .lace-col .lace-label-row,
-      .lace-col .lace-note{
-        min-height: auto;
+      .lace-col .lace-note,
+      .lace-col .lace-note.is-empty{
+        visibility: visible;
+        margin: 0 0 8px;
+      }
+
+      .lace-col .lace-note.is-empty{
+        display: none;
       }
     }
   </style>
@@ -487,11 +492,7 @@ body_class: inner
 
               <div class="lace-grid">
                 <div class="lace-col">
-                  <div class="lace-label-row">
-                    <label for="sr-primary-lace">Primary Lace Color</label>
-                    <span class="req-badge">Required</span>
-                  </div>
-                  <div class="lace-note is-empty">.</div>
+                  <label class="lace-label" for="sr-primary-lace">Primary Lace Color <span class="req-badge">Required</span></label>
                   <div class="mm-field" style="margin:0;">
                     <select id="sr-primary-lace" name="primaryLaceColor">
                       <option value="">Choose</option>
@@ -513,9 +514,7 @@ body_class: inner
                 </div>
 
                 <div class="lace-col">
-                  <div class="lace-label-row">
-                    <label for="sr-secondary-lace">Secondary / Accent Lace Color</label>
-                  </div>
+                  <label class="lace-label" for="sr-secondary-lace">Secondary / Accent Lace Color</label>
                   <div class="lace-note">Leave blank if single-color relace.</div>
                   <div class="mm-field" style="margin:0;">
                     <select id="sr-secondary-lace" name="secondaryLaceColor">
