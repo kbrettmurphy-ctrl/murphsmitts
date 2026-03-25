@@ -44,8 +44,28 @@ export async function onRequest(context) {
 
     const body = await request.json();
 
-    // Accept both clean frontend keys and ugly legacy/google-ish labels if needed.
-    const incoming = normalizeIncomingPayload(body);
+    const incoming = {
+      customer_name: cleanText(body.customerName),
+      email_address: cleanText(body.emailAddress),
+      phone_number: cleanText(body.phoneNumber),
+      brand_model: cleanText(body.brandModel),
+      glove_type: cleanText(body.gloveType),
+      web_type: cleanText(body.webType),
+      services_requested: cleanText(body.servicesRequested),
+      primary_lace_color: cleanText(body.primaryLaceColor),
+      secondary_lace_color: cleanText(body.secondaryLaceColor),
+      custom_color_request: cleanText(body.customColorRequest),
+      drop_off_method: cleanText(body.dropOffMethod),
+      street_address: cleanText(body.streetAddress),
+      city: cleanText(body.city),
+      state: cleanText(body.state),
+      zip_code: cleanText(body.zipCode),
+      glove_notes: cleanText(body.gloveNotes),
+      customer_notes: cleanText(body.gloveNotes),
+      social_tag: cleanText(body.socialTag),
+      turnaround_acknowledged: cleanText(body.turnaroundAcknowledged),
+      referral_source: cleanText(body.referralSource)
+    };
 
     if (!incoming.customer_name) {
       return json(
@@ -69,7 +89,91 @@ export async function onRequest(context) {
       );
     }
 
-    // Get next order number
+    if (!incoming.phone_number) {
+      return json(
+        {
+          ok: false,
+          error: "Missing required field: phone number."
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
+    if (!incoming.glove_type) {
+      return json(
+        {
+          ok: false,
+          error: "Missing required field: glove type."
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
+    if (incoming.glove_type === "Fielders Glove" && !incoming.web_type) {
+      return json(
+        {
+          ok: false,
+          error: "Web type is required for fielders gloves."
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
+    if (!incoming.services_requested) {
+      return json(
+        {
+          ok: false,
+          error: "Missing required field: services requested."
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
+    if (!incoming.primary_lace_color) {
+      return json(
+        {
+          ok: false,
+          error: "Missing required field: primary lace color."
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
+    if (!incoming.drop_off_method) {
+      return json(
+        {
+          ok: false,
+          error: "Missing required field: drop-off method."
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
+    if (!incoming.turnaround_acknowledged) {
+      return json(
+        {
+          ok: false,
+          error: "You must acknowledge that turnaround times vary based on workload."
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
+    // For local drop-off, do not keep shipping address junk
+    if (!looksLikeShipMethod(incoming.drop_off_method)) {
+      incoming.street_address = null;
+      incoming.city = null;
+      incoming.state = null;
+      incoming.zip_code = null;
+    }
+
     const nextOrderResp = await supabaseFetch(
       env,
       `/rest/v1/orders?select=order_number&order=order_number.desc&limit=1`
@@ -90,7 +194,7 @@ export async function onRequest(context) {
     const nextOrderNumber = getNextOrderNumber(nextOrderResp.data);
 
     const newOrder = {
-      timestamp_submitted: incoming.timestamp_submitted || new Date().toISOString(),
+      timestamp_submitted: new Date().toISOString(),
       customer_name: incoming.customer_name,
       phone_number: incoming.phone_number,
       email_address: incoming.email_address,
@@ -111,11 +215,11 @@ export async function onRequest(context) {
       zip_code: incoming.zip_code,
 
       glove_notes: incoming.glove_notes,
-      customer_notes: incoming.customer_notes || incoming.glove_notes,
+      customer_notes: incoming.customer_notes,
       social_tag: incoming.social_tag,
       turnaround_acknowledged: incoming.turnaround_acknowledged,
       referral_source: incoming.referral_source,
-      glove_photos: incoming.glove_photos,
+      glove_photos: null,
 
       order_number: nextOrderNumber,
       status: "Received",
@@ -157,7 +261,6 @@ export async function onRequest(context) {
 
     let inserted = insert.data[0];
 
-    // Send the same style/status logic email system used elsewhere
     const emailResult = await sendStatusEmail(env, inserted, "Received");
 
     if (!emailResult.ok) {
@@ -172,7 +275,6 @@ export async function onRequest(context) {
       );
     }
 
-    // Stamp last_status_emailed after successful send
     const stamp = await supabaseFetch(
       env,
       `/rest/v1/orders?order_number=eq.${encodeURIComponent(inserted.order_number)}`,
@@ -264,157 +366,6 @@ async function supabaseFetch(env, path, options = {}) {
     status: resp.status,
     data
   };
-}
-
-/* =========================
-   INTAKE FIELD MAPPING
-========================= */
-function normalizeIncomingPayload(body) {
-  return {
-    timestamp_submitted: pick(body, [
-      "timestampSubmitted",
-      "timestamp_submitted",
-      "Timestamp"
-    ]) || new Date().toISOString(),
-
-    customer_name: pick(body, [
-      "customerName",
-      "customer_name",
-      "Customer Name"
-    ]),
-
-    phone_number: pick(body, [
-      "phoneNumber",
-      "phone_number",
-      "Phone Number"
-    ]),
-
-    email_address: pick(body, [
-      "emailAddress",
-      "email_address",
-      "Email Address"
-    ]),
-
-    brand_model: pick(body, [
-      "brandModel",
-      "brand_model",
-      "Brand / Model (if known)",
-      "Brand / Model"
-    ]),
-
-    glove_type: pick(body, [
-      "gloveType",
-      "glove_type",
-      "Glove Type"
-    ]),
-
-    web_type: pick(body, [
-      "webType",
-      "web_type",
-      "Web Type (Fielders Gloves Only)",
-      "Web Type"
-    ]),
-
-    services_requested: pick(body, [
-      "servicesRequested",
-      "services_requested",
-      "Services Requested"
-    ]),
-
-    primary_lace_color: pick(body, [
-      "primaryLaceColor",
-      "primary_lace_color",
-      "Primary Lace Color"
-    ]),
-
-    secondary_lace_color: pick(body, [
-      "secondaryLaceColor",
-      "secondary_lace_color",
-      "Secondary / Accent Lace Color",
-      "Secondary Lace Color",
-      "Accent Lace Color"
-    ]),
-
-    custom_color_request: pick(body, [
-      "customColorRequest",
-      "custom_color_request",
-      "customLaceNotes",
-      "Custom Color Request"
-    ]),
-
-    drop_off_method: pick(body, [
-      "dropOffMethod",
-      "drop_off_method",
-      "Drop-Off Method"
-    ]),
-
-    street_address: pick(body, [
-      "streetAddress",
-      "street_address",
-      "Street Address"
-    ]),
-
-    city: pick(body, [
-      "city",
-      "City"
-    ]),
-
-    state: pick(body, [
-      "state",
-      "State"
-    ]),
-
-    zip_code: pick(body, [
-      "zipCode",
-      "zip_code",
-      "Zip Code"
-    ]),
-
-    glove_notes: pick(body, [
-      "gloveNotes",
-      "glove_notes",
-      "Anything I should know about this glove?"
-    ]),
-
-    customer_notes: pick(body, [
-      "customerNotes",
-      "customer_notes"
-    ]),
-
-    social_tag: pick(body, [
-      "socialTag",
-      "social_tag",
-      "If I post a video of your glove and you’d like to be tagged, enter your platform + username"
-    ]),
-
-    turnaround_acknowledged: pick(body, [
-      "turnaroundAcknowledged",
-      "turnaround_acknowledged",
-      "I understand that turnaround times vary based on workload"
-    ]),
-
-    referral_source: pick(body, [
-      "referralSource",
-      "referral_source",
-      "How did you hear about me?"
-    ]),
-
-    glove_photos: pick(body, [
-      "glovePhotos",
-      "glove_photos",
-      "Photos of your glove"
-    ])
-  };
-}
-
-function pick(obj, keys) {
-  for (const key of keys) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const value = cleanText(obj[key]);
-      if (value !== null) return value;
-    }
-  }
-  return null;
 }
 
 function getNextOrderNumber(rows) {
@@ -742,7 +693,7 @@ function wrapEmailHtmlSplit(beforeThanks, afterThanks, includeReview) {
 }
 
 /* =========================
-   SMALL HELPERS
+   HELPERS
 ========================= */
 function cleanText(value) {
   if (value === null || value === undefined) return null;
