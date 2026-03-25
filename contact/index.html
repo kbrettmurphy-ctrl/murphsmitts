@@ -67,14 +67,41 @@ body_class: inner
       margin-bottom: 0;
     }
 
-    .service-form-wrap .mm-field label{
+    .service-form-wrap .mm-field label,
+    .service-form-wrap .group-label{
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
       font-size: 13px;
-      opacity: .88;
+      opacity: .92;
     }
 
-    .service-form-wrap .mm-field .req{
-      opacity: .72;
-      font-weight: 500;
+    .service-form-wrap .req-badge{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 22px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(146,26,36,.12);
+      color: #921a24;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+
+    .service-form-wrap .required-note{
+      margin: 0 0 10px;
+      color: rgba(2,11,18,.76);
+      line-height: 1.5;
+      font-size: .96rem;
+    }
+
+    .service-form-wrap .required-note strong{
+      color: #921a24;
     }
 
     .service-form-wrap .mm-choice-list{
@@ -123,6 +150,7 @@ body_class: inner
       outline: none;
       appearance: auto;
       box-shadow: none;
+      transition: border-color .15s ease, box-shadow .15s ease;
     }
 
     .service-form-wrap .mm-field textarea{
@@ -141,6 +169,7 @@ body_class: inner
     .service-form-wrap .mm-field textarea:focus,
     .service-form-wrap .mm-field select:focus{
       border-color: rgba(9,47,77,.42);
+      box-shadow: 0 0 0 3px rgba(9,47,77,.08);
     }
 
     .service-form-wrap .note{
@@ -161,16 +190,27 @@ body_class: inner
     }
 
     .service-status{
+      display: none;
       margin-top: 12px;
-      min-height: 24px;
+      padding: 12px 14px;
+      border-radius: 14px;
       font-weight: 600;
+      line-height: 1.4;
+    }
+
+    .service-status.show{
+      display: block;
     }
 
     .service-status.error{
+      background: rgba(146,26,36,.08);
+      border: 1px solid rgba(146,26,36,.18);
       color: #921a24;
     }
 
     .service-status.success{
+      background: rgba(15,106,60,.08);
+      border: 1px solid rgba(15,106,60,.18);
       color: #0f6a3c;
     }
 
@@ -194,6 +234,18 @@ body_class: inner
 
     .service-success-card p{
       margin: 6px 0;
+    }
+
+    .field-invalid{
+      border-color: rgba(146,26,36,.55) !important;
+      box-shadow: 0 0 0 3px rgba(146,26,36,.08) !important;
+    }
+
+    .group-invalid{
+      padding: 10px 12px;
+      border: 1px solid rgba(146,26,36,.18);
+      border-radius: 14px;
+      background: rgba(146,26,36,.04);
     }
 
     @media (max-width: 820px){
@@ -296,24 +348,28 @@ body_class: inner
 
       <div class="service-form-wrap">
         <form id="serviceRequestForm" class="mm-form" novalidate>
+          <p class="required-note"><strong>Required fields</strong> are marked in red.</p>
+
+          <div id="serviceStatus" class="service-status" aria-live="polite"></div>
+
           <div class="service-section">
             <h3 class="service-section-title">Contact Info</h3>
             <div class="service-section-body">
               <div class="mm-grid-2">
                 <div class="mm-field">
-                  <label for="sr-email">Email <span class="req">(required)</span></label>
-                  <input id="sr-email" name="emailAddress" type="email" required autocomplete="email" placeholder="Email">
+                  <label for="sr-email">Email <span class="req-badge">Required</span></label>
+                  <input id="sr-email" name="emailAddress" type="email" autocomplete="email" placeholder="Email">
                 </div>
 
                 <div class="mm-field">
-                  <label for="sr-name">Customer Name <span class="req">(required)</span></label>
-                  <input id="sr-name" name="customerName" type="text" required autocomplete="name" placeholder="Customer Name">
+                  <label for="sr-name">Customer Name <span class="req-badge">Required</span></label>
+                  <input id="sr-name" name="customerName" type="text" autocomplete="name" placeholder="Customer Name">
                 </div>
               </div>
 
               <div class="mm-field">
-                <label for="sr-phone">Phone Number <span class="req">(required)</span></label>
-                <input id="sr-phone" name="phoneNumber" type="tel" required inputmode="tel" placeholder="Phone Number">
+                <label for="sr-phone">Phone Number <span class="req-badge">Required</span></label>
+                <input id="sr-phone" name="phoneNumber" type="tel" inputmode="tel" placeholder="Phone Number">
                 <div class="note">So that I can contact you for questions and drop-off/shipping coordination.</div>
               </div>
             </div>
@@ -327,8 +383,8 @@ body_class: inner
                 <input id="sr-brand" name="brandModel" type="text" placeholder="Example: Nokona AMG1200, Rawlings HoH PRO7175SB-2WSS">
               </div>
 
-              <div class="mm-field">
-                <label>Glove Type <span class="req">(required)</span></label>
+              <div class="mm-field" id="gloveTypeGroup">
+                <div class="group-label">Glove Type <span class="req-badge">Required</span></div>
                 <div class="mm-choice-list">
                   <label class="mm-choice"><input type="radio" name="gloveType" value="Fielders Glove"> <span>Fielders Glove</span></label>
                   <label class="mm-choice"><input type="radio" name="gloveType" value="Catchers Mitt"> <span>Catchers Mitt</span></label>
@@ -337,7 +393,7 @@ body_class: inner
               </div>
 
               <div id="webTypeWrap" class="mm-field is-hidden">
-                <label for="sr-web-type">Web Type (Fielders Gloves Only) <span class="req">(required for fielders)</span></label>
+                <label for="sr-web-type">Web Type (Fielders Gloves Only) <span class="req-badge">Required</span></label>
                 <div class="note">Trapeze and Modified Trapeze webs require additional lace and labor and may be priced higher.</div>
                 <select id="sr-web-type" name="webType">
                   <option value="">Choose</option>
@@ -356,8 +412,8 @@ body_class: inner
           <div class="service-section">
             <h3 class="service-section-title">Services</h3>
             <div class="service-section-body">
-              <div class="mm-field">
-                <label>Services Requested <span class="req">(required)</span></label>
+              <div class="mm-field" id="servicesGroup">
+                <div class="group-label">Services Requested <span class="req-badge">Required</span></div>
                 <div class="mm-choice-list">
                   <label class="mm-choice"><input type="checkbox" name="servicesRequested" value="Relacing"> <span>Relacing</span></label>
                   <label class="mm-choice"><input type="checkbox" name="servicesRequested" value="Cleaning + Conditioning"> <span>Cleaning + Conditioning</span></label>
@@ -379,7 +435,7 @@ body_class: inner
 
               <div class="mm-grid-2">
                 <div class="mm-field">
-                  <label for="sr-primary-lace">Primary Lace Color <span class="req">(required)</span></label>
+                  <label for="sr-primary-lace">Primary Lace Color <span class="req-badge">Required</span></label>
                   <select id="sr-primary-lace" name="primaryLaceColor">
                     <option value="">Choose</option>
                     <option value="Black">Black</option>
@@ -430,8 +486,8 @@ body_class: inner
           <div class="service-section">
             <h3 class="service-section-title">Drop-Off Method</h3>
             <div class="service-section-body">
-              <div class="mm-field">
-                <label>Drop-Off Method <span class="req">(required)</span></label>
+              <div class="mm-field" id="dropOffGroup">
+                <div class="group-label">Drop-Off Method <span class="req-badge">Required</span></div>
                 <div class="mm-choice-list">
                   <label class="mm-choice"><input type="radio" name="dropOffMethod" value="Local Drop-Off"> <span>Local Drop-Off</span></label>
                   <label class="mm-choice"><input type="radio" name="dropOffMethod" value="Shipped to Murph’s Mitt Maintenance"> <span>Shipped to Murph’s Mitt Maintenance</span></label>
@@ -468,18 +524,16 @@ body_class: inner
                 </div>
               </div>
 
-              <div class="mm-field">
+              <div class="mm-field" id="turnaroundGroup">
                 <label class="mm-choice">
                   <input id="sr-turnaround" name="turnaroundAck" type="checkbox">
-                  <span>I understand that turnaround times vary based on workload <span class="req">(required)</span></span>
+                  <span>I understand that turnaround times vary based on workload <span class="req-badge">Required</span></span>
                 </label>
               </div>
 
               <div class="mm-actions">
                 <button id="serviceSubmitBtn" class="btn btn-primary" type="submit">Submit Service Request</button>
               </div>
-
-              <div id="serviceStatus" class="service-status" aria-live="polite"></div>
 
               <div id="serviceSuccessCard" class="service-success-card">
                 <h3>Request submitted.</h3>
@@ -515,6 +569,11 @@ body_class: inner
   const successOrder = document.getElementById("serviceSuccessOrder");
   const submitBtn = document.getElementById("serviceSubmitBtn");
 
+  const gloveTypeGroup = document.getElementById("gloveTypeGroup");
+  const servicesGroup = document.getElementById("servicesGroup");
+  const dropOffGroup = document.getElementById("dropOffGroup");
+  const turnaroundGroup = document.getElementById("turnaroundGroup");
+
   function selectedValue(name) {
     return form.querySelector(`input[name="${name}"]:checked`)?.value || "";
   }
@@ -524,7 +583,10 @@ body_class: inner
     const showWebType = gloveType === "Fielders Glove";
 
     webTypeWrap.classList.toggle("is-hidden", !showWebType);
-    if (!showWebType) webTypeSelect.value = "";
+    if (!showWebType) {
+      webTypeSelect.value = "";
+      webTypeSelect.classList.remove("field-invalid");
+    }
   }
 
   function collectServicesRequested() {
@@ -549,28 +611,111 @@ body_class: inner
     return selected;
   }
 
-  function showError(message) {
-    statusEl.className = "service-status error";
+  function showStatus(message, type) {
+    statusEl.className = `service-status show ${type}`;
     statusEl.textContent = message;
   }
 
-  function showSuccess(orderNumber) {
-    statusEl.className = "service-status success";
+  function clearStatus() {
+    statusEl.className = "service-status";
     statusEl.textContent = "";
+  }
+
+  function showSuccess(orderNumber) {
+    clearStatus();
     successOrder.textContent = orderNumber ? `Order #: ${orderNumber}` : "";
     successCard.classList.add("show");
   }
 
   function clearMessages() {
-    statusEl.className = "service-status";
-    statusEl.textContent = "";
+    clearStatus();
     successCard.classList.remove("show");
     successOrder.textContent = "";
+  }
+
+  function clearInvalidStates() {
+    form.querySelectorAll(".field-invalid").forEach(el => el.classList.remove("field-invalid"));
+    [gloveTypeGroup, servicesGroup, dropOffGroup, turnaroundGroup].forEach(el => el.classList.remove("group-invalid"));
+  }
+
+  function scrollToElement(el) {
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function fail(message, el, groupEl) {
+    showStatus(message, "error");
+
+    if (groupEl) groupEl.classList.add("group-invalid");
+    if (el) el.classList.add("field-invalid");
+
+    setTimeout(() => {
+      scrollToElement(groupEl || el || statusEl);
+      if (el && typeof el.focus === "function") {
+        el.focus({ preventScroll: true });
+      }
+    }, 20);
+
+    return false;
+  }
+
+  function validateForm() {
+    clearInvalidStates();
+
+    if (!form.emailAddress.value.trim()) {
+      return fail("Please enter your email address.", form.emailAddress);
+    }
+
+    if (!form.customerName.value.trim()) {
+      return fail("Please enter your customer name.", form.customerName);
+    }
+
+    if (!form.phoneNumber.value.trim()) {
+      return fail("Please enter your phone number.", form.phoneNumber);
+    }
+
+    if (!selectedValue("gloveType")) {
+      return fail("Please select a glove type.", null, gloveTypeGroup);
+    }
+
+    if (selectedValue("gloveType") === "Fielders Glove" && !webTypeSelect.value.trim()) {
+      return fail("Please select a web type for a fielders glove.", webTypeSelect);
+    }
+
+    if (!collectServicesRequested()) {
+      return fail("Select at least one service requested.", null, servicesGroup);
+    }
+
+    if (!form.primaryLaceColor.value.trim()) {
+      return fail("Please select a primary lace color.", form.primaryLaceColor);
+    }
+
+    if (!selectedValue("dropOffMethod")) {
+      return fail("Please select a drop-off method.", null, dropOffGroup);
+    }
+
+    if (!turnaroundBox.checked) {
+      return fail("You must acknowledge that turnaround times vary based on workload.", null, turnaroundGroup);
+    }
+
+    return true;
   }
 
   form.addEventListener("change", (e) => {
     if (e.target.name === "gloveType") {
       toggleConditionalFields();
+    }
+
+    if (e.target.classList.contains("field-invalid")) {
+      e.target.classList.remove("field-invalid");
+    }
+
+    clearStatus();
+  });
+
+  form.addEventListener("input", (e) => {
+    if (e.target.classList.contains("field-invalid")) {
+      e.target.classList.remove("field-invalid");
     }
   });
 
@@ -579,62 +724,12 @@ body_class: inner
     clearMessages();
     toggleConditionalFields();
 
-    const servicesRequested = collectServicesRequested();
-
-    if (!form.emailAddress.value.trim()) {
-      showError("Please enter your email address.");
-      form.emailAddress.focus();
-      return;
-    }
-
-    if (!form.customerName.value.trim()) {
-      showError("Please enter your customer name.");
-      form.customerName.focus();
-      return;
-    }
-
-    if (!form.phoneNumber.value.trim()) {
-      showError("Please enter your phone number.");
-      form.phoneNumber.focus();
-      return;
-    }
-
-    if (!selectedValue("gloveType")) {
-      showError("Please select a glove type.");
-      return;
-    }
-
-    if (selectedValue("gloveType") === "Fielders Glove" && !webTypeSelect.value.trim()) {
-      showError("Please select a web type for a fielders glove.");
-      webTypeSelect.focus();
-      return;
-    }
-
-    if (!servicesRequested) {
-      showError("Select at least one service requested.");
-      return;
-    }
-
-    if (!form.primaryLaceColor.value.trim()) {
-      showError("Please select a primary lace color.");
-      form.primaryLaceColor.focus();
-      return;
-    }
-
-    if (!selectedValue("dropOffMethod")) {
-      showError("Please select a drop-off method.");
-      return;
-    }
-
-    if (!turnaroundBox.checked) {
-      showError("You must acknowledge that turnaround times vary based on workload.");
-      turnaroundBox.focus();
+    if (!validateForm()) {
       return;
     }
 
     submitBtn.disabled = true;
-    statusEl.className = "service-status";
-    statusEl.textContent = "Submitting...";
+    showStatus("Submitting...", "success");
 
     const payload = {
       customerName: form.customerName.value.trim(),
@@ -643,7 +738,7 @@ body_class: inner
       brandModel: form.brandModel.value.trim(),
       gloveType: selectedValue("gloveType"),
       webType: webTypeSelect.value.trim(),
-      servicesRequested,
+      servicesRequested: collectServicesRequested(),
       primaryLaceColor: form.primaryLaceColor.value.trim(),
       secondaryLaceColor: form.secondaryLaceColor.value.trim(),
       customColorRequest: form.customColorRequest.value.trim(),
@@ -670,11 +765,18 @@ body_class: inner
       }
 
       form.reset();
+      clearInvalidStates();
       toggleConditionalFields();
       showSuccess(data.order?.orderNumber || data.order?.order_number || "");
-      window.scrollTo({ top: form.offsetTop - 120, behavior: "smooth" });
+
+      setTimeout(() => {
+        scrollToElement(successCard);
+      }, 20);
     } catch (err) {
-      showError(err.message || "Failed to submit service request.");
+      showStatus(err.message || "Failed to submit service request.", "error");
+      setTimeout(() => {
+        scrollToElement(statusEl);
+      }, 20);
     } finally {
       submitBtn.disabled = false;
     }
