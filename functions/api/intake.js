@@ -221,6 +221,13 @@ export async function onRequest(context) {
       );
     }
 
+    await sendPushoverNotification(env, {
+      orderNumber: inserted.order_number,
+      name: inserted.customer_name,
+      gloveType: inserted.glove_type,
+      services: inserted.services_requested
+    });
+
     const stamp = await supabaseFetch(
       env,
       `/rest/v1/orders?order_number=eq.${encodeURIComponent(inserted.order_number)}`,
@@ -449,6 +456,29 @@ ${msg}`.trimEnd();
     plainBody,
     htmlBody
   });
+}
+
+async function sendPushoverNotification(env, { orderNumber, name, gloveType, services }) {
+  try {
+    const res = await fetch("https://api.pushover.net/1/messages.json", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        token: env.PUSHOVER_APP_TOKEN,
+        user: env.PUSHOVER_USER_KEY,
+        title: `New Order #${orderNumber}`,
+        message: `${name} submitted a ${gloveType}\nServices: ${services}`
+      })
+    });
+
+    if (!res.ok) {
+      console.error("Pushover failed:", await res.text());
+    }
+  } catch (err) {
+    console.error("Pushover error:", err);
+  }
 }
 
 async function sendOwnerNewOrderEmail(env, row) {
