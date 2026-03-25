@@ -302,7 +302,6 @@ body_class: inner
       <label class="toggle-tab" for="tab-service">Service Request</label>
     </div>
 
-    <!-- PANEL: QUESTIONS -->
     <section class="toggle-panel" data-panel="questions" aria-label="Questions form">
       <h2 class="panel-title">General questions</h2>
 
@@ -362,7 +361,6 @@ body_class: inner
       </div>
     </section>
 
-    <!-- PANEL: SERVICE REQUEST -->
     <section class="toggle-panel" data-panel="service" aria-label="Service request form">
       <h2 class="panel-title">Service request</h2>
 
@@ -514,6 +512,30 @@ body_class: inner
                   <label class="mm-choice"><input type="radio" name="dropOffMethod" value="Shipped to Murph’s Mitt Maintenance"> <span>Shipped to Murph’s Mitt Maintenance</span></label>
                 </div>
               </div>
+
+              <div id="shippingAddressWrap" class="is-hidden" style="margin-top:16px;">
+                <div class="mm-field">
+                  <label for="sr-street">Street Address <span class="req-badge">Required</span></label>
+                  <input id="sr-street" name="streetAddress" type="text" placeholder="Street Address">
+                </div>
+
+                <div class="mm-grid-2">
+                  <div class="mm-field">
+                    <label for="sr-city">City <span class="req-badge">Required</span></label>
+                    <input id="sr-city" name="city" type="text" placeholder="City">
+                  </div>
+
+                  <div class="mm-field">
+                    <label for="sr-state">State <span class="req-badge">Required</span></label>
+                    <input id="sr-state" name="state" type="text" placeholder="State">
+                  </div>
+                </div>
+
+                <div class="mm-field">
+                  <label for="sr-zip">Zip Code <span class="req-badge">Required</span></label>
+                  <input id="sr-zip" name="zipCode" type="text" inputmode="numeric" placeholder="Zip Code">
+                </div>
+              </div>
             </div>
           </div>
 
@@ -589,6 +611,12 @@ body_class: inner
   const successCard = document.getElementById("serviceSuccessCard");
   const successOrder = document.getElementById("serviceSuccessOrder");
   const submitBtn = document.getElementById("serviceSubmitBtn");
+  const shippingAddressWrap = document.getElementById("shippingAddressWrap");
+
+  const streetEl = document.getElementById("sr-street");
+  const cityEl = document.getElementById("sr-city");
+  const stateEl = document.getElementById("sr-state");
+  const zipEl = document.getElementById("sr-zip");
 
   const gloveTypeGroup = document.getElementById("gloveTypeGroup");
   const servicesGroup = document.getElementById("servicesGroup");
@@ -602,11 +630,20 @@ body_class: inner
   function toggleConditionalFields() {
     const gloveType = selectedValue("gloveType");
     const showWebType = gloveType === "Fielders Glove";
+    const shipped = selectedValue("dropOffMethod") === "Shipped to Murph’s Mitt Maintenance";
 
     webTypeWrap.classList.toggle("is-hidden", !showWebType);
     if (!showWebType) {
       webTypeSelect.value = "";
       webTypeSelect.classList.remove("field-invalid");
+    }
+
+    shippingAddressWrap.classList.toggle("is-hidden", !shipped);
+    if (!shipped) {
+      [streetEl, cityEl, stateEl, zipEl].forEach(el => {
+        el.value = "";
+        el.classList.remove("field-invalid");
+      });
     }
   }
 
@@ -715,6 +752,13 @@ body_class: inner
       return fail("Please select a drop-off method.", null, dropOffGroup);
     }
 
+    if (selectedValue("dropOffMethod") === "Shipped to Murph’s Mitt Maintenance") {
+      if (!streetEl.value.trim()) return fail("Please enter your street address.", streetEl);
+      if (!cityEl.value.trim()) return fail("Please enter your city.", cityEl);
+      if (!stateEl.value.trim()) return fail("Please enter your state.", stateEl);
+      if (!zipEl.value.trim()) return fail("Please enter your zip code.", zipEl);
+    }
+
     if (!turnaroundBox.checked) {
       return fail("You must acknowledge that turnaround times vary based on workload.", null, turnaroundGroup);
     }
@@ -723,7 +767,7 @@ body_class: inner
   }
 
   form.addEventListener("change", (e) => {
-    if (e.target.name === "gloveType") {
+    if (e.target.name === "gloveType" || e.target.name === "dropOffMethod") {
       toggleConditionalFields();
     }
 
@@ -764,6 +808,10 @@ body_class: inner
       secondaryLaceColor: form.secondaryLaceColor.value.trim(),
       customColorRequest: form.customColorRequest.value.trim(),
       dropOffMethod: selectedValue("dropOffMethod"),
+      streetAddress: streetEl.value.trim(),
+      city: cityEl.value.trim(),
+      state: stateEl.value.trim(),
+      zipCode: zipEl.value.trim(),
       gloveNotes: form.gloveNotes.value.trim(),
       socialTag: form.socialTag.value.trim(),
       turnaroundAcknowledged: "I understand",
