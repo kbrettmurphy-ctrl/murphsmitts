@@ -248,8 +248,46 @@ body_class: inner
       background: rgba(146,26,36,.04);
     }
 
+    /* Lace selector alignment fix */
+    .lace-grid{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .lace-col{
+      display: grid;
+      grid-template-rows: auto minmax(48px, auto) auto;
+      align-content: start;
+    }
+
+    .lace-col .lace-label-row{
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .lace-col .lace-note{
+      min-height: 38px;
+      display: flex;
+      align-items: flex-end;
+      color: rgba(2,11,18,.72);
+      line-height: 1.45;
+      font-style: italic;
+      margin-bottom: 8px;
+    }
+
+    .lace-col .lace-note.is-empty{
+      visibility: hidden;
+    }
+
     @media (max-width: 820px){
-      .service-form-wrap .mm-grid-2{
+      .service-form-wrap .mm-grid-2,
+      .lace-grid{
         grid-template-columns: 1fr;
         gap: 0;
       }
@@ -269,6 +307,20 @@ body_class: inner
 
       .service-form-wrap .mm-inline-other input[type="text"]{
         margin-top: -2px;
+      }
+
+      .lace-col{
+        grid-template-rows: auto auto auto;
+        margin-bottom: 14px;
+      }
+
+      .lace-col:last-child{
+        margin-bottom: 0;
+      }
+
+      .lace-col .lace-label-row,
+      .lace-col .lace-note{
+        min-height: auto;
       }
     }
   </style>
@@ -433,50 +485,60 @@ body_class: inner
             <div class="service-section-body">
               <p class="service-help">If there is a certain shade of a certain color listed that you would prefer, please write it in the custom color request box below.</p>
 
-              <div class="mm-grid-2">
-                <div class="mm-field">
-                  <label for="sr-primary-lace">Primary Lace Color <span class="req-badge">Required</span></label>
-                  <select id="sr-primary-lace" name="primaryLaceColor">
-                    <option value="">Choose</option>
-                    <option value="Black">Black</option>
-                    <option value="Gray">Gray</option>
-                    <option value="Tan – Camel">Tan – Camel</option>
-                    <option value="Tan – Indian">Tan – Indian</option>
-                    <option value="Brown – Chestnut">Brown – Chestnut</option>
-                    <option value="Brown – Chocolate">Brown – Chocolate</option>
-                    <option value="Blue – Royal">Blue – Royal</option>
-                    <option value="Blue – Navy">Blue – Navy</option>
-                    <option value="Blue – Carolina">Blue – Carolina</option>
-                    <option value="Red">Red</option>
-                    <option value="Red - Dark">Red - Dark</option>
-                    <option value="Orange">Orange</option>
-                    <option value="Other (Special Order)">Other (Special Order)</option>
-                  </select>
+              <div class="lace-grid">
+                <div class="lace-col">
+                  <div class="lace-label-row">
+                    <label for="sr-primary-lace">Primary Lace Color</label>
+                    <span class="req-badge">Required</span>
+                  </div>
+                  <div class="lace-note is-empty">.</div>
+                  <div class="mm-field" style="margin:0;">
+                    <select id="sr-primary-lace" name="primaryLaceColor">
+                      <option value="">Choose</option>
+                      <option value="Black">Black</option>
+                      <option value="Gray">Gray</option>
+                      <option value="Tan – Camel">Tan – Camel</option>
+                      <option value="Tan – Indian">Tan – Indian</option>
+                      <option value="Brown – Chestnut">Brown – Chestnut</option>
+                      <option value="Brown – Chocolate">Brown – Chocolate</option>
+                      <option value="Blue – Royal">Blue – Royal</option>
+                      <option value="Blue – Navy">Blue – Navy</option>
+                      <option value="Blue – Carolina">Blue – Carolina</option>
+                      <option value="Red">Red</option>
+                      <option value="Red - Dark">Red - Dark</option>
+                      <option value="Orange">Orange</option>
+                      <option value="Other (Special Order)">Other (Special Order)</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div class="mm-field">
-                  <label for="sr-secondary-lace">Secondary / Accent Lace Color</label>
-                  <div class="note">Leave blank if single-color relace.</div>
-                  <select id="sr-secondary-lace" name="secondaryLaceColor">
-                    <option value="">Choose</option>
-                    <option value="Black">Black</option>
-                    <option value="Gray">Gray</option>
-                    <option value="Tan – Camel">Tan – Camel</option>
-                    <option value="Tan – Indian">Tan – Indian</option>
-                    <option value="Brown – Chestnut">Brown – Chestnut</option>
-                    <option value="Brown – Chocolate">Brown – Chocolate</option>
-                    <option value="Blue – Royal">Blue – Royal</option>
-                    <option value="Blue – Navy">Blue – Navy</option>
-                    <option value="Blue – Carolina">Blue – Carolina</option>
-                    <option value="Red">Red</option>
-                    <option value="Red - Dark">Red - Dark</option>
-                    <option value="Orange">Orange</option>
-                    <option value="Other (Special Order)">Other (Special Order)</option>
-                  </select>
+                <div class="lace-col">
+                  <div class="lace-label-row">
+                    <label for="sr-secondary-lace">Secondary / Accent Lace Color</label>
+                  </div>
+                  <div class="lace-note">Leave blank if single-color relace.</div>
+                  <div class="mm-field" style="margin:0;">
+                    <select id="sr-secondary-lace" name="secondaryLaceColor">
+                      <option value="">Choose</option>
+                      <option value="Black">Black</option>
+                      <option value="Gray">Gray</option>
+                      <option value="Tan – Camel">Tan – Camel</option>
+                      <option value="Tan – Indian">Tan – Indian</option>
+                      <option value="Brown – Chestnut">Brown – Chestnut</option>
+                      <option value="Brown – Chocolate">Brown – Chocolate</option>
+                      <option value="Blue – Royal">Blue – Royal</option>
+                      <option value="Blue – Navy">Blue – Navy</option>
+                      <option value="Blue – Carolina">Blue – Carolina</option>
+                      <option value="Red">Red</option>
+                      <option value="Red - Dark">Red - Dark</option>
+                      <option value="Orange">Orange</option>
+                      <option value="Other (Special Order)">Other (Special Order)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              <div class="mm-field">
+              <div class="mm-field" style="margin-top:16px;">
                 <label for="sr-custom-color">Custom Color Request</label>
                 <textarea id="sr-custom-color" name="customColorRequest" rows="4" placeholder="Don’t see your color? Describe it here. Special order lace may extend turnaround."></textarea>
               </div>
