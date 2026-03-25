@@ -7,95 +7,615 @@ body_class: inner
 ---
 
 <main class="container page page-under-header">
-    <h1>Contact Me</h1>
-    <p class="lede">
-      Got a question? Use the quick form. Ready for glove work? Use the Service Request.
-    </p>
+  <h1>Contact Me</h1>
+  <p class="lede">
+    Got a question? Use the quick form. Ready for glove work? Use the Service Request.
+  </p>
 
-    <!-- TOGGLE (no JS) -->
-<div class="card" style="margin-top:18px;">
+  <style>
+    .service-form-wrap{
+      margin-top: 8px;
+    }
 
-  <!-- radios must be siblings of the panels for the CSS to work -->
-  <input class="toggle-input" type="radio" name="contactTabs" id="tab-questions" checked>
-  <input class="toggle-input" type="radio" name="contactTabs" id="tab-service">
+    .service-section{
+      margin: 18px 0 0;
+      border: 1px solid rgba(9,47,77,.12);
+      border-radius: 18px;
+      overflow: hidden;
+      background: #fffdf9;
+    }
 
-  <div class="toggle">
-    <label class="toggle-tab" for="tab-questions">Questions</label>
-    <label class="toggle-tab" for="tab-service">Service Request</label>
-  </div>
+    .service-section-title{
+      margin: 0;
+      padding: 14px 18px;
+      background: #092f4d;
+      color: #f2eee6;
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
 
-      <!-- PANEL: QUESTIONS -->
-      <section class="toggle-panel" data-panel="questions" aria-label="Questions form">
-        <h2 class="panel-title">General questions</h2>
+    .service-section-body{
+      padding: 18px;
+    }
 
-        <!-- Sends to your email via FormSubmit (no backend). Replace email if needed. -->
-        <form class="mm-form" action="https://formsubmit.co/murphsmitts@gmail.com" method="POST">
-          <input type="hidden" name="_subject" value="Murph’s Mitts: New Contact Message">
-          <input type="hidden" name="_captcha" value="false">
+    .service-help{
+      margin: 0 0 14px;
+      color: rgba(2,11,18,.72);
+      font-style: italic;
+    }
 
-          <div class="mm-grid-2">
-            <div class="mm-field">
-              <label for="first">First Name <span class="req">(required)</span></label>
-              <input id="first" name="First Name" required autocomplete="given-name" placeholder="First Name">
-            </div>
+    .service-note{
+      margin: 0 0 12px;
+      color: rgba(2,11,18,.72);
+    }
 
-            <div class="mm-field">
-              <label for="last">Last Name <span class="req">(required)</span></label>
-              <input id="last" name="Last Name" required autocomplete="family-name" placeholder="Last Name">
-            </div>
+    .mm-form .mm-choice-list{
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .mm-form .mm-choice{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 24px;
+    }
+
+    .mm-form .mm-choice input[type="radio"],
+    .mm-form .mm-choice input[type="checkbox"]{
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      accent-color: #092f4d;
+      flex: 0 0 auto;
+    }
+
+    .mm-form .mm-inline-other{
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .mm-form select{
+      width: 100%;
+      min-height: 50px;
+      border-radius: 16px;
+      border: 1.5px solid rgba(9,47,77,.18);
+      background: #fff;
+      padding: 12px 14px;
+      color: #020b12;
+      font: inherit;
+    }
+
+    .mm-form input[type="text"],
+    .mm-form input[type="email"],
+    .mm-form input[type="tel"],
+    .mm-form textarea{
+      width: 100%;
+      min-height: 50px;
+      border-radius: 16px;
+      border: 1.5px solid rgba(9,47,77,.18);
+      background: #fff;
+      padding: 12px 14px;
+      color: #020b12;
+      font: inherit;
+    }
+
+    .mm-form textarea{
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .is-hidden{
+      display: none !important;
+    }
+
+    .service-status{
+      margin-top: 12px;
+      min-height: 24px;
+      font-weight: 600;
+    }
+
+    .service-status.error{
+      color: #921a24;
+    }
+
+    .service-status.success{
+      color: #0f6a3c;
+    }
+
+    .service-success-card{
+      display: none;
+      margin-top: 16px;
+      padding: 18px;
+      border: 1px solid rgba(15,106,60,.18);
+      border-radius: 18px;
+      background: #f5fbf7;
+      color: #092f4d;
+    }
+
+    .service-success-card.show{
+      display: block;
+    }
+
+    .service-success-card h3{
+      margin: 0 0 8px;
+    }
+
+    .service-success-card p{
+      margin: 6px 0;
+    }
+  </style>
+
+  <!-- TOGGLE (no JS) -->
+  <div class="card" style="margin-top:18px;">
+
+    <!-- radios must be siblings of the panels for the CSS to work -->
+    <input class="toggle-input" type="radio" name="contactTabs" id="tab-questions" checked>
+    <input class="toggle-input" type="radio" name="contactTabs" id="tab-service">
+
+    <div class="toggle">
+      <label class="toggle-tab" for="tab-questions">Questions</label>
+      <label class="toggle-tab" for="tab-service">Service Request</label>
+    </div>
+
+    <!-- PANEL: QUESTIONS -->
+    <section class="toggle-panel" data-panel="questions" aria-label="Questions form">
+      <h2 class="panel-title">General questions</h2>
+
+      <form class="mm-form" action="https://formsubmit.co/murphsmitts@gmail.com" method="POST">
+        <input type="hidden" name="_subject" value="Murph’s Mitts: New Contact Message">
+        <input type="hidden" name="_captcha" value="false">
+
+        <div class="mm-grid-2">
+          <div class="mm-field">
+            <label for="first">First Name <span class="req">(required)</span></label>
+            <input id="first" name="First Name" required autocomplete="given-name" placeholder="First Name">
           </div>
 
           <div class="mm-field">
-            <label for="email">Email <span class="req">(required)</span></label>
-            <input id="email" type="email" name="Email" required autocomplete="email" placeholder="Email">
-          </div>
-
-          <div class="mm-field">
-            <label for="msg">Message <span class="req">(required)</span></label>
-            <textarea id="msg" name="Message" rows="6" required placeholder="What can I help with?"></textarea>
-          </div>
-
-          <div class="mm-actions">
-            <button class="btn btn-primary" type="submit">Submit</button>
-          </div>
-
-          <div class="note" style="margin-top:8px;">
-            If you’re ready for glove work, switch to <strong>Service Request</strong> so we can get started.
-          </div>
-        </form>
-
-        <div class="contact-mini">
-          <div class="contact-mini-title">Email:
-          <a class="contact-mini-link" href="mailto:murphsmitts@gmail.com">murphsmitts@gmail.com</a></div>
-
-          <div class="contact-social-icons">
-            <a href="https://www.facebook.com/murphsmitts" target="_blank" rel="noopener" aria-label="Facebook">
-              <img src="/assets/img/FB.png" alt="Facebook">
-            </a>
-
-            <a href="https://www.instagram.com/murphsmitts" target="_blank" rel="noopener" aria-label="Instagram">
-              <img src="/assets/img/IG.png" alt="Instagram">
-            </a>
-
-            <a href="https://www.tiktok.com/@murphsmitts" target="_blank" rel="noopener" aria-label="TikTok">
-              <img src="/assets/img/TT.png" alt="TikTok">
-            </a>
+            <label for="last">Last Name <span class="req">(required)</span></label>
+            <input id="last" name="Last Name" required autocomplete="family-name" placeholder="Last Name">
           </div>
         </div>
-      </section>
 
-      <!-- PANEL: SERVICE REQUEST -->
-      <section class="toggle-panel" data-panel="service" aria-label="Service request form">
-        <h2 class="panel-title">Service request</h2>
+        <div class="mm-field">
+          <label for="email">Email <span class="req">(required)</span></label>
+          <input id="email" type="email" name="Email" required autocomplete="email" placeholder="Email">
+        </div>
 
-        <iframe
-          src="https://docs.google.com/forms/d/e/1FAIpQLSdqtE5a1pKifXvuR8sOlySfLVYHmIgn--CA4CWe2xhplFcg-Q/viewform"
-          title="Murph’s Mitt Maintenance Service Request"
-        ></iframe>
+        <div class="mm-field">
+          <label for="msg">Message <span class="req">(required)</span></label>
+          <textarea id="msg" name="Message" rows="6" required placeholder="What can I help with?"></textarea>
+        </div>
+
+        <div class="mm-actions">
+          <button class="btn btn-primary" type="submit">Submit</button>
+        </div>
+
+        <div class="note" style="margin-top:8px;">
+          If you’re ready for glove work, switch to <strong>Service Request</strong> so we can get started.
+        </div>
+      </form>
+
+      <div class="contact-mini">
+        <div class="contact-mini-title">Email:
+          <a class="contact-mini-link" href="mailto:murphsmitts@gmail.com">murphsmitts@gmail.com</a>
+        </div>
+
+        <div class="contact-social-icons">
+          <a href="https://www.facebook.com/murphsmitts" target="_blank" rel="noopener" aria-label="Facebook">
+            <img src="/assets/img/FB.png" alt="Facebook">
+          </a>
+
+          <a href="https://www.instagram.com/murphsmitts" target="_blank" rel="noopener" aria-label="Instagram">
+            <img src="/assets/img/IG.png" alt="Instagram">
+          </a>
+
+          <a href="https://www.tiktok.com/@murphsmitts" target="_blank" rel="noopener" aria-label="TikTok">
+            <img src="/assets/img/TT.png" alt="TikTok">
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- PANEL: SERVICE REQUEST -->
+    <section class="toggle-panel" data-panel="service" aria-label="Service request form">
+      <h2 class="panel-title">Service request</h2>
+
+      <div class="service-form-wrap">
+        <form id="serviceRequestForm" class="mm-form" novalidate>
+          <div class="service-section">
+            <h3 class="service-section-title">Contact Info</h3>
+            <div class="service-section-body">
+              <div class="mm-grid-2">
+                <div class="mm-field">
+                  <label for="sr-email">Email <span class="req">(required)</span></label>
+                  <input id="sr-email" name="emailAddress" type="email" required autocomplete="email" placeholder="Email">
+                </div>
+
+                <div class="mm-field">
+                  <label for="sr-name">Customer Name <span class="req">(required)</span></label>
+                  <input id="sr-name" name="customerName" type="text" required autocomplete="name" placeholder="Customer Name">
+                </div>
+              </div>
+
+              <div class="mm-field">
+                <label for="sr-phone">Phone Number <span class="req">(required)</span></label>
+                <input id="sr-phone" name="phoneNumber" type="tel" required inputmode="tel" placeholder="Phone Number">
+                <div class="note">So that I can contact you for questions and drop-off/shipping coordination.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="service-section">
+            <h3 class="service-section-title">Glove Details</h3>
+            <div class="service-section-body">
+              <div class="mm-field">
+                <label for="sr-brand">Brand / Model (if known)</label>
+                <input id="sr-brand" name="brandModel" type="text" placeholder="Example: Nokona AMG1200, Rawlings HoH PRO7175SB-2WSS">
+              </div>
+
+              <div class="mm-field">
+                <label>Glove Type <span class="req">(required)</span></label>
+                <div class="mm-choice-list">
+                  <label class="mm-choice"><input type="radio" name="gloveType" value="Fielders Glove" required> <span>Fielders Glove</span></label>
+                  <label class="mm-choice"><input type="radio" name="gloveType" value="Catchers Mitt"> <span>Catchers Mitt</span></label>
+                  <label class="mm-choice"><input type="radio" name="gloveType" value="First Base Mitt"> <span>First Base Mitt</span></label>
+                </div>
+              </div>
+
+              <div id="webTypeWrap" class="mm-field is-hidden">
+                <label for="sr-web-type">Web Type (Fielders Gloves Only) <span class="req">(required for fielders)</span></label>
+                <div class="note">Trapeze and Modified Trapeze webs require additional lace and labor and may be priced higher.</div>
+                <select id="sr-web-type" name="webType">
+                  <option value="">Select web type</option>
+                  <option value="Basket (Fully Closed) Web">Basket (Fully Closed) Web</option>
+                  <option value="I-Web">I-Web</option>
+                  <option value="H-Web">H-Web</option>
+                  <option value="Modified Trapeze Web">Modified Trapeze Web</option>
+                  <option value="Trapeze Web">Trapeze Web</option>
+                  <option value="Single Post Web">Single Post Web</option>
+                  <option value="Other / Not Sure">Other / Not Sure</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="service-section">
+            <h3 class="service-section-title">Services</h3>
+            <div class="service-section-body">
+              <div class="mm-field">
+                <label>Services Requested <span class="req">(required)</span></label>
+                <div class="mm-choice-list">
+                  <label class="mm-choice"><input type="checkbox" name="servicesRequested" value="Relacing"> <span>Relacing</span></label>
+                  <label class="mm-choice"><input type="checkbox" name="servicesRequested" value="Cleaning + Conditioning"> <span>Cleaning + Conditioning</span></label>
+                  <label class="mm-choice"><input type="checkbox" name="servicesRequested" value="Cleaning + Conditioning + Relacing"> <span>Cleaning + Conditioning + Relacing</span></label>
+                  <label class="mm-choice"><input type="checkbox" name="servicesRequested" value="ShockTec Air2Gel Palm Pad"> <span>ShockTec Air2Gel Palm Pad</span></label>
+                  <label class="mm-inline-other">
+                    <span class="mm-choice"><input type="checkbox" id="serviceOtherCheck" value="Other"> <span>Other:</span></span>
+                    <input id="serviceOtherText" type="text" placeholder="Describe other requested work">
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="service-section">
+            <h3 class="service-section-title">Lace Color Selection</h3>
+            <div class="service-section-body">
+              <p class="service-help">If there is a certain shade of a certain color listed that you would prefer, please write it in the custom color request box below.</p>
+
+              <div class="mm-grid-2">
+                <div class="mm-field">
+                  <label for="sr-primary-lace">Primary Lace Color <span class="req">(required)</span></label>
+                  <select id="sr-primary-lace" name="primaryLaceColor" required>
+                    <option value="">Choose</option>
+                    <option value="Black">Black</option>
+                    <option value="Gray">Gray</option>
+                    <option value="Tan – Camel">Tan – Camel</option>
+                    <option value="Tan – Indian">Tan – Indian</option>
+                    <option value="Brown – Chestnut">Brown – Chestnut</option>
+                    <option value="Brown – Chocolate">Brown – Chocolate</option>
+                    <option value="Blue – Royal">Blue – Royal</option>
+                    <option value="Blue – Navy">Blue – Navy</option>
+                    <option value="Blue – Carolina">Blue – Carolina</option>
+                    <option value="Red">Red</option>
+                    <option value="Red - Dark">Red - Dark</option>
+                    <option value="Orange">Orange</option>
+                    <option value="Other (Special Order)">Other (Special Order)</option>
+                  </select>
+                </div>
+
+                <div class="mm-field">
+                  <label for="sr-secondary-lace">Secondary / Accent Lace Color</label>
+                  <div class="note">Leave blank if single-color relace.</div>
+                  <select id="sr-secondary-lace" name="secondaryLaceColor">
+                    <option value="">Choose</option>
+                    <option value="Black">Black</option>
+                    <option value="Gray">Gray</option>
+                    <option value="Tan – Camel">Tan – Camel</option>
+                    <option value="Tan – Indian">Tan – Indian</option>
+                    <option value="Brown – Chestnut">Brown – Chestnut</option>
+                    <option value="Brown – Chocolate">Brown – Chocolate</option>
+                    <option value="Blue – Royal">Blue – Royal</option>
+                    <option value="Blue – Navy">Blue – Navy</option>
+                    <option value="Blue – Carolina">Blue – Carolina</option>
+                    <option value="Red">Red</option>
+                    <option value="Red - Dark">Red - Dark</option>
+                    <option value="Orange">Orange</option>
+                    <option value="Other (Special Order)">Other (Special Order)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="mm-field">
+                <label for="sr-custom-color">Custom Color Request</label>
+                <textarea id="sr-custom-color" name="customColorRequest" rows="4" placeholder="Don’t see your color? Describe it here. Special order lace may extend turnaround."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="service-section">
+            <h3 class="service-section-title">Drop-Off Method</h3>
+            <div class="service-section-body">
+              <div class="mm-field">
+                <label>Drop-Off Method <span class="req">(required)</span></label>
+                <div class="mm-choice-list">
+                  <label class="mm-choice"><input type="radio" name="dropOffMethod" value="Local Drop-Off" required> <span>Local Drop-Off</span></label>
+                  <label class="mm-choice"><input type="radio" name="dropOffMethod" value="Shipped to Murph’s Mitt Maintenance"> <span>Shipped to Murph’s Mitt Maintenance</span></label>
+                </div>
+              </div>
+
+              <div id="shippingFields" class="is-hidden">
+                <div class="mm-field">
+                  <label for="sr-street">Street Address</label>
+                  <input id="sr-street" name="streetAddress" type="text" placeholder="Street Address">
+                </div>
+
+                <div class="mm-grid-3">
+                  <div class="mm-field">
+                    <label for="sr-city">City</label>
+                    <input id="sr-city" name="city" type="text" placeholder="City">
+                  </div>
+
+                  <div class="mm-field">
+                    <label for="sr-state">State</label>
+                    <input id="sr-state" name="state" type="text" placeholder="State">
+                  </div>
+
+                  <div class="mm-field">
+                    <label for="sr-zip">Zip Code</label>
+                    <input id="sr-zip" name="zipCode" type="text" inputmode="numeric" placeholder="Zip Code">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="service-section">
+            <h3 class="service-section-title">Final Details</h3>
+            <div class="service-section-body">
+              <div class="mm-field">
+                <label for="sr-notes">Anything I should know about this glove?</label>
+                <textarea id="sr-notes" name="gloveNotes" rows="5" placeholder="Anything I should know about this glove?"></textarea>
+              </div>
+
+              <div class="mm-field">
+                <label for="sr-social">If I post a video of your glove and you'd like to be tagged, enter your platform + username</label>
+                <input id="sr-social" name="socialTag" type="text" placeholder="Example: tiktok @murphsmitts">
+              </div>
+
+              <div class="mm-field">
+                <label>How did you hear about me?</label>
+                <div class="mm-choice-list">
+                  <label class="mm-choice"><input type="radio" name="referralSource" value="TikTok"> <span>TikTok</span></label>
+                  <label class="mm-choice"><input type="radio" name="referralSource" value="Insta"> <span>Insta</span></label>
+                  <label class="mm-choice"><input type="radio" name="referralSource" value="Facebook"> <span>Facebook</span></label>
+                  <label class="mm-choice"><input type="radio" name="referralSource" value="Referral"> <span>Referral</span></label>
+                  <label class="mm-choice"><input type="radio" name="referralSource" value="The Craftsman"> <span>The Craftsman</span></label>
+                  <label class="mm-inline-other">
+                    <span class="mm-choice"><input type="radio" name="referralSource" value="Other"> <span>Other:</span></span>
+                    <input id="referralOtherText" type="text" placeholder="Tell me where">
+                  </label>
+                </div>
+              </div>
+
+              <div class="mm-field">
+                <label class="mm-choice">
+                  <input id="sr-turnaround" name="turnaroundAck" type="checkbox" required>
+                  <span>I understand that turnaround times vary based on workload <span class="req">(required)</span></span>
+                </label>
+              </div>
+
+              <div class="mm-actions">
+                <button id="serviceSubmitBtn" class="btn btn-primary" type="submit">Submit Service Request</button>
+              </div>
+
+              <div id="serviceStatus" class="service-status" aria-live="polite"></div>
+
+              <div id="serviceSuccessCard" class="service-success-card">
+                <h3>Request submitted.</h3>
+                <p>Your service request has been recorded.</p>
+                <p id="serviceSuccessOrder"></p>
+                <p>Check your email for the confirmation message.</p>
+              </div>
+            </div>
+          </div>
+        </form>
 
         <div class="note" style="margin-top:10px;">
           This form is intended for actual service requests (placing an order). Please direct general questions to the questions tab.
         </div>
-      </section>
-    </div>
-  </main>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+(function () {
+  const form = document.getElementById("serviceRequestForm");
+  if (!form) return;
+
+  const webTypeWrap = document.getElementById("webTypeWrap");
+  const webTypeSelect = document.getElementById("sr-web-type");
+  const shippingFields = document.getElementById("shippingFields");
+  const turnaroundBox = document.getElementById("sr-turnaround");
+  const serviceOtherCheck = document.getElementById("serviceOtherCheck");
+  const serviceOtherText = document.getElementById("serviceOtherText");
+  const referralOtherText = document.getElementById("referralOtherText");
+  const statusEl = document.getElementById("serviceStatus");
+  const successCard = document.getElementById("serviceSuccessCard");
+  const successOrder = document.getElementById("serviceSuccessOrder");
+  const submitBtn = document.getElementById("serviceSubmitBtn");
+
+  function selectedValue(name) {
+    return form.querySelector(`input[name="${name}"]:checked`)?.value || "";
+  }
+
+  function toggleConditionalFields() {
+    const gloveType = selectedValue("gloveType");
+    const dropOffMethod = selectedValue("dropOffMethod");
+
+    const showWebType = gloveType === "Fielders Glove";
+    webTypeWrap.classList.toggle("is-hidden", !showWebType);
+    webTypeSelect.required = showWebType;
+    if (!showWebType) webTypeSelect.value = "";
+
+    const showShipping = dropOffMethod === "Shipped to Murph’s Mitt Maintenance";
+    shippingFields.classList.toggle("is-hidden", !showShipping);
+
+    if (!showShipping) {
+      ["sr-street", "sr-city", "sr-state", "sr-zip"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
+    }
+  }
+
+  function collectServicesRequested() {
+    const checked = Array.from(form.querySelectorAll('input[name="servicesRequested"]:checked'))
+      .map(el => el.value);
+
+    const other = serviceOtherText.value.trim();
+    if (serviceOtherCheck.checked && other) {
+      checked.push(`Other: ${other}`);
+    } else if (serviceOtherCheck.checked) {
+      checked.push("Other");
+    }
+
+    return checked.join(", ");
+  }
+
+  function collectReferralSource() {
+    const selected = selectedValue("referralSource");
+    const other = referralOtherText.value.trim();
+
+    if (selected === "Other" && other) return `Other: ${other}`;
+    return selected;
+  }
+
+  function showError(message) {
+    statusEl.className = "service-status error";
+    statusEl.textContent = message;
+  }
+
+  function showSuccess(orderNumber) {
+    statusEl.className = "service-status success";
+    statusEl.textContent = "";
+    successOrder.textContent = orderNumber ? `Order #: ${orderNumber}` : "";
+    successCard.classList.add("show");
+  }
+
+  function clearMessages() {
+    statusEl.className = "service-status";
+    statusEl.textContent = "";
+    successCard.classList.remove("show");
+    successOrder.textContent = "";
+  }
+
+  form.addEventListener("change", (e) => {
+    if (e.target.name === "gloveType" || e.target.name === "dropOffMethod") {
+      toggleConditionalFields();
+    }
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearMessages();
+
+    toggleConditionalFields();
+
+    const servicesRequested = collectServicesRequested();
+    if (!servicesRequested) {
+      showError("Select at least one service requested.");
+      return;
+    }
+
+    if (!form.reportValidity()) {
+      showError("Please complete the required fields.");
+      return;
+    }
+
+    if (!turnaroundBox.checked) {
+      showError("You must acknowledge that turnaround times vary based on workload.");
+      return;
+    }
+
+    const payload = {
+      customerName: form.customerName.value.trim(),
+      emailAddress: form.emailAddress.value.trim(),
+      phoneNumber: form.phoneNumber.value.trim(),
+      brandModel: form.brandModel.value.trim(),
+      gloveType: selectedValue("gloveType"),
+      webType: webTypeSelect.value.trim(),
+      servicesRequested,
+      primaryLaceColor: form.primaryLaceColor.value.trim(),
+      secondaryLaceColor: form.secondaryLaceColor.value.trim(),
+      customColorRequest: form.customColorRequest.value.trim(),
+      dropOffMethod: selectedValue("dropOffMethod"),
+      streetAddress: form.streetAddress.value.trim(),
+      city: form.city.value.trim(),
+      state: form.state.value.trim(),
+      zipCode: form.zipCode.value.trim(),
+      gloveNotes: form.gloveNotes.value.trim(),
+      socialTag: form.socialTag.value.trim(),
+      turnaroundAcknowledged: turnaroundBox.checked ? "I understand" : "",
+      referralSource: collectReferralSource()
+    };
+
+    submitBtn.disabled = true;
+    statusEl.className = "service-status";
+    statusEl.textContent = "Submitting...";
+
+    try {
+      const res = await fetch("/api/intake", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Failed to submit service request.");
+      }
+
+      form.reset();
+      toggleConditionalFields();
+      showSuccess(data.order?.orderNumber || data.order?.order_number || "");
+      window.scrollTo({ top: form.offsetTop - 120, behavior: "smooth" });
+    } catch (err) {
+      showError(err.message || "Failed to submit service request.");
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  toggleConditionalFields();
+})();
+</script>
