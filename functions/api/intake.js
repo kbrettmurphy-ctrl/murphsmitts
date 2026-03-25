@@ -56,10 +56,6 @@ export async function onRequest(context) {
       secondary_lace_color: cleanText(body.secondaryLaceColor),
       custom_color_request: cleanText(body.customColorRequest),
       drop_off_method: cleanText(body.dropOffMethod),
-      street_address: cleanText(body.streetAddress),
-      city: cleanText(body.city),
-      state: cleanText(body.state),
-      zip_code: cleanText(body.zipCode),
       glove_notes: cleanText(body.gloveNotes),
       customer_notes: cleanText(body.gloveNotes),
       social_tag: cleanText(body.socialTag),
@@ -68,91 +64,35 @@ export async function onRequest(context) {
     };
 
     if (!incoming.customer_name) {
-      return json(
-        {
-          ok: false,
-          error: "Missing required field: customer name."
-        },
-        200,
-        jsonHeaders
-      );
+      return json({ ok: false, error: "Missing required field: customer name." }, 200, jsonHeaders);
     }
 
     if (!incoming.email_address) {
-      return json(
-        {
-          ok: false,
-          error: "Missing required field: email address."
-        },
-        200,
-        jsonHeaders
-      );
+      return json({ ok: false, error: "Missing required field: email address." }, 200, jsonHeaders);
     }
 
     if (!incoming.phone_number) {
-      return json(
-        {
-          ok: false,
-          error: "Missing required field: phone number."
-        },
-        200,
-        jsonHeaders
-      );
+      return json({ ok: false, error: "Missing required field: phone number." }, 200, jsonHeaders);
     }
 
     if (!incoming.glove_type) {
-      return json(
-        {
-          ok: false,
-          error: "Missing required field: glove type."
-        },
-        200,
-        jsonHeaders
-      );
+      return json({ ok: false, error: "Missing required field: glove type." }, 200, jsonHeaders);
     }
 
     if (incoming.glove_type === "Fielders Glove" && !incoming.web_type) {
-      return json(
-        {
-          ok: false,
-          error: "Web type is required for fielders gloves."
-        },
-        200,
-        jsonHeaders
-      );
+      return json({ ok: false, error: "Web type is required for fielders gloves." }, 200, jsonHeaders);
     }
 
     if (!incoming.services_requested) {
-      return json(
-        {
-          ok: false,
-          error: "Missing required field: services requested."
-        },
-        200,
-        jsonHeaders
-      );
+      return json({ ok: false, error: "Missing required field: services requested." }, 200, jsonHeaders);
     }
 
     if (!incoming.primary_lace_color) {
-      return json(
-        {
-          ok: false,
-          error: "Missing required field: primary lace color."
-        },
-        200,
-        jsonHeaders
-      );
+      return json({ ok: false, error: "Missing required field: primary lace color." }, 200, jsonHeaders);
     }
 
     if (!incoming.drop_off_method) {
-      return json(
-        {
-          ok: false,
-          error: "Missing required field: drop-off method."
-        },
-        200,
-        jsonHeaders
-      );
+      return json({ ok: false, error: "Missing required field: drop-off method." }, 200, jsonHeaders);
     }
 
     if (!incoming.turnaround_acknowledged) {
@@ -166,17 +106,9 @@ export async function onRequest(context) {
       );
     }
 
-    // For local drop-off, do not keep shipping address junk
-    if (!looksLikeShipMethod(incoming.drop_off_method)) {
-      incoming.street_address = null;
-      incoming.city = null;
-      incoming.state = null;
-      incoming.zip_code = null;
-    }
-
     const nextOrderResp = await supabaseFetch(
       env,
-      `/rest/v1/orders?select=order_number&order=order_number.desc&limit=1`
+      `/rest/v1/orders?select=order_number`
     );
 
     if (!nextOrderResp.ok) {
@@ -209,10 +141,10 @@ export async function onRequest(context) {
       custom_color_request: incoming.custom_color_request,
 
       drop_off_method: incoming.drop_off_method,
-      street_address: incoming.street_address,
-      city: incoming.city,
-      state: incoming.state,
-      zip_code: incoming.zip_code,
+      street_address: null,
+      city: null,
+      state: null,
+      zip_code: null,
 
       glove_notes: incoming.glove_notes,
       customer_notes: incoming.customer_notes,
@@ -261,14 +193,28 @@ export async function onRequest(context) {
 
     let inserted = insert.data[0];
 
-    const emailResult = await sendStatusEmail(env, inserted, "Received");
+    const customerEmailResult = await sendStatusEmail(env, inserted, "Received");
 
-    if (!emailResult.ok) {
+    if (!customerEmailResult.ok) {
       return json(
         {
           ok: false,
           error: "Order was created, but the Received email failed to send.",
-          details: emailResult.error
+          details: customerEmailResult.error
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
+    const ownerEmailResult = await sendOwnerNewOrderEmail(env, inserted);
+
+    if (!ownerEmailResult.ok) {
+      return json(
+        {
+          ok: false,
+          error: "Order was created and customer email sent, but owner notification failed.",
+          details: ownerEmailResult.error
         },
         200,
         jsonHeaders
@@ -369,17 +315,19 @@ async function supabaseFetch(env, path, options = {}) {
 }
 
 function getNextOrderNumber(rows) {
-  let nextOrder = 80;
+  let maxNum = 79;
 
-  if (Array.isArray(rows) && rows.length) {
-    const raw = String(rows[0].order_number || "").trim();
-    const lastNum = parseInt(raw, 10);
-    if (!Number.isNaN(lastNum)) {
-      nextOrder = lastNum + 1;
+  if (Array.isArray(rows)) {
+    for (const row of rows) {
+      const raw = String(row.order_number || "").trim();
+      const n = parseInt(raw, 10);
+      if (!Number.isNaN(n) && n > maxNum) {
+        maxNum = n;
+      }
     }
   }
 
-  return String(nextOrder).padStart(4, "0");
+  return String(maxNum + 1).padStart(4, "0");
 }
 
 /* =========================
@@ -497,6 +445,58 @@ ${msg}`.trimEnd();
 
   return await sendBrandedEmail(env, {
     to: email,
+    subject,
+    plainBody,
+    htmlBody
+  });
+}
+
+async function sendOwnerNewOrderEmail(env, row) {
+  const ownerEmail = env.OWNER_NOTIFICATION_EMAIL || env.RESEND_REPLY_TO;
+  if (!ownerEmail) {
+    return { ok: true, skipped: true, reason: "No owner notification email configured." };
+  }
+
+  const order = mapOrderFromDb(row);
+  const subject = `New Murph's Mitts order submitted: #${order.orderNumber}`;
+
+  const plainBody =
+`A new service request was submitted.
+
+Order #: ${order.orderNumber}
+Customer: ${order.customerName || ""}
+Email: ${order.emailAddress || ""}
+Phone: ${order.phoneNumber || ""}
+Glove Type: ${order.gloveType || ""}
+Web Type: ${order.webType || ""}
+Services: ${order.servicesRequested || ""}
+Drop-Off Method: ${order.dropOffMethod || ""}
+Primary Lace: ${order.primaryLaceColor || ""}
+Accent Lace: ${order.secondaryLaceColor || ""}
+Color Notes: ${order.customColorRequest || ""}
+Notes: ${order.gloveNotes || ""}
+Referral Source: ${order.referralSource || ""}`;
+
+  const htmlBody = `
+  <div style="font-family: Arial, sans-serif; max-width: 640px; line-height: 1.45; text-align:left;">
+    <p><strong>A new service request was submitted.</strong></p>
+    <p><strong>Order #:</strong> ${escapeHtml(order.orderNumber || "")}</p>
+    <p><strong>Customer:</strong> ${escapeHtml(order.customerName || "")}</p>
+    <p><strong>Email:</strong> ${escapeHtml(order.emailAddress || "")}</p>
+    <p><strong>Phone:</strong> ${escapeHtml(order.phoneNumber || "")}</p>
+    <p><strong>Glove Type:</strong> ${escapeHtml(order.gloveType || "")}</p>
+    <p><strong>Web Type:</strong> ${escapeHtml(order.webType || "")}</p>
+    <p><strong>Services:</strong> ${escapeHtml(order.servicesRequested || "")}</p>
+    <p><strong>Drop-Off Method:</strong> ${escapeHtml(order.dropOffMethod || "")}</p>
+    <p><strong>Primary Lace:</strong> ${escapeHtml(order.primaryLaceColor || "")}</p>
+    <p><strong>Accent Lace:</strong> ${escapeHtml(order.secondaryLaceColor || "")}</p>
+    <p><strong>Color Notes:</strong> ${escapeHtml(order.customColorRequest || "")}</p>
+    <p><strong>Notes:</strong> ${escapeHtml(order.gloveNotes || "")}</p>
+    <p><strong>Referral Source:</strong> ${escapeHtml(order.referralSource || "")}</p>
+  </div>`;
+
+  return await sendBrandedEmail(env, {
+    to: ownerEmail,
     subject,
     plainBody,
     htmlBody
