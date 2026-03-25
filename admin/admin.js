@@ -328,7 +328,21 @@ function applyFilters() {
     const bNum = Number(String(b.orderNumber || "").replace(/[^\d]/g, "")) || 0;
 
     if (activeView === "progress") {
-      return aNum - bNum; // oldest first for In Progress
+      const aDate = Date.parse(String(a.dateReceived || "").trim());
+      const bDate = Date.parse(String(b.dateReceived || "").trim());
+
+      const aHasDate = !Number.isNaN(aDate);
+      const bHasDate = !Number.isNaN(bDate);
+
+      if (aHasDate && bHasDate) {
+        if (aDate !== bDate) return aDate - bDate; // oldest received first
+        return aNum - bNum; // tie-breaker
+      }
+
+      if (aHasDate && !bHasDate) return -1;
+      if (!aHasDate && bHasDate) return 1;
+
+      return aNum - bNum; // fallback if both dates missing
     }
 
     return bNum - aNum; // newest first for everything else
