@@ -323,6 +323,17 @@ function applyFilters() {
     });
   }
 
+  list.sort((a, b) => {
+    const aNum = Number(String(a.orderNumber || "").replace(/[^\d]/g, "")) || 0;
+    const bNum = Number(String(b.orderNumber || "").replace(/[^\d]/g, "")) || 0;
+
+    if (activeView === "progress") {
+      return aNum - bNum; // oldest first for In Progress
+    }
+
+    return bNum - aNum; // newest first for everything else
+  });
+
   renderOrders(list);
 }
 
