@@ -469,9 +469,8 @@ async function sendPushoverNotification(env, { orderNumber, name, gloveType, ser
         token: env.PUSHOVER_APP_TOKEN,
         user: env.PUSHOVER_USER_KEY,
         title: `New Order #${orderNumber}`,
-        message: `${name} submitted a ${gloveType}\nServices: ${services}`
-
-        url: `https://murphsmitts.com/admin`,
+        message: `${name} submitted a ${gloveType}\nServices: ${services}`,
+        url: "https://murphsmitts.com/admin",
         url_title: "Orders"
       })
     });
