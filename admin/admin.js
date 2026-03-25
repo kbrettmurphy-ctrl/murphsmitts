@@ -99,19 +99,35 @@ async function postJson(body, useAuth = false) {
 ========================= */
 function formatDate(value) {
   if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleDateString();
+  const s = String(value).trim();
+
+  // Handle plain YYYY-MM-DD without timezone shifting
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split("-");
+    return `${Number(m)}/${Number(d)}/${y}`;
+  }
+
+  const dt = new Date(s);
+  if (Number.isNaN(dt.getTime())) return s;
+  return dt.toLocaleDateString();
 }
 
 function formatDateForInput(value) {
   if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  const s = String(value).trim();
+
+  // Preserve plain YYYY-MM-DD exactly as-is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return s;
+  }
+
+  const dt = new Date(s);
+  if (Number.isNaN(dt.getTime())) return "";
+
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const d = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function formatMoneyForInput(value) {
