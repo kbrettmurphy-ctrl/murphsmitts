@@ -256,14 +256,103 @@ function renderFieldLike(label, value) {
   `;
 }
 
-function renderLaceInput(label, id, value) {
-  return `
-    <div class="detail-block">
-      <div class="label">${escapeHtml(label)}</div>
-      <input id="${escapeAttr(id)}" type="text" value="${escapeAttr(value || "")}" />
-    </div>
-  `;
-}
+const GLOVE_TYPE_OPTIONS = [
+  "Fielders Glove",
+  "Catchers Mitt",
+  "First Base Mitt"
+];
+
+const WEB_TYPE_OPTIONS = [
+  "Basket (Fully Closed) Web",
+  "I-Web",
+  "H-Web",
+  "Modified Trapeze Web",
+  "Trapeze Web",
+  "Single Post Web",
+  "Other / Not Sure"
+];
+
+const DROP_OFF_METHOD_OPTIONS = [
+  "Local Drop-Off",
+  "Shipped to Murph’s Mitt Maintenance"
+];
+
+const SERVICE_OPTIONS = [
+  "Relacing",
+  "Cleaning + Conditioning",
+  "Cleaning + Conditioning + Relacing",
+  "ShockTec Air2Gel Palm Pad"
+];
+
+const LACE_COLOR_OPTIONS = [
+  "Black",
+  "Gray",
+  "Tan – Camel",
+  "Tan – Indian",
+  "Brown – Chestnut",
+  "Brown – Chocolate",
+  "Blue – Royal",
+  "Blue – Navy",
+  "Blue – Carolina",
+  "Red",
+  "Red - Dark",
+  "Orange",
+  "Other (Special Order)"
+];
+
+const STATE_OPTIONS = [
+  { value: "AL", label: "Alabama" },
+  { value: "AK", label: "Alaska" },
+  { value: "AZ", label: "Arizona" },
+  { value: "AR", label: "Arkansas" },
+  { value: "CA", label: "California" },
+  { value: "CO", label: "Colorado" },
+  { value: "CT", label: "Connecticut" },
+  { value: "DE", label: "Delaware" },
+  { value: "FL", label: "Florida" },
+  { value: "GA", label: "Georgia" },
+  { value: "HI", label: "Hawaii" },
+  { value: "ID", label: "Idaho" },
+  { value: "IL", label: "Illinois" },
+  { value: "IN", label: "Indiana" },
+  { value: "IA", label: "Iowa" },
+  { value: "KS", label: "Kansas" },
+  { value: "KY", label: "Kentucky" },
+  { value: "LA", label: "Louisiana" },
+  { value: "ME", label: "Maine" },
+  { value: "MD", label: "Maryland" },
+  { value: "MA", label: "Massachusetts" },
+  { value: "MI", label: "Michigan" },
+  { value: "MN", label: "Minnesota" },
+  { value: "MS", label: "Mississippi" },
+  { value: "MO", label: "Missouri" },
+  { value: "MT", label: "Montana" },
+  { value: "NE", label: "Nebraska" },
+  { value: "NV", label: "Nevada" },
+  { value: "NH", label: "New Hampshire" },
+  { value: "NJ", label: "New Jersey" },
+  { value: "NM", label: "New Mexico" },
+  { value: "NY", label: "New York" },
+  { value: "NC", label: "North Carolina" },
+  { value: "ND", label: "North Dakota" },
+  { value: "OH", label: "Ohio" },
+  { value: "OK", label: "Oklahoma" },
+  { value: "OR", label: "Oregon" },
+  { value: "PA", label: "Pennsylvania" },
+  { value: "RI", label: "Rhode Island" },
+  { value: "SC", label: "South Carolina" },
+  { value: "SD", label: "South Dakota" },
+  { value: "TN", label: "Tennessee" },
+  { value: "TX", label: "Texas" },
+  { value: "UT", label: "Utah" },
+  { value: "VT", label: "Vermont" },
+  { value: "VA", label: "Virginia" },
+  { value: "WA", label: "Washington" },
+  { value: "WV", label: "West Virginia" },
+  { value: "WI", label: "Wisconsin" },
+  { value: "WY", label: "Wyoming" },
+  { value: "DC", label: "District of Columbia" }
+];
 
 function renderSelectOptions(current, options, placeholder = "") {
   const values = placeholder ? ["", ...options] : options;
@@ -273,27 +362,48 @@ function renderSelectOptions(current, options, placeholder = "") {
   }).join("");
 }
 
+function renderSelectInput(label, id, current, options, placeholder = "") {
+  return `
+    <div class="detail-block">
+      <div class="label">${escapeHtml(label)}</div>
+      <select id="${escapeAttr(id)}">
+        ${renderSelectOptions(current, options, placeholder)}
+      </select>
+    </div>
+  `;
+}
+
+function renderPhoneInput(label, id, value) {
+  return `
+    <div class="detail-block">
+      <div class="label">${escapeHtml(label)}</div>
+      <input
+        id="${escapeAttr(id)}"
+        type="tel"
+        inputmode="tel"
+        autocomplete="tel"
+        maxlength="14"
+        placeholder="(555) 555-5555"
+        value="${escapeAttr(formatPhoneForInput(value || ""))}"
+      />
+    </div>
+  `;
+}
+
+function renderLaceInput(label, id, value, placeholder = "Choose") {
+  return renderSelectInput(label, id, value, LACE_COLOR_OPTIONS, placeholder);
+}
+
 function gloveTypeOptions(current) {
-  return renderSelectOptions(
-    current,
-    ["Fielders Glove", "Catchers Mitt", "First Base Mitt"],
-    "Select glove type"
-  );
+  return renderSelectOptions(current, GLOVE_TYPE_OPTIONS, "Select glove type");
 }
 
 function webTypeOptions(current) {
-  return renderSelectOptions(
-    current,
-    [
-      "I-Web",
-      "H-Web",
-      "Single Post Web",
-      "Trapeze Web",
-      "Modified Trapeze Web",
-      "Basket (Fully Closed) Web"
-    ],
-    "Select web type"
-  );
+  return renderSelectOptions(current, WEB_TYPE_OPTIONS, "Choose");
+}
+
+function dropOffMethodOptions(current) {
+  return renderSelectOptions(current, DROP_OFF_METHOD_OPTIONS, "Select drop-off method");
 }
 
 function carrierOptions(current) {
@@ -302,6 +412,109 @@ function carrierOptions(current) {
     ["USPS", "UPS", "FedEx"],
     "Select carrier"
   );
+}
+
+function stateOptions(current) {
+  const raw = String(current || "").trim();
+  const upper = raw.toUpperCase();
+
+  return [
+    `<option value="">Select state</option>`,
+    ...STATE_OPTIONS.map(opt => {
+      const selected =
+        upper === opt.value ||
+        raw.toLowerCase() === opt.label.toLowerCase();
+
+      return `<option value="${escapeAttr(opt.value)}" ${selected ? "selected" : ""}>${escapeHtml(opt.label)}</option>`;
+    })
+  ].join("");
+}
+
+function parseServicesValue(value) {
+  const parts = String(value || "")
+    .split(",")
+    .map(v => v.trim())
+    .filter(Boolean);
+
+  const selected = SERVICE_OPTIONS.filter(opt => parts.includes(opt));
+
+  const otherParts = parts
+    .filter(v => !SERVICE_OPTIONS.includes(v))
+    .map(v => v.replace(/^Other:\s*/i, "").trim())
+    .filter(Boolean);
+
+  const otherChecked = parts.some(v => /^other$/i.test(v)) || otherParts.length > 0;
+
+  return {
+    selected,
+    otherChecked,
+    otherText: otherParts.join(", ")
+  };
+}
+
+function renderServicesEditor(currentValue) {
+  const parsed = parseServicesValue(currentValue);
+
+  return `
+    <div class="detail-block full">
+      <div class="label">Services Requested</div>
+      <div class="checkbox-group" id="editServicesRequestedWrap">
+        ${SERVICE_OPTIONS.map(opt => `
+          <label class="checkbox-item">
+            <input
+              type="checkbox"
+              name="editServicesRequested"
+              value="${escapeAttr(opt)}"
+              ${parsed.selected.includes(opt) ? "checked" : ""}
+            />
+            <span>${escapeHtml(opt)}</span>
+          </label>
+        `).join("")}
+
+        <div class="checkbox-other">
+          <label class="checkbox-item">
+            <input
+              id="editServiceOtherCheck"
+              type="checkbox"
+              ${parsed.otherChecked ? "checked" : ""}
+            />
+            <span>Other:</span>
+          </label>
+          <input
+            id="editServiceOtherText"
+            type="text"
+            placeholder="Describe other requested work"
+            value="${escapeAttr(parsed.otherText)}"
+          />
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function getSelectedServices() {
+  const checked = Array.from(
+    document.querySelectorAll('input[name="editServicesRequested"]:checked')
+  ).map(el => el.value);
+
+  const otherChecked = document.getElementById("editServiceOtherCheck")?.checked;
+  const otherText = val("editServiceOtherText").trim();
+
+  if (otherChecked && otherText) {
+    checked.push(`Other: ${otherText}`);
+  } else if (otherChecked) {
+    checked.push("Other");
+  }
+
+  return checked.join(", ");
+}
+
+function formatPhoneForInput(value) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 10);
+
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
 /* =========================
