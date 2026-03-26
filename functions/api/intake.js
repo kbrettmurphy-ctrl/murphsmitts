@@ -145,10 +145,10 @@ export async function onRequest(context) {
       custom_color_request: incoming.custom_color_request,
 
       drop_off_method: incoming.drop_off_method,
-      street_address: null,
-      city: null,
-      state: null,
-      zip_code: null,
+      street_address: looksLikeShipMethod(incoming.drop_off_method) ? incoming.street_address : null,
+      city: looksLikeShipMethod(incoming.drop_off_method) ? incoming.city : null,
+      state: looksLikeShipMethod(incoming.drop_off_method) ? incoming.state : null,
+      zip_code: looksLikeShipMethod(incoming.drop_off_method) ? incoming.zip_code : null,
 
       glove_notes: incoming.glove_notes,
       customer_notes: incoming.customer_notes,
