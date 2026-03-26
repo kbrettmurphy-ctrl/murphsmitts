@@ -718,6 +718,43 @@ button.secondary{
   }
 }
 
+.swipe-row{
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  margin-bottom: 12px;
+}
+
+.swipe-delete{
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  background: #921a24;
+}
+
+.swipe-delete-btn{
+  min-width: 92px;
+  border: 0;
+  background: #921a24;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.swipe-row .order-card{
+  position: relative;
+  z-index: 1;
+  transition: transform .18s ease;
+  will-change: transform;
+}
+
+.swipe-row.swiped .order-card{
+  transform: translateX(-92px);
+}
+
 /* =========================
    MOBILE
    ========================= */
