@@ -525,7 +525,7 @@ function installSwipeDeleteStyles() {
       position:relative;
       overflow:hidden;
       border-radius:18px;
-      margin-bottom:14px;
+      margin-bottom:0;
     }
 
     .swipe-delete-bg{
@@ -535,7 +535,7 @@ function installSwipeDeleteStyles() {
       justify-content:flex-end;
       align-items:stretch;
       background:#921a24;
-      border-radius:18px;
+      border-radius:0;
     }
 
     .swipe-delete-btn{
@@ -555,6 +555,7 @@ function installSwipeDeleteStyles() {
       margin-bottom:0;
       transition:transform .18s ease;
       will-change:transform;
+      touch-action:pan-y;
     }
 
     .swipe-row.swiped .order-card{
