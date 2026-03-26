@@ -45,23 +45,27 @@ export async function onRequest(context) {
     const body = await request.json();
 
     const incoming = {
-      customer_name: cleanText(body.customerName),
-      email_address: cleanText(body.emailAddress),
-      phone_number: cleanText(body.phoneNumber),
-      brand_model: cleanText(body.brandModel),
-      glove_type: cleanText(body.gloveType),
-      web_type: cleanText(body.webType),
-      services_requested: cleanText(body.servicesRequested),
-      primary_lace_color: cleanText(body.primaryLaceColor),
-      secondary_lace_color: cleanText(body.secondaryLaceColor),
-      custom_color_request: cleanText(body.customColorRequest),
-      drop_off_method: cleanText(body.dropOffMethod),
-      glove_notes: cleanText(body.gloveNotes),
-      customer_notes: cleanText(body.gloveNotes),
-      social_tag: cleanText(body.socialTag),
-      turnaround_acknowledged: cleanText(body.turnaroundAcknowledged),
-      referral_source: cleanText(body.referralSource)
-    };
+  customer_name: cleanText(body.customerName),
+  email_address: cleanText(body.emailAddress),
+  phone_number: cleanText(body.phoneNumber),
+  brand_model: cleanText(body.brandModel),
+  glove_type: cleanText(body.gloveType),
+  web_type: cleanText(body.webType),
+  services_requested: cleanText(body.servicesRequested),
+  primary_lace_color: cleanText(body.primaryLaceColor),
+  secondary_lace_color: cleanText(body.secondaryLaceColor),
+  custom_color_request: cleanText(body.customColorRequest),
+  drop_off_method: cleanText(body.dropOffMethod),
+  street_address: cleanText(body.streetAddress),
+  city: cleanText(body.city),
+  state: cleanText(body.state),
+  zip_code: cleanText(body.zipCode),
+  glove_notes: cleanText(body.gloveNotes),
+  customer_notes: cleanText(body.gloveNotes),
+  social_tag: cleanText(body.socialTag),
+  turnaround_acknowledged: cleanText(body.turnaroundAcknowledged),
+  referral_source: cleanText(body.referralSource)
+};
 
     if (!incoming.customer_name) {
       return json({ ok: false, error: "Missing required field: customer name." }, 200, jsonHeaders);
