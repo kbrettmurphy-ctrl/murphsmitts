@@ -89,7 +89,26 @@ async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
   }
 
   if (!data.ok) {
-    throw new Error(data.error || "Request failed");
+    let message = "Request failed";
+
+    if (typeof data.error === "string") {
+      message = data.error;
+    } else if (Array.isArray(data.error)) {
+      message = data.error.map(item => {
+        if (typeof item === "string") return item;
+        if (item?.message) return item.message;
+        if (item?.details) return item.details;
+        return JSON.stringify(item);
+      }).join(" | ");
+    } else if (data.error && typeof data.error === "object") {
+      message =
+        data.error.message ||
+        data.error.details ||
+        data.error.hint ||
+        JSON.stringify(data.error);
+    }
+
+    throw new Error(message);
   }
 
   return data;
