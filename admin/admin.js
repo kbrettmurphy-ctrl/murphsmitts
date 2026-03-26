@@ -715,7 +715,10 @@ function renderOrderDetail(order) {
         <input id="editEstimatedCompletion" type="date" />
       </div>
 
-      ${renderFieldLike("Date Received", formatDate(order.dateReceived))}
+      <div class="detail-block">
+        <div class="label">Date Received</div>
+        <input id="editDateReceived" type="date" />
+      </div>
 
       <div class="detail-block">
         <div class="label">Date Completed</div>
@@ -813,6 +816,7 @@ function renderOrderDetail(order) {
   document.getElementById("editStatus").value = order.status || "Received";
   document.getElementById("editPaid").value = normalizeText(order.paid) === "paid" ? "Paid" : "Unpaid";
   document.getElementById("editPriceQuoted").value = formatMoneyForInput(order.priceQuoted);
+  document.getElementById("editDateReceived").value = formatDateForInput(order.dateReceived);
   document.getElementById("editEstimatedCompletion").value = formatDateForInput(order.estimatedCompletion);
   document.getElementById("editDateCompleted").value = formatDateForInput(order.dateCompleted);
   document.getElementById("editInternalNotes").value = order.internalNotes || "";
@@ -941,6 +945,7 @@ async function saveCurrentOrderFromForm() {
     paid: val("editPaid"),
     phoneNumber: formatPhoneForInput(val("editPhoneNumber")),
     priceQuoted: parseMoneyInput(val("editPriceQuoted")),
+    dateReceived: val("editDateReceived"),
     estimatedCompletion: val("editEstimatedCompletion"),
     dateCompleted,
     internalNotes: val("editInternalNotes"),
