@@ -948,7 +948,7 @@ function renderOrderDetail(order) {
 
       <div class="detail-block full">
         <div class="label">Internal Notes</div>
-        <textarea id="editInternalNotes" rows="4"></textarea>
+        <textarea id="editInternalNotes" rows="1"></textarea>
       </div>
 
       ${renderSectionHeading("Glove Details")}
@@ -980,12 +980,12 @@ function renderOrderDetail(order) {
 
       <div class="detail-block full">
         <div class="label">Custom Color Request</div>
-        <textarea id="editCustomColorRequest" rows="3" placeholder="Don’t see your color? Describe it here.">${escapeHtml(customColorRequest)}</textarea>
+        <textarea id="editCustomColorRequest" rows="1" placeholder="Don’t see your color? Describe it here.">${escapeHtml(customColorRequest)}</textarea>
       </div>
 
       <div class="detail-block full">
         <div class="label">Customer Notes</div>
-        <textarea id="editGloveNotes" rows="5"></textarea>
+        <textarea id="editGloveNotes" rows="2"></textarea>
       </div>
 
       <div id="editShippingSection" class="full ${isLocal ? "is-hidden" : ""}">
