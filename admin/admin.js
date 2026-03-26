@@ -494,22 +494,23 @@ function renderServicesEditor(currentValue) {
           </label>
         `).join("")}
 
-        <label class="checkbox-item checkbox-inline-other">
-          <span class="checkbox-item checkbox-other-choice">
-            <input
-              id="editServiceOtherCheck"
-              type="checkbox"
-              ${parsed.otherChecked ? "checked" : ""}
-            />
-            <span>Other:</span>
-          </span>
+        <label class="checkbox-item">
+          <input
+            id="editServiceOtherCheck"
+            type="checkbox"
+            ${parsed.otherChecked ? "checked" : ""}
+          />
+          <span>Other:</span>
+        </label>
+
+        <div style="padding-left:30px;">
           <input
             id="editServiceOtherText"
             type="text"
             placeholder="Describe other requested work"
             value="${escapeAttr(parsed.otherText)}"
           />
-        </label>
+        </div>
       </div>
     </div>
   `;
@@ -1197,11 +1198,11 @@ async function saveCurrentOrderFromForm() {
     updates.zipCode = zipCode || null;
     updates.trackingNumber = trackingNumber || null;
     updates.carrier = carrier || null;
-    updates.allowShipWithoutPayment = allowShipWithoutPayment;
+    updates.allow_ship_without_payment = allowShipWithoutPayment;
   } else {
     updates.trackingNumber = null;
     updates.carrier = null;
-    updates.allowShipWithoutPayment = false;
+    updates.allow_ship_without_payment = false;
     updates.streetAddress = null;
     updates.city = null;
     updates.state = null;
