@@ -494,22 +494,22 @@ function renderServicesEditor(currentValue) {
           </label>
         `).join("")}
 
-        <div class="checkbox-other">
-          <label class="checkbox-item">
+        <label class="checkbox-item checkbox-inline-other">
+          <span class="checkbox-item checkbox-other-choice">
             <input
               id="editServiceOtherCheck"
               type="checkbox"
               ${parsed.otherChecked ? "checked" : ""}
             />
             <span>Other:</span>
-          </label>
+          </span>
           <input
             id="editServiceOtherText"
             type="text"
             placeholder="Describe other requested work"
             value="${escapeAttr(parsed.otherText)}"
           />
-        </div>
+        </label>
       </div>
     </div>
   `;
