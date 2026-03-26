@@ -1198,11 +1198,11 @@ async function saveCurrentOrderFromForm() {
     updates.zipCode = zipCode || null;
     updates.trackingNumber = trackingNumber || null;
     updates.carrier = carrier || null;
-    updates.allow_ship_without_payment = allowShipWithoutPayment;
+    updates.allowShipWithoutPayment = allowShipWithoutPayment;
   } else {
     updates.trackingNumber = null;
     updates.carrier = null;
-    updates.allow_ship_without_payment = false;
+    updates.allowShipWithoutPayment = false;
     updates.streetAddress = null;
     updates.city = null;
     updates.state = null;
