@@ -774,11 +774,11 @@ async function confirmAndDeleteOrder(orderNumber) {
 }
 
 function renderOrders(list) {
-  ordersList.innerHTML = "";
   orderCount.textContent = `${list.length} order${list.length === 1 ? "" : "s"}`;
+  ordersList.innerHTML = "";
 
   if (!list.length) {
-    ordersList.innerHTML = `<div class="empty-state">No orders found.</div>`;
+    ordersList.innerHTML = `<div class="no-results">No matching orders.</div>`;
     return;
   }
 
@@ -787,69 +787,52 @@ function renderOrders(list) {
     const row = document.createElement("div");
     row.className = "swipe-row";
 
-    const primaryLace = order.primaryLaceColor || order.lacePrimary || "";
-    const secondaryLace = order.secondaryLaceColor || order.laceAccent || "";
-    const customLace = order.customLaceNotes || order.customColorRequest || "";
+    const paidClass = normalizeText(order.paid) === "paid" ? "paid" : "unpaid";
 
     row.innerHTML = `
       <div class="swipe-delete" aria-hidden="true">
         <button class="swipe-delete-btn" type="button">Delete</button>
       </div>
 
-      <div class="order-card clickable-card" data-order-number="${escapeAttr(order.orderNumber)}">
-        <div class="order-head">
-          <div>
-            <h3>#${escapeHtml(order.orderNumber)}</h3>
-            <div class="subline">${escapeHtml(order.customerName || "")}</div>
+      <div class="order-card clickable-card" data-order-number="${escapeAttr(order.orderNumber)}" tabindex="0">
+        <div class="order-top">
+          <div class="order-main">
+            <div class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</div>
+            <div class="order-name">${escapeHtml(order.customerName || "")}</div>
           </div>
-          <span class="badge">${escapeHtml(order.status || "")}</span>
+          <div class="order-status">${escapeHtml(order.status || "")}</div>
         </div>
 
-        <div class="order-meta">
+        <div class="value" style="margin-top:10px;">
           <div><strong>Phone:</strong> ${escapeHtml(order.phoneNumber || "")}</div>
           <div><strong>Email:</strong> ${escapeHtml(order.emailAddress || "")}</div>
           <div><strong>Glove Type:</strong> ${escapeHtml(order.gloveType || "")}</div>
           ${order.webType ? `<div><strong>Web Type:</strong> ${escapeHtml(order.webType)}</div>` : ""}
           <div><strong>Services:</strong> ${escapeHtml(order.servicesRequested || "")}</div>
           <div><strong>Drop-Off:</strong> ${escapeHtml(order.dropOffMethod || "")}</div>
-          ${shouldShowPrimaryLace(order) ? `<div><strong>Primary Lace:</strong> ${escapeHtml(primaryLace)}</div>` : ""}
-          ${shouldShowSecondaryLace(order) ? `<div><strong>Accent Lace:</strong> ${escapeHtml(secondaryLace)}</div>` : ""}
-          ${shouldShowCustomLaceNotes(order) ? `<div><strong>Color Notes:</strong> ${escapeHtml(customLace)}</div>` : ""}
+          ${(order.primaryLaceColor || order.lacePrimary) ? `<div><strong>Primary Lace:</strong> ${escapeHtml(order.primaryLaceColor || order.lacePrimary)}</div>` : ""}
+          ${(order.secondaryLaceColor || order.laceAccent) ? `<div><strong>Accent Lace:</strong> ${escapeHtml(order.secondaryLaceColor || order.laceAccent)}</div>` : ""}
+          ${(order.customLaceNotes || order.customColorRequest) ? `<div><strong>Color Notes:</strong> ${escapeHtml(order.customLaceNotes || order.customColorRequest)}</div>` : ""}
           ${order.dateReceived ? `<div><strong>Date Received:</strong> ${escapeHtml(formatDate(order.dateReceived))}</div>` : ""}
           ${order.priceQuoted ? `<div><strong>Quote:</strong> ${escapeHtml(formatMoneyForInput(order.priceQuoted))}</div>` : ""}
           ${!isLocal && (order.city || order.state) ? `<div><strong>Ship To:</strong> ${escapeHtml([order.city, order.state].filter(Boolean).join(", "))}</div>` : ""}
         </div>
 
-        <div class="order-actions">
+        <div class="action-row">
           <button class="action-btn action-open" type="button" aria-label="Open">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M15 3h6v6"/>
-              <path d="M10 14 21 3"/>
-              <path d="M21 14v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h4"/>
-            </svg>
+            <svg viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h4"/></svg>
           </button>
 
           <a class="action-btn" href="mailto:${escapeAttr(order.emailAddress || "")}" aria-label="Email" onclick="event.stopPropagation();">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="5" width="18" height="14" rx="2"/>
-              <path d="m4 7 8 6 8-6"/>
-            </svg>
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
           </a>
 
           <a class="action-btn" href="tel:${escapeAttr(order.phoneNumber || "")}" aria-label="Phone" onclick="event.stopPropagation();">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.77.62 2.6a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6 6l1.48-1.28a2 2 0 0 1 2.11-.45c.83.29 1.7.5 2.6.62A2 2 0 0 1 22 16.92z"/>
-            </svg>
+            <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.77.62 2.6a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6 6l1.48-1.28a2 2 0 0 1 2.11-.45c.83.29 1.7.5 2.6.62A2 2 0 0 1 22 16.92z"/></svg>
           </a>
 
           <button class="action-btn action-delete" type="button" aria-label="Delete">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 6h18"/>
-              <path d="M8 6V4h8v2"/>
-              <path d="M19 6l-1 14H6L5 6"/>
-              <path d="M10 11v6"/>
-              <path d="M14 11v6"/>
-            </svg>
+            <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
           </button>
         </div>
       </div>
@@ -861,6 +844,13 @@ function renderOrders(list) {
     const swipeDeleteBtn = row.querySelector(".swipe-delete-btn");
 
     card?.addEventListener("click", () => openOrder(order.orderNumber));
+    card?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openOrder(order.orderNumber);
+      }
+    });
+
     openBtn?.addEventListener("click", (e) => {
       e.stopPropagation();
       openOrder(order.orderNumber);
