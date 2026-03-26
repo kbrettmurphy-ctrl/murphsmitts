@@ -575,11 +575,11 @@ button.secondary{
   background:#fff;
   color:var(--light-ink);
   border:2px solid #d1ccc2;
-  border-radius:20px;
-  padding:12px 12px;
+  border-radius:16px;
+  padding:9px 12px;
   font-size:1rem;
   line-height:1.2;
-  min-height:50px;
+  min-height:42px;
 }
 
 .detail-block select{
@@ -589,14 +589,14 @@ button.secondary{
 }
 
 .detail-block .field-like{
-  min-height:50px;
+  min-height:42px;
   display:flex;
   align-items:center;
 }
 
 .detail-block textarea{
   resize:vertical;
-  min-height:120px;
+  min-height:50px;
 }
 
 .detail-block input[type="date"]{
@@ -663,6 +663,7 @@ button.secondary{
 
   .detail-section-title.full,
   .detail-block.full,
+  .detail-grid > .full,
   .detail-divider{
     grid-column:1 / -1;
   }
