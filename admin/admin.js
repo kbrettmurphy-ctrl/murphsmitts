@@ -578,41 +578,91 @@ function enableSwipeDelete(row) {
   const card = row.querySelector(".order-card");
   if (!card) return;
 
+  const MAX_SWIPE = 94;
   let startX = 0;
   let currentX = 0;
+  let startOffset = 0;
   let dragging = false;
+  let currentOffset = 0;
+
+  function setOffset(x, withTransition = false) {
+    currentOffset = Math.max(-MAX_SWIPE, Math.min(0, x));
+    card.style.transition = withTransition ? "transform .18s ease" : "none";
+    card.style.transform = `translateX(${currentOffset}px)`;
+    row.classList.toggle("swiped", currentOffset <= -MAX_SWIPE + 2);
+  }
+
+  function closeSwipe(withTransition = true) {
+    setOffset(0, withTransition);
+  }
+
+  function openSwipe(withTransition = true) {
+    closeOtherSwipes(row);
+    setOffset(-MAX_SWIPE, withTransition);
+  }
 
   card.addEventListener("touchstart", (e) => {
     if (window.innerWidth > 900) return;
+
     startX = e.touches[0].clientX;
     currentX = startX;
+    startOffset = currentOffset;
     dragging = true;
     closeOtherSwipes(row);
+    card.style.transition = "none";
   }, { passive: true });
 
   card.addEventListener("touchmove", (e) => {
     if (!dragging || window.innerWidth > 900) return;
+
     currentX = e.touches[0].clientX;
+    const dx = currentX - startX;
+
+    // startOffset lets you drag from already-open state too
+    let next = startOffset + dx;
+
+    // light resistance if user pulls right past closed
+    if (next > 0) {
+      next = next * 0.35;
+    }
+
+    // light resistance if user drags too far left
+    if (next < -MAX_SWIPE) {
+      next = -MAX_SWIPE + (next + MAX_SWIPE) * 0.35;
+    }
+
+    setOffset(next, false);
   }, { passive: true });
 
   card.addEventListener("touchend", () => {
     if (!dragging || window.innerWidth > 900) return;
     dragging = false;
 
-    const dx = currentX - startX;
+    if (currentOffset <= -MAX_SWIPE / 2) {
+      openSwipe(true);
+    } else {
+      closeSwipe(true);
+    }
+  });
 
-    if (dx < -60) {
-      row.classList.add("swiped");
-    } else if (dx > 30) {
-      row.classList.remove("swiped");
+  card.addEventListener("touchcancel", () => {
+    if (!dragging || window.innerWidth > 900) return;
+    dragging = false;
+
+    if (currentOffset <= -MAX_SWIPE / 2) {
+      openSwipe(true);
+    } else {
+      closeSwipe(true);
     }
   });
 
   document.addEventListener("touchstart", (e) => {
     if (!row.contains(e.target)) {
-      row.classList.remove("swiped");
+      closeSwipe(true);
     }
   }, { passive: true });
+
+  row._closeSwipe = closeSwipe;
 }
 
 async function deleteOrder(orderNumber) {
@@ -769,8 +819,10 @@ function installAdminEnhancementStyles() {
 }
 
 function closeOtherSwipes(activeRow) {
-  document.querySelectorAll(".swipe-row.swiped").forEach(row => {
-    if (row !== activeRow) row.classList.remove("swiped");
+  document.querySelectorAll(".swipe-row").forEach(row => {
+    if (row !== activeRow && typeof row._closeSwipe === "function") {
+      row._closeSwipe(true);
+    }
   });
 }
 
