@@ -824,7 +824,7 @@ button.secondary{
   /* keep Save button same kind of size/placement as desktop */
   #saveOrderBtn{
     width:auto;
-    min-width:148px;
+    /*min-width:148px;*/
     padding:12px 16px;
     flex:0 0 auto;
     white-space:nowrap;
