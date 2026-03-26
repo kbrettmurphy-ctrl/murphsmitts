@@ -274,6 +274,11 @@ function renderFieldLike(label, value) {
   `;
 }
 
+function emptyToNull(value) {
+  const s = String(value ?? "").trim();
+  return s === "" ? null : s;
+}
+
 const GLOVE_TYPE_OPTIONS = [
   "Fielders Glove",
   "Catchers Mitt",
@@ -589,12 +594,6 @@ function installSwipeDeleteStyles() {
   document.head.appendChild(style);
 }
 
-function closeOtherSwipes(activeRow) {
-  document.querySelectorAll(".swipe-row.swiped").forEach(row => {
-    if (row !== activeRow) row.classList.remove("swiped");
-  });
-}
-
 function enableSwipeDelete(row) {
   const card = row.querySelector(".order-card");
   if (!card) return;
@@ -686,208 +685,12 @@ function enableSwipeDelete(row) {
   row._closeSwipe = closeSwipe;
 }
 
-async function deleteOrder(orderNumber) {
-  const data = await postJson(
-    {
-      order_number: orderNumber,
-      deleteOrder: true
-    },
-    true,
-    "/api/update-order"
-  );
-
-  allOrders = allOrders.filter(o => String(o.orderNumber) !== String(orderNumber));
-
-  if (currentOrder && String(currentOrder.orderNumber) === String(orderNumber)) {
-    currentOrder = null;
-  }
-
-  localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
-  applyFilters();
-  showView(dashboardView);
-
-  return data;
-}
-
-async function confirmAndDeleteOrder(orderNumber) {
-  const ok = confirm(`Delete order #${orderNumber}? This cannot be undone.`);
-  if (!ok) return;
-
-  try {
-    await deleteOrder(orderNumber);
-  } catch (err) {
-    alert(err.message || "Delete failed.");
-  }
-}
-
-function installAdminEnhancementStyles() {
-  if (document.getElementById("mm-admin-enhancement-styles")) return;
-
-  const style = document.createElement("style");
-  style.id = "mm-admin-enhancement-styles";
-  style.textContent = `
-    .swipe-row{
-      position:relative;
-      overflow:hidden;
-      border-radius:16px;
-      margin-bottom:12px;
-    }
-
-    .swipe-delete{
-      position:absolute;
-      inset:0;
-      display:flex;
-      justify-content:flex-end;
-      align-items:stretch;
-      background:#921a24;
-    }
-
-    .swipe-delete-btn{
-      min-width:92px;
-      border:0;
-      background:#921a24;
-      color:#fff;
-      font:inherit;
-      font-weight:700;
-      cursor:pointer;
-      padding:0 18px;
-    }
-
-    .swipe-row .order-card{
-      position:relative;
-      z-index:1;
-      transition:transform .18s ease;
-      will-change:transform;
-      margin-bottom:0;
-    }
-
-    .swipe-row.swiped .order-card{
-      transform:translateX(-92px);
-    }
-
-    .action-btn.action-delete{
-      color:#921a24;
-    }
-
-    .detail-delete-row{
-      display:flex;
-      justify-content:flex-end;
-      margin:4px 0 14px;
-    }
-
-    .detail-delete-btn{
-      appearance:none;
-      border:1px solid rgba(146,26,36,.22);
-      background:rgba(146,26,36,.08);
-      color:#921a24;
-      border-radius:12px;
-      padding:10px 14px;
-      font:inherit;
-      font-weight:700;
-      cursor:pointer;
-    }
-
-    .detail-delete-btn:active{
-      transform:translateY(1px);
-    }
-
-    .checkbox-group{
-      display:grid;
-      gap:12px;
-      margin-top:4px;
-    }
-
-    .checkbox-item{
-      display:grid;
-      grid-template-columns:auto 1fr;
-      gap:12px;
-      align-items:center;
-      color:var(--light-ink);
-    }
-
-    .checkbox-other{
-      display:grid;
-      grid-template-columns:minmax(170px, auto) minmax(0, 1fr);
-      gap:12px;
-      align-items:center;
-    }
-
-    .detail-block input[type="checkbox"]{
-      width:18px;
-      height:18px;
-      min-height:18px;
-      padding:0;
-      margin:0;
-      border:none;
-      border-radius:0;
-      background:transparent;
-      box-shadow:none;
-      accent-color:var(--navy);
-      justify-self:start;
-    }
-
-    .checkbox-other input[type="text"]{
-      min-width:0;
-    }
-
-    @media (max-width: 899px){
-      .checkbox-other{
-        grid-template-columns:1fr;
-      }
-    }
-  `;
-  document.head.appendChild(style);
-}
-
 function closeOtherSwipes(activeRow) {
   document.querySelectorAll(".swipe-row").forEach(row => {
     if (row !== activeRow && typeof row._closeSwipe === "function") {
       row._closeSwipe(true);
     }
   });
-}
-
-function enableSwipeToDelete(row) {
-  if (!row) return;
-
-  const card = row.querySelector(".order-card");
-  if (!card) return;
-
-  let startX = 0;
-  let currentX = 0;
-  let dragging = false;
-
-  card.addEventListener("touchstart", (e) => {
-    if (window.innerWidth > 900) return;
-    startX = e.touches[0].clientX;
-    currentX = startX;
-    dragging = true;
-    closeOtherSwipes(row);
-  }, { passive: true });
-
-  card.addEventListener("touchmove", (e) => {
-    if (!dragging || window.innerWidth > 900) return;
-    currentX = e.touches[0].clientX;
-  }, { passive: true });
-
-  card.addEventListener("touchend", () => {
-    if (!dragging || window.innerWidth > 900) return;
-    dragging = false;
-
-    const dx = currentX - startX;
-
-    if (dx < -60) {
-      row.classList.add("swiped");
-    } else if (dx > 30) {
-      row.classList.remove("swiped");
-    }
-  });
-
-  document.addEventListener("touchstart", (e) => {
-    if (!row.contains(e.target)) {
-      row.classList.remove("swiped");
-    }
-  }, { passive: true });
 }
 
 function setActiveView(viewName) {
@@ -1362,15 +1165,16 @@ async function saveCurrentOrderFromForm() {
     dateCompleted = todayForInput();
   }
 
+  const parsedPrice = parseMoneyInput(val("editPriceQuoted")); 
   const updates = {
     status: newStatus,
     paid: val("editPaid"),
     phoneNumber: formatPhoneForInput(val("editPhoneNumber")),
-    priceQuoted: parseMoneyInput(val("editPriceQuoted")),
-    dateReceived: val("editDateReceived"),
-    estimatedCompletion: val("editEstimatedCompletion"),
-    dateCompleted,
-    internalNotes: val("editInternalNotes"),
+    priceQuoted: parsedPrice === "" ? null : parsedPrice,
+    dateReceived: emptyToNull(val("editDateReceived")),
+    estimatedCompletion: emptyToNull(val("editEstimatedCompletion")),
+    dateCompleted: emptyToNull(dateCompleted),
+    internalNotes: emptyToNull(val("editInternalNotes")),
     brandModel: val("editBrandModel"),
     gloveType,
     webType,
@@ -1387,27 +1191,21 @@ async function saveCurrentOrderFromForm() {
   };
 
   if (!isLocal) {
-    updates.streetAddress = streetAddress;
-    updates.address = streetAddress;
-    updates.city = city;
-    updates.state = state;
-    updates.zipCode = zipCode;
-    updates.zip = zipCode;
-    updates.tracking = trackingNumber;
-    updates.trackingNumber = trackingNumber;
-    updates.carrier = carrier;
+    updates.streetAddress = streetAddress || null;
+    updates.city = city || null;
+    updates.state = state || null;
+    updates.zipCode = zipCode || null;
+    updates.trackingNumber = trackingNumber || null;
+    updates.carrier = carrier || null;
     updates.allowShipWithoutPayment = allowShipWithoutPayment;
   } else {
-    updates.tracking = "";
-    updates.trackingNumber = "";
-    updates.carrier = "";
+    updates.trackingNumber = null;
+    updates.carrier = null;
     updates.allowShipWithoutPayment = false;
-    updates.streetAddress = "";
-    updates.address = "";
-    updates.city = "";
-    updates.state = "";
-    updates.zipCode = "";
-    updates.zip = "";
+    updates.streetAddress = null;
+    updates.city = null;
+    updates.state = null;
+    updates.zipCode = null;
   }
 
   const updated = await saveOrderUpdate(currentOrder.orderNumber, updates, true);
