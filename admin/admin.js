@@ -771,50 +771,6 @@ function installAdminEnhancementStyles() {
       transform:translateY(1px);
     }
 
-    .checkbox-group{
-      display:grid;
-      gap:12px;
-      margin-top:4px;
-    }
-
-    .checkbox-item{
-      display:grid;
-      grid-template-columns:auto 1fr;
-      gap:12px;
-      align-items:center;
-      color:var(--light-ink);
-    }
-
-    .checkbox-other{
-      display:grid;
-      grid-template-columns:minmax(170px, auto) minmax(0, 1fr);
-      gap:12px;
-      align-items:center;
-    }
-
-    .detail-block input[type="checkbox"]{
-      width:18px;
-      height:18px;
-      min-height:18px;
-      padding:0;
-      margin:0;
-      border:none;
-      border-radius:0;
-      background:transparent;
-      box-shadow:none;
-      accent-color:var(--navy);
-      justify-self:start;
-    }
-
-    .checkbox-other input[type="text"]{
-      min-width:0;
-    }
-
-    @media (max-width: 899px){
-      .checkbox-other{
-        grid-template-columns:1fr;
-      }
-    }
   `;
   document.head.appendChild(style);
 }
