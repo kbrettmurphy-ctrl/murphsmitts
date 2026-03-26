@@ -1,3 +1,4 @@
+
 const API_BASE_URL = window.MM_ADMIN_CONFIG.API_BASE_URL;
 const TOKEN_KEY = "mm_admin_token";
 
@@ -67,10 +68,10 @@ function clearSaveStatus() {
 /* =========================
    API
 ========================= */
-async function postJson(body, useAuth = false) {
+async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
   if (useAuth) body._token = getToken();
 
-  const res = await fetch(API_BASE_URL, {
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "text/plain;charset=utf-8"
@@ -101,7 +102,6 @@ function formatDate(value) {
   if (!value) return "";
   const s = String(value).trim();
 
-  // Handle plain YYYY-MM-DD without timezone shifting
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     const [y, m, d] = s.split("-");
     return `${Number(m)}/${Number(d)}/${y}`;
@@ -116,7 +116,6 @@ function formatDateForInput(value) {
   if (!value) return "";
   const s = String(value).trim();
 
-  // Preserve plain YYYY-MM-DD exactly as-is
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     return s;
   }
@@ -517,9 +516,401 @@ function formatPhoneForInput(value) {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
-/* =========================
-   FILTER / LIST
-========================= */
+function installSwipeDeleteStyles() {
+  if (document.getElementById("mm-swipe-delete-styles")) return;
+
+  const style = document.createElement("style");
+  style.id = "mm-swipe-delete-styles";
+  style.textContent = `
+    .swipe-row{
+      position:relative;
+      overflow:hidden;
+      border-radius:0;
+      margin-bottom:0;
+    }
+
+    .swipe-delete-bg{
+      position:absolute;
+      inset:0;
+      display:flex;
+      justify-content:flex-end;
+      align-items:stretch;
+      background:#921a24;
+      border-radius:0;
+    }
+
+    .swipe-delete-btn{
+      min-width:94px;
+      border:0;
+      background:#921a24;
+      color:#fff;
+      font:inherit;
+      font-weight:700;
+      padding:0 18px;
+      cursor:pointer;
+    }
+
+    .swipe-row .order-card{
+      position:relative;
+      z-index:1;
+      margin-bottom:0;
+      transition:transform .18s ease;
+      will-change:transform;
+      touch-action:pan-y;
+    }
+
+    .swipe-row.swiped .order-card{
+      transform:translateX(-94px);
+    }
+
+    .action-delete svg{
+      stroke:#921a24;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function closeOtherSwipes(activeRow) {
+  document.querySelectorAll(".swipe-row.swiped").forEach(row => {
+    if (row !== activeRow) row.classList.remove("swiped");
+  });
+}
+
+function enableSwipeDelete(row) {
+  const card = row.querySelector(".order-card");
+  if (!card) return;
+
+  const MAX_SWIPE = 94;
+  let startX = 0;
+  let currentX = 0;
+  let startOffset = 0;
+  let dragging = false;
+  let currentOffset = 0;
+
+  function setOffset(x, withTransition = false) {
+    currentOffset = Math.max(-MAX_SWIPE, Math.min(0, x));
+    card.style.transition = withTransition ? "transform .18s ease" : "none";
+    card.style.transform = `translateX(${currentOffset}px)`;
+    row.classList.toggle("swiped", currentOffset <= -MAX_SWIPE + 2);
+  }
+
+  function closeSwipe(withTransition = true) {
+    setOffset(0, withTransition);
+  }
+
+  function openSwipe(withTransition = true) {
+    closeOtherSwipes(row);
+    setOffset(-MAX_SWIPE, withTransition);
+  }
+
+  card.addEventListener("touchstart", (e) => {
+    if (window.innerWidth > 900) return;
+
+    startX = e.touches[0].clientX;
+    currentX = startX;
+    startOffset = currentOffset;
+    dragging = true;
+    closeOtherSwipes(row);
+    card.style.transition = "none";
+  }, { passive: true });
+
+  card.addEventListener("touchmove", (e) => {
+    if (!dragging || window.innerWidth > 900) return;
+
+    currentX = e.touches[0].clientX;
+    const dx = currentX - startX;
+
+    // startOffset lets you drag from already-open state too
+    let next = startOffset + dx;
+
+    // light resistance if user pulls right past closed
+    if (next > 0) {
+      next = next * 0.35;
+    }
+
+    // light resistance if user drags too far left
+    if (next < -MAX_SWIPE) {
+      next = -MAX_SWIPE + (next + MAX_SWIPE) * 0.35;
+    }
+
+    setOffset(next, false);
+  }, { passive: true });
+
+  card.addEventListener("touchend", () => {
+    if (!dragging || window.innerWidth > 900) return;
+    dragging = false;
+
+    if (currentOffset <= -MAX_SWIPE / 2) {
+      openSwipe(true);
+    } else {
+      closeSwipe(true);
+    }
+  });
+
+  card.addEventListener("touchcancel", () => {
+    if (!dragging || window.innerWidth > 900) return;
+    dragging = false;
+
+    if (currentOffset <= -MAX_SWIPE / 2) {
+      openSwipe(true);
+    } else {
+      closeSwipe(true);
+    }
+  });
+
+  document.addEventListener("touchstart", (e) => {
+    if (!row.contains(e.target)) {
+      closeSwipe(true);
+    }
+  }, { passive: true });
+
+  row._closeSwipe = closeSwipe;
+}
+
+async function deleteOrder(orderNumber) {
+  const data = await postJson(
+    {
+      order_number: orderNumber,
+      deleteOrder: true
+    },
+    true,
+    "/api/update-order"
+  );
+
+  allOrders = allOrders.filter(o => String(o.orderNumber) !== String(orderNumber));
+
+  if (currentOrder && String(currentOrder.orderNumber) === String(orderNumber)) {
+    currentOrder = null;
+  }
+
+  localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
+  applyFilters();
+  showView(dashboardView);
+
+  return data;
+}
+
+async function confirmAndDeleteOrder(orderNumber) {
+  const ok = confirm(`Delete order #${orderNumber}? This cannot be undone.`);
+  if (!ok) return;
+
+  try {
+    await deleteOrder(orderNumber);
+  } catch (err) {
+    alert(err.message || "Delete failed.");
+  }
+}
+
+function installAdminEnhancementStyles() {
+  if (document.getElementById("mm-admin-enhancement-styles")) return;
+
+  const style = document.createElement("style");
+  style.id = "mm-admin-enhancement-styles";
+  style.textContent = `
+    .swipe-row{
+      position:relative;
+      overflow:hidden;
+      border-radius:16px;
+      margin-bottom:12px;
+    }
+
+    .swipe-delete{
+      position:absolute;
+      inset:0;
+      display:flex;
+      justify-content:flex-end;
+      align-items:stretch;
+      background:#921a24;
+    }
+
+    .swipe-delete-btn{
+      min-width:92px;
+      border:0;
+      background:#921a24;
+      color:#fff;
+      font:inherit;
+      font-weight:700;
+      cursor:pointer;
+      padding:0 18px;
+    }
+
+    .swipe-row .order-card{
+      position:relative;
+      z-index:1;
+      transition:transform .18s ease;
+      will-change:transform;
+      margin-bottom:0;
+    }
+
+    .swipe-row.swiped .order-card{
+      transform:translateX(-92px);
+    }
+
+    .action-btn.action-delete{
+      color:#921a24;
+    }
+
+    .detail-delete-row{
+      display:flex;
+      justify-content:flex-end;
+      margin:4px 0 14px;
+    }
+
+    .detail-delete-btn{
+      appearance:none;
+      border:1px solid rgba(146,26,36,.22);
+      background:rgba(146,26,36,.08);
+      color:#921a24;
+      border-radius:12px;
+      padding:10px 14px;
+      font:inherit;
+      font-weight:700;
+      cursor:pointer;
+    }
+
+    .detail-delete-btn:active{
+      transform:translateY(1px);
+    }
+
+    .checkbox-group{
+      display:grid;
+      gap:12px;
+      margin-top:4px;
+    }
+
+    .checkbox-item{
+      display:grid;
+      grid-template-columns:auto 1fr;
+      gap:12px;
+      align-items:center;
+      color:var(--light-ink);
+    }
+
+    .checkbox-other{
+      display:grid;
+      grid-template-columns:minmax(170px, auto) minmax(0, 1fr);
+      gap:12px;
+      align-items:center;
+    }
+
+    .detail-block input[type="checkbox"]{
+      width:18px;
+      height:18px;
+      min-height:18px;
+      padding:0;
+      margin:0;
+      border:none;
+      border-radius:0;
+      background:transparent;
+      box-shadow:none;
+      accent-color:var(--navy);
+      justify-self:start;
+    }
+
+    .checkbox-other input[type="text"]{
+      min-width:0;
+    }
+
+    @media (max-width: 899px){
+      .checkbox-other{
+        grid-template-columns:1fr;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function closeOtherSwipes(activeRow) {
+  document.querySelectorAll(".swipe-row").forEach(row => {
+    if (row !== activeRow && typeof row._closeSwipe === "function") {
+      row._closeSwipe(true);
+    }
+  });
+}
+
+function enableSwipeToDelete(row) {
+  if (!row) return;
+
+  const card = row.querySelector(".order-card");
+  if (!card) return;
+
+  let startX = 0;
+  let currentX = 0;
+  let dragging = false;
+
+  card.addEventListener("touchstart", (e) => {
+    if (window.innerWidth > 900) return;
+    startX = e.touches[0].clientX;
+    currentX = startX;
+    dragging = true;
+    closeOtherSwipes(row);
+  }, { passive: true });
+
+  card.addEventListener("touchmove", (e) => {
+    if (!dragging || window.innerWidth > 900) return;
+    currentX = e.touches[0].clientX;
+  }, { passive: true });
+
+  card.addEventListener("touchend", () => {
+    if (!dragging || window.innerWidth > 900) return;
+    dragging = false;
+
+    const dx = currentX - startX;
+
+    if (dx < -60) {
+      row.classList.add("swiped");
+    } else if (dx > 30) {
+      row.classList.remove("swiped");
+    }
+  });
+
+  document.addEventListener("touchstart", (e) => {
+    if (!row.contains(e.target)) {
+      row.classList.remove("swiped");
+    }
+  }, { passive: true });
+}
+
+function setActiveView(viewName) {
+  activeView = viewName;
+  navLinks.forEach(link => {
+    link.classList.toggle("active", link.dataset.view === viewName);
+  });
+  viewTitle.textContent = getViewTitle(viewName);
+  applyFilters();
+  showView(dashboardView);
+  closeMenu();
+}
+
+function sortOrders(list) {
+  list.sort((a, b) => {
+    const aNum = Number(String(a.orderNumber || "").replace(/[^\d]/g, "")) || 0;
+    const bNum = Number(String(b.orderNumber || "").replace(/[^\d]/g, "")) || 0;
+
+    if (activeView === "progress") {
+      const aDate = Date.parse(String(a.dateReceived || "").trim());
+      const bDate = Date.parse(String(b.dateReceived || "").trim());
+
+      const aHasDate = !Number.isNaN(aDate);
+      const bHasDate = !Number.isNaN(bDate);
+
+      if (aHasDate && bHasDate) {
+        if (aDate !== bDate) return aDate - bDate;
+        return aNum - bNum;
+      }
+
+      if (aHasDate && !bHasDate) return -1;
+      if (!aHasDate && bHasDate) return 1;
+
+      return aNum - bNum;
+    }
+
+    return bNum - aNum;
+  });
+
+  return list;
+}
+
 function applyFilters() {
   const q = searchInput.value.trim().toLowerCase();
   let list = getViewOrders();
@@ -536,51 +927,37 @@ function applyFilters() {
     });
   }
 
-  list.sort((a, b) => {
-    const aNum = Number(String(a.orderNumber || "").replace(/[^\d]/g, "")) || 0;
-    const bNum = Number(String(b.orderNumber || "").replace(/[^\d]/g, "")) || 0;
-
-    if (activeView === "progress") {
-      const aDate = Date.parse(String(a.dateReceived || "").trim());
-      const bDate = Date.parse(String(b.dateReceived || "").trim());
-
-      const aHasDate = !Number.isNaN(aDate);
-      const bHasDate = !Number.isNaN(bDate);
-
-      if (aHasDate && bHasDate) {
-        if (aDate !== bDate) return aDate - bDate; // oldest received first
-        return aNum - bNum; // tie-breaker
-      }
-
-      if (aHasDate && !bHasDate) return -1;
-      if (!aHasDate && bHasDate) return 1;
-
-      return aNum - bNum; // fallback if both dates missing
-    }
-
-    return bNum - aNum; // newest first for everything else
-  });
-
+  sortOrders(list);
   renderOrders(list);
 }
 
-function setActiveView(viewName) {
-  activeView = viewName;
-  viewTitle.textContent = getViewTitle(viewName);
+async function deleteOrder(orderNumber) {
+  const data = await postJson({
+    order_number: orderNumber,
+    deleteOrder: true
+  }, true, "/api/update-order");
 
-  navLinks.forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.view === viewName);
-  });
+  allOrders = allOrders.filter(o => String(o.orderNumber) !== String(orderNumber));
 
-  closeMenu();
-  clearSaveStatus();
+  if (currentOrder && String(currentOrder.orderNumber) === String(orderNumber)) {
+    currentOrder = null;
+  }
+
+  localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
   applyFilters();
+  showView(dashboardView);
 
-  if (detailView.classList.contains("active")) {
-    showView(dashboardView);
-    orderDetail.scrollTop = 0;
-    detailView.scrollTop = 0;
-    window.scrollTo(0, 0);
+  return data;
+}
+
+async function confirmAndDeleteOrder(orderNumber) {
+  const ok = confirm(`Delete order #${orderNumber}? This cannot be undone.`);
+  if (!ok) return;
+
+  try {
+    await deleteOrder(orderNumber);
+  } catch (err) {
+    alert(err.message || "Delete failed.");
   }
 }
 
@@ -594,36 +971,46 @@ function renderOrders(list) {
   }
 
   list.forEach(order => {
-    const card = document.createElement("div");
-    card.className = "order-card clickable-card";
-    card.tabIndex = 0;
+    const row = document.createElement("div");
+    row.className = "swipe-row";
 
     const paidClass = normalizeText(order.paid) === "paid" ? "paid" : "unpaid";
 
-    card.innerHTML = `
-      <div class="order-top">
-        <div class="order-main">
-          <div class="order-name">${escapeHtml(order.customerName || "")}</div>
-          <div class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</div>
-        </div>
-        <div class="order-status">${escapeHtml(order.status || "")}</div>
+    row.innerHTML = `
+      <div class="swipe-delete-bg">
+        <button class="swipe-delete-btn" type="button">Delete</button>
       </div>
 
-      <div class="action-row">
-        <button class="action-btn action-edit" type="button" aria-label="Edit">
-          <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-        </button>
-        <button class="action-btn action-email" type="button" aria-label="Email">
-          <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="m4 7 8 6 8-6"/></svg>
-        </button>
-        <button class="action-btn action-phone" type="button" aria-label="Call">
-          <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.08 4.18 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.63 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.15a2 2 0 0 1 2.11-.45c.83.3 1.71.51 2.61.63A2 2 0 0 1 22 16.92z"/></svg>
-        </button>
-        <button class="action-btn action-text" type="button" aria-label="Text">
-          <svg viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
-        </button>
+      <div class="order-card clickable-card" tabindex="0">
+        <div class="order-top">
+          <div class="order-main">
+            <div class="order-name">${escapeHtml(order.customerName || "")}</div>
+            <div class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</div>
+          </div>
+          <div class="order-status">${escapeHtml(order.status || "")}</div>
+        </div>
+
+        <div class="action-row">
+          <button class="action-btn action-edit" type="button" aria-label="Edit">
+            <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+          <button class="action-btn action-email" type="button" aria-label="Email">
+            <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="m4 7 8 6 8-6"/></svg>
+          </button>
+          <button class="action-btn action-phone" type="button" aria-label="Call">
+            <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.08 4.18 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.63 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.15a2 2 0 0 1 2.11-.45c.83.3 1.71.51 2.61.63A2 2 0 0 1 22 16.92z"/></svg>
+          </button>
+          <button class="action-btn action-text" type="button" aria-label="Text">
+            <svg viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+          </button>
+          <button class="action-btn action-delete" type="button" aria-label="Delete">
+            <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+          </button>
+        </div>
       </div>
     `;
+
+    const card = row.querySelector(".order-card");
 
     card.addEventListener("click", () => openOrder(order.orderNumber));
     card.addEventListener("keydown", (e) => {
@@ -633,36 +1020,44 @@ function renderOrders(list) {
       }
     });
 
-    card.querySelector(".action-edit").addEventListener("click", (e) => {
+    row.querySelector(".action-edit").addEventListener("click", (e) => {
       e.stopPropagation();
       openOrder(order.orderNumber);
     });
 
-    card.querySelector(".action-email").addEventListener("click", (e) => {
+    row.querySelector(".action-email").addEventListener("click", (e) => {
       e.stopPropagation();
       const email = String(order.emailAddress || "").trim();
       if (email) window.location.href = `mailto:${email}`;
     });
 
-    card.querySelector(".action-phone").addEventListener("click", (e) => {
+    row.querySelector(".action-phone").addEventListener("click", (e) => {
       e.stopPropagation();
       const phone = String(order.phoneNumber || "").trim();
       if (phone) window.location.href = `tel:${phone}`;
     });
 
-    card.querySelector(".action-text").addEventListener("click", (e) => {
+    row.querySelector(".action-text").addEventListener("click", (e) => {
       e.stopPropagation();
       const phone = String(order.phoneNumber || "").replace(/[^\d+]/g, "").trim();
       if (phone) window.location.href = `sms:${phone}`;
     });
 
-    ordersList.appendChild(card);
+    row.querySelector(".action-delete").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await confirmAndDeleteOrder(order.orderNumber);
+    });
+
+    row.querySelector(".swipe-delete-btn").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await confirmAndDeleteOrder(order.orderNumber);
+    });
+
+    ordersList.appendChild(row);
+    enableSwipeDelete(row);
   });
 }
 
-/* =========================
-   DETAIL
-========================= */
 function renderOrderDetail(order) {
   currentOrder = order;
   clearSaveStatus();
@@ -674,6 +1069,10 @@ function renderOrderDetail(order) {
   const customColorRequest = order.customColorRequest || order.customLaceNotes || "";
 
   orderDetail.innerHTML = `
+    <div class="detail-delete-row">
+      <button id="detailDeleteBtn" class="detail-delete-btn" type="button">Delete Order</button>
+    </div>
+
     <div class="detail-grid">
       ${renderSectionHeading("Order Summary")}
 
@@ -711,13 +1110,13 @@ function renderOrderDetail(order) {
       </div>
 
       <div class="detail-block">
-        <div class="label">Estimated Completion</div>
-        <input id="editEstimatedCompletion" type="date" />
+        <div class="label">Date Received</div>
+        <input id="editDateReceived" type="date" />
       </div>
 
       <div class="detail-block">
-        <div class="label">Date Received</div>
-        <input id="editDateReceived" type="date" />
+        <div class="label">Estimated Completion</div>
+        <input id="editEstimatedCompletion" type="date" />
       </div>
 
       <div class="detail-block">
@@ -846,6 +1245,10 @@ function renderOrderDetail(order) {
   if (cityEl) cityEl.value = order.city || "";
   if (stateEl && !stateEl.value) stateEl.value = order.state || "";
   if (zipEl) zipEl.value = order.zipCode || order.zip || "";
+
+  document.getElementById("detailDeleteBtn")?.addEventListener("click", async () => {
+    await confirmAndDeleteOrder(order.orderNumber);
+  });
 
   wireDetailForm();
 }
@@ -999,10 +1402,9 @@ async function saveCurrentOrderFromForm() {
 
 async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false) {
   const data = await postJson({
-    action: "updateOrder",
-    orderNumber,
+    order_number: orderNumber,
     updates
-  }, true);
+  }, true, "/api/update-order");
 
   const updatedOrder = data.order;
   const idx = allOrders.findIndex(o => String(o.orderNumber) === String(updatedOrder.orderNumber));
@@ -1137,6 +1539,8 @@ navLinks.forEach(btn => {
    INIT
 ========================= */
 (async function init() {
+  installSwipeDeleteStyles();
+
   if (!getToken()) {
     showView(loginView);
     return;
