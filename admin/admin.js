@@ -671,49 +671,7 @@ function renderOrderDetail(order) {
 
   const primaryLaceColor = order.primaryLaceColor || order.lacePrimary || "";
   const secondaryLaceColor = order.secondaryLaceColor || order.laceAccent || "";
-  const customLaceNotes = order.customLaceNotes || "";
-
-  const shippingSection = isLocal ? "" : `
-    ${renderSectionHeading("Shipping")}
-
-    <div class="detail-block">
-      <div class="label">Allow Ship Without Payment</div>
-      <select id="editAllowShipWithoutPayment">
-        <option value="false">No</option>
-        <option value="true">Yes</option>
-      </select>
-    </div>
-
-    <div class="detail-block">
-      <div class="label">Tracking Number</div>
-      <input id="editTrackingNumber" type="text" />
-    </div>
-
-    <div class="detail-block">
-      <div class="label">Carrier</div>
-      <select id="editCarrier">${carrierOptions(order.carrier)}</select>
-    </div>
-
-    <div class="detail-block full">
-      <div class="label">Street Address</div>
-      <input id="editStreetAddress" type="text" />
-    </div>
-
-    <div class="detail-block">
-      <div class="label">City</div>
-      <input id="editCity" type="text" />
-    </div>
-
-    <div class="detail-block">
-      <div class="label">State</div>
-      <input id="editState" type="text" />
-    </div>
-
-    <div class="detail-block">
-      <div class="label">Zip Code</div>
-      <input id="editZipCode" type="text" />
-    </div>
-  `;
+  const customColorRequest = order.customColorRequest || order.customLaceNotes || "";
 
   orderDetail.innerHTML = `
     <div class="detail-grid">
@@ -721,7 +679,7 @@ function renderOrderDetail(order) {
 
       ${renderFieldLike("Order #", order.orderNumber || "")}
       ${renderFieldLike("Customer", order.customerName || "")}
-      ${renderFieldLike("Phone", order.phoneNumber || "")}
+      ${renderPhoneInput("Phone", "editPhoneNumber", order.phoneNumber || "")}
       ${renderFieldLike("Email", order.emailAddress || "")}
 
       ${renderSectionHeading("Order Status")}
@@ -781,31 +739,74 @@ function renderOrderDetail(order) {
         <select id="editGloveType">${gloveTypeOptions(order.gloveType)}</select>
       </div>
 
-      <div class="detail-block">
+      <div id="editWebTypeWrap" class="detail-block">
         <div class="label">Web Type</div>
         <select id="editWebType">${webTypeOptions(order.webType)}</select>
       </div>
 
       <div class="detail-block">
         <div class="label">Drop-Off Method</div>
-        <input id="editDropOffMethod" type="text" />
+        <select id="editDropOffMethod">${dropOffMethodOptions(order.dropOffMethod)}</select>
       </div>
+
+      ${renderServicesEditor(order.servicesRequested || "")}
+
+      ${renderLaceInput("Primary Lace Color", "editPrimaryLaceColor", primaryLaceColor, "Choose")}
+      ${renderLaceInput("Secondary / Accent Lace Color", "editSecondaryLaceColor", secondaryLaceColor, "Only if multi-colors wanted")}
 
       <div class="detail-block full">
-        <div class="label">Services Requested</div>
-        <textarea id="editServicesRequested" rows="4"></textarea>
+        <div class="label">Custom Color Request</div>
+        <textarea id="editCustomColorRequest" rows="3" placeholder="Don’t see your color? Describe it here.">${escapeHtml(customColorRequest)}</textarea>
       </div>
-
-      ${shouldShowPrimaryLace(order) ? renderLaceInput("Primary Lace Color", "editPrimaryLaceColor", primaryLaceColor) : ""}
-      ${shouldShowSecondaryLace(order) ? renderLaceInput("Secondary Lace Color", "editSecondaryLaceColor", secondaryLaceColor) : ""}
-      ${shouldShowCustomLaceNotes(order) ? renderLaceInput("Custom Lace Notes", "editCustomLaceNotes", customLaceNotes) : ""}
 
       <div class="detail-block full">
         <div class="label">Customer Notes</div>
         <textarea id="editGloveNotes" rows="5"></textarea>
       </div>
 
-      ${shippingSection}
+      <div id="editShippingSection" class="full ${isLocal ? "is-hidden" : ""}">
+        ${renderSectionHeading("Shipping")}
+
+        <div class="detail-grid">
+          <div class="detail-block">
+            <div class="label">Allow Ship Without Payment</div>
+            <select id="editAllowShipWithoutPayment">
+              <option value="false">No</option>
+              <option value="true">Yes</option>
+            </select>
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Tracking Number</div>
+            <input id="editTrackingNumber" type="text" />
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Carrier</div>
+            <select id="editCarrier">${carrierOptions(order.carrier)}</select>
+          </div>
+
+          <div class="detail-block full">
+            <div class="label">Street Address</div>
+            <input id="editStreetAddress" type="text" />
+          </div>
+
+          <div class="detail-block">
+            <div class="label">City</div>
+            <input id="editCity" type="text" />
+          </div>
+
+          <div class="detail-block">
+            <div class="label">State</div>
+            <select id="editState">${stateOptions(order.state)}</select>
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Zip Code</div>
+            <input id="editZipCode" type="text" inputmode="numeric" />
+          </div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -819,27 +820,93 @@ function renderOrderDetail(order) {
   document.getElementById("editBrandModel").value = order.brandModel || "";
   document.getElementById("editGloveType").value = order.gloveType || "";
   document.getElementById("editWebType").value = order.webType || "";
-  document.getElementById("editServicesRequested").value = order.servicesRequested || "";
   document.getElementById("editDropOffMethod").value = order.dropOffMethod || "";
   document.getElementById("editGloveNotes").value = order.gloveNotes || order.customerNotes || "";
 
-  const primaryEl = document.getElementById("editPrimaryLaceColor");
-  const secondaryEl = document.getElementById("editSecondaryLaceColor");
-  const customLaceEl = document.getElementById("editCustomLaceNotes");
+  document.getElementById("editPrimaryLaceColor").value = primaryLaceColor;
+  document.getElementById("editSecondaryLaceColor").value = secondaryLaceColor;
+  document.getElementById("editCustomColorRequest").value = customColorRequest;
 
-  if (primaryEl) primaryEl.value = primaryLaceColor;
-  if (secondaryEl) secondaryEl.value = secondaryLaceColor;
-  if (customLaceEl) customLaceEl.value = customLaceNotes;
+  const trackingEl = document.getElementById("editTrackingNumber");
+  const carrierEl = document.getElementById("editCarrier");
+  const allowShipEl = document.getElementById("editAllowShipWithoutPayment");
+  const streetEl = document.getElementById("editStreetAddress");
+  const cityEl = document.getElementById("editCity");
+  const stateEl = document.getElementById("editState");
+  const zipEl = document.getElementById("editZipCode");
 
-  if (!isLocal) {
-    document.getElementById("editTrackingNumber").value = order.trackingNumber || order.tracking || "";
-    document.getElementById("editCarrier").value = order.carrier || "";
-    document.getElementById("editAllowShipWithoutPayment").value = order.allowShipWithoutPayment ? "true" : "false";
-    document.getElementById("editStreetAddress").value = order.streetAddress || order.address || "";
-    document.getElementById("editCity").value = order.city || "";
-    document.getElementById("editState").value = order.state || "";
-    document.getElementById("editZipCode").value = order.zipCode || order.zip || "";
+  if (trackingEl) trackingEl.value = order.trackingNumber || order.tracking || "";
+  if (carrierEl) carrierEl.value = order.carrier || "";
+  if (allowShipEl) allowShipEl.value = order.allowShipWithoutPayment ? "true" : "false";
+  if (streetEl) streetEl.value = order.streetAddress || order.address || "";
+  if (cityEl) cityEl.value = order.city || "";
+  if (stateEl && !stateEl.value) stateEl.value = order.state || "";
+  if (zipEl) zipEl.value = order.zipCode || order.zip || "";
+
+  wireDetailForm();
+}
+
+function wireDetailForm() {
+  const gloveTypeEl = document.getElementById("editGloveType");
+  const webTypeWrap = document.getElementById("editWebTypeWrap");
+  const webTypeEl = document.getElementById("editWebType");
+  const dropOffEl = document.getElementById("editDropOffMethod");
+  const shippingSection = document.getElementById("editShippingSection");
+  const phoneEl = document.getElementById("editPhoneNumber");
+
+  function toggleConditionalFields() {
+    const isFielders = gloveTypeEl && gloveTypeEl.value === "Fielders Glove";
+    if (webTypeWrap) {
+      webTypeWrap.classList.toggle("is-hidden", !isFielders);
+    }
+    if (!isFielders && webTypeEl) {
+      webTypeEl.value = "";
+    }
+
+    const isLocal = looksLocalDropOff({ dropOffMethod: dropOffEl?.value || "" });
+    if (shippingSection) {
+      shippingSection.classList.toggle("is-hidden", isLocal);
+    }
+
+    if (isLocal) {
+      const ids = [
+        "editAllowShipWithoutPayment",
+        "editTrackingNumber",
+        "editCarrier",
+        "editStreetAddress",
+        "editCity",
+        "editState",
+        "editZipCode"
+      ];
+
+      ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        if (el.tagName === "SELECT") {
+          el.value = id === "editAllowShipWithoutPayment" ? "false" : "";
+        } else {
+          el.value = "";
+        }
+      });
+    }
   }
+
+  if (gloveTypeEl) {
+    gloveTypeEl.addEventListener("change", toggleConditionalFields);
+  }
+
+  if (dropOffEl) {
+    dropOffEl.addEventListener("change", toggleConditionalFields);
+  }
+
+  if (phoneEl) {
+    phoneEl.addEventListener("input", () => {
+      phoneEl.value = formatPhoneForInput(phoneEl.value);
+    });
+  }
+
+  toggleConditionalFields();
 }
 
 async function saveCurrentOrderFromForm() {
@@ -848,7 +915,11 @@ async function saveCurrentOrderFromForm() {
 
   saveStatusEl.textContent = "Saving...";
 
-  const isLocal = looksLocalDropOff(currentOrder);
+  const dropOffMethod = val("editDropOffMethod");
+  const isLocal = looksLocalDropOff({ dropOffMethod });
+
+  const gloveType = val("editGloveType");
+  const webType = gloveType === "Fielders Glove" ? val("editWebType") : "";
 
   const streetAddress = isLocal ? "" : val("editStreetAddress");
   const city = isLocal ? "" : val("editCity");
@@ -857,10 +928,6 @@ async function saveCurrentOrderFromForm() {
   const trackingNumber = isLocal ? "" : val("editTrackingNumber");
   const carrier = isLocal ? "" : val("editCarrier");
   const allowShipWithoutPayment = isLocal ? false : (val("editAllowShipWithoutPayment") === "true");
-
-  const primaryLaceColor = val("editPrimaryLaceColor");
-  const secondaryLaceColor = val("editSecondaryLaceColor");
-  const customLaceNotes = val("editCustomLaceNotes");
 
   let dateCompleted = val("editDateCompleted");
   const newStatus = val("editStatus");
@@ -872,17 +939,24 @@ async function saveCurrentOrderFromForm() {
   const updates = {
     status: newStatus,
     paid: val("editPaid"),
+    phoneNumber: formatPhoneForInput(val("editPhoneNumber")),
     priceQuoted: parseMoneyInput(val("editPriceQuoted")),
     estimatedCompletion: val("editEstimatedCompletion"),
     dateCompleted,
     internalNotes: val("editInternalNotes"),
     brandModel: val("editBrandModel"),
-    gloveType: val("editGloveType"),
-    webType: val("editWebType"),
-    servicesRequested: val("editServicesRequested"),
-    dropOffMethod: val("editDropOffMethod"),
+    gloveType,
+    webType,
+    servicesRequested: getSelectedServices(),
+    dropOffMethod,
     gloveNotes: val("editGloveNotes"),
-    customerNotes: val("editGloveNotes")
+    customerNotes: val("editGloveNotes"),
+    primaryLaceColor: val("editPrimaryLaceColor"),
+    lacePrimary: val("editPrimaryLaceColor"),
+    secondaryLaceColor: val("editSecondaryLaceColor"),
+    laceAccent: val("editSecondaryLaceColor"),
+    customColorRequest: val("editCustomColorRequest"),
+    customLaceNotes: val("editCustomColorRequest")
   };
 
   if (!isLocal) {
@@ -901,20 +975,12 @@ async function saveCurrentOrderFromForm() {
     updates.trackingNumber = "";
     updates.carrier = "";
     updates.allowShipWithoutPayment = false;
-  }
-
-  if (document.getElementById("editPrimaryLaceColor")) {
-    updates.primaryLaceColor = primaryLaceColor;
-    updates.lacePrimary = primaryLaceColor;
-  }
-
-  if (document.getElementById("editSecondaryLaceColor")) {
-    updates.secondaryLaceColor = secondaryLaceColor;
-    updates.laceAccent = secondaryLaceColor;
-  }
-
-  if (document.getElementById("editCustomLaceNotes")) {
-    updates.customLaceNotes = customLaceNotes;
+    updates.streetAddress = "";
+    updates.address = "";
+    updates.city = "";
+    updates.state = "";
+    updates.zipCode = "";
+    updates.zip = "";
   }
 
   const updated = await saveOrderUpdate(currentOrder.orderNumber, updates, true);
