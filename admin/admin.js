@@ -524,7 +524,7 @@ function installSwipeDeleteStyles() {
     .swipe-row{
       position:relative;
       overflow:hidden;
-      border-radius:18px;
+      border-radius:0;
       margin-bottom:0;
     }
 
