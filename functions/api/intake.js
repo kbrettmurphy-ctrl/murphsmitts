@@ -159,7 +159,7 @@ export async function onRequest(context) {
 
       order_number: nextOrderNumber,
       status: "Received",
-      date_received: todayIsoDate(),
+      date_received: null,
       estimated_completion: null,
       price_quoted: null,
       paid: "Unpaid",
