@@ -503,14 +503,12 @@ function renderServicesEditor(currentValue) {
           <span>Other:</span>
         </label>
 
-        <div style="padding-left:30px;">
-          <input
-            id="editServiceOtherText"
-            type="text"
-            placeholder="Describe other requested work"
-            value="${escapeAttr(parsed.otherText)}"
-          />
-        </div>
+        <input
+          id="editServiceOtherText"
+          type="text"
+          placeholder="Describe other requested work"
+          value="${escapeAttr(parsed.otherText)}"
+        />
       </div>
     </div>
   `;
