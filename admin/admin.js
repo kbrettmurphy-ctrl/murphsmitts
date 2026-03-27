@@ -1218,9 +1218,10 @@ async function saveCurrentOrderFromForm() {
 
 async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false) {
   const data = await postJson({
-    order_number: orderNumber,
+    action: "updateOrder",
+    orderNumber,
     updates
-  }, true, "/api/update-order");
+  }, true);
 
   const updatedOrder = data.order;
   const idx = allOrders.findIndex(o => String(o.orderNumber) === String(updatedOrder.orderNumber));
@@ -1235,6 +1236,7 @@ async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false) {
     currentOrder = updatedOrder;
   }
 
+  localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
   applyFilters();
   return updatedOrder;
 }
