@@ -208,7 +208,7 @@ function isInTransitToMe(order) {
 
 function getViewTitle(viewName) {
   switch (viewName) {
-    case "waiting": return "Waiting on Parts";
+    case "waiting": return "Waiting on Lace";
     case "estimate": return "Estimate Sent";
     case "customer-response": return "Pending Response";
     case "transit": return "In Transit to Me";
@@ -225,7 +225,7 @@ function getViewOrders() {
       return allOrders.filter(isCompletedOrder);
 
     case "waiting":
-      return allOrders.filter(order => normalizeStatus(order.status) === "waiting on parts");
+      return allOrders.filter(order => normalizeStatus(order.status) === "waiting on lace");
 
     case "estimate":
       return allOrders.filter(order => normalizeStatus(order.status) === "estimate sent");
@@ -933,7 +933,7 @@ function renderOrderDetail(order) {
            <option value="Pending Response">Pending Response</option>
            <option value="In Transit to Me">In Transit to Me</option>
            <option value="In Progress">In Progress</option>
-           <option value="Waiting on Parts">Waiting on Parts</option>
+           <option value="Waiting on Lace">Waiting on Lace</option>
            <option value="Ready to Go">Ready to Go</option>
            <option value="Completed">Completed</option>
            <option value="Picked Up">Picked Up</option>
