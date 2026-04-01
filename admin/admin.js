@@ -198,10 +198,20 @@ function isCompletedOrder(order) {
   return status === "completed" || status === "picked up";
 }
 
+function isWaitingForCustomerResponse(order) {
+  return normalizeStatus(order.status) === "waiting for customer response";
+}
+
+function isInTransitToMe(order) {
+  return normalizeStatus(order.status) === "in transit to me";
+}
+
 function getViewTitle(viewName) {
   switch (viewName) {
     case "waiting": return "Waiting on Parts";
     case "estimate": return "Estimate Sent";
+    case "customer-response": return "Waiting for Customer Response";
+    case "transit": return "In Transit to Me";
     case "progress": return "In Progress";
     case "ready": return "Ready to Go";
     case "completed": return "Completed";
@@ -213,14 +223,25 @@ function getViewOrders() {
   switch (activeView) {
     case "completed":
       return allOrders.filter(isCompletedOrder);
+
     case "waiting":
       return allOrders.filter(order => normalizeStatus(order.status) === "waiting on parts");
+
     case "estimate":
       return allOrders.filter(order => normalizeStatus(order.status) === "estimate sent");
+
+    case "customer-response":
+      return allOrders.filter(isWaitingForCustomerResponse);
+
+    case "transit":
+      return allOrders.filter(isInTransitToMe);
+
     case "progress":
       return allOrders.filter(order => normalizeStatus(order.status) === "in progress");
+
     case "ready":
       return allOrders.filter(order => normalizeStatus(order.status) === "ready to go");
+
     default:
       return allOrders.filter(order => !isCompletedOrder(order));
   }
@@ -907,14 +928,16 @@ function renderOrderDetail(order) {
       <div class="detail-block">
         <div class="label">Status</div>
         <select id="editStatus">
-          <option value="Received">Received</option>
-          <option value="Estimate Sent">Estimate Sent</option>
-          <option value="In Progress">In Progress</option>
-          <option value="Waiting on Parts">Waiting on Parts</option>
-          <option value="Ready to Go">Ready to Go</option>
-          <option value="Completed">Completed</option>
-          <option value="Picked Up">Picked Up</option>
-        </select>
+           <option value="Received">Received</option>
+           <option value="Estimate Sent">Estimate Sent</option>
+           <option value="Waiting for Customer Response">Waiting for Customer Response</option>
+           <option value="In Transit to Me">In Transit to Me</option>
+           <option value="In Progress">In Progress</option>
+           <option value="Waiting on Parts">Waiting on Parts</option>
+           <option value="Ready to Go">Ready to Go</option>
+           <option value="Completed">Completed</option>
+           <option value="Picked Up">Picked Up</option>
+         </select>
       </div>
 
       <div class="detail-block">
