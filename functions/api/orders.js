@@ -199,7 +199,10 @@ export async function onRequest(context) {
 
       const newStatus = normalizeStatus(mergedPreview.status);
       const statusChanged = !!newStatus && newStatus !== oldStatus;
-      const shouldEmailForStatus = statusChanged && newStatus !== "picked up" && newStatus !== lastStatusEmailed;
+      const shouldEmailForStatus =
+        statusChanged &&
+        !isInternalOnlyStatus(newStatus) &&
+        newStatus !== lastStatusEmailed;
 
       // Keep the old GAS shipping rule:
       // cannot mark shipped orders completed if unpaid and no override.
@@ -225,10 +228,11 @@ export async function onRequest(context) {
         mergedPreview.date_completed = dbUpdates.date_completed;
       }
 
-      // If status changed to Picked Up, mark last emailed without sending.
-      if (statusChanged && newStatus === "picked up") {
-        dbUpdates.last_status_emailed = "Picked Up";
-        mergedPreview.last_status_emailed = "Picked Up";
+      // Internal-only statuses should never email, but should still stamp Last Status Emailed
+      // so the record reflects the latest internal status.
+      if (statusChanged && isInternalOnlyStatus(newStatus)) {
+        dbUpdates.last_status_emailed = normalizeDisplayStatus(mergedPreview.status);
+        mergedPreview.last_status_emailed = normalizeDisplayStatus(mergedPreview.status);
       }
 
       // If a real status email needs to go out, force email config to exist BEFORE patching.
@@ -643,8 +647,8 @@ async function sendStatusEmail(env, row, statusDisplay) {
     return { ok: true, skipped: true, reason: "Blank status." };
   }
 
-  if (status === "picked up") {
-    return { ok: true, skipped: true, reason: "Picked Up is internal-only." };
+  if (isInternalOnlyStatus(status)) {
+    return { ok: true, skipped: true, reason: `${statusDisplay} is internal-only.` };
   }
 
   const orderNum = String(order.orderNumber || "").trim() || "(unknown)";
@@ -972,4 +976,13 @@ function escapeHtml(s) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function isInternalOnlyStatus(value) {
+  const status = normalizeStatus(value);
+  return (
+    status === "picked up" ||
+    status === "waiting for customer response" ||
+    status === "in transit to me"
+  );
 }
