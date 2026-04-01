@@ -982,7 +982,7 @@ function isInternalOnlyStatus(value) {
   const status = normalizeStatus(value);
   return (
     status === "picked up" ||
-    status === "waiting for customer response" ||
+    status === "pending response" ||
     status === "in transit to me"
   );
 }
