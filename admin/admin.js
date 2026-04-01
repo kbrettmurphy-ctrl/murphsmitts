@@ -199,7 +199,7 @@ function isCompletedOrder(order) {
 }
 
 function isWaitingForCustomerResponse(order) {
-  return normalizeStatus(order.status) === "waiting for customer response";
+  return normalizeStatus(order.status) === "pending response";
 }
 
 function isInTransitToMe(order) {
@@ -210,7 +210,7 @@ function getViewTitle(viewName) {
   switch (viewName) {
     case "waiting": return "Waiting on Parts";
     case "estimate": return "Estimate Sent";
-    case "customer-response": return "Waiting for Customer Response";
+    case "customer-response": return "Pending Response";
     case "transit": return "In Transit to Me";
     case "progress": return "In Progress";
     case "ready": return "Ready to Go";
@@ -930,7 +930,7 @@ function renderOrderDetail(order) {
         <select id="editStatus">
            <option value="Received">Received</option>
            <option value="Estimate Sent">Estimate Sent</option>
-           <option value="Waiting for Customer Response">Waiting for Customer Response</option>
+           <option value="Pending Response">Pending Response</option>
            <option value="In Transit to Me">In Transit to Me</option>
            <option value="In Progress">In Progress</option>
            <option value="Waiting on Parts">Waiting on Parts</option>
