@@ -37,6 +37,7 @@ let loginInProgress = false;
 function showView(view) {
   [loginView, dashboardView, detailView].forEach(v => v.classList.remove("active"));
   view.classList.add("active");
+  syncAuthUI();
 }
 
 function getToken() {
@@ -52,6 +53,7 @@ function clearToken() {
 }
 
 function openMenu() {
+  if (!isAuthenticated()) return;
   sideMenu.classList.add("open");
   menuBackdrop.classList.add("show");
 }
@@ -63,6 +65,24 @@ function closeMenu() {
 
 function clearSaveStatus() {
   if (saveStatusEl) saveStatusEl.textContent = "";
+}
+
+function isAuthenticated() {
+  return !!getToken();
+}
+
+function syncAuthUI() {
+  const authed = isAuthenticated();
+
+  if (sideMenu) {
+    sideMenu.style.display = authed ? "" : "none";
+    sideMenu.classList.remove("open");
+  }
+
+  if (menuBackdrop) {
+    menuBackdrop.classList.remove("show");
+    menuBackdrop.style.display = authed ? "" : "none";
+  }
 }
 
 /* =========================
@@ -714,6 +734,14 @@ function closeOtherSwipes(activeRow) {
 }
 
 function setActiveView(viewName) {
+  if (!isAuthenticated()) {
+    activeView = "current";
+    showView(loginView);
+    closeMenu();
+    syncAuthUI();
+    return;
+  }
+
   activeView = viewName;
   navLinks.forEach(link => {
     link.classList.toggle("active", link.dataset.view === viewName);
@@ -1281,6 +1309,7 @@ async function login(pinValue) {
     setToken(data.token);
     pinInput.value = "";
     loginStatus.textContent = "";
+    syncAuthUI();
     showView(dashboardView);
     await loadOrders();
   } catch (err) {
@@ -1343,6 +1372,8 @@ logoutBtn.addEventListener("click", () => {
   clearToken();
   currentOrder = null;
   clearSaveStatus();
+  closeMenu();
+  syncAuthUI();
   showView(loginView);
 });
 
@@ -1381,6 +1412,7 @@ navLinks.forEach(btn => {
 ========================= */
 (async function init() {
   installSwipeDeleteStyles();
+  syncAuthUI();
 
   if (!getToken()) {
     showView(loginView);
@@ -1393,6 +1425,8 @@ navLinks.forEach(btn => {
     showView(dashboardView);
   } catch (err) {
     clearToken();
+    closeMenu();
+    syncAuthUI();
     showView(loginView);
   }
 })();
