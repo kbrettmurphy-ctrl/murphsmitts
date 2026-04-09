@@ -137,7 +137,7 @@ export async function onRequest(context) {
       }
 
       const existing = await fetchOrderByNumber(env, orderNumber);
-      if (!existing.ok) {
+      if (!existing.ok || !existing.data) {
         return json(
           {
             ok: false,
@@ -152,6 +152,58 @@ export async function onRequest(context) {
         {
           ok: true,
           order: mapOrderFromDb(existing.data)
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
+    if (action === "deleteOrder") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const orderNumber = String(body.orderNumber || "").trim();
+      if (!orderNumber) {
+        return json(
+          {
+            ok: false,
+            error: "Missing orderNumber."
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      const del = await supabaseFetch(
+        env,
+        `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Prefer: "return=representation"
+          }
+        }
+      );
+
+      if (!del.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Failed to delete order from Supabase.",
+            details: del.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json(
+        {
+          ok: true,
+          deleted: true,
+          orderNumber
         },
         200,
         jsonHeaders
@@ -204,8 +256,6 @@ export async function onRequest(context) {
         !isInternalOnlyStatus(newStatus) &&
         newStatus !== lastStatusEmailed;
 
-      // Keep the old GAS shipping rule:
-      // cannot mark shipped orders completed if unpaid and no override.
       if (
         newStatus === "completed" &&
         looksLikeShipMethod(mergedPreview.drop_off_method) &&
@@ -222,31 +272,25 @@ export async function onRequest(context) {
         );
       }
 
-      // GAS behavior: stamp Date Completed when becoming Completed if blank.
       if (newStatus === "completed" && !mergedPreview.date_completed) {
         dbUpdates.date_completed = todayIsoDate();
         mergedPreview.date_completed = dbUpdates.date_completed;
       }
 
-      // Internal-only statuses should never email, but should still stamp Last Status Emailed
-      // so the record reflects the latest internal status.
       if (statusChanged && isInternalOnlyStatus(newStatus)) {
         dbUpdates.last_status_emailed = normalizeDisplayStatus(mergedPreview.status);
         mergedPreview.last_status_emailed = normalizeDisplayStatus(mergedPreview.status);
       }
 
-      // If a real status email needs to go out, force email config to exist BEFORE patching.
-      if (shouldEmailForStatus) {
-        if (!env.RESEND_API_KEY) {
-          return json(
-            {
-              ok: false,
-              error: "Missing RESEND_API_KEY environment variable."
-            },
-            500,
-            jsonHeaders
-          );
-        }
+      if (shouldEmailForStatus && !env.RESEND_API_KEY) {
+        return json(
+          {
+            ok: false,
+            error: "Missing RESEND_API_KEY environment variable."
+          },
+          500,
+          jsonHeaders
+        );
       }
 
       const patch = await supabaseFetch(
@@ -285,9 +329,12 @@ export async function onRequest(context) {
         );
       }
 
-      // Send status email after successful update, then stamp Last Status Emailed.
       if (shouldEmailForStatus) {
-        const emailResult = await sendStatusEmail(env, updated, normalizeDisplayStatus(updated.status));
+        const emailResult = await sendStatusEmail(
+          env,
+          updated,
+          normalizeDisplayStatus(updated.status)
+        );
 
         if (!emailResult.ok) {
           return json(
@@ -656,7 +703,7 @@ async function sendStatusEmail(env, row, statusDisplay) {
 
   const orderNum = String(order.orderNumber || "").trim() || "(unknown)";
   const firstName = getFirstName(order.customerName);
-  const subject = `Murph's Mitt Maintenance – Update for Order #${orderNum}: ${statusDisplay}`;
+  const subject = `${BRAND_NAME} – Update for Order #${orderNum}: ${statusDisplay}`;
   const msg = statusMessageSmart(order, statusDisplay);
 
   const isCompleted = status === "completed";
@@ -810,7 +857,7 @@ If you ever need another glove cleaned up, relaced, or tuned up, you know where 
 }
 
 async function sendBrandedEmail(env, { to, subject, plainBody, htmlBody }) {
-  const from = env.RESEND_FROM || "Murph's Mitt Maintenance <orders@murphsmitts.com>";
+  const from = env.RESEND_FROM || `${BRAND_NAME} <orders@murphsmitts.com>`;
   const replyTo = env.RESEND_REPLY_TO || undefined;
 
   const payload = {
