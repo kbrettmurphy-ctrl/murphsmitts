@@ -162,6 +162,7 @@ function mapUpdatesToDb(updates) {
 
   if ("gloveNotes" in updates) out.glove_notes = cleanText(updates.gloveNotes);
   if ("customerNotes" in updates) out.customer_notes = cleanText(updates.customerNotes);
+  if ("referralSource" in updates) out.referral_source = cleanText(updates.referralSource);
 
   if ("priceQuoted" in updates) out.price_quoted = cleanNumeric(updates.priceQuoted);
   if ("paid" in updates) out.paid = cleanText(updates.paid);
