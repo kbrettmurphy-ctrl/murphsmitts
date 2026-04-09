@@ -218,6 +218,7 @@ function mapOrderFromDb(row) {
 
     gloveNotes: row.glove_notes,
     customerNotes: row.customer_notes || row.glove_notes,
+    referralSource: row.referral_source,
 
     orderNumber: row.order_number,
     status: row.status,
