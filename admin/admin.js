@@ -424,6 +424,7 @@ const REFERRAL_SOURCE_OPTIONS = [
   "Facebook",
   "Referral",
   "The Craftsman",
+  "Google",
   "Other"
 ];
 
