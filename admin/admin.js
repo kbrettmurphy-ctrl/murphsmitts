@@ -418,6 +418,15 @@ const STATE_OPTIONS = [
   { value: "DC", label: "District of Columbia" }
 ];
 
+const REFERRAL_SOURCE_OPTIONS = [
+  "TikTok",
+  "Insta",
+  "Facebook",
+  "Referral",
+  "The Craftsman",
+  "Other"
+];
+
 function renderSelectOptions(current, options, placeholder = "") {
   const values = placeholder ? ["", ...options] : options;
   return values.map(v => {
@@ -950,6 +959,7 @@ function renderOrderDetail(order) {
       ${renderFieldLike("Customer", order.customerName || "")}
       ${renderPhoneInput("Phone", "editPhoneNumber", order.phoneNumber || "")}
       ${renderFieldLike("Email", order.emailAddress || "")}
+      ${renderSelectInput("Referral Source", "editReferralSource", order.referralSource || "", REFERRAL_SOURCE_OPTIONS, "Select source")}
 
       ${renderSectionHeading("Order Status")}
 
@@ -1217,28 +1227,29 @@ async function saveCurrentOrderFromForm() {
 
   const parsedPrice = parseMoneyInput(val("editPriceQuoted")); 
   const updates = {
-    status: newStatus,
-    paid: val("editPaid"),
-    phoneNumber: formatPhoneForInput(val("editPhoneNumber")),
-    priceQuoted: parsedPrice === "" ? null : parsedPrice,
-    dateReceived: emptyToNull(val("editDateReceived")),
-    estimatedCompletion: emptyToNull(val("editEstimatedCompletion")),
-    dateCompleted: emptyToNull(dateCompleted),
-    internalNotes: emptyToNull(val("editInternalNotes")),
-    brandModel: val("editBrandModel"),
-    gloveType,
-    webType,
-    servicesRequested: getSelectedServices(),
-    dropOffMethod,
-    gloveNotes: val("editGloveNotes"),
-    customerNotes: val("editGloveNotes"),
-    primaryLaceColor: val("editPrimaryLaceColor"),
-    lacePrimary: val("editPrimaryLaceColor"),
-    secondaryLaceColor: val("editSecondaryLaceColor"),
-    laceAccent: val("editSecondaryLaceColor"),
-    customColorRequest: val("editCustomColorRequest"),
-    customLaceNotes: val("editCustomColorRequest")
-  };
+  status: newStatus,
+  paid: val("editPaid"),
+  phoneNumber: formatPhoneForInput(val("editPhoneNumber")),
+  priceQuoted: parsedPrice === "" ? null : parsedPrice,
+  dateReceived: emptyToNull(val("editDateReceived")),
+  estimatedCompletion: emptyToNull(val("editEstimatedCompletion")),
+  dateCompleted: emptyToNull(dateCompleted),
+  internalNotes: emptyToNull(val("editInternalNotes")),
+  brandModel: val("editBrandModel"),
+  gloveType,
+  webType,
+  servicesRequested: getSelectedServices(),
+  dropOffMethod,
+  referralSource: emptyToNull(val("editReferralSource")),
+  gloveNotes: val("editGloveNotes"),
+  customerNotes: val("editGloveNotes"),
+  primaryLaceColor: val("editPrimaryLaceColor"),
+  lacePrimary: val("editPrimaryLaceColor"),
+  secondaryLaceColor: val("editSecondaryLaceColor"),
+  laceAccent: val("editSecondaryLaceColor"),
+  customColorRequest: val("editCustomColorRequest"),
+  customLaceNotes: val("editCustomColorRequest")
+};
 
   if (!isLocal) {
     updates.streetAddress = streetAddress || null;
