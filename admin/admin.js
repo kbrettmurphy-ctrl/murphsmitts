@@ -812,9 +812,9 @@ function applyFilters() {
 
 async function deleteOrder(orderNumber) {
   const data = await postJson({
-    order_number: orderNumber,
-    deleteOrder: true
-  }, true, "/api/update-order");
+    action: "deleteOrder",
+    orderNumber
+  }, true);
 
   allOrders = allOrders.filter(o => String(o.orderNumber) !== String(orderNumber));
 
