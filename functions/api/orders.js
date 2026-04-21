@@ -1033,6 +1033,7 @@ function isInternalOnlyStatus(value) {
   return (
     status === "picked up" ||
     status === "pending response" ||
+    status === "On Hold" ||
     status === "in transit to me"
   );
 }
