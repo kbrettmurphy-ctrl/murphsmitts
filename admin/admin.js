@@ -222,6 +222,10 @@ function isWaitingForCustomerResponse(order) {
   return normalizeStatus(order.status) === "pending response";
 }
 
+function isOnHold(order) {
+  return normalizeStatus(order.status) === "on hold";
+}
+
 function isInTransitToMe(order) {
   return normalizeStatus(order.status) === "in transit to me";
 }
@@ -234,6 +238,7 @@ function getViewTitle(viewName) {
     case "transit": return "In Transit to Me";
     case "progress": return "In Progress";
     case "ready": return "Ready to Go";
+    case "hold": return "On Hold";
     case "completed": return "Completed";
     default: return "Current Orders";
   }
@@ -974,6 +979,7 @@ function renderOrderDetail(order) {
            <option value="In Progress">In Progress</option>
            <option value="Waiting on Lace">Waiting on Lace</option>
            <option value="Ready to Go">Ready to Go</option>
+           <option value="On Hold">On Hold</option>
            <option value="Completed">Completed</option>
            <option value="Picked Up">Picked Up</option>
          </select>
