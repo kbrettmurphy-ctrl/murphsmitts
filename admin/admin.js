@@ -267,6 +267,9 @@ function getViewOrders() {
     case "ready":
       return allOrders.filter(order => normalizeStatus(order.status) === "ready to go");
 
+    case "hold":
+      return allOrders.filter(isOnHold);
+
     default:
       return allOrders.filter(order => {
         const status = normalizeStatus(order.status);
