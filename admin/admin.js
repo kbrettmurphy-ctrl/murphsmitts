@@ -268,7 +268,14 @@ function getViewOrders() {
       return allOrders.filter(order => normalizeStatus(order.status) === "ready to go");
 
     default:
-      return allOrders.filter(order => !isCompletedOrder(order));
+      return allOrders.filter(order => {
+        const status = normalizeStatus(order.status);
+        return (
+          status !== "completed" &&
+          status !== "picked up" &&
+          status !== "on hold"
+        );
+      });
   }
 }
 
