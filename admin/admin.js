@@ -1436,6 +1436,23 @@ navLinks.forEach(btn => {
   });
 });
 
+document.getElementById("refreshBtn")?.addEventListener("click", async () => {
+  try {
+    // Clear local cache first
+    localStorage.removeItem("mm_orders_cache");
+
+    // Force reload from API
+    await loadOrders();
+
+    // Re-render current view
+    applyFilters();
+
+    alert("Orders refreshed.");
+  } catch (err) {
+    alert("Refresh failed: " + err.message);
+  }
+});
+
 /* =========================
    INIT
 ========================= */
