@@ -975,6 +975,7 @@ function renderOrderDetail(order) {
       ${renderFieldLike("Customer", order.customerName || "")}
       ${renderPhoneInput("Phone", "editPhoneNumber", order.phoneNumber || "")}
       ${renderFieldLike("Email", order.emailAddress || "")}
+      ${renderFieldLike("Social Tag", order.socialTag || "")}
       ${renderSelectInput("Referral Source", "editReferralSource", order.referralSource || "", REFERRAL_SOURCE_OPTIONS, "Select source")}
 
       ${renderSectionHeading("Order Status")}
