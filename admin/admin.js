@@ -1,4 +1,3 @@
-
 const API_BASE_URL = window.MM_ADMIN_CONFIG.API_BASE_URL;
 const TOKEN_KEY = "mm_admin_token";
 
@@ -443,6 +442,8 @@ const REFERRAL_SOURCE_OPTIONS = [
   "Other"
 ];
 
+const REFERRAL_OTHER_VALUE = "__other__";
+
 function renderSelectOptions(current, options, placeholder = "") {
   const values = placeholder ? ["", ...options] : options;
   return values.map(v => {
@@ -460,6 +461,46 @@ function renderSelectInput(label, id, current, options, placeholder = "") {
       </select>
     </div>
   `;
+}
+
+function renderReferralSourceEditor(currentValue) {
+  const raw = String(currentValue || "").trim();
+  const isPreset = !raw || REFERRAL_SOURCE_OPTIONS.includes(raw);
+  const selectValue = isPreset ? raw : REFERRAL_OTHER_VALUE;
+  const customValue = isPreset ? "" : raw;
+
+  return `
+    <div class="detail-block">
+      <div class="label">Referral Source</div>
+      <select id="editReferralSource">
+        ${renderSelectOptions(selectValue, REFERRAL_SOURCE_OPTIONS, "Select source")}
+        <option value="${REFERRAL_OTHER_VALUE}" ${selectValue === REFERRAL_OTHER_VALUE ? "selected" : ""}>
+          Other - Custom
+        </option>
+      </select>
+    </div>
+
+    <div id="editReferralSourceOtherWrap" class="detail-block ${selectValue === REFERRAL_OTHER_VALUE ? "" : "is-hidden"}">
+      <div class="label">Custom Referral Source</div>
+      <input
+        id="editReferralSourceOther"
+        type="text"
+        placeholder="Enter custom referral source"
+        value="${escapeAttr(customValue)}"
+      />
+    </div>
+  `;
+}
+
+function getReferralSourceValue() {
+  const selected = val("editReferralSource");
+  const custom = val("editReferralSourceOther").trim();
+
+  if (selected === REFERRAL_OTHER_VALUE) {
+    return emptyToNull(custom || "Other");
+  }
+
+  return emptyToNull(selected);
 }
 
 function renderPhoneInput(label, id, value) {
@@ -703,15 +744,12 @@ function enableSwipeDelete(row) {
     currentX = e.touches[0].clientX;
     const dx = currentX - startX;
 
-    // startOffset lets you drag from already-open state too
     let next = startOffset + dx;
 
-    // light resistance if user pulls right past closed
     if (next > 0) {
       next = next * 0.35;
     }
 
-    // light resistance if user drags too far left
     if (next < -MAX_SWIPE) {
       next = -MAX_SWIPE + (next + MAX_SWIPE) * 0.35;
     }
@@ -976,7 +1014,7 @@ function renderOrderDetail(order) {
       ${renderPhoneInput("Phone", "editPhoneNumber", order.phoneNumber || "")}
       ${renderFieldLike("Email", order.emailAddress || "")}
       ${renderFieldLike("Social Tag", order.socialTag || "")}
-      ${renderSelectInput("Referral Source", "editReferralSource", order.referralSource || "", REFERRAL_SOURCE_OPTIONS, "Select source")}
+      ${renderReferralSourceEditor(order.referralSource || "")}
 
       ${renderSectionHeading("Order Status")}
 
@@ -1160,6 +1198,20 @@ function wireDetailForm() {
   const dropOffEl = document.getElementById("editDropOffMethod");
   const shippingSection = document.getElementById("editShippingSection");
   const phoneEl = document.getElementById("editPhoneNumber");
+  const referralEl = document.getElementById("editReferralSource");
+  const referralOtherWrap = document.getElementById("editReferralSourceOtherWrap");
+  const referralOtherEl = document.getElementById("editReferralSourceOther");
+
+  function toggleReferralOther() {
+    if (!referralEl || !referralOtherWrap) return;
+
+    const isOther = referralEl.value === REFERRAL_OTHER_VALUE;
+    referralOtherWrap.classList.toggle("is-hidden", !isOther);
+
+    if (!isOther && referralOtherEl) {
+      referralOtherEl.value = "";
+    }
+  }
 
   function toggleConditionalFields() {
     const isFielders = gloveTypeEl && gloveTypeEl.value === "Fielders Glove";
@@ -1213,6 +1265,11 @@ function wireDetailForm() {
     });
   }
 
+  if (referralEl) {
+    referralEl.addEventListener("change", toggleReferralOther);
+  }
+
+  toggleReferralOther();
   toggleConditionalFields();
 }
 
@@ -1243,31 +1300,32 @@ async function saveCurrentOrderFromForm() {
     dateCompleted = todayForInput();
   }
 
-  const parsedPrice = parseMoneyInput(val("editPriceQuoted")); 
+  const parsedPrice = parseMoneyInput(val("editPriceQuoted"));
+
   const updates = {
-  status: newStatus,
-  paid: val("editPaid"),
-  phoneNumber: formatPhoneForInput(val("editPhoneNumber")),
-  priceQuoted: parsedPrice === "" ? null : parsedPrice,
-  dateReceived: emptyToNull(val("editDateReceived")),
-  estimatedCompletion: emptyToNull(val("editEstimatedCompletion")),
-  dateCompleted: emptyToNull(dateCompleted),
-  internalNotes: emptyToNull(val("editInternalNotes")),
-  brandModel: val("editBrandModel"),
-  gloveType,
-  webType,
-  servicesRequested: getSelectedServices(),
-  dropOffMethod,
-  referralSource: emptyToNull(val("editReferralSource")),
-  gloveNotes: val("editGloveNotes"),
-  customerNotes: val("editGloveNotes"),
-  primaryLaceColor: val("editPrimaryLaceColor"),
-  lacePrimary: val("editPrimaryLaceColor"),
-  secondaryLaceColor: val("editSecondaryLaceColor"),
-  laceAccent: val("editSecondaryLaceColor"),
-  customColorRequest: val("editCustomColorRequest"),
-  customLaceNotes: val("editCustomColorRequest")
-};
+    status: newStatus,
+    paid: val("editPaid"),
+    phoneNumber: formatPhoneForInput(val("editPhoneNumber")),
+    priceQuoted: parsedPrice === "" ? null : parsedPrice,
+    dateReceived: emptyToNull(val("editDateReceived")),
+    estimatedCompletion: emptyToNull(val("editEstimatedCompletion")),
+    dateCompleted: emptyToNull(dateCompleted),
+    internalNotes: emptyToNull(val("editInternalNotes")),
+    brandModel: val("editBrandModel"),
+    gloveType,
+    webType,
+    servicesRequested: getSelectedServices(),
+    dropOffMethod,
+    referralSource: getReferralSourceValue(),
+    gloveNotes: val("editGloveNotes"),
+    customerNotes: val("editGloveNotes"),
+    primaryLaceColor: val("editPrimaryLaceColor"),
+    lacePrimary: val("editPrimaryLaceColor"),
+    secondaryLaceColor: val("editSecondaryLaceColor"),
+    laceAccent: val("editSecondaryLaceColor"),
+    customColorRequest: val("editCustomColorRequest"),
+    customLaceNotes: val("editCustomColorRequest")
+  };
 
   if (!isLocal) {
     updates.streetAddress = streetAddress || null;
@@ -1438,15 +1496,9 @@ navLinks.forEach(btn => {
 
 document.getElementById("refreshBtn")?.addEventListener("click", async () => {
   try {
-    // Clear local cache first
     localStorage.removeItem("mm_orders_cache");
-
-    // Force reload from API
     await loadOrders();
-
-    // Re-render current view
     applyFilters();
-
     alert("Orders refreshed.");
   } catch (err) {
     alert("Refresh failed: " + err.message);
