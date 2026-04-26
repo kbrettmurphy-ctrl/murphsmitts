@@ -626,7 +626,7 @@ function mapUpdatesToDb(updates) {
   if ("customerName" in updates) out.customer_name = cleanText(updates.customerName);
   if ("phoneNumber" in updates) out.phone_number = cleanText(updates.phoneNumber);
   if ("emailAddress" in updates) out.email_address = cleanText(updates.emailAddress);
-
+  if ("socialTag" in updates) out.social_tag = cleanText(updates.socialTag);
   if ("brandModel" in updates) out.brand_model = cleanText(updates.brandModel);
   if ("gloveType" in updates) out.glove_type = cleanText(updates.gloveType);
   if ("webType" in updates) out.web_type = cleanText(updates.webType);
