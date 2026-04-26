@@ -314,7 +314,7 @@ button.secondary{
 .topbar h1,
 #viewTitle{
   margin:0;
-  font-size:.8rem;
+  font-size:1.55rem;
   line-height:1;
   color:var(--cream);
 }
@@ -797,7 +797,7 @@ button.secondary{
   .topbar h1,
   #viewTitle,
   #detailView .detail-topbar h1{
-    font-size:1.25rem;
+    font-size:.8rem;
   }
 
   #orderCount{
