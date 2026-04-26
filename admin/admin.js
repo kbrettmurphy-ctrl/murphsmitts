@@ -994,7 +994,10 @@ function renderOrderDetail(order) {
       ${renderFieldLike("Customer", order.customerName || "")}
       ${renderPhoneInput("Phone", "editPhoneNumber", order.phoneNumber || "")}
       ${renderFieldLike("Email", order.emailAddress || "")}
-      ${renderFieldLike("Social Tag", order.socialTag || "")}
+      <div class="detail-block">
+        <div class="label">Social Tag</div>
+        <input id="editSocialTag" type="text" value="${escapeAttr(order.socialTag || "")}" />
+      </div>
       ${renderReferralSourceEditor(order.referralSource || "")}
 
       ${renderSectionHeading("Order Status")}
@@ -1279,6 +1282,7 @@ async function saveCurrentOrderFromForm() {
     servicesRequested: getSelectedServices(),
     dropOffMethod,
     referralSource: getReferralSourceValue(),
+    socialTag: emptyToNull(val("editSocialTag")),
     gloveNotes: val("editGloveNotes"),
     customerNotes: val("editGloveNotes"),
     primaryLaceColor: val("editPrimaryLaceColor"),
