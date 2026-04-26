@@ -797,7 +797,7 @@ button.secondary{
   .topbar h1,
   #viewTitle,
   #detailView .detail-topbar h1{
-    font-size:1.0rem;
+    font-size:.95rem;
   }
 
   #orderCount{
