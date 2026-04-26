@@ -442,8 +442,6 @@ const REFERRAL_SOURCE_OPTIONS = [
   "Other"
 ];
 
-const REFERRAL_OTHER_VALUE = "__other__";
-
 function renderSelectOptions(current, options, placeholder = "") {
   const values = placeholder ? ["", ...options] : options;
   return values.map(v => {
@@ -466,41 +464,24 @@ function renderSelectInput(label, id, current, options, placeholder = "") {
 function renderReferralSourceEditor(currentValue) {
   const raw = String(currentValue || "").trim();
   const isPreset = !raw || REFERRAL_SOURCE_OPTIONS.includes(raw);
-  const selectValue = isPreset ? raw : REFERRAL_OTHER_VALUE;
-  const customValue = isPreset ? "" : raw;
+
+  const customOption = !isPreset
+    ? `<option value="${escapeAttr(raw)}" selected>${escapeHtml(raw)}</option>`
+    : "";
 
   return `
     <div class="detail-block">
       <div class="label">Referral Source</div>
       <select id="editReferralSource">
-        ${renderSelectOptions(selectValue, REFERRAL_SOURCE_OPTIONS, "Select source")}
-        <option value="${REFERRAL_OTHER_VALUE}" ${selectValue === REFERRAL_OTHER_VALUE ? "selected" : ""}>
-          Other - Custom
-        </option>
+        ${renderSelectOptions(isPreset ? raw : "", REFERRAL_SOURCE_OPTIONS, "Select source")}
+        ${customOption}
       </select>
-    </div>
-
-    <div id="editReferralSourceOtherWrap" class="detail-block ${selectValue === REFERRAL_OTHER_VALUE ? "" : "is-hidden"}">
-      <div class="label">Custom Referral Source</div>
-      <input
-        id="editReferralSourceOther"
-        type="text"
-        placeholder="Enter custom referral source"
-        value="${escapeAttr(customValue)}"
-      />
     </div>
   `;
 }
 
 function getReferralSourceValue() {
-  const selected = val("editReferralSource");
-  const custom = val("editReferralSourceOther").trim();
-
-  if (selected === REFERRAL_OTHER_VALUE) {
-    return emptyToNull(custom || "Other");
-  }
-
-  return emptyToNull(selected);
+  return emptyToNull(val("editReferralSource"));
 }
 
 function renderPhoneInput(label, id, value) {
@@ -1198,20 +1179,6 @@ function wireDetailForm() {
   const dropOffEl = document.getElementById("editDropOffMethod");
   const shippingSection = document.getElementById("editShippingSection");
   const phoneEl = document.getElementById("editPhoneNumber");
-  const referralEl = document.getElementById("editReferralSource");
-  const referralOtherWrap = document.getElementById("editReferralSourceOtherWrap");
-  const referralOtherEl = document.getElementById("editReferralSourceOther");
-
-  function toggleReferralOther() {
-    if (!referralEl || !referralOtherWrap) return;
-
-    const isOther = referralEl.value === REFERRAL_OTHER_VALUE;
-    referralOtherWrap.classList.toggle("is-hidden", !isOther);
-
-    if (!isOther && referralOtherEl) {
-      referralOtherEl.value = "";
-    }
-  }
 
   function toggleConditionalFields() {
     const isFielders = gloveTypeEl && gloveTypeEl.value === "Fielders Glove";
@@ -1265,11 +1232,6 @@ function wireDetailForm() {
     });
   }
 
-  if (referralEl) {
-    referralEl.addEventListener("change", toggleReferralOther);
-  }
-
-  toggleReferralOther();
   toggleConditionalFields();
 }
 
