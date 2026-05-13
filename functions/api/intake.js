@@ -543,7 +543,7 @@ function statusMessageSmart(order, statusDisplay) {
   const s = normalizeStatus(statusDisplay);
 
   if (s === "received") {
-    return "Your glove is checked in and queued up.";
+    return "Your glove request has been received. I will get back to you if I have any questions, otherwise you will be getting an order summary and quote for services to the email address you provided. <br><br> In the meantime, if you have photos of your glove it will be very helpful if you could reply to this email and attach photos to help me determine what your glove may need.<br>";
   }
 
   if (s === "estimate sent") {
