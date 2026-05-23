@@ -4,7 +4,7 @@ const TOKEN_KEY = "mm_admin_token";
 const loginView = document.getElementById("loginView");
 const dashboardView = document.getElementById("dashboardView");
 const detailView = document.getElementById("detailView");
-
+const detailTitle = document.getElementById("detailTitle");
 const pinInput = document.getElementById("pinInput");
 const loginStatus = document.getElementById("loginStatus");
 
@@ -974,6 +974,9 @@ function renderOrders(list) {
 
 function renderOrderDetail(order) {
   currentOrder = order;
+  if (detailTitle) {
+  detailTitle.textContent = order.customerName || "Order Detail";
+}
   clearSaveStatus();
 
   const isLocal = looksLocalDropOff(order);
