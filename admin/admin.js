@@ -900,12 +900,12 @@ function renderOrders(list) {
           <div class="order-main">
             <div class="order-name">${escapeHtml(order.customerName || "")}</div>
             <div class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</div>
-${renderLaceChips(order)}
           </div>
           <div class="order-status">${escapeHtml(order.status || "")}</div>
         </div>
 
         <div class="action-row">
+          ${renderLaceChips(order)}
           <button class="action-btn action-email" type="button" aria-label="Email">
             <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="m4 7 8 6 8-6"/></svg>
           </button>
@@ -1394,32 +1394,25 @@ function renderLaceChips(order) {
 
   if (primary) {
     chips.push(`
-      <span class="lace-chip">
-        <span class="lace-swatch" style="background:${getLaceColor(primary)}"></span>
-        <span>${escapeHtml(primary)}</span>
-      </span>
+      <span class="lace-dot" style="background:${getLaceColor(primary)}"></span>
     `);
   }
 
   if (secondary) {
     chips.push(`
-      <span class="lace-chip">
-        <span class="lace-swatch" style="background:${getLaceColor(secondary)}"></span>
-        <span>${escapeHtml(secondary)}</span>
-      </span>
+      <span class="lace-dot" style="background:${getLaceColor(secondary)}"></span>
     `);
   }
 
   if (custom) {
     chips.push(`
-      <span class="lace-chip custom">
-        <span class="lace-swatch custom-swatch">?</span>
-        <span>Custom: ${escapeHtml(custom)}</span>
-      </span>
+      <span class="lace-dot custom-dot">?</span>
     `);
   }
 
-  return chips.length ? `<div class="lace-chip-row">${chips.join("")}</div>` : "";
+  return chips.length
+    ? `<div class="lace-dot-row">${chips.join("")}</div>`
+    : "";
 }
 
 /* =========================
