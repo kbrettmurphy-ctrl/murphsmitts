@@ -1370,8 +1370,8 @@ const LACE_COLOR_MAP = {
   "dark red": "#6f111a",
   "orange": "#d46a1f",
   "pink": "#e889b9",
-  "white": "#f4eee4"
-  "other (special order)": "linear",
+  "white": "#f4eee4",
+  "other (special order)": "linear"
 };
 
 function normalizeLaceName(value) {
