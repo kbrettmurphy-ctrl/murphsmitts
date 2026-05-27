@@ -853,6 +853,12 @@ I really appreciate you trusting me with your glove and hope it treats you well 
 If you ever need another glove cleaned up, relaced, or tuned up, you know where to find me!`;
   }
 
+if (s === "on hold") {
+  return `Your order has been placed on hold for now.
+
+When you're ready to move forward with servicing your glove, just reply to this email and I’ll be happy to pick things back up from there.`;
+}
+
   return "Status has been updated.";
 }
 
@@ -1033,7 +1039,6 @@ function isInternalOnlyStatus(value) {
   return (
     status === "picked up" ||
     status === "pending response" ||
-    status === "On Hold" ||
     status === "in transit to me"
   );
 }
