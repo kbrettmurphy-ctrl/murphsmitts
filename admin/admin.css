@@ -437,47 +437,30 @@ button.secondary{
   color:var(--muted);
 }
 
-.lace-chip-row{
+.lace-dot-row{
   display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-  margin-top:8px;
-}
-
-.lace-chip{
-  display:inline-flex;
   align-items:center;
-  gap:6px;
-  max-width:100%;
-  padding:4px 8px;
-  border-radius:8px;
-  background:rgba(218,202,177,.10);
-  border:1px solid rgba(218,202,177,.18);
-  color:var(--cream);
-  font-size:.78rem;
-  line-height:1.2;
+  gap:8px;
+  margin-right:auto;
 }
 
-.lace-swatch{
-  width:28px;
-  height:14px;
-  border-radius:4px;
-  border:1px solid rgba(255,255,255,.38);
+.lace-dot{
+  width:18px;
+  height:18px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.35);
   flex:0 0 auto;
+  box-shadow:0 1px 3px rgba(0,0,0,.28);
 }
 
-.lace-chip.custom{
-  background:rgba(146,26,36,.22);
-}
-
-.custom-swatch{
+.custom-dot{
+  display:flex;
+  align-items:center;
+  justify-content:center;
   background:linear-gradient(135deg, #dacab1, #092f4d);
   color:#020b12;
   font-size:.7rem;
   font-weight:800;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
 }
 
 /* =========================
