@@ -29,6 +29,7 @@ let allOrders = [];
 let activeView = "current";
 let currentOrder = null;
 let loginInProgress = false;
+let listScrollY = 0;
 
 /* =========================
    VIEW / MENU
@@ -1499,6 +1500,7 @@ async function loadOrders() {
 }
 
 function openOrder(orderNumber) {
+  listScrollY = window.scrollY || document.documentElement.scrollTop || 0;
   const order = allOrders.find(o => String(o.orderNumber) === String(orderNumber));
   if (!order) {
     alert("Order not found.");
@@ -1544,9 +1546,10 @@ searchInput.addEventListener("input", applyFilters);
 backBtn.addEventListener("click", () => {
   clearSaveStatus();
   showView(dashboardView);
-  orderDetail.scrollTop = 0;
-  detailView.scrollTop = 0;
-  window.scrollTo(0, 0);
+
+  requestAnimationFrame(() => {
+    window.scrollTo(0, listScrollY);
+  });
 });
 
 if (saveOrderBtn) {
