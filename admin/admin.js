@@ -827,10 +827,12 @@ function sortOrders(list) {
 
 function applyFilters() {
   const q = searchInput.value.trim().toLowerCase();
-  let list = getViewOrders();
+
+  let list;
 
   if (q) {
-    list = list.filter(order => {
+    // Search ALL orders when typing
+    list = allOrders.filter(order => {
       return [
         order.orderNumber,
         order.customerName,
@@ -839,6 +841,9 @@ function applyFilters() {
         order.status
       ].some(v => String(v || "").toLowerCase().includes(q));
     });
+  } else {
+    // No search = normal filtered view
+    list = getViewOrders();
   }
 
   sortOrders(list);
