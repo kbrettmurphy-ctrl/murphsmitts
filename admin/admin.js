@@ -240,12 +240,16 @@ function getViewTitle(viewName) {
     case "ready": return "Ready to Go";
     case "hold": return "On Hold";
     case "completed": return "Completed";
+    case "all": return "All Orders";
     default: return "Current Orders";
   }
 }
 
 function getViewOrders() {
   switch (activeView) {
+    case "all":
+      return allOrders;
+      
     case "completed":
       return allOrders.filter(isCompletedOrder);
 
