@@ -900,14 +900,12 @@ function renderOrders(list) {
           <div class="order-main">
             <div class="order-name">${escapeHtml(order.customerName || "")}</div>
             <div class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</div>
+${renderLaceChips(order)}
           </div>
           <div class="order-status">${escapeHtml(order.status || "")}</div>
         </div>
 
         <div class="action-row">
-          <button class="action-btn action-edit" type="button" aria-label="Edit">
-            <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-          </button>
           <button class="action-btn action-email" type="button" aria-label="Email">
             <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="m4 7 8 6 8-6"/></svg>
           </button>
@@ -932,11 +930,6 @@ function renderOrders(list) {
         e.preventDefault();
         openOrder(order.orderNumber);
       }
-    });
-
-    row.querySelector(".action-edit").addEventListener("click", (e) => {
-      e.stopPropagation();
-      openOrder(order.orderNumber);
     });
 
     row.querySelector(".action-email").addEventListener("click", (e) => {
@@ -1346,6 +1339,87 @@ async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false) {
   localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
   applyFilters();
   return updatedOrder;
+}
+
+const LACE_COLOR_MAP = {
+  "black": "#111111",
+  "gray": "#777777",
+  "grey": "#777777",
+  "tan – camel": "#c49a6c",
+  "tan - camel": "#c49a6c",
+  "camel": "#c49a6c",
+  "tan – indian": "#b8793a",
+  "tan - indian": "#b8793a",
+  "indian tan": "#b8793a",
+  "brown – chestnut": "#7a3f1d",
+  "brown - chestnut": "#7a3f1d",
+  "brown – chocolate": "#4a2616",
+  "brown - chocolate": "#4a2616",
+  "chocolate": "#4a2616",
+  "blue – royal": "#1f4fbf",
+  "blue - royal": "#1f4fbf",
+  "royal blue": "#1f4fbf",
+  "blue – navy": "#092f4d",
+  "blue - navy": "#092f4d",
+  "navy blue": "#092f4d",
+  "blue – carolina": "#78aeda",
+  "blue - carolina": "#78aeda",
+  "carolina blue": "#78aeda",
+  "red": "#b01f2e",
+  "red - dark": "#6f111a",
+  "dark red": "#6f111a",
+  "orange": "#d46a1f",
+  "pink": "#e889b9",
+  "white": "#f4eee4"
+};
+
+function normalizeLaceName(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function getLaceColor(value) {
+  const key = normalizeLaceName(value);
+  return LACE_COLOR_MAP[key] || "#dacab1";
+}
+
+function renderLaceChips(order) {
+  const primary = order.primaryLaceColor || order.lacePrimary || "";
+  const secondary = order.secondaryLaceColor || order.laceAccent || "";
+  const custom = order.customColorRequest || order.customLaceNotes || "";
+
+  const chips = [];
+
+  if (primary) {
+    chips.push(`
+      <span class="lace-chip">
+        <span class="lace-swatch" style="background:${getLaceColor(primary)}"></span>
+        <span>${escapeHtml(primary)}</span>
+      </span>
+    `);
+  }
+
+  if (secondary) {
+    chips.push(`
+      <span class="lace-chip">
+        <span class="lace-swatch" style="background:${getLaceColor(secondary)}"></span>
+        <span>${escapeHtml(secondary)}</span>
+      </span>
+    `);
+  }
+
+  if (custom) {
+    chips.push(`
+      <span class="lace-chip custom">
+        <span class="lace-swatch custom-swatch">?</span>
+        <span>Custom: ${escapeHtml(custom)}</span>
+      </span>
+    `);
+  }
+
+  return chips.length ? `<div class="lace-chip-row">${chips.join("")}</div>` : "";
 }
 
 /* =========================
