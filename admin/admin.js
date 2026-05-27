@@ -1371,6 +1371,7 @@ const LACE_COLOR_MAP = {
   "orange": "#d46a1f",
   "pink": "#e889b9",
   "white": "#f4eee4"
+  "other (special order)": "linear",
 };
 
 function normalizeLaceName(value) {
@@ -1394,25 +1395,58 @@ function renderLaceChips(order) {
 
   if (primary) {
     chips.push(`
-      <span class="lace-dot" style="background:${getLaceColor(primary)}"></span>
+      <span 
+  class="lace-dot ${getLaceColor(primary) === "linear" ? "custom-dot" : ""}"
+  style="${getLaceColor(primary) === "linear"
+    ? ""
+    : `background:${getLaceColor(primary)}`}"
+>
+  ${getLaceColor(primary) === "linear" ? "?" : ""}
+</span>
     `);
   }
 
   if (secondary) {
     chips.push(`
-      <span class="lace-dot" style="background:${getLaceColor(secondary)}"></span>
+      <span 
+  class="lace-dot ${getLaceColor(secondary) === "linear" ? "custom-dot" : ""}"
+  style="${getLaceColor(secondary) === "linear"
+    ? ""
+    : `background:${getLaceColor(secondary)}`}"
+>
+  ${getLaceColor(secondary) === "linear" ? "?" : ""}
+</span>
     `);
   }
 
   if (custom) {
-    chips.push(`
-      <span class="lace-dot custom-dot">?</span>
-    `);
-  }
+  const customColor = getCustomLaceColor(custom);
+
+  chips.push(`
+    <span
+      class="lace-dot ${customColor ? "" : "custom-dot"}"
+      style="${customColor ? `background:${escapeAttr(customColor)}` : ""}"
+    >${customColor ? "" : "?"}</span>
+  `);
+}
 
   return chips.length
     ? `<div class="lace-dot-row">${chips.join("")}</div>`
     : "";
+}
+
+function isValidCssColor(value) {
+  const s = String(value || "").trim();
+  if (!s) return false;
+
+  const test = new Option().style;
+  test.color = s;
+  return test.color !== "";
+}
+
+function getCustomLaceColor(customValue) {
+  const s = String(customValue || "").trim();
+  return isValidCssColor(s) ? s : "";
 }
 
 /* =========================
