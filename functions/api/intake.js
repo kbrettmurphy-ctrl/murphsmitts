@@ -439,7 +439,7 @@ Quick update on your glove service.
 Order #: ${orderNum}
 New Status: ${statusDisplay}
 
-${msg}`.trimEnd();
+${msg}`;
 
   const afterThanks =
 `${THANKS_LINE}
