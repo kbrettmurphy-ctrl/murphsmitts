@@ -548,6 +548,7 @@ function statusMessageSmart(order, statusDisplay) {
 I will get back to you if I have any questions. Otherwise, you will be receiving an order summary and quote for services at the email address you provided.
 
 In the meantime, if you have photos of your glove, it would be very helpful if you could reply to this email and attach them so I can better determine what your glove may need.
+
 `;
   }
 
