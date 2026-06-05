@@ -48,6 +48,7 @@ export async function onRequest(context) {
   customer_name: cleanText(body.customerName),
   email_address: cleanText(body.emailAddress),
   phone_number: cleanText(body.phoneNumber),
+  sms_opt_in: body.smsOptIn === true,
   brand_model: cleanText(body.brandModel),
   glove_type: cleanText(body.gloveType),
   web_type: cleanText(body.webType),
@@ -168,7 +169,9 @@ export async function onRequest(context) {
       carrier: null,
       date_completed: null,
       internal_notes: null,
-      last_status_emailed: null
+      last_status_emailed: null,
+      sms_opt_in: incoming.sms_opt_in,
+      last_status_texted: null
     };
 
     const insert = await supabaseFetch(
