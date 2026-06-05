@@ -392,6 +392,17 @@ body_class: inner
                   <input id="sr-phone" name="phoneNumber" type="tel" inputmode="tel" placeholder="Phone Number">
                   <div class="note">So that I can contact you for questions and drop-off/shipping coordination.</div>
                 </div>
+
+                <div class="mm-field" id="smsOptInGroup">
+                  <label class="mm-choice">
+                    <input id="sr-sms-opt-in" name="smsOptIn" type="checkbox">
+                    <span>Send me text updates about my order.</span>
+                  </label>
+                  <div class="note">
+                    By checking this box, you agree to receive SMS messages from Murph's Mitts regarding your glove service request, estimates, status updates, pickup notifications, and shipping updates. Message frequency varies. Message and data rates may apply. Reply STOP to opt out.
+                  </div>
+                </div>
+                
               </div>
             </div>
           </div>
@@ -608,6 +619,7 @@ body_class: inner
   const webTypeWrap = document.getElementById("webTypeWrap");
   const webTypeSelect = document.getElementById("sr-web-type");
   const turnaroundBox = document.getElementById("sr-turnaround");
+  const smsOptInBox = document.getElementById("sr-sms-opt-in");
   const serviceOtherCheck = document.getElementById("serviceOtherCheck");
   const serviceOtherText = document.getElementById("serviceOtherText");
   const referralOtherText = document.getElementById("referralOtherText");
@@ -804,6 +816,7 @@ body_class: inner
       customerName: form.customerName.value.trim(),
       emailAddress: form.emailAddress.value.trim(),
       phoneNumber: form.phoneNumber.value.trim(),
+      smsOptIn: !!smsOptInBox?.checked,
       brandModel: form.brandModel.value.trim(),
       gloveType: selectedValue("gloveType"),
       webType: webTypeSelect.value.trim(),
