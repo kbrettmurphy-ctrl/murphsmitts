@@ -182,6 +182,18 @@ body_class: inner
       line-height: 1.45;
     }
 
+    .sms-optin-label{
+      font-size: 1rem;
+      font-weight: 500;
+    }
+
+    .sms-optin-disclosure{
+      font-size: .85rem;
+      line-height: 1.4;
+      color: rgba(2,11,18,.65);
+      font-style: normal;
+    }
+
     .service-form-wrap .mm-actions{
       display: flex;
       gap: 12px;
@@ -393,11 +405,12 @@ body_class: inner
                 </div>
 
                 <div class="mm-field" id="smsOptInGroup">
-                  <label class="mm-choice">
+                  <label class="mm-choice sms-optin-label">
                     <input id="sr-sms-opt-in" name="smsOptIn" type="checkbox">
                     <span>Send me text updates about my order.</span>
                   </label>
-                  <div class="note">
+
+                  <div class="sms-optin-disclosure">
                     By checking this box, you agree to receive SMS messages from Murph's Mitts regarding your glove service request, estimates, status updates, pickup notifications, and shipping updates. Message frequency varies. Message and data rates may apply. Reply STOP to opt out.
                   </div>
                 </div>
