@@ -1036,7 +1036,7 @@ async function sendStatusText(env, row, statusDisplay) {
 
 function smsMessageSmart(order, status) {
   if (status === "estimate sent") {
-    return "Your estimate has been sent to your email. Reply YES to approve or NO to cancel.";
+    return "Your estimate has been sent to your email with a quote and service details. Please respond to the email to approve the work or ask questions.";
   }
 
   if (status === "in progress") {
@@ -1045,7 +1045,7 @@ function smsMessageSmart(order, status) {
   }
 
   if (status === "ready to go") {
-    return "Your glove is ready! I’ll follow up to coordinate pickup or shipping.";
+    return "Your glove is finished and ready for pickup or shipment! I will contact you shortly with next steps.";
   }
 
   if (status === "completed") {
