@@ -17,7 +17,9 @@ export async function onRequest(context) {
     const message = String(body || "").trim();
     const normalized = message.toLowerCase();
     
-    if (!from || !message) {
+    const mediaCount = Number(form.get("NumMedia") || 0);
+
+    if (!from || (!message && mediaCount === 0)) {
       return twiml("Thanks. I received your message.");
     }
 
