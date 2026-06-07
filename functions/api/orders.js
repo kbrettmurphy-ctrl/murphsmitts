@@ -390,6 +390,18 @@ export async function onRequest(context) {
           normalizeDisplayStatus(updated.status)
         );
 
+        if (textResult.skipped) {
+          return json(
+            {
+              ok: false,
+              error: "Order updated, but SMS was skipped.",
+              details: textResult.reason
+            },
+            200,
+            jsonHeaders
+          );
+        }
+
         if (!textResult.ok) {
           return json(
             {
