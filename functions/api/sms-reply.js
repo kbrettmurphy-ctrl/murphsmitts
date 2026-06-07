@@ -26,11 +26,21 @@ export async function onRequest(context) {
 
     const found = await supabaseFetch(
       env,
-      `/rest/v1/orders?select=*&phone_number=ilike.*${last10}*&order=order_number.desc&limit=1`
+      `/rest/v1/orders?select=*&order=order_number.desc&limit=100`
     );
 
-    if (!found.ok || !Array.isArray(found.data) || !found.data[0]) {
-      await notifyOwner(env, `Incoming text from ${from}`, message);
+    if (!found.ok || !Array.isArray(found.data)) {
+      await notifyOwner(env, `Incoming text lookup failed from ${from}`, message);
+      return twiml("Thanks for the message. Brett will follow up with you.");
+    }
+
+    const order = found.data.find(row => {
+      const rowDigits = String(row.phone_number || "").replace(/\D/g, "");
+      return rowDigits.slice(-10) === last10;
+    });
+
+    if (!order) {
+      await notifyOwner(env, `Incoming text from unknown number ${from}`, message);
       return twiml("Thanks for the message. Brett will follow up with you.");
     }
 
