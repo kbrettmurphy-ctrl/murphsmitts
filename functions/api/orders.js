@@ -1205,6 +1205,7 @@ function isInternalOnlyStatus(value) {
   return (
     status === "picked up" ||
     status === "pending response" ||
-    status === "in transit to me"
+    status === "in transit to me" ||
+    status === "customer approved"
   );
 }
