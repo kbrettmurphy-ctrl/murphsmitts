@@ -334,6 +334,26 @@ function renderFieldLike(label, value) {
   `;
 }
 
+function renderPhotoGallery(order) {
+  const photos = Array.isArray(order.glovePhotos) ? order.glovePhotos : [];
+
+  if (!photos.length) return "";
+
+  return `
+    ${renderSectionHeading("Photos")}
+
+    <div class="detail-block full">
+      <div class="photo-grid">
+        ${photos.map((url, index) => `
+          <a class="photo-thumb" href="${escapeAttr(url)}" target="_blank" rel="noopener">
+            <img src="${escapeAttr(url)}" alt="Glove photo ${index + 1}" loading="lazy">
+          </a>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
 function emptyToNull(value) {
   const s = String(value ?? "").trim();
   return s === "" ? null : s;
@@ -681,6 +701,27 @@ function installSwipeDeleteStyles() {
 
     .action-delete svg{
       stroke:#921a24;
+    }
+
+    .photo-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(96px,1fr));
+      gap:10px;
+    }
+
+    .photo-thumb{
+      display:block;
+      border:1px solid rgba(9,47,77,.18);
+      border-radius:12px;
+      overflow:hidden;
+      background:#fff;
+    }
+
+    .photo-thumb img{
+      display:block;
+      width:100%;
+      aspect-ratio:1 / 1;
+      object-fit:cover;
     }
   `;
   document.head.appendChild(style);
@@ -1094,6 +1135,8 @@ function renderOrderDetail(order) {
         <div class="label">Customer Notes</div>
         <textarea id="editGloveNotes" rows="2"></textarea>
       </div>
+
+      ${renderPhotoGallery(order)}
 
       <div id="editShippingSection" class="full ${isLocal ? "is-hidden" : ""}">
         ${renderSectionHeading("Shipping")}
