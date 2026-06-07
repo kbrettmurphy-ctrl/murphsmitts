@@ -245,7 +245,7 @@ export async function onRequest(context) {
       const oldRow = existing.data;
       const oldStatus = normalizeStatus(oldRow.status);
       const lastStatusEmailed = normalizeStatus(oldRow.last_status_emailed);
-
+      const lastStatusTexted = normalizeStatus(oldRow.last_status_texted);
       const dbUpdates = mapUpdatesToDb(updates);
       const mergedPreview = { ...oldRow, ...dbUpdates };
 
@@ -255,7 +255,12 @@ export async function onRequest(context) {
         statusChanged &&
         !isInternalOnlyStatus(newStatus) &&
         newStatus !== lastStatusEmailed;
-
+      const shouldTextForStatus =
+        statusChanged &&
+        toBoolean(mergedPreview.sms_opt_in) &&
+        shouldSendTextForStatus(newStatus) &&
+        newStatus !== lastStatusTexted;
+      
       if (
         newStatus === "completed" &&
         looksLikeShipMethod(mergedPreview.drop_off_method) &&
@@ -364,6 +369,55 @@ export async function onRequest(context) {
 
         if (stamp.ok && Array.isArray(stamp.data) && stamp.data[0]) {
           updated = stamp.data[0];
+        }
+      }
+
+      if (shouldTextForStatus) {
+        if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
+          return json(
+            {
+              ok: false,
+              error: "Order updated, but SMS was not sent because Twilio environment variables are missing."
+            },
+            200,
+            jsonHeaders
+          );
+        }
+
+        const textResult = await sendStatusText(
+          env,
+          updated,
+          normalizeDisplayStatus(updated.status)
+        );
+
+        if (!textResult.ok) {
+          return json(
+            {
+              ok: false,
+              error: "Order updated, but status text failed to send.",
+              details: textResult.error
+            },
+            200,
+            jsonHeaders
+          );
+        }
+
+        const textStamp = await supabaseFetch(
+          env,
+          `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+          {
+            method: "PATCH",
+            headers: {
+              Prefer: "return=representation"
+            },
+            body: JSON.stringify({
+              last_status_texted: normalizeDisplayStatus(updated.status)
+            })
+          }
+        );
+
+        if (textStamp.ok && Array.isArray(textStamp.data) && textStamp.data[0]) {
+          updated = textStamp.data[0];
         }
       }
 
@@ -613,6 +667,8 @@ function mapOrderFromDb(row) {
     dateCompleted: row.date_completed,
     internalNotes: row.internal_notes,
     lastStatusEmailed: row.last_status_emailed,
+    smsOptIn: row.sms_opt_in === true,
+    lastStatusTexted: row.last_status_texted,
 
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -908,6 +964,104 @@ async function sendBrandedEmail(env, { to, subject, plainBody, htmlBody }) {
     ok: true,
     data
   };
+}
+
+async function sendStatusText(env, row, statusDisplay) {
+  const order = mapOrderFromDb(row);
+
+  if (!order.smsOptIn) {
+    return { ok: true, skipped: true, reason: "Customer did not opt in to SMS." };
+  }
+
+  const to = toE164US(order.phoneNumber);
+  if (!to) {
+    return { ok: true, skipped: true, reason: "Invalid or missing phone number." };
+  }
+
+  const status = normalizeStatus(statusDisplay);
+  const orderNum = String(order.orderNumber || "").trim() || "(unknown)";
+
+  const body = `Murph's Mitts: Order #${orderNum} update - ${statusDisplay}. ${smsMessageSmart(order, status)}`;
+
+  const accountSid = env.TWILIO_ACCOUNT_SID;
+  const authToken = env.TWILIO_AUTH_TOKEN;
+  const messagingServiceSid = env.TWILIO_MESSAGING_SERVICE_SID;
+
+  const form = new URLSearchParams();
+  form.set("To", to);
+  form.set("MessagingServiceSid", messagingServiceSid);
+  form.set("Body", body);
+
+  const resp = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: form.toString()
+    }
+  );
+
+  const text = await resp.text();
+
+  let data = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+  }
+
+  if (!resp.ok) {
+    return { ok: false, error: data || `Twilio HTTP ${resp.status}` };
+  }
+
+  return { ok: true, data };
+}
+
+function smsMessageSmart(order, status) {
+  if (status === "estimate sent") {
+    return "Your estimate has been sent to your email. Reply YES to approve or NO to cancel.";
+  }
+
+  if (status === "in progress") {
+    const d = formatLongDate(order.estimatedCompletion);
+    return `Work has begun on your glove.${d ? " Estimated completion: " + d + "." : ""}`;
+  }
+
+  if (status === "ready to go") {
+    return "Your glove is ready! I’ll follow up to coordinate pickup or shipping.";
+  }
+
+  if (status === "completed") {
+    const tracking = cleanDisplay(order.trackingNumber || order.tracking);
+    return tracking
+      ? `Your glove is complete and has shipped. Tracking: ${tracking}`
+      : "Your glove service is complete. Thanks again for choosing Murph's Mitts!";
+  }
+
+  return "Your order status has been updated.";
+}
+
+function toE164US(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+
+  return "";
+}
+
+function shouldSendTextForStatus(status) {
+  return (
+    status === "estimate sent" ||
+    status === "in progress" ||
+    status === "ready to go" ||
+    status === "completed"
+  );
 }
 
 function reviewText() {
