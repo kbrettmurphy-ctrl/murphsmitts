@@ -1036,7 +1036,7 @@ async function sendStatusText(env, row, statusDisplay) {
 
 function smsMessageSmart(order, status) {
   if (status === "estimate sent") {
-    return "Your estimate has been sent to your email with a quote and service details. Please respond to the email to approve the work or ask questions.";
+    return "Your estimate has been sent to your email with a quote and service details. Reply YES to this text to approve, or NO to place the request on hold.";
   }
 
   if (status === "in progress") {
