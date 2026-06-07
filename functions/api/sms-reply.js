@@ -16,7 +16,7 @@ export async function onRequest(context) {
     const body = cleanText(form.get("Body"));
     const message = String(body || "").trim();
     const normalized = message.toLowerCase();
-
+    
     if (!from || !message) {
       return twiml("Thanks. I received your message.");
     }
@@ -45,13 +45,19 @@ export async function onRequest(context) {
     }
 
     const orderNumber = order.order_number;
+    const mediaUrls = await saveIncomingMedia(env, form, orderNumber);
+    
+    const existingPhotos = Array.isArray(order.glove_photos) ? order.glove_photos : [];
 
     const updates = {
-      last_customer_text: message,
-      last_customer_text_at: new Date().toISOString()
+      last_customer_text: message || (mediaUrls.length ? "[Photo received]" : ""),
+      last_customer_text_at: new Date().toISOString(),
+      glove_photos: [...existingPhotos, ...mediaUrls]
     };
 
-    let reply = "Thanks for the message. Brett will follow up with you.";
+    let reply = mediaUrls.length
+      ? "Thanks, I received the photo(s). Brett will review them and follow up if needed."
+      : "Thanks for the message. Brett will follow up with you.";
 
     if (normalized === "yes" || normalized === "y") {
       if (normalizeStatus(order.status) === "estimate sent") {
@@ -182,4 +188,53 @@ function escapeXml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+}
+
+async function saveIncomingMedia(env, form, orderNumber) {
+  const count = Number(form.get("NumMedia") || 0);
+  if (!count) return [];
+
+  const savedUrls = [];
+
+  for (let i = 0; i < count; i++) {
+    const mediaUrl = String(form.get(`MediaUrl${i}`) || "").trim();
+    const contentType = String(form.get(`MediaContentType${i}`) || "image/jpeg").trim();
+
+    if (!mediaUrl || !contentType.startsWith("image/")) continue;
+
+    const ext = contentType.includes("png") ? "png" : "jpg";
+    const filename = `${orderNumber}/${Date.now()}-${i}.${ext}`;
+
+    const fileResp = await fetch(mediaUrl, {
+      headers: {
+        Authorization: "Basic " + btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`)
+      }
+    });
+
+    if (!fileResp.ok) continue;
+
+    const bytes = await fileResp.arrayBuffer();
+
+    const uploadResp = await fetch(
+      `${env.SUPABASE_URL}/storage/v1/object/order-photos/${filename}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": contentType,
+          "x-upsert": "true"
+        },
+        body: bytes
+      }
+    );
+
+    if (!uploadResp.ok) continue;
+
+    savedUrls.push(
+      `${env.SUPABASE_URL}/storage/v1/object/public/order-photos/${filename}`
+    );
+  }
+
+  return savedUrls;
 }
