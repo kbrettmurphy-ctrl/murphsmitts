@@ -44,7 +44,6 @@ export async function onRequest(context) {
       return twiml("Thanks for the message. Brett will follow up with you.");
     }
 
-    const order = found.data[0];
     const orderNumber = order.order_number;
 
     const updates = {
