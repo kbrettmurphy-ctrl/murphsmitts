@@ -213,7 +213,21 @@ export async function onRequest(context) {
         jsonHeaders
       );
     }
+    
+    const customerTextResult = await sendReceivedText(env, inserted);
 
+    if (!customerTextResult.ok) {
+      return json(
+        {
+          ok: false,
+          error: "Order was created and email sent, but the Received text failed to send.",
+          details: customerTextResult.error
+        },
+        200,
+        jsonHeaders
+      );
+    }
+    
     const ownerEmailResult = await sendOwnerNewOrderEmail(env, inserted);
 
     if (!ownerEmailResult.ok) {
@@ -245,6 +259,7 @@ export async function onRequest(context) {
         },
         body: JSON.stringify({
           last_status_emailed: "Received"
+          last_status_texted: inserted.sms_opt_in === true ? "Received" : null
         })
       }
     );
@@ -787,6 +802,79 @@ function wrapEmailHtmlSplit(beforeThanks, afterThanks, includeReview) {
     ${includeReview ? reviewHtml() : ""}
     <div style="white-space:pre-wrap; margin:0;">${escapeHtml(afterThanks)}</div>
   </div>`;
+}
+
+async function sendReceivedText(env, row) {
+  if (row.sms_opt_in !== true) {
+    return { ok: true, skipped: true, reason: "Customer did not opt in to SMS." };
+  }
+
+  const to = toE164US(row.phone_number);
+  if (!to) {
+    return { ok: true, skipped: true, reason: "Invalid or missing phone number." };
+  }
+
+  if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
+    return { ok: false, error: "Missing Twilio environment variables." };
+  }
+
+  const orderNum = String(row.order_number || "").trim() || "(unknown)";
+
+  const body =
+    `Murph's Mitts: I received your glove service request (#${orderNum}). ` +
+    `I'll review the details and send an estimate by email. ` +
+    `If you'd like, you can reply to this text with photos of your glove to help me evaluate it.`;
+
+  return await sendTwilioText(env, to, body);
+}
+
+async function sendTwilioText(env, to, body) {
+  const accountSid = env.TWILIO_ACCOUNT_SID;
+  const authToken = env.TWILIO_AUTH_TOKEN;
+  const messagingServiceSid = env.TWILIO_MESSAGING_SERVICE_SID;
+
+  const form = new URLSearchParams();
+  form.set("To", to);
+  form.set("MessagingServiceSid", messagingServiceSid);
+  form.set("Body", body);
+
+  const resp = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: form.toString()
+    }
+  );
+
+  const text = await resp.text();
+
+  let data = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+  }
+
+  if (!resp.ok) {
+    return { ok: false, error: data || `Twilio HTTP ${resp.status}` };
+  }
+
+  return { ok: true, data };
+}
+
+function toE164US(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+
+  return "";
 }
 
 /* =========================
