@@ -258,7 +258,7 @@ export async function onRequest(context) {
           Prefer: "return=representation"
         },
         body: JSON.stringify({
-          last_status_emailed: "Received"
+          last_status_emailed: "Received",
           last_status_texted: inserted.sms_opt_in === true ? "Received" : null
         })
       }
