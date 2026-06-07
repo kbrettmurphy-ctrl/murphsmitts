@@ -156,7 +156,7 @@ export async function onRequest(context) {
       social_tag: incoming.social_tag,
       turnaround_acknowledged: incoming.turnaround_acknowledged,
       referral_source: incoming.referral_source,
-      glove_photos: null,
+      glove_photos: [],
 
       order_number: nextOrderNumber,
       status: "Received",
