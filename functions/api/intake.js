@@ -499,39 +499,91 @@ async function sendOwnerNewOrderEmail(env, row) {
   const order = mapOrderFromDb(row);
   const subject = `New Murph's Mitts order submitted: #${order.orderNumber}`;
 
+  const smsUpdates = row.sms_opt_in === true ? "Yes" : "No";
+
+  const brandModelLine = order.brandModel
+    ? `Brand / Model: ${order.brandModel}\n`
+    : "";
+
+  const webTypeLine = order.webType
+    ? `Web Type: ${order.webType}\n`
+    : "";
+
+  const accentLaceLine = order.secondaryLaceColor
+    ? `Accent Lace: ${order.secondaryLaceColor}\n`
+    : "";
+
+  const colorNotesLine = order.customColorRequest
+    ? `Color Notes: ${order.customColorRequest}\n`
+    : "";
+
+  const notesLine = order.gloveNotes
+    ? `\nAdditional Notes\n${order.gloveNotes}\n`
+    : "";
+
+  const referralLine = order.referralSource
+    ? `\nReferral Source: ${order.referralSource}`
+    : "";
+
   const plainBody =
 `A new service request was submitted.
 
 Order #: ${order.orderNumber}
-Customer: ${order.customerName || ""}
+
+Customer Info
+Name: ${order.customerName || ""}
 Email: ${order.emailAddress || ""}
 Phone: ${order.phoneNumber || ""}
-Glove Type: ${order.gloveType || ""}
-Web Type: ${order.webType || ""}
-Services: ${order.servicesRequested || ""}
-Drop-Off Method: ${order.dropOffMethod || ""}
+Text Updates: ${smsUpdates}
+
+Glove Info
+${brandModelLine}Glove Type: ${order.gloveType || ""}
+${webTypeLine}Services: ${order.servicesRequested || ""}
 Primary Lace: ${order.primaryLaceColor || ""}
-Accent Lace: ${order.secondaryLaceColor || ""}
-Color Notes: ${order.customColorRequest || ""}
-Notes: ${order.gloveNotes || ""}
-Referral Source: ${order.referralSource || ""}`;
+${accentLaceLine}${colorNotesLine}
+Delivery Info
+Drop-Off Method: ${order.dropOffMethod || ""}
+${notesLine}${referralLine}`.trim();
 
   const htmlBody = `
-  <div style="font-family: Arial, sans-serif; max-width: 640px; line-height: 1.45; text-align:left;">
-    <p><strong>A new service request was submitted.</strong></p>
-    <p><strong>Order #:</strong> ${escapeHtml(order.orderNumber || "")}</p>
-    <p><strong>Customer:</strong> ${escapeHtml(order.customerName || "")}</p>
-    <p><strong>Email:</strong> ${escapeHtml(order.emailAddress || "")}</p>
-    <p><strong>Phone:</strong> ${escapeHtml(order.phoneNumber || "")}</p>
-    <p><strong>Glove Type:</strong> ${escapeHtml(order.gloveType || "")}</p>
-    <p><strong>Web Type:</strong> ${escapeHtml(order.webType || "")}</p>
-    <p><strong>Services:</strong> ${escapeHtml(order.servicesRequested || "")}</p>
-    <p><strong>Drop-Off Method:</strong> ${escapeHtml(order.dropOffMethod || "")}</p>
-    <p><strong>Primary Lace:</strong> ${escapeHtml(order.primaryLaceColor || "")}</p>
-    <p><strong>Accent Lace:</strong> ${escapeHtml(order.secondaryLaceColor || "")}</p>
-    <p><strong>Color Notes:</strong> ${escapeHtml(order.customColorRequest || "")}</p>
-    <p><strong>Notes:</strong> ${escapeHtml(order.gloveNotes || "")}</p>
-    <p><strong>Referral Source:</strong> ${escapeHtml(order.referralSource || "")}</p>
+  <div style="font-family: Arial, sans-serif; max-width: 640px; line-height: 1.35; text-align:left;">
+    <p style="margin:0 0 14px;"><strong>A new service request was submitted.</strong></p>
+
+    <p style="margin:0 0 14px;"><strong>Order #:</strong> ${escapeHtml(order.orderNumber || "")}</p>
+
+    <h3 style="margin:18px 0 8px;">Customer Info</h3>
+    <p style="margin:0;">
+      <strong>Name:</strong> ${escapeHtml(order.customerName || "")}<br>
+      <strong>Email:</strong> ${escapeHtml(order.emailAddress || "")}<br>
+      <strong>Phone:</strong> ${escapeHtml(order.phoneNumber || "")}<br>
+      <strong>Text Updates:</strong> ${escapeHtml(smsUpdates)}
+    </p>
+
+    <h3 style="margin:18px 0 8px;">Glove Info</h3>
+    <p style="margin:0;">
+      ${order.brandModel ? `<strong>Brand / Model:</strong> ${escapeHtml(order.brandModel)}<br>` : ""}
+      <strong>Glove Type:</strong> ${escapeHtml(order.gloveType || "")}<br>
+      ${order.webType ? `<strong>Web Type:</strong> ${escapeHtml(order.webType)}<br>` : ""}
+      <strong>Services:</strong> ${escapeHtml(order.servicesRequested || "")}<br>
+      <strong>Primary Lace:</strong> ${escapeHtml(order.primaryLaceColor || "")}<br>
+      ${order.secondaryLaceColor ? `<strong>Accent Lace:</strong> ${escapeHtml(order.secondaryLaceColor)}<br>` : ""}
+      ${order.customColorRequest ? `<strong>Color Notes:</strong> ${escapeHtml(order.customColorRequest)}<br>` : ""}
+    </p>
+
+    <h3 style="margin:18px 0 8px;">Delivery Info</h3>
+    <p style="margin:0;">
+      <strong>Drop-Off Method:</strong> ${escapeHtml(order.dropOffMethod || "")}
+    </p>
+
+    ${order.gloveNotes ? `
+      <h3 style="margin:18px 0 8px;">Additional Notes</h3>
+      <p style="margin:0;">${escapeHtml(order.gloveNotes)}</p>
+    ` : ""}
+
+    ${order.referralSource ? `
+      <h3 style="margin:18px 0 8px;">Referral Source</h3>
+      <p style="margin:0;">${escapeHtml(order.referralSource)}</p>
+    ` : ""}
   </div>`;
 
   return await sendBrandedEmail(env, {
