@@ -1013,6 +1013,7 @@ function renderOrderDetail(order) {
         <select id="editStatus">
            <option value="Received">Received</option>
            <option value="Estimate Sent">Estimate Sent</option>
+           <option value="Customer Approved">Customer Approved</option>
            <option value="Pending Response">Pending Response</option>
            <option value="In Transit to Me">In Transit to Me</option>
            <option value="In Progress">In Progress</option>
