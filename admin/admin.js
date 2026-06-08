@@ -1275,11 +1275,16 @@ function renderOrderDetail(order) {
   });
 
   if (lightbox && lightboxImg) {
-    lightbox.addEventListener("click", () => {
-       lightbox.classList.remove("show");
-       lightboxImg.src = "";
-     });
-  }
+  lightbox.addEventListener("click", () => {
+    if (currentPhoto < photos.length - 1) {
+      currentPhoto++;
+      lightboxImg.src = photos[currentPhoto];
+    } else {
+      lightbox.classList.remove("show");
+      lightboxImg.src = "";
+    }
+  });
+}
 
    let startX = 0;
 
