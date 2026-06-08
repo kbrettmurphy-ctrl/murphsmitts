@@ -664,7 +664,11 @@ function mapOrderFromDb(row) {
     socialTag: row.social_tag,
     turnaroundAcknowledged: row.turnaround_acknowledged,
     referralSource: row.referral_source,
-    glovePhotos: row.glove_photos,
+    glovePhotos: Array.isArray(row.glove_photos)
+      ? row.glove_photos
+      : row.glove_photos
+        ? JSON.parse(row.glove_photos)
+        : [],
 
     orderNumber: row.order_number,
     status: row.status,
