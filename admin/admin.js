@@ -1261,10 +1261,12 @@ function renderOrderDetail(order) {
    
   const photos = Array.isArray(order.glovePhotos) ? order.glovePhotos : [];
 
-  const lightbox = document.getElementById("photoLightbox");
-  const lightboxImg = document.getElementById("lightboxImage");
+const lightbox = document.getElementById("photoLightbox");
+const lightboxImg = document.getElementById("lightboxImage");
 
+if (photos.length && lightbox && lightboxImg) {
   let currentPhoto = 0;
+  let startX = 0;
 
   document.querySelectorAll(".photo-thumb-img").forEach(img => {
     img.addEventListener("click", () => {
@@ -1274,7 +1276,6 @@ function renderOrderDetail(order) {
     });
   });
 
-  if (lightbox && lightboxImg) {
   lightbox.addEventListener("click", () => {
     if (currentPhoto < photos.length - 1) {
       currentPhoto++;
@@ -1284,30 +1285,28 @@ function renderOrderDetail(order) {
       lightboxImg.src = "";
     }
   });
+
+  lightbox.addEventListener("touchstart", e => {
+    startX = e.touches[0].clientX;
+  });
+
+  lightbox.addEventListener("touchend", e => {
+    const endX = e.changedTouches[0].clientX;
+    const diff = endX - startX;
+
+    if (Math.abs(diff) < 40) return;
+
+    if (diff < 0 && currentPhoto < photos.length - 1) {
+      currentPhoto++;
+    }
+
+    if (diff > 0 && currentPhoto > 0) {
+      currentPhoto--;
+    }
+
+    lightboxImg.src = photos[currentPhoto];
+  });
 }
-
-   let startX = 0;
-
-   lightbox.addEventListener("touchstart", e => {
-     startX = e.touches[0].clientX;
-   });
-
-   lightbox.addEventListener("touchend", e => {
-     const endX = e.changedTouches[0].clientX;
-     const diff = endX - startX;
-
-     if (Math.abs(diff) < 40) return;
-   
-     if (diff < 0 && currentPhoto < photos.length - 1) {
-       currentPhoto++;
-     }
-
-     if (diff > 0 && currentPhoto > 0) {
-        currentPhoto--;
-     }
-
-     lightboxImg.src = photos[currentPhoto];
-   });
 
   wireDetailForm();
 }
