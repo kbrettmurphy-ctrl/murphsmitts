@@ -345,11 +345,19 @@ function renderPhotoGallery(order) {
     <div class="detail-block full">
       <div class="photo-grid">
         ${photos.map((url, index) => `
-          <a class="photo-thumb" href="${escapeAttr(url)}" target="_blank" rel="noopener">
-            <img src="${escapeAttr(url)}" alt="Glove photo ${index + 1}" loading="lazy">
-          </a>
+          <img
+            class="photo-thumb-img"
+            src="${escapeAttr(url)}"
+            data-index="${index}"
+            alt="Glove photo ${index + 1}"
+            loading="lazy"
+          >
         `).join("")}
       </div>
+    </div>
+
+    <div id="photoLightbox" class="photo-lightbox">
+      <img id="lightboxImage" src="">
     </div>
   `;
 }
@@ -722,6 +730,35 @@ function installSwipeDeleteStyles() {
       width:100%;
       aspect-ratio:1 / 1;
       object-fit:cover;
+    }
+
+    .photo-thumb-img{
+      display:block;
+      width:100%;
+      aspect-ratio:1 / 1;
+      object-fit:cover;
+      cursor:pointer;
+      border-radius:12px;
+    }
+
+    .photo-lightbox{
+      display:none;
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.92);
+      z-index:9999;
+      justify-content:center;
+      align-items:center;
+    }
+
+    .photo-lightbox.show{
+      display:flex;
+    }
+
+    .photo-lightbox img{
+      max-width:95vw;
+      max-height:95vh;
+      object-fit:contain;
     }
   `;
   document.head.appendChild(style);
@@ -1221,6 +1258,51 @@ function renderOrderDetail(order) {
   document.getElementById("detailDeleteBtn")?.addEventListener("click", async () => {
     await confirmAndDeleteOrder(order.orderNumber);
   });
+   
+  const photos = Array.isArray(order.glovePhotos) ? order.glovePhotos : [];
+
+  const lightbox = document.getElementById("photoLightbox");
+  const lightboxImg = document.getElementById("lightboxImage");
+
+  let currentPhoto = 0;
+
+  document.querySelectorAll(".photo-thumb-img").forEach(img => {
+    img.addEventListener("click", () => {
+      currentPhoto = Number(img.dataset.index);
+      lightboxImg.src = photos[currentPhoto];
+      lightbox.classList.add("show");
+    });
+  });
+
+  if (lightbox && lightboxImg) {
+    lightbox.addEventListener("click", () => {
+       lightbox.classList.remove("show");
+       lightboxImg.src = "";
+     });
+  }
+
+   let startX = 0;
+
+   lightbox.addEventListener("touchstart", e => {
+     startX = e.touches[0].clientX;
+   });
+
+   lightbox.addEventListener("touchend", e => {
+     const endX = e.changedTouches[0].clientX;
+     const diff = endX - startX;
+
+     if (Math.abs(diff) < 40) return;
+   
+     if (diff < 0 && currentPhoto < photos.length - 1) {
+       currentPhoto++;
+     }
+
+     if (diff > 0 && currentPhoto > 0) {
+        currentPhoto--;
+     }
+
+     lightboxImg.src = photos[currentPhoto];
+   });
 
   wireDetailForm();
 }
