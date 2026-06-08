@@ -234,6 +234,7 @@ function getViewTitle(viewName) {
   switch (viewName) {
     case "waiting": return "Waiting on Lace";
     case "estimate": return "Estimate Sent";
+    case "approved": return "Customer Approved";
     case "customer-response": return "Pending Response";
     case "transit": return "In Transit to Me";
     case "progress": return "In Progress";
@@ -258,6 +259,9 @@ function getViewOrders() {
 
     case "estimate":
       return allOrders.filter(order => normalizeStatus(order.status) === "estimate sent");
+      
+    case "approved":
+      return allOrders.filter(order => normalizeStatus(order.status) === "customer approved");
 
     case "customer-response":
       return allOrders.filter(isWaitingForCustomerResponse);
