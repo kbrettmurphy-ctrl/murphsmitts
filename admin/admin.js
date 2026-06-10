@@ -26,7 +26,7 @@ const closeMenuBtn = document.getElementById("closeMenuBtn");
 const navLinks = Array.from(document.querySelectorAll(".nav-link"));
 
 let laceInventory = [];
-let reorderAlertShown = false;
+let reorderBannerDismissed = false;
 let allOrders = [];
 let activeView = "current";
 let currentOrder = null;
@@ -769,6 +769,62 @@ function installSwipeDeleteStyles() {
       max-height:95vh;
       object-fit:contain;
     }
+
+    .reorder-banner{
+        margin:0;
+        padding:12px 14px;
+        background:#fff3cd;
+        color:#5a4100;
+        border-bottom:1px solid rgba(90,65,0,.25);
+        display:flex;
+        justify-content:space-between;
+        gap:12px;
+        align-items:center;
+      }
+
+      .reorder-banner-text{
+        display:grid;
+        gap:4px;
+        line-height:1.3;
+      }
+
+      .reorder-banner-text span{
+        font-size:.92rem;
+      }
+
+      .reorder-banner-actions{
+        display:flex;
+        gap:8px;
+        align-items:center;
+        flex:0 0 auto;
+      }
+
+      .reorder-banner-actions button{
+        border:0;
+        border-radius:10px;
+        padding:8px 10px;
+        background:#092f4d;
+        color:#dacab1;
+        font-weight:700;
+      }
+
+      #reorderDismissBtn{
+        width:34px;
+        height:34px;
+        padding:0;
+        font-size:22px;
+        line-height:1;
+      }
+
+      @media (max-width:700px){
+        .reorder-banner{
+          align-items:flex-start;
+        }
+
+        .reorder-banner-actions{
+          flex-direction:column-reverse;
+        }
+      }
   `;
   document.head.appendChild(style);
 }
@@ -1663,13 +1719,20 @@ async function loadOrders() {
   }
 
   applyFilters();
+  try {
+     const inv = await postJson({ action: "listInventory" }, true);
+     laceInventory = inv.inventory || [];
+     renderReorderBanner(laceInventory);
+   } catch {
+     // Don't block orders if inventory check fails.
+   }
 }
 
 async function loadInventory() {
   const data = await postJson({ action: "listInventory" }, true);
   laceInventory = data.inventory || [];
   renderInventory(laceInventory);
-  showReorderAlert(laceInventory);
+  renderReorderBanner(laceInventory);
 }
 
 function renderInventory(rows) {
@@ -1709,21 +1772,52 @@ function renderInventory(rows) {
   });
 }
 
-function showReorderAlert(rows) {
-  if (reorderAlertShown) return;
-
-  const lowColors = rows
-    .filter(item => Number(item.quantity_on_hand || 0) <= Number(item.reorder_at || 0))
-    .map(item => `${item.color} (${item.quantity_on_hand} left)`);
-
-  if (!lowColors.length) return;
-
-  reorderAlertShown = true;
-
-  alert(
-    "Reorder lace:\n\n" +
-    lowColors.join("\n")
+function getLowInventoryItems(rows) {
+  return rows.filter(item =>
+    Number(item.quantity_on_hand || 0) <= Number(item.reorder_at || 0)
   );
+}
+
+function renderReorderBanner(rows) {
+  const existing = document.getElementById("reorderBanner");
+  if (existing) existing.remove();
+
+  if (reorderBannerDismissed) return;
+
+  const lowItems = getLowInventoryItems(rows);
+  if (!lowItems.length) return;
+
+  const banner = document.createElement("div");
+  banner.id = "reorderBanner";
+  banner.className = "reorder-banner";
+
+  banner.innerHTML = `
+    <div class="reorder-banner-text">
+      <strong>⚠ Reorder Lace Needed</strong>
+      <span>${lowItems.map(item =>
+        `${escapeHtml(item.color)} (${escapeHtml(item.quantity_on_hand)} left)`
+      ).join(", ")}</span>
+    </div>
+
+    <div class="reorder-banner-actions">
+      <button id="reorderViewBtn" type="button">View Inventory</button>
+      <button id="reorderDismissBtn" type="button" aria-label="Dismiss reorder alert">×</button>
+    </div>
+  `;
+
+  const dashboardTopbar = dashboardView.querySelector(".topbar");
+  if (dashboardTopbar) {
+    dashboardTopbar.insertAdjacentElement("afterend", banner);
+  }
+
+  document.getElementById("reorderDismissBtn")?.addEventListener("click", () => {
+    reorderBannerDismissed = true;
+    banner.remove();
+  });
+
+  document.getElementById("reorderViewBtn")?.addEventListener("click", () => {
+    setActiveView("inventory");
+  });
 }
 
 function openOrder(orderNumber) {
