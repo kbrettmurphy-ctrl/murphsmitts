@@ -118,6 +118,39 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "listInventory") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const supa = await supabaseFetch(
+        env,
+        `/rest/v1/lace_inventory?select=*&order=color.asc`
+      );
+
+      if (!supa.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Failed to load lace inventory from Supabase.",
+            details: supa.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json(
+        {
+          ok: true,
+          inventory: supa.data || []
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     if (action === "getOrder") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
