@@ -647,6 +647,9 @@ function mapOrderFromDb(row) {
     laceAccent: row.secondary_lace_color,
     customColorRequest: row.custom_color_request,
     customLaceNotes: row.custom_color_request,
+    
+    primaryLaceUsed: row.primary_lace_used,
+    secondaryLaceUsed: row.secondary_lace_used,
 
     dropOffMethod: row.drop_off_method,
     dropoffMethod: row.drop_off_method,
@@ -712,6 +715,8 @@ function mapUpdatesToDb(updates) {
 
   if ("customColorRequest" in updates) out.custom_color_request = cleanText(updates.customColorRequest);
   if ("customLaceNotes" in updates) out.custom_color_request = cleanText(updates.customLaceNotes);
+  if ("primaryLaceUsed" in updates) out.primary_lace_used = cleanNumeric(updates.primaryLaceUsed);
+  if ("secondaryLaceUsed" in updates) out.secondary_lace_used = cleanNumeric(updates.secondaryLaceUsed);
 
   if ("dropOffMethod" in updates) out.drop_off_method = cleanText(updates.dropOffMethod);
 
