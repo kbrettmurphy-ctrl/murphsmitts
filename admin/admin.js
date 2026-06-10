@@ -25,6 +25,7 @@ const menuBtn = document.getElementById("menuBtn");
 const closeMenuBtn = document.getElementById("closeMenuBtn");
 const navLinks = Array.from(document.querySelectorAll(".nav-link"));
 
+let laceInventory = [];
 let allOrders = [];
 let activeView = "current";
 let currentOrder = null;
@@ -881,9 +882,17 @@ function setActiveView(viewName) {
     link.classList.toggle("active", link.dataset.view === viewName);
   });
   viewTitle.textContent = getViewTitle(viewName);
-  applyFilters();
-  showView(dashboardView);
-  closeMenu();
+  if (viewName === "inventory") {
+     searchInput.value = "";
+     loadInventory().catch(err => {
+       ordersList.innerHTML = `<div class="no-results">${escapeHtml(err.message || "Failed to load inventory.")}</div>`;
+     });
+   } else {
+     applyFilters();
+   }
+
+   showView(dashboardView);
+   closeMenu();
 }
 
 function sortOrders(list) {
@@ -1653,6 +1662,49 @@ async function loadOrders() {
   }
 
   applyFilters();
+}
+
+async function loadInventory() {
+  const data = await postJson({ action: "listInventory" }, true);
+  laceInventory = data.inventory || [];
+  renderInventory(laceInventory);
+}
+
+function renderInventory(rows) {
+  orderCount.textContent = `${rows.length} color${rows.length === 1 ? "" : "s"}`;
+  ordersList.innerHTML = "";
+
+  if (!rows.length) {
+    ordersList.innerHTML = `<div class="no-results">No lace inventory found.</div>`;
+    return;
+  }
+
+  rows.forEach(item => {
+    const qty = Number(item.quantity_on_hand || 0);
+    const reorderAt = Number(item.reorder_at || 0);
+    const low = qty <= reorderAt;
+
+    const row = document.createElement("div");
+    row.className = "order-card";
+
+    row.innerHTML = `
+      <div class="order-top">
+        <div class="order-main">
+          <div class="order-name">${escapeHtml(item.color || "")}</div>
+          <div class="muted">${qty} piece${qty === 1 ? "" : "s"} on hand</div>
+        </div>
+        <div class="order-status" style="color:${low ? "var(--red)" : "var(--green)"};">
+          ${low ? "LOW" : "OK"}
+        </div>
+      </div>
+
+      <div class="muted" style="margin-top:8px;">
+        Reorder at: ${reorderAt}
+      </div>
+    `;
+
+    ordersList.appendChild(row);
+  });
 }
 
 function openOrder(orderNumber) {
