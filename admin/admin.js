@@ -232,6 +232,7 @@ function isInTransitToMe(order) {
 
 function getViewTitle(viewName) {
   switch (viewName) {
+    case "inventory": return "Lace Inventory";
     case "waiting": return "Waiting on Lace";
     case "estimate": return "Estimate Sent";
     case "approved": return "Customer Approved";
