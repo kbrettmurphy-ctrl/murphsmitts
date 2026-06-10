@@ -1787,6 +1787,12 @@ function renderReorderBanner(rows) {
   const lowItems = getLowInventoryItems(rows);
   if (!lowItems.length) return;
 
+  const lowText = lowItems.map(item => {
+    const color = String(item.color || "").trim();
+    const qty = Number(item.quantity_on_hand ?? 0);
+    return `${color} (${qty} left)`;
+  }).join(", ");
+
   const banner = document.createElement("div");
   banner.id = "reorderBanner";
   banner.className = "reorder-banner";
@@ -1794,9 +1800,7 @@ function renderReorderBanner(rows) {
   banner.innerHTML = `
     <div class="reorder-banner-text">
       <strong>⚠ Reorder Lace Needed</strong>
-      <span>${lowItems.map(item =>
-        `${escapeHtml(item.color)} (${escapeHtml(item.quantity_on_hand)} left)`
-      ).join(", ")}</span>
+      <span>${escapeHtml(lowText)}</span>
     </div>
 
     <div class="reorder-banner-actions">
