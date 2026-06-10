@@ -26,6 +26,7 @@ const closeMenuBtn = document.getElementById("closeMenuBtn");
 const navLinks = Array.from(document.querySelectorAll(".nav-link"));
 
 let laceInventory = [];
+let reorderAlertShown = false;
 let allOrders = [];
 let activeView = "current";
 let currentOrder = null;
@@ -1668,6 +1669,7 @@ async function loadInventory() {
   const data = await postJson({ action: "listInventory" }, true);
   laceInventory = data.inventory || [];
   renderInventory(laceInventory);
+  showReorderAlert(laceInventory);
 }
 
 function renderInventory(rows) {
@@ -1705,6 +1707,23 @@ function renderInventory(rows) {
 
     ordersList.appendChild(row);
   });
+}
+
+function showReorderAlert(rows) {
+  if (reorderAlertShown) return;
+
+  const lowColors = rows
+    .filter(item => Number(item.quantity_on_hand || 0) <= Number(item.reorder_at || 0))
+    .map(item => `${item.color} (${item.quantity_on_hand} left)`);
+
+  if (!lowColors.length) return;
+
+  reorderAlertShown = true;
+
+  alert(
+    "Reorder lace:\n\n" +
+    lowColors.join("\n")
+  );
 }
 
 function openOrder(orderNumber) {
