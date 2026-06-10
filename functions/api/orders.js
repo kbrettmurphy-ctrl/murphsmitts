@@ -246,6 +246,10 @@ export async function onRequest(context) {
       const oldStatus = normalizeStatus(oldRow.status);
       const lastStatusEmailed = normalizeStatus(oldRow.last_status_emailed);
       const lastStatusTexted = normalizeStatus(oldRow.last_status_texted);
+      const oldPrimaryColor = cleanText(oldRow.primary_lace_color);
+      const oldSecondaryColor = cleanText(oldRow.secondary_lace_color);
+      const oldPrimaryUsed = Number(oldRow.primary_lace_used || 0);
+      const oldSecondaryUsed = Number(oldRow.secondary_lace_used || 0);
       const dbUpdates = mapUpdatesToDb(updates);
       const mergedPreview = { ...oldRow, ...dbUpdates };
 
@@ -334,6 +338,17 @@ export async function onRequest(context) {
         );
       }
 
+      await adjustLaceInventoryForOrderUpdate(env, {
+        oldPrimaryColor,
+        oldSecondaryColor,
+        oldPrimaryUsed,
+        oldSecondaryUsed,
+        newPrimaryColor: cleanText(updated.primary_lace_color),
+        newSecondaryColor: cleanText(updated.secondary_lace_color),
+        newPrimaryUsed: Number(updated.primary_lace_used || 0),
+        newSecondaryUsed: Number(updated.secondary_lace_used || 0)
+      });
+      
       if (shouldEmailForStatus) {
         const emailResult = await sendStatusEmail(
           env,
@@ -753,6 +768,55 @@ function mapUpdatesToDb(updates) {
   if ("lastStatusEmailed" in updates) out.last_status_emailed = cleanText(updates.lastStatusEmailed);
 
   return out;
+}
+
+async function adjustLaceInventoryForOrderUpdate(env, usage) {
+  const adjustments = new Map();
+
+  addAdjustment(adjustments, usage.oldPrimaryColor, usage.oldPrimaryUsed);
+  addAdjustment(adjustments, usage.oldSecondaryColor, usage.oldSecondaryUsed);
+
+  addAdjustment(adjustments, usage.newPrimaryColor, -usage.newPrimaryUsed);
+  addAdjustment(adjustments, usage.newSecondaryColor, -usage.newSecondaryUsed);
+
+  for (const [color, delta] of adjustments.entries()) {
+    if (!color || !delta) continue;
+
+    const existing = await supabaseFetch(
+      env,
+      `/rest/v1/lace_inventory?select=quantity_on_hand&color=eq.${encodeURIComponent(color)}&limit=1`
+    );
+
+    if (!existing.ok || !Array.isArray(existing.data) || !existing.data[0]) {
+      continue;
+    }
+
+    const currentQty = Number(existing.data[0].quantity_on_hand || 0);
+    const nextQty = currentQty + delta;
+
+    await supabaseFetch(
+      env,
+      `/rest/v1/lace_inventory?color=eq.${encodeURIComponent(color)}`,
+      {
+        method: "PATCH",
+        headers: {
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify({
+          quantity_on_hand: nextQty
+        })
+      }
+    );
+  }
+}
+
+function addAdjustment(map, color, amount) {
+  const cleanColor = cleanText(color);
+  const qty = Number(amount || 0);
+
+  if (!cleanColor || !qty) return;
+
+  map.set(cleanColor, (map.get(cleanColor) || 0) + qty);
 }
 
 /* =========================
