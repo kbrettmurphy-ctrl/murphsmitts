@@ -406,12 +406,14 @@ const LACE_COLOR_OPTIONS = [
   "Tan – Indian",
   "Brown – Chestnut",
   "Brown – Chocolate",
+  "Vintage Chestnut",
   "Blue – Royal",
   "Blue – Navy",
   "Blue – Carolina",
   "Red",
   "Red - Dark",
   "Orange",
+  "Yellow",
   "Other (Special Order)"
 ];
 
@@ -1172,6 +1174,16 @@ function renderOrderDetail(order) {
         <textarea id="editCustomColorRequest" rows="1" placeholder="Don’t see your color? Describe it here.">${escapeHtml(customColorRequest)}</textarea>
       </div>
 
+      <div class="detail-block">
+        <div class="label">Primary Lace Used</div>
+        <input id="editPrimaryLaceUsed" type="number" step="0.25" min="0" placeholder="0" />
+      </div>
+
+      <div class="detail-block">
+        <div class="label">Secondary Lace Used</div>
+        <input id="editSecondaryLaceUsed" type="number" step="0.25" min="0" placeholder="0" />
+      </div>
+
       <div class="detail-block full">
         <div class="label">Customer Notes</div>
         <textarea id="editGloveNotes" rows="2"></textarea>
@@ -1242,6 +1254,8 @@ function renderOrderDetail(order) {
   document.getElementById("editPrimaryLaceColor").value = primaryLaceColor;
   document.getElementById("editSecondaryLaceColor").value = secondaryLaceColor;
   document.getElementById("editCustomColorRequest").value = customColorRequest;
+  document.getElementById("editPrimaryLaceUsed").value = order.primaryLaceUsed ?? "";
+  document.getElementById("editSecondaryLaceUsed").value = order.secondaryLaceUsed ?? "";
 
   const trackingEl = document.getElementById("editTrackingNumber");
   const carrierEl = document.getElementById("editCarrier");
@@ -1430,7 +1444,9 @@ async function saveCurrentOrderFromForm() {
     secondaryLaceColor: val("editSecondaryLaceColor"),
     laceAccent: val("editSecondaryLaceColor"),
     customColorRequest: val("editCustomColorRequest"),
-    customLaceNotes: val("editCustomColorRequest")
+    customLaceNotes: val("editCustomColorRequest"),
+    primaryLaceUsed: emptyToNull(val("editPrimaryLaceUsed")),
+    secondaryLaceUsed: emptyToNull(val("editSecondaryLaceUsed"))
   };
 
   if (!isLocal) {
@@ -1515,6 +1531,7 @@ const LACE_COLOR_MAP = {
   "orange": "#d46a1f",
   "pink": "#e889b9",
   "white": "#f4eee4",
+  "yellow": "#d6b21f",
   "other (special order)": "linear"
 };
 
