@@ -33,6 +33,8 @@ let currentOrder = null;
 let loginInProgress = false;
 let listScrollY = 0;
 
+window.inventoryNeedsOrderOnly = false;
+
 /* =========================
    VIEW / MENU
 ========================= */
@@ -780,86 +782,107 @@ function installSwipeDeleteStyles() {
         justify-content:space-between;
         gap:12px;
         align-items:center;
-      }
+    }
 
-      .reorder-banner-text{
-        display:grid;
-        gap:4px;
-        line-height:1.3;
-      }
+    .reorder-banner-text{
+       display:grid;
+       gap:4px;
+       line-height:1.3;
+    }
+ 
+    .reorder-banner-text span{
+       font-size:.92rem;
+    }
 
-      .reorder-banner-text span{
-        font-size:.92rem;
-      }
+    .reorder-banner-actions{
+       display:flex;
+       gap:8px;
+       align-items:center;
+       flex:0 0 auto;
+    }
 
-      .reorder-banner-actions{
-        display:flex;
-        gap:8px;
-        align-items:center;
-        flex:0 0 auto;
-      }
+    .reorder-banner-actions button{
+       border:0;
+       border-radius:10px;
+       padding:8px 10px;
+       background:#092f4d;
+       color:#dacab1;
+       font-weight:700;
+    }
 
-      .reorder-banner-actions button{
-        border:0;
-        border-radius:10px;
-        padding:8px 10px;
-        background:#092f4d;
-        color:#dacab1;
-        font-weight:700;
-      }
+    #reorderDismissBtn{
+       width:34px;
+       height:34px;
+       padding:0;
+       font-size:22px;
+       line-height:1;
+    }
 
-      #reorderDismissBtn{
-        width:34px;
-        height:34px;
-        padding:0;
-        font-size:22px;
-        line-height:1;
-      }
+    @media (max-width:700px){
+       .reorder-banner{
+         padding:10px 14px;
+         display:grid;
+         gap:10px;
+       }
 
-      @media (max-width:700px){
-        .reorder-banner{
-        padding:10px 14px;
-        display:grid;
-        gap:10px;
-      }
+       .reorder-banner-text{
+          display:block;
+          font-size:.92rem;
+          line-height:1.35;
+       }
 
-      .reorder-banner-text{
-        display:block;
-        font-size:.92rem;
-        line-height:1.35;
-      }
+       .reorder-banner-text strong{
+         display:block;
+         margin-bottom:4px;
+       }
 
-      .reorder-banner-text strong{
-        display:block;
-        margin-bottom:4px;
-      }
+       .reorder-banner-text span{
+         display:-webkit-box;
+         -webkit-line-clamp:2;
+         -webkit-box-orient:vertical;
+         overflow:hidden;
+         font-size:.86rem;
+       }
 
-      .reorder-banner-text span{
-        display:-webkit-box;
-        -webkit-line-clamp:2;
-        -webkit-box-orient:vertical;
-        overflow:hidden;
-        font-size:.86rem;
-      }
+       .reorder-banner-actions{
+         display:flex;
+         flex-direction:row;
+         justify-content:space-between;
+         gap:8px;
+       }
 
-      .reorder-banner-actions{
-        display:flex;
-        flex-direction:row;
-        justify-content:space-between;
-        gap:8px;
-      }
+       #reorderViewBtn{
+         flex:1;
+         padding:9px 10px;
+         font-size:.9rem;
+       }
 
-      #reorderViewBtn{
-        flex:1;
-        padding:9px 10px;
-        font-size:.9rem;
-      }
+       #reorderDismissBtn{
+         width:42px;
+         height:38px;
+         font-size:22px;
+       }
+    }
 
-      #reorderDismissBtn{
-        width:42px;
-        height:38px;
-        font-size:22px;
-      }
+    .inventory-filter-bar{
+      display:flex;
+      gap:10px;
+      padding:14px 16px;
+      border-bottom:1px solid var(--line);
+    }
+
+    .inventory-filter-bar button{
+      border:0;
+      border-radius:999px;
+      padding:9px 14px;
+      background:var(--navy);
+      color:var(--bg);
+      font-weight:700;
+    }
+
+    .inventory-filter-bar button.secondary{
+      background:rgba(255,255,255,.08);
+      color:var(--muted);
     }
   `;
   document.head.appendChild(style);
@@ -1772,18 +1795,58 @@ async function loadInventory() {
 }
 
 function renderInventory(rows) {
-  orderCount.textContent = `${rows.length} color${rows.length === 1 ? "" : "s"}`;
+  const filteredRows = window.inventoryNeedsOrderOnly
+    ? rows.filter(item => Number(item.quantity_on_hand || 0) <= Number(item.reorder_at || 0))
+    : rows;
+
+  orderCount.textContent = `${filteredRows.length} color${filteredRows.length === 1 ? "" : "s"}`;
   ordersList.innerHTML = "";
 
-  if (!rows.length) {
-    ordersList.innerHTML = `<div class="no-results">No lace inventory found.</div>`;
+  const filterBar = document.createElement("div");
+  filterBar.className = "inventory-filter-bar";
+  filterBar.innerHTML = `
+    <button
+      id="inventoryAllBtn"
+      type="button"
+      class="${window.inventoryNeedsOrderOnly ? "secondary" : ""}"
+    >
+      All
+    </button>
+
+    <button
+      id="inventoryNeedsOrderBtn"
+      type="button"
+      class="${window.inventoryNeedsOrderOnly ? "" : "secondary"}"
+    >
+      Needs Order
+    </button>
+  `;
+
+  ordersList.appendChild(filterBar);
+
+  document.getElementById("inventoryAllBtn")?.addEventListener("click", () => {
+    window.inventoryNeedsOrderOnly = false;
+    renderInventory(laceInventory);
+  });
+
+  document.getElementById("inventoryNeedsOrderBtn")?.addEventListener("click", () => {
+    window.inventoryNeedsOrderOnly = true;
+    renderInventory(laceInventory);
+  });
+
+  if (!filteredRows.length) {
+    ordersList.insertAdjacentHTML("beforeend", `<div class="no-results">No matching lace inventory.</div>`);
     return;
   }
 
-  rows.forEach(item => {
+  filteredRows.forEach(item => {
     const qty = Number(item.quantity_on_hand || 0);
     const reorderAt = Number(item.reorder_at || 0);
-    const low = qty <= reorderAt;
+    const out = qty === 0;
+    const low = qty > 0 && qty <= reorderAt;
+
+    const statusText = out ? "OUT" : low ? "LOW" : "OK";
+    const statusColor = out || low ? "var(--red)" : "var(--green)";
 
     const row = document.createElement("div");
     row.className = "order-card";
@@ -1794,8 +1857,8 @@ function renderInventory(rows) {
           <div class="order-name">${escapeHtml(item.color || "")}</div>
           <div class="muted">${qty} piece${qty === 1 ? "" : "s"} on hand</div>
         </div>
-        <div class="order-status" style="color:${low ? "var(--red)" : "var(--green)"};">
-          ${low ? "LOW" : "OK"}
+        <div class="order-status" style="color:${statusColor};">
+          ${statusText}
         </div>
       </div>
 
