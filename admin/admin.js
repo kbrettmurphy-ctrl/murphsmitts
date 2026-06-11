@@ -2074,10 +2074,25 @@ menuBtn.addEventListener("click", openMenu);
 closeMenuBtn.addEventListener("click", closeMenu);
 menuBackdrop.addEventListener("click", closeMenu);
 
-navLinks.forEach(btn => {
-  btn.addEventListener("click", () => {
-    setActiveView(btn.dataset.view);
-  });
+document.querySelector(".side-nav")?.addEventListener("click", (e) => {
+  const treeBtn = e.target.closest("[data-tree-toggle]");
+
+  if (treeBtn) {
+    const key = treeBtn.dataset.treeToggle;
+    const group = document.querySelector(`[data-tree="${key}"]`);
+    if (!group) return;
+
+    const collapsed = group.classList.toggle("is-collapsed");
+    treeBtn.classList.toggle("is-collapsed", collapsed);
+    treeBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    return;
+  }
+
+  const navBtn = e.target.closest(".nav-link[data-view]");
+
+  if (navBtn) {
+    setActiveView(navBtn.dataset.view);
+  }
 });
 
 document.getElementById("refreshBtn")?.addEventListener("click", async () => {
@@ -2091,18 +2106,16 @@ document.getElementById("refreshBtn")?.addEventListener("click", async () => {
   }
 });
 
-function initNavTree() {
-  document.querySelectorAll("[data-tree-toggle]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const key = btn.dataset.treeToggle;
-      const group = document.querySelector(`[data-tree="${key}"]`);
-      if (!group) return;
+document.getElementById("uploadMenuBtn")?.addEventListener("click", openMenu);
 
-      group.classList.toggle("is-collapsed");
-      btn.classList.toggle("is-collapsed");
-    });
-  });
-}
+document.getElementById("uploadLogoutBtn")?.addEventListener("click", () => {
+  clearToken();
+  currentOrder = null;
+  clearSaveStatus();
+  closeMenu();
+  syncAuthUI();
+  showView(loginView);
+});
 
 /* =========================
    INIT
@@ -2110,7 +2123,6 @@ function initNavTree() {
 (async function init() {
   installSwipeDeleteStyles();
   initUploadView();
-  initNavTree();
   syncAuthUI();
 
   if (!getToken()) {
