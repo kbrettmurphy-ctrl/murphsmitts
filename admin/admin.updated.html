@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Murph's Mitt Maintenance Orders</title>
+  <link rel="stylesheet" href="admin.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="sideMenu" class="side-menu">
+      <div class="side-menu-header">
+        <div class="brand-row">
+          <img src="/assets/img/logo.png" alt="Murph's Mitt Maintenance logo" class="brand-logo">
+          <div>
+            <div class="brand-title">Murph's Mitts</div>
+            <div class="brand-subtitle">Orders</div>
+          </div>
+        </div>
+        <button id="closeMenuBtn" class="icon-btn mobile-only" aria-label="Close menu">✕</button>
+      </div>
+
+      <nav class="side-nav">
+        <div class="nav-group">
+          <button class="nav-parent" type="button" data-tree-toggle="orders" aria-expanded="true">
+            <span>Orders</span>
+            <span class="nav-caret" aria-hidden="true">▾</span>
+          </button>
+
+          <div class="nav-children" data-tree="orders">
+            <button class="nav-link active" data-view="current">Current Orders</button>
+            <button class="nav-link" data-view="progress">In Progress</button>
+            <button class="nav-link" data-view="estimate">Estimate Sent</button>
+            <button class="nav-link" data-view="approved">Customer Approved</button>
+            <button class="nav-link" data-view="customer-response">Pending Response</button>
+            <button class="nav-link" data-view="transit">In Transit to Me</button>
+            <button class="nav-link" data-view="waiting">Waiting on Lace</button>
+            <button class="nav-link" data-view="ready">Ready to Go</button>
+            <button class="nav-link" data-view="hold">On Hold</button>
+            <button class="nav-link" data-view="completed">Completed</button>
+            <button class="nav-link" data-view="all">All Orders</button>
+          </div>
+        </div>
+
+        <button class="nav-link nav-main" data-view="inventory">Lace Inventory</button>
+        <button class="nav-link nav-main" data-view="upload">Upload</button>
+      </nav>
+    </aside>
+
+    <div id="menuBackdrop" class="menu-backdrop"></div>
+
+    <main class="main-panel">
+      <section id="loginView" class="view active">
+        <div class="card login-card">
+          <h1>Murph's Mitts Order Tracker</h1>
+          <p class="muted">Enter PIN.</p>
+          <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="PIN" />
+          <p id="loginStatus" class="status"></p>
+        </div>
+      </section>
+
+      <section id="dashboardView" class="view">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="menuBtn" class="icon-btn" aria-label="Open menu">☰</button>
+            <div>
+              <h1 id="viewTitle">Current Orders</h1>
+              <p id="orderCount" class="muted"></p>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button id="refreshBtn" class="secondary">🔄</button>
+            <button id="logoutBtn" class="secondary">Log Out</button>
+          </div>
+        </header>
+
+        <div class="toolbar">
+          <input id="searchInput" type="search" placeholder="Search by order #, name, email..." />
+        </div>
+
+        <div id="ordersList" class="orders-list"></div>
+      </section>
+
+      <section id="uploadView" class="view">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="uploadMenuBtn" class="icon-btn" aria-label="Open menu">☰</button>
+            <div>
+              <h1>Upload</h1>
+              <p class="muted">Upload photos to the website gallery.</p>
+            </div>
+          </div>
+          <button id="uploadLogoutBtn" class="secondary">Log Out</button>
+        </header>
+
+        <div class="upload-panel">
+          <div class="upload-card">
+            <h2>Website Gallery</h2>
+            <p class="muted">
+              This is the future home for uploading before-and-after photos from your phone.
+            </p>
+
+            <label class="upload-drop" for="galleryUploadInput">
+              <span class="upload-drop-title">Choose gallery photos</span>
+              <span class="upload-drop-note">Multiple photos allowed. Upload wiring comes next.</span>
+            </label>
+
+            <input id="galleryUploadInput" type="file" accept="image/*" multiple>
+
+            <p id="galleryUploadStatus" class="upload-status">
+              No photos selected.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="detailView" class="view">
+        <header class="topbar detail-topbar">
+          <div class="topbar-left">
+            <button id="backBtn" class="secondary">Back</button>
+            <div>
+              <h1 id="detailTitle">Order Detail</h1>
+            </div>
+          </div>
+
+          <div class="detail-topbar-actions">
+            <p id="saveStatus" class="status" aria-live="polite"></p>
+            <button id="saveOrderBtn" type="button">Save</button>
+          </div>
+        </header>
+
+        <div id="orderDetail" class="detail-card"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
