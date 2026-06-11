@@ -1027,7 +1027,7 @@ async function listGallerySection(env, section) {
           limit: 100,
           offset: 0,
           sortBy: {
-            column: "created_at",
+            column: "name",
             order: "desc"
           }
         })
