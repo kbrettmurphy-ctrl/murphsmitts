@@ -927,7 +927,7 @@ async function uploadGalleryPhoto(env, { filename, contentType, dataUrl }) {
     const path = `${stamp}-${cleanName}.${ext}`;
 
     const uploadResp = await fetch(
-      `${env.SUPABASE_URL}/storage/v1/object/gallery/${encodeURIComponent(path)}`,
+      `${env.SUPABASE_URL}/storage/v1/object/gallery/${path}`,
       {
         method: "POST",
         headers: {
@@ -957,7 +957,7 @@ async function uploadGalleryPhoto(env, { filename, contentType, dataUrl }) {
     return {
       ok: true,
       path,
-      url: `${env.SUPABASE_URL}/storage/v1/object/public/gallery/${encodeURIComponent(path)}`
+      url: `${env.SUPABASE_URL}/storage/v1/object/public/gallery/${path}`
     };
   } catch (err) {
     return {
