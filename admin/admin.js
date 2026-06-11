@@ -137,6 +137,14 @@ async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
         data.error.details ||
         data.error.hint ||
         JSON.stringify(data.error);
+
+      if (data.details) {
+         message += ` | Details: ${
+          typeof data.details === "string"
+            ? data.details
+            : JSON.stringify(data.details)
+         }`;
+      }
     }
 
     throw new Error(message);
