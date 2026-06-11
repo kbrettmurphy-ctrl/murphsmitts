@@ -554,6 +554,45 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "listGalleryPhotos") {
+      const sections = [
+        "fielding-gloves",
+        "catchers-mitts",
+        "first-base-mitts",
+        "custom-color-relaces",
+        "vintage"
+      ];
+
+      const gallery = {};
+
+      for (const section of sections) {
+        const listed = await listGallerySection(env, section);
+
+        if (!listed.ok) {
+          return json(
+            {
+              ok: false,
+              error: `Failed to load gallery section: ${section}`,
+              details: listed.error
+            },
+            200,
+            jsonHeaders
+          );
+        }
+
+        gallery[section] = listed.photos;
+      }
+
+      return json(
+        {
+          ok: true,
+          gallery
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     return json(
       {
         ok: false,
@@ -961,6 +1000,71 @@ async function uploadGalleryPhoto(env, { section, filename, contentType, dataUrl
       ok: true,
       path,
       url: `${env.SUPABASE_URL}/storage/v1/object/public/gallery/${path}`
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err && err.message ? err.message : String(err)
+    };
+  }
+}
+
+async function listGallerySection(env, section) {
+  try {
+    const safeSection = safeGallerySection(section);
+
+    const resp = await fetch(
+      `${env.SUPABASE_URL}/storage/v1/object/list/gallery`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          prefix: safeSection,
+          limit: 100,
+          offset: 0,
+          sortBy: {
+            column: "created_at",
+            order: "desc"
+          }
+        })
+      }
+    );
+
+    const text = await resp.text();
+
+    let data = [];
+    try {
+      data = text ? JSON.parse(text) : [];
+    } catch {
+      data = [];
+    }
+
+    if (!resp.ok) {
+      return {
+        ok: false,
+        error: data || text || `Supabase storage list failed: ${resp.status}`
+      };
+    }
+
+    const photos = (Array.isArray(data) ? data : [])
+      .filter(item => item && item.name && !item.name.endsWith("/"))
+      .map(item => {
+        const path = `${safeSection}/${item.name}`;
+
+        return {
+          name: item.name,
+          path,
+          url: `${env.SUPABASE_URL}/storage/v1/object/public/gallery/${path}`
+        };
+      });
+
+    return {
+      ok: true,
+      photos
     };
   } catch (err) {
     return {
