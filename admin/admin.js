@@ -1962,6 +1962,10 @@ function initUploadView() {
 
     for (const file of files) {
       try {
+        if (!file.type.startsWith("image/")) {
+          throw new Error("Not an image file.");
+        }
+
         const dataUrl = await fileToDataUrl(file);
 
         await postJson(
