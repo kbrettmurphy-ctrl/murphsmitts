@@ -500,6 +500,7 @@ export async function onRequest(context) {
       const filename = cleanText(body.filename);
       const contentType = cleanText(body.contentType) || "image/jpeg";
       const dataUrl = cleanText(body.dataUrl);
+      const section = cleanText(body.section) || "fielding-gloves";
 
       if (!filename || !dataUrl) {
         return json(
@@ -524,6 +525,7 @@ export async function onRequest(context) {
       }
 
       const uploaded = await uploadGalleryPhoto(env, {
+        section,
         filename,
         contentType,
         dataUrl
@@ -913,7 +915,7 @@ function addAdjustment(map, color, amount) {
   map.set(cleanColor, (map.get(cleanColor) || 0) + qty);
 }
 
-async function uploadGalleryPhoto(env, { filename, contentType, dataUrl }) {
+async function uploadGalleryPhoto(env, { section, filename, contentType, dataUrl }) {
   try {
     const base64 = String(dataUrl || "").split(",").pop();
     if (!base64) {
@@ -924,7 +926,8 @@ async function uploadGalleryPhoto(env, { filename, contentType, dataUrl }) {
     const ext = extensionFromContentType(contentType, filename);
     const cleanName = safeStorageName(filename).replace(/\.[a-z0-9]+$/i, "");
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const path = `${stamp}-${cleanName}.${ext}`;
+    const safeSection = safeGallerySection(section);
+    const path = `${safeSection}/${stamp}-${cleanName}.${ext}`;
 
     const uploadResp = await fetch(
       `${env.SUPABASE_URL}/storage/v1/object/gallery/${path}`,
@@ -1000,6 +1003,24 @@ function safeStorageName(filename) {
     .replace(/[^a-z0-9._-]/g, "")
     .replace(/-+/g, "-")
     .slice(0, 80) || "gallery-photo";
+}
+
+function safeGallerySection(section) {
+  const allowed = new Set([
+    "fielding-gloves",
+    "catchers-mitts",
+    "first-base-mitts",
+    "custom-color-relaces",
+    "vintage"
+  ]);
+
+  const clean = String(section || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+
+  return allowed.has(clean) ? clean : "fielding-gloves";
 }
 
 /* =========================
