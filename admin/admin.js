@@ -1952,11 +1952,13 @@ function renderReorderBanner(rows) {
 function initUploadView() {
   const input = document.getElementById("galleryUploadInput");
   const status = document.getElementById("galleryUploadStatus");
+  const sectionSelect = document.getElementById("gallerySectionSelect");
 
   if (!input || !status) return;
 
   input.addEventListener("change", async () => {
     const files = Array.from(input.files || []);
+    const section = sectionSelect?.value || "fielding-gloves";
 
     if (!files.length) {
       status.textContent = "Choose photos to upload.";
@@ -1970,7 +1972,9 @@ function initUploadView() {
 
     for (const file of files) {
       try {
-        if (!file.type.startsWith("image/")) {
+        const type = file.type || "image/jpeg";
+
+        if (!type.startsWith("image/")) {
           throw new Error("Not an image file.");
         }
 
@@ -1979,15 +1983,16 @@ function initUploadView() {
         await postJson(
           {
             action: "uploadGalleryPhoto",
+            section,
             filename: file.name,
-            contentType: file.type || "image/jpeg",
+            contentType: type,
             dataUrl
           },
           true
         );
 
         uploaded++;
-        status.textContent = `Uploaded ${uploaded} of ${files.length} photo${files.length === 1 ? "" : "s"}...`;
+        status.textContent = `Uploaded ${uploaded} of ${files.length} photo${files.length === 1 ? "" : "s"} to ${section}...`;
       } catch (err) {
         failed.push(`${file.name}: ${err.message || "Upload failed"}`);
       }
