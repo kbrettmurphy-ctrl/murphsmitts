@@ -818,13 +818,49 @@ function installSwipeDeleteStyles() {
 
       @media (max-width:700px){
         .reorder-banner{
-          align-items:flex-start;
-        }
-
-        .reorder-banner-actions{
-          flex-direction:column-reverse;
-        }
+        padding:10px 14px;
+        display:grid;
+        gap:10px;
       }
+
+      .reorder-banner-text{
+        display:block;
+        font-size:.92rem;
+        line-height:1.35;
+      }
+
+      .reorder-banner-text strong{
+        display:block;
+        margin-bottom:4px;
+      }
+
+      .reorder-banner-text span{
+        display:-webkit-box;
+        -webkit-line-clamp:2;
+        -webkit-box-orient:vertical;
+        overflow:hidden;
+        font-size:.86rem;
+      }
+
+      .reorder-banner-actions{
+        display:flex;
+        flex-direction:row;
+        justify-content:space-between;
+        gap:8px;
+      }
+
+      #reorderViewBtn{
+        flex:1;
+        padding:9px 10px;
+        font-size:.9rem;
+      }
+
+      #reorderDismissBtn{
+        width:42px;
+        height:38px;
+        font-size:22px;
+      }
+    }
   `;
   document.head.appendChild(style);
 }
