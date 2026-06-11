@@ -190,6 +190,109 @@ button.secondary{
   background:#13314c;
 }
 
+.nav-group{
+  display:grid;
+  gap:6px;
+}
+
+.nav-parent{
+  width:100%;
+  border:none;
+  background:#13314c;
+  color:var(--cream);
+  text-align:left;
+  padding:11px 12px;
+  border-radius:12px;
+  font:inherit;
+  font-weight:800;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.nav-caret{
+  font-size:.9rem;
+  opacity:.8;
+}
+
+.nav-children{
+  display:grid;
+  gap:6px;
+  padding-left:12px;
+}
+
+.nav-children.is-collapsed{
+  display:none;
+}
+
+.nav-children .nav-link{
+  font-size:.9rem;
+  padding:9px 10px;
+  color:rgba(218,202,177,.88);
+}
+
+.nav-main{
+  font-weight:800;
+  background:rgba(218,202,177,.06);
+}
+
+.upload-panel{
+  padding:16px 14px 28px;
+}
+
+.upload-card{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:16px;
+  box-shadow:0 10px 24px rgba(0,0,0,.14);
+}
+
+.upload-card h2{
+  margin:0 0 8px;
+  color:var(--cream);
+  font-size:1.2rem;
+}
+
+.upload-drop{
+  display:grid;
+  gap:6px;
+  margin-top:16px;
+  padding:22px 16px;
+  border:2px dashed rgba(218,202,177,.35);
+  border-radius:18px;
+  background:rgba(255,255,255,.06);
+  color:var(--cream);
+  text-align:center;
+  cursor:pointer;
+}
+
+.upload-drop-title{
+  font-weight:800;
+  font-size:1rem;
+}
+
+.upload-drop-note{
+  color:var(--muted);
+  font-size:.9rem;
+}
+
+#galleryUploadInput{
+  position:absolute;
+  width:1px;
+  height:1px;
+  opacity:0;
+  pointer-events:none;
+}
+
+.upload-status{
+  margin:14px 0 0;
+  color:var(--muted);
+}
+
+
 .menu-backdrop{
   position:fixed;
   inset:0;
