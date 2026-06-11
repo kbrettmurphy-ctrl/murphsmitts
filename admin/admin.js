@@ -2130,6 +2130,14 @@ document.getElementById("uploadLogoutBtn")?.addEventListener("click", () => {
   showView(loginView);
 });
 
+document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
+  const input = document.getElementById("galleryUploadInput");
+  const status = document.getElementById("galleryUploadStatus");
+
+  if (input) input.value = "";
+  if (status) status.textContent = "No photos selected.";
+});
+
 /* =========================
    INIT
 ========================= */
