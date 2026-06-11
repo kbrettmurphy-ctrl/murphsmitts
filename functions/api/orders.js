@@ -1051,7 +1051,12 @@ async function listGallerySection(env, section) {
     }
 
     const photos = (Array.isArray(data) ? data : [])
-      .filter(item => item && item.name && !item.name.endsWith("/"))
+      .filter(item =>
+        item &&
+        item.name &&
+        !item.name.endsWith("/") &&
+        item.name !== ".emptyFolderPlaceholder"
+      )
       .map(item => {
         const path = `${safeSection}/${item.name}`;
 
