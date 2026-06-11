@@ -10,42 +10,8 @@ body_class: inner
   <h1>Before &amp; After</h1>
   <p class="lede">A small selection of gloves that showed up hopeless and left with a second chance.</p>
 
-  {% assign categories =
-     "fielding|Fielding Gloves,
-     catcher|Catcher’s Mitts,
-     first-base|First Base Mitts,
-     custom|Custom Color Relaces,
-     vintage|Vintage" | split: "," %}
-
-  {% for entry in categories %}
-    {% assign parts = entry | strip | split: "|" %}
-    {% assign key = parts[0] %}
-    {% assign label = parts[1] %}
-    {% assign items = site.data.gallery | where: "category", key %}
-
-    {% if items.size > 0 %}
-      <section class="gallery-group" id="{{ key }}">
-        <h2>{{ label }}</h2>
-
-        <div class="gallery-strip" data-gallery-group="{{ key }}">
-          {% for item in items %}
-            <button
-              class="gallery-thumb"
-              type="button"
-              data-gallery-group="{{ key }}"
-              data-gallery-index="{{ forloop.index0 }}"
-              aria-label="Open image: {{ item.alt | escape }}">
-              <img
-                src="{{ '/assets/img/beforeafter/' | append: item.file | relative_url }}"
-                alt="{{ item.alt | escape }}"
-                loading="lazy"
-                decoding="async">
-            </button>
-          {% endfor %}
-        </div>
-      </section>
-    {% endif %}
-  {% endfor %}
+  <div id="galleryStatus" class="lede" style="margin-top:18px;">Loading gallery...</div>
+  <div id="dynamicGallery"></div>
 
   <div class="lightbox" aria-hidden="true">
     <button class="lb-close" aria-label="Close">×</button>
@@ -62,3 +28,197 @@ body_class: inner
     </div>
   </div>
 </main>
+
+<script>
+(() => {
+  const API_URL = "/api/orders";
+
+  const sections = [
+    ["fielding-gloves", "Fielding Gloves"],
+    ["catchers-mitts", "Catcher’s Mitts"],
+    ["first-base-mitts", "First Base Mitts"],
+    ["custom-color-relaces", "Custom Color Relaces"],
+    ["vintage", "Vintage"]
+  ];
+
+  const galleryRoot = document.getElementById("dynamicGallery");
+  const statusEl = document.getElementById("galleryStatus");
+
+  const lightbox = document.querySelector(".lightbox");
+  const track = document.querySelector(".lb-track");
+  const closeBtn = document.querySelector(".lb-close");
+  const prevBtn = document.querySelector(".lb-prev");
+  const nextBtn = document.querySelector(".lb-next");
+  const counter = document.querySelector(".lb-counter");
+
+  let activePhotos = [];
+  let activeIndex = 0;
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function prettyAlt(sectionLabel, photo, index) {
+    return `${sectionLabel} glove photo ${index + 1}`;
+  }
+
+  function renderGallery(gallery) {
+    galleryRoot.innerHTML = "";
+
+    let total = 0;
+
+    sections.forEach(([key, label]) => {
+      const photos = Array.isArray(gallery[key]) ? gallery[key] : [];
+      if (!photos.length) return;
+
+      total += photos.length;
+
+      const section = document.createElement("section");
+      section.className = "gallery-group";
+      section.id = key;
+
+      section.innerHTML = `
+        <h2>${escapeHtml(label)}</h2>
+        <div class="gallery-strip" data-gallery-group="${escapeHtml(key)}">
+          ${photos.map((photo, index) => `
+            <button
+              class="gallery-thumb"
+              type="button"
+              data-gallery-group="${escapeHtml(key)}"
+              data-gallery-index="${index}"
+              aria-label="Open image: ${escapeHtml(prettyAlt(label, photo, index))}">
+              <img
+                src="${escapeHtml(photo.url)}"
+                alt="${escapeHtml(prettyAlt(label, photo, index))}"
+                loading="lazy"
+                decoding="async">
+            </button>
+          `).join("")}
+        </div>
+      `;
+
+      section.querySelectorAll(".gallery-thumb").forEach(btn => {
+        btn.addEventListener("click", () => {
+          openLightbox(photos, Number(btn.dataset.galleryIndex || 0));
+        });
+      });
+
+      galleryRoot.appendChild(section);
+    });
+
+    if (statusEl) {
+      statusEl.textContent = total ? "" : "No gallery photos have been uploaded yet.";
+    }
+  }
+
+  function openLightbox(photos, index) {
+    activePhotos = photos || [];
+    activeIndex = index || 0;
+
+    renderLightbox();
+    lightbox.classList.add("open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeLightbox() {
+    lightbox.classList.remove("open");
+    lightbox.setAttribute("aria-hidden", "true");
+    track.innerHTML = "";
+    document.body.style.overflow = "";
+  }
+
+  function renderLightbox() {
+    if (!activePhotos.length) return;
+
+    track.innerHTML = activePhotos.map(photo => `
+      <img src="${escapeHtml(photo.url)}" alt="">
+    `).join("");
+
+    track.style.transform = `translateX(-${activeIndex * 100}%)`;
+    track.style.transition = "transform .2s ease";
+
+    if (counter) {
+      counter.textContent = `${activeIndex + 1} / ${activePhotos.length}`;
+    }
+
+    prevBtn.style.display = activePhotos.length > 1 ? "" : "none";
+    nextBtn.style.display = activePhotos.length > 1 ? "" : "none";
+  }
+
+  function moveLightbox(direction) {
+    if (!activePhotos.length) return;
+
+    activeIndex += direction;
+
+    if (activeIndex < 0) activeIndex = activePhotos.length - 1;
+    if (activeIndex >= activePhotos.length) activeIndex = 0;
+
+    renderLightbox();
+  }
+
+  closeBtn.addEventListener("click", closeLightbox);
+  prevBtn.addEventListener("click", () => moveLightbox(-1));
+  nextBtn.addEventListener("click", () => moveLightbox(1));
+
+  lightbox.addEventListener("click", (e) => {
+    if (e.target === lightbox) closeLightbox();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (!lightbox.classList.contains("open")) return;
+
+    if (e.key === "Escape") closeLightbox();
+    if (e.key === "ArrowLeft") moveLightbox(-1);
+    if (e.key === "ArrowRight") moveLightbox(1);
+  });
+
+  let touchStartX = 0;
+
+  lightbox.addEventListener("touchstart", (e) => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+
+  lightbox.addEventListener("touchend", (e) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchEndX - touchStartX;
+
+    if (Math.abs(diff) < 40) return;
+
+    if (diff < 0) moveLightbox(1);
+    if (diff > 0) moveLightbox(-1);
+  }, { passive: true });
+
+  async function loadGallery() {
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+        body: JSON.stringify({
+          action: "listGalleryPhotos"
+        })
+      });
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        throw new Error(data.error || "Gallery failed to load.");
+      }
+
+      renderGallery(data.gallery || {});
+    } catch (err) {
+      if (statusEl) {
+        statusEl.textContent = err.message || "Gallery failed to load.";
+      }
+    }
+  }
+
+  loadGallery();
+})();
+</script>
