@@ -273,4 +273,82 @@ body_class: inner
       <a class="btn btn-secondary" href="{{ '/contact/' | relative_url }}">Contact Me</a>
       <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Service Request</a>
     </div>
+
+    <script>
+(function () {
+  const OUT_OF_STOCK_THRESHOLD = 3;
+
+  function normalizeColor(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+  }
+
+  function setOutOfStock(tile) {
+    if (!tile || tile.querySelector(".overlay")) return;
+
+    const label = tile.querySelector(".lace-label");
+
+    const overlay = document.createElement("a");
+    overlay.className = "overlay";
+    overlay.textContent = "Out of stock";
+    overlay.setAttribute(
+      "style",
+      "position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(9,47,77,.5);color:var(--bg);font-size:16px;font-weight:600;letter-spacing:.03em;display:flex;align-items:center;justify-content:center;"
+    );
+
+    tile.appendChild(overlay);
+
+    if (label) {
+      label.dataset.originalLabel = label.dataset.originalLabel || label.textContent;
+      label.textContent = "Out of stock";
+    }
+  }
+
+  function setInStock(tile) {
+    if (!tile) return;
+
+    const overlay = tile.querySelector(".overlay");
+    if (overlay) overlay.remove();
+
+    const label = tile.querySelector(".lace-label");
+    if (label && label.dataset.originalLabel) {
+      label.textContent = label.dataset.originalLabel;
+    }
+  }
+
+  async function updateLaceStockDisplay() {
+    const res = await fetch("/api/lace-inventory", {
+      cache: "no-store"
+    });
+
+    const data = await res.json();
+    if (!data.ok || !Array.isArray(data.inventory)) return;
+
+    const inventoryMap = new Map(
+      data.inventory.map(item => [
+        normalizeColor(item.color),
+        Number(item.quantity_on_hand ?? 0)
+      ])
+    );
+
+    document.querySelectorAll("[data-lace-color]").forEach(tile => {
+      const key = normalizeColor(tile.dataset.laceColor);
+
+      if (!inventoryMap.has(key)) return;
+
+      const qty = inventoryMap.get(key);
+
+      if (qty < OUT_OF_STOCK_THRESHOLD) {
+        setOutOfStock(tile);
+      } else {
+        setInStock(tile);
+      }
+    });
+  }
+
+  updateLaceStockDisplay().catch(() => {});
+})();
+</script>
   </main>
