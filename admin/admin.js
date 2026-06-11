@@ -864,6 +864,7 @@ function installSwipeDeleteStyles() {
        }
     }
 
+ /* Inventory filter */
     .inventory-filter-bar{
       display:flex;
       gap:10px;
@@ -872,17 +873,18 @@ function installSwipeDeleteStyles() {
     }
 
     .inventory-filter-bar button{
-      border:0;
+      border:1px solid rgba(218,202,177,.28);
       border-radius:999px;
       padding:9px 14px;
-      background:var(--navy);
-      color:var(--bg);
+      background:rgba(255,255,255,.08);
+      color:var(--muted);
       font-weight:700;
     }
 
-    .inventory-filter-bar button.secondary{
-      background:rgba(255,255,255,.08);
-      color:var(--muted);
+    .inventory-filter-bar button.active{
+      background:#dacab1;
+      color:#092f4d;
+      border-color:#dacab1;
     }
   `;
   document.head.appendChild(style);
@@ -1808,7 +1810,7 @@ function renderInventory(rows) {
     <button
       id="inventoryAllBtn"
       type="button"
-      class="${window.inventoryNeedsOrderOnly ? "secondary" : ""}"
+      class="${window.inventoryNeedsOrderOnly ? "" : "active"}"
     >
       All
     </button>
@@ -1816,7 +1818,7 @@ function renderInventory(rows) {
     <button
       id="inventoryNeedsOrderBtn"
       type="button"
-      class="${window.inventoryNeedsOrderOnly ? "" : "secondary"}"
+      class="${window.inventoryNeedsOrderOnly ? "active" : ""}"
     >
       Needs Order
     </button>
