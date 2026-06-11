@@ -1947,13 +1947,59 @@ function initUploadView() {
 
   if (!input || !status) return;
 
-  input.addEventListener("change", () => {
-    const count = input.files?.length || 0;
+  input.addEventListener("change", async () => {
+    const files = Array.from(input.files || []);
 
-    status.textContent =
-      count === 0
-        ? "Choose photos to upload."
-        : `${count} photo${count === 1 ? "" : "s"} selected. Supabase upload is next.`;
+    if (!files.length) {
+      status.textContent = "Choose photos to upload.";
+      return;
+    }
+
+    status.textContent = `Uploading ${files.length} photo${files.length === 1 ? "" : "s"}...`;
+
+    let uploaded = 0;
+    const failed = [];
+
+    for (const file of files) {
+      try {
+        const dataUrl = await fileToDataUrl(file);
+
+        await postJson(
+          {
+            action: "uploadGalleryPhoto",
+            filename: file.name,
+            contentType: file.type || "image/jpeg",
+            dataUrl
+          },
+          true
+        );
+
+        uploaded++;
+        status.textContent = `Uploaded ${uploaded} of ${files.length} photo${files.length === 1 ? "" : "s"}...`;
+      } catch (err) {
+        failed.push(`${file.name}: ${err.message || "Upload failed"}`);
+      }
+    }
+
+    input.value = "";
+
+    if (failed.length) {
+      status.textContent = `Uploaded ${uploaded}. Failed: ${failed.join(" | ")}`;
+      return;
+    }
+
+    status.textContent = `Uploaded ${uploaded} photo${uploaded === 1 ? "" : "s"} to the website gallery.`;
+  });
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Could not read file."));
+
+    reader.readAsDataURL(file);
   });
 }
 
