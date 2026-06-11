@@ -2048,8 +2048,8 @@ function initNavTree() {
       const group = document.querySelector(`[data-tree="${key}"]`);
       if (!group) return;
 
-      group.classList.toggle("collapsed");
-      btn.classList.toggle("collapsed");
+      group.classList.toggle("is-collapsed");
+      btn.classList.toggle("is-collapsed");
     });
   });
 }
