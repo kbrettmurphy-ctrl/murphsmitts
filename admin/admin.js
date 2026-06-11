@@ -4,6 +4,7 @@ const TOKEN_KEY = "mm_admin_token";
 const loginView = document.getElementById("loginView");
 const dashboardView = document.getElementById("dashboardView");
 const detailView = document.getElementById("detailView");
+const uploadView = document.getElementById("uploadView");
 const detailTitle = document.getElementById("detailTitle");
 const pinInput = document.getElementById("pinInput");
 const loginStatus = document.getElementById("loginStatus");
@@ -39,7 +40,10 @@ window.inventoryNeedsOrderOnly = false;
    VIEW / MENU
 ========================= */
 function showView(view) {
-  [loginView, dashboardView, detailView].forEach(v => v.classList.remove("active"));
+  [loginView, dashboardView, detailView, uploadView]
+    .filter(Boolean)
+    .forEach(v => v.classList.remove("active"));
+
   view.classList.add("active");
   syncAuthUI();
 }
@@ -247,6 +251,8 @@ function getViewTitle(viewName) {
     case "hold": return "On Hold";
     case "completed": return "Completed";
     case "all": return "All Orders";
+    case "upload":
+     return "Upload";
     default: return "Current Orders";
   }
 }
@@ -1000,6 +1006,11 @@ function setActiveView(viewName) {
     link.classList.toggle("active", link.dataset.view === viewName);
   });
   viewTitle.textContent = getViewTitle(viewName);
+  if (viewName === "upload") {
+     showView(uploadView);
+     closeMenu();
+     return;
+  }
   if (viewName === "inventory") {
      searchInput.value = "";
      loadInventory().catch(err => {
@@ -2009,11 +2020,28 @@ document.getElementById("refreshBtn")?.addEventListener("click", async () => {
   }
 });
 
+function initUploadView() {
+  const input = document.getElementById("galleryUploadInput");
+  const status = document.getElementById("galleryUploadStatus");
+
+  if (!input || !status) return;
+
+  input.addEventListener("change", () => {
+    const count = input.files?.length || 0;
+
+    status.textContent =
+      count === 0
+        ? "Choose photos to upload."
+        : `${count} photo${count === 1 ? "" : "s"} selected.`;
+  });
+}
+
 /* =========================
    INIT
 ========================= */
 (async function init() {
   installSwipeDeleteStyles();
+  initUploadView();
   syncAuthUI();
 
   if (!getToken()) {
