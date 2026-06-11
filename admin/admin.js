@@ -44,7 +44,10 @@ function showView(view) {
     .filter(Boolean)
     .forEach(v => v.classList.remove("active"));
 
-  view.classList.add("active");
+  if (view) {
+    view.classList.add("active");
+  }
+
   syncAuthUI();
 }
 
@@ -240,6 +243,7 @@ function isInTransitToMe(order) {
 
 function getViewTitle(viewName) {
   switch (viewName) {
+    case "upload": return "Upload";
     case "inventory": return "Lace Inventory";
     case "waiting": return "Waiting on Lace";
     case "estimate": return "Estimate Sent";
@@ -251,8 +255,6 @@ function getViewTitle(viewName) {
     case "hold": return "On Hold";
     case "completed": return "Completed";
     case "all": return "All Orders";
-    case "upload":
-     return "Upload";
     default: return "Current Orders";
   }
 }
@@ -1005,12 +1007,15 @@ function setActiveView(viewName) {
   navLinks.forEach(link => {
     link.classList.toggle("active", link.dataset.view === viewName);
   });
+
   viewTitle.textContent = getViewTitle(viewName);
+
   if (viewName === "upload") {
-     showView(uploadView);
-     closeMenu();
-     return;
+    showView(uploadView);
+    closeMenu();
+    return;
   }
+
   if (viewName === "inventory") {
      searchInput.value = "";
      loadInventory().catch(err => {
@@ -1936,6 +1941,22 @@ function renderReorderBanner(rows) {
   });
 }
 
+function initUploadView() {
+  const input = document.getElementById("galleryUploadInput");
+  const status = document.getElementById("galleryUploadStatus");
+
+  if (!input || !status) return;
+
+  input.addEventListener("change", () => {
+    const count = input.files?.length || 0;
+
+    status.textContent =
+      count === 0
+        ? "Choose photos to upload."
+        : `${count} photo${count === 1 ? "" : "s"} selected. Supabase upload is next.`;
+  });
+}
+
 function openOrder(orderNumber) {
   listScrollY = window.scrollY || document.documentElement.scrollTop || 0;
   const order = allOrders.find(o => String(o.orderNumber) === String(orderNumber));
@@ -2019,22 +2040,6 @@ document.getElementById("refreshBtn")?.addEventListener("click", async () => {
     alert("Refresh failed: " + err.message);
   }
 });
-
-function initUploadView() {
-  const input = document.getElementById("galleryUploadInput");
-  const status = document.getElementById("galleryUploadStatus");
-
-  if (!input || !status) return;
-
-  input.addEventListener("change", () => {
-    const count = input.files?.length || 0;
-
-    status.textContent =
-      count === 0
-        ? "Choose photos to upload."
-        : `${count} photo${count === 1 ? "" : "s"} selected.`;
-  });
-}
 
 /* =========================
    INIT
