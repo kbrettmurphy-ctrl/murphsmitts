@@ -422,7 +422,7 @@ button.secondary{
   color:var(--cream);
 }
 
-#orderCount{
+#orderCount,
 #uploadCount{
   margin:4px 0 0;
   color:rgba(218,202,177,.76);
@@ -930,7 +930,7 @@ button.secondary{
     font-size:.95rem;
   }
 
-  #orderCount{
+  #orderCount,
   #uploadCount{
     font-size:.8rem;
   }
