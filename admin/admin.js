@@ -2041,12 +2041,26 @@ document.getElementById("refreshBtn")?.addEventListener("click", async () => {
   }
 });
 
+function initNavTree() {
+  document.querySelectorAll("[data-tree-toggle]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.treeToggle;
+      const group = document.querySelector(`[data-tree="${key}"]`);
+      if (!group) return;
+
+      group.classList.toggle("collapsed");
+      btn.classList.toggle("collapsed");
+    });
+  });
+}
+
 /* =========================
    INIT
 ========================= */
 (async function init() {
   installSwipeDeleteStyles();
   initUploadView();
+  initNavTree();
   syncAuthUI();
 
   if (!getToken()) {
