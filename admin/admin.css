@@ -423,6 +423,7 @@ button.secondary{
 }
 
 #orderCount{
+#uploadCount{
   margin:4px 0 0;
   color:rgba(218,202,177,.76);
   font-size:.95rem;
@@ -930,6 +931,7 @@ button.secondary{
   }
 
   #orderCount{
+  #uploadCount{
     font-size:.8rem;
   }
 
