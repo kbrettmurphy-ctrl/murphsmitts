@@ -49,13 +49,16 @@ export async function onRequest(context) {
     const orderNumber = order.order_number;
     const mediaUrls = await saveIncomingMedia(env, form, orderNumber);
     
-    const existingPhotos = Array.isArray(order.glove_photos) ? order.glove_photos : [];
+    const existingPhotos = parsePhotoList(order.glove_photos);
 
     const updates = {
       last_customer_text: message || (mediaUrls.length ? "[Photo received]" : ""),
-      last_customer_text_at: new Date().toISOString(),
-      glove_photos: [...existingPhotos, ...mediaUrls]
+      last_customer_text_at: new Date().toISOString()
     };
+
+    if (mediaUrls.length) {
+      updates.glove_photos = [...existingPhotos, ...mediaUrls];
+    }
 
     let reply = mediaUrls.length
       ? "Thanks, I received the photo(s). Brett will review them and follow up if needed."
@@ -239,4 +242,19 @@ async function saveIncomingMedia(env, form, orderNumber) {
   }
 
   return savedUrls;
+}
+
+function parsePhotoList(value) {
+  if (Array.isArray(value)) return value;
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
 }
