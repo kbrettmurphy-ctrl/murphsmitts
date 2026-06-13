@@ -1436,45 +1436,117 @@ const lightboxImg = document.getElementById("lightboxImage");
 
 if (photos.length && lightbox && lightboxImg) {
   let currentPhoto = 0;
-  let startX = 0;
+
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartCount = 0;
+  let touchMoved = false;
+  let ignoreNextClick = false;
+
+  function showPhoto(index) {
+    currentPhoto = Math.max(0, Math.min(photos.length - 1, index));
+    lightboxImg.src = photos[currentPhoto];
+  }
+
+  function closeLightbox() {
+    lightbox.classList.remove("show");
+    lightboxImg.src = "";
+  }
+
+  function nextPhoto() {
+    if (currentPhoto < photos.length - 1) {
+      showPhoto(currentPhoto + 1);
+    }
+  }
+
+  function prevPhoto() {
+    if (currentPhoto > 0) {
+      showPhoto(currentPhoto - 1);
+    }
+  }
 
   document.querySelectorAll(".photo-thumb-img").forEach(img => {
     img.addEventListener("click", () => {
-      currentPhoto = Number(img.dataset.index);
-      lightboxImg.src = photos[currentPhoto];
+      showPhoto(Number(img.dataset.index));
       lightbox.classList.add("show");
     });
   });
 
-  lightbox.addEventListener("click", () => {
-    if (currentPhoto < photos.length - 1) {
-      currentPhoto++;
-      lightboxImg.src = photos[currentPhoto];
-    } else {
-      lightbox.classList.remove("show");
-      lightboxImg.src = "";
-    }
-  });
-
   lightbox.addEventListener("touchstart", e => {
-    startX = e.touches[0].clientX;
-  });
+    touchStartCount = e.touches.length;
+    touchMoved = false;
+
+    if (e.touches.length === 1) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }
+
+    if (e.touches.length > 1) {
+      ignoreNextClick = true;
+    }
+  }, { passive: true });
+
+  lightbox.addEventListener("touchmove", e => {
+    touchMoved = true;
+
+    if (e.touches.length > 1) {
+      ignoreNextClick = true;
+    }
+  }, { passive: true });
 
   lightbox.addEventListener("touchend", e => {
-    const endX = e.changedTouches[0].clientX;
-    const diff = endX - startX;
-
-    if (Math.abs(diff) < 40) return;
-
-    if (diff < 0 && currentPhoto < photos.length - 1) {
-      currentPhoto++;
+    if (touchStartCount > 1) {
+      ignoreNextClick = true;
+      return;
     }
 
-    if (diff > 0 && currentPhoto > 0) {
-      currentPhoto--;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+
+    const diffX = touch.clientX - touchStartX;
+    const diffY = touch.clientY - touchStartY;
+
+    // Swipes only. Pinch/zoom/tap release should do nothing here.
+    if (Math.abs(diffX) > 60 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+      ignoreNextClick = true;
+
+      if (diffX < 0) {
+        nextPhoto();
+      } else {
+        prevPhoto();
+      }
+    }
+  }, { passive: true });
+
+  lightbox.addEventListener("click", e => {
+    if (ignoreNextClick || touchMoved) {
+      ignoreNextClick = false;
+      touchMoved = false;
+      return;
     }
 
-    lightboxImg.src = photos[currentPhoto];
+    const rect = lightboxImg.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+
+    const clickedImage =
+      x >= rect.left &&
+      x <= rect.right &&
+      y >= rect.top &&
+      y <= rect.bottom;
+
+    if (!clickedImage) {
+      closeLightbox();
+      return;
+    }
+
+    const imageMidpoint = rect.left + rect.width / 2;
+
+    if (x < imageMidpoint) {
+      prevPhoto();
+    } else {
+      nextPhoto();
+    }
   });
 }
 
