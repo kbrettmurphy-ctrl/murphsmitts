@@ -1234,7 +1234,7 @@ If I don't hear back within 48 hours, the order will be placed on hold.`;
 I'll keep you updated if anything changes.`;
   }
 
-  if (s === "waiting on lace") {
+  if (s === "waiting on lace/parts") {
     return "Your glove is temporarily on hold while I wait on materials needed to complete the work.\n\nAs soon as the lace arrives, I'll be able to start the work and send another update.";
   }
 
