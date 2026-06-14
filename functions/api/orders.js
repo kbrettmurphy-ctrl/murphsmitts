@@ -1235,7 +1235,7 @@ I'll keep you updated if anything changes.`;
   }
 
   if (s === "waiting on lace/parts") {
-    return "Your glove is temporarily on hold while I wait on materials needed to complete the work.\n\nAs soon as the lace arrives, I'll be able to start the work and send another update.";
+    return "Your glove is temporarily on hold while I wait on materials needed to complete the work.\n\nAs soon as the lace/parts arrive, I'll be able to start the work and send another update.";
   }
 
   if (s === "ready to go") {
