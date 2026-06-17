@@ -45,6 +45,7 @@
 
         <button class="nav-link nav-main" data-view="inventory">Lace Inventory</button>
         <button class="nav-link nav-main" data-view="upload">Upload</button>
+        <button class="nav-link nav-main" data-view="gloves-sale">Gloves For Sale</button>
       </nav>
     </aside>
 
@@ -128,6 +129,26 @@
             </p>
           </div>
         </div>
+      </section>
+
+      <section id="saleGlovesView" class="view">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="saleGlovesMenuBtn" class="icon-btn" aria-label="Open menu">☰</button>
+            <div>
+              <h1>Gloves For Sale</h1>
+              <p id="saleGlovesCount" class="muted">Manage glove listings</p>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px;">
+            <button id="addSaleGloveBtn" class="secondary">+ Add</button>
+            <button id="saleGlovesRefreshBtn" class="secondary">🔄</button>
+            <button id="saleGlovesLogoutBtn" class="secondary">Log Out</button>
+          </div>
+        </header>
+
+        <div id="saleGlovesList" class="orders-list"></div>
       </section>
 
       <section id="detailView" class="view">
