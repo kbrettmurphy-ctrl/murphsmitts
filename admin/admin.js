@@ -26,6 +26,15 @@ const menuBtn = document.getElementById("menuBtn");
 const closeMenuBtn = document.getElementById("closeMenuBtn");
 const navLinks = Array.from(document.querySelectorAll(".nav-link"));
 
+const saleGlovesView = document.getElementById("saleGlovesView");
+const saleGlovesList = document.getElementById("saleGlovesList");
+const saleGlovesCount = document.getElementById("saleGlovesCount");
+
+const saleGlovesMenuBtn = document.getElementById("saleGlovesMenuBtn");
+const saleGlovesRefreshBtn = document.getElementById("saleGlovesRefreshBtn");
+const saleGlovesLogoutBtn = document.getElementById("saleGlovesLogoutBtn");
+const addSaleGloveBtn = document.getElementById("addSaleGloveBtn");
+
 let laceInventory = [];
 let reorderBannerDismissed = false;
 let allOrders = [];
@@ -40,7 +49,7 @@ window.inventoryNeedsOrderOnly = false;
    VIEW / MENU
 ========================= */
 function showView(view) {
-  [loginView, dashboardView, detailView, uploadView]
+  [loginView, dashboardView, detailView, uploadView, saleGlovesView]
     .filter(Boolean)
     .forEach(v => v.classList.remove("active"));
 
@@ -263,6 +272,7 @@ function getViewTitle(viewName) {
     case "hold": return "On Hold";
     case "completed": return "Completed";
     case "all": return "All Orders";
+    case "gloves-sale": return "Gloves For Sale";
     default: return "Current Orders";
   }
 }
@@ -1022,6 +1032,13 @@ function setActiveView(viewName) {
     showView(uploadView);
     closeMenu();
     return;
+  }
+
+  if (viewName === "gloves-sale") {
+     loadSaleGloves();
+     showView(saleGlovesView);
+     closeMenu();
+     return;
   }
 
   if (viewName === "inventory") {
@@ -1885,6 +1902,49 @@ async function loadOrders() {
    }
 }
 
+async function loadSaleGloves() {
+  saleGlovesList.innerHTML =
+    `<div class="no-results">Loading gloves...</div>`;
+
+  try {
+    const data = await postJson({
+      action: "listSaleGloves"
+    }, true);
+
+    const gloves = data.gloves || [];
+
+    saleGlovesCount.textContent =
+      `${gloves.length} glove${gloves.length === 1 ? "" : "s"}`;
+
+    if (!gloves.length) {
+      saleGlovesList.innerHTML =
+        `<div class="no-results">No gloves listed.</div>`;
+      return;
+    }
+
+    saleGlovesList.innerHTML = gloves.map(glove => `
+      <div class="order-card">
+        <div class="order-top">
+          <div>
+            <div class="order-name">${escapeHtml(glove.title || "")}</div>
+            <div class="order-number">
+              $${Number(glove.price || 0).toFixed(2)}
+            </div>
+          </div>
+
+          <div class="order-status">
+            ${escapeHtml(glove.status || "")}
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+  } catch (err) {
+    saleGlovesList.innerHTML =
+      `<div class="no-results">${escapeHtml(err.message)}</div>`;
+  }
+}
+
 async function loadInventory() {
   const data = await postJson({ action: "listInventory" }, true);
   laceInventory = data.inventory || [];
@@ -2143,6 +2203,19 @@ backBtn.addEventListener("click", () => {
   requestAnimationFrame(() => {
     window.scrollTo(0, listScrollY);
   });
+});
+
+saleGlovesMenuBtn?.addEventListener("click", openMenu);
+
+saleGlovesRefreshBtn?.addEventListener("click", loadSaleGloves);
+
+saleGlovesLogoutBtn?.addEventListener("click", () => {
+  clearToken();
+  location.reload();
+});
+
+addSaleGloveBtn?.addEventListener("click", () => {
+  alert("Create glove form coming next.");
 });
 
 if (saveOrderBtn) {
