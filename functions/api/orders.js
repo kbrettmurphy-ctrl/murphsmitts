@@ -587,6 +587,69 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "createSaleGlove") {
+      const auth = await validateTokenFromBody(
+        body,
+        env.ADMIN_SESSION_SECRET
+      );
+
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const payload = {
+        slug: body.slug,
+        title: body.title,
+        short_description: body.shortDescription,
+        description: body.description,
+        price: body.price || null,
+        brand: body.brand,
+        model: body.model,
+        glove_size: body.gloveSize,
+        position: body.position,
+        web: body.web,
+        throw_hand: body.throwHand,
+        condition: body.condition,
+        status: body.status || "available",
+        purchase_url: body.purchaseUrl,
+        featured: body.featured === true,
+        sort_order: Number(body.sortOrder || 0)
+      };
+
+      const result = await supabaseFetch(
+        env,
+        "/rest/v1/gloves_for_sale",
+        {
+          method: "POST",
+          headers: {
+            Prefer: "return=representation"
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Failed to create glove listing.",
+            details: result.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json(
+        {
+          ok: true,
+          glove: result.data?.[0] || null
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     if (action === "listGalleryPhotos") {
       const sections = [
         "fielding-gloves",
