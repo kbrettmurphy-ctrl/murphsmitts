@@ -820,6 +820,126 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "uploadSaleGlovePhoto") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const gloveId = cleanText(body.gloveId);
+      const filename = cleanText(body.filename);
+      const contentType = cleanText(body.contentType) || "image/jpeg";
+      const dataUrl = cleanText(body.dataUrl);
+
+      if (!gloveId || !filename || !dataUrl) {
+        return json(
+          {
+            ok: false,
+            error: "Missing gloveId, filename or image data."
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      if (!contentType.startsWith("image/")) {
+        return json(
+          {
+            ok: false,
+            error: "Only image uploads are allowed."
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      const gloveResp = await supabaseFetch(
+        env,
+        `/rest/v1/gloves_for_sale?select=id,slug&id=eq.${encodeURIComponent(gloveId)}&limit=1`
+      );
+
+      if (!gloveResp.ok || !Array.isArray(gloveResp.data) || !gloveResp.data[0]) {
+        return json(
+          {
+            ok: false,
+            error: "Glove not found.",
+            details: gloveResp.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      const glove = gloveResp.data[0];
+
+      const uploaded = await uploadSaleGlovePhoto(env, {
+        slug: glove.slug,
+        filename,
+        contentType,
+        dataUrl
+      });
+
+      if (!uploaded.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Glove photo upload failed.",
+            details: uploaded.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      const countResp = await supabaseFetch(
+        env,
+        `/rest/v1/glove_sale_photos?select=id&glove_id=eq.${encodeURIComponent(gloveId)}`
+      );
+
+      const sortOrder = Array.isArray(countResp.data)
+        ? countResp.data.length
+        : 0;
+
+      const photoInsert = await supabaseFetch(
+        env,
+        "/rest/v1/glove_sale_photos",
+        {
+          method: "POST",
+          headers: {
+            Prefer: "return=representation"
+          },
+          body: JSON.stringify({
+            glove_id: gloveId,
+            url: uploaded.url,
+            filename,
+            sort_order: sortOrder
+          })
+        }
+      );
+
+      if (!photoInsert.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Photo uploaded but database insert failed.",
+            details: photoInsert.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json(
+        {
+          ok: true,
+          photo: photoInsert.data?.[0] || null
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     if (action === "listGalleryPhotos") {
       const sections = [
         "fielding-gloves",
@@ -1297,6 +1417,78 @@ async function uploadGalleryPhoto(env, { section, filename, contentType, dataUrl
     return {
       ok: false,
       error: err && err.message ? err.message : String(err)
+    };
+  }
+}
+
+async function uploadSaleGlovePhoto(env, { slug, filename, contentType, dataUrl }) {
+  try {
+    const base64 = String(dataUrl || "").split(",").pop();
+
+    if (!base64) {
+      return {
+        ok: false,
+        error: "Invalid image data."
+      };
+    }
+
+    const bytes = base64ToUint8Array(base64);
+    const ext = extensionFromContentType(contentType, filename);
+
+    const cleanName = safeStorageName(filename)
+      .replace(/\.[a-z0-9]+$/i, "");
+
+    const stamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, "-");
+
+    const safeSlug = String(slug || "glove")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "") || "glove";
+
+    const path = `${safeSlug}/${stamp}-${cleanName}.${ext}`;
+
+    const uploadResp = await fetch(
+      `${env.SUPABASE_URL}/storage/v1/object/gloves-for-sale/${path}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": contentType,
+          "x-upsert": "true"
+        },
+        body: bytes
+      }
+    );
+
+    const uploadText = await uploadResp.text();
+
+    if (!uploadResp.ok) {
+      let error = uploadText;
+      try {
+        error = JSON.parse(uploadText);
+      } catch {}
+
+      return {
+        ok: false,
+        error
+      };
+    }
+
+    return {
+      ok: true,
+      path,
+      url: `${env.SUPABASE_URL}/storage/v1/object/public/gloves-for-sale/${path}`
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err?.message || String(err)
     };
   }
 }
