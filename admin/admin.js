@@ -1923,7 +1923,8 @@ async function loadSaleGloves() {
     }
 
     saleGlovesList.innerHTML = gloves.map(glove => `
-      <div class="order-card">
+      <div class="order-card sale-glove-card"
+           data-id="${glove.id}">
         <div class="order-top">
           <div>
             <div class="order-name">${escapeHtml(glove.title || "")}</div>
@@ -1938,6 +1939,31 @@ async function loadSaleGloves() {
         </div>
       </div>
     `).join("");
+
+    saleGlovesList
+      .querySelectorAll(".sale-glove-card")
+      .forEach(card => {
+
+       card.addEventListener("click", async () => {
+
+         const gloveId = card.dataset.id;
+
+         try {
+
+           const data = await postJson({
+             action: "getSaleGlove",
+             id: gloveId
+           }, true);
+
+           renderSaleGloveEditor(data.glove);
+
+         } catch (err) {
+           alert(err.message);
+         }
+
+       });
+
+    });
 
   } catch (err) {
     saleGlovesList.innerHTML =
