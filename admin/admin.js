@@ -2099,6 +2099,7 @@ function renderSaleGloveEditor(glove) {
              <p id="saleGloveUploadStatus" class="upload-status">
                No photos selected.
              </p>
+            <div id="saleGlovePhotosList"></div>
            </div>
         `}
 
@@ -2216,6 +2217,7 @@ function renderSaleGloveEditor(glove) {
 
   if (!isNew && glove?.id) {
     initSaleGlovePhotoUploader(glove);
+    loadSaleGlovePhotos(glove.id);
   }
 }
 
@@ -2317,9 +2319,61 @@ function initSaleGlovePhotoUploader(glove) {
     }
 
     clearSelection();
+    await loadSaleGlovePhotos(glove.id);
     status.textContent =
       `Uploaded ${uploaded} photo${uploaded === 1 ? "" : "s"}.`;
   });
+}
+
+async function loadSaleGlovePhotos(gloveId) {
+  const wrap =
+    document.getElementById("saleGlovePhotosList");
+
+  if (!wrap) return;
+
+  try {
+
+    const data = await postJson({
+      action: "listSaleGlovePhotos",
+      gloveId
+    }, true);
+
+    const photos = data.photos || [];
+
+    if (!photos.length) {
+      wrap.innerHTML = `
+        <p class="muted">
+          No uploaded photos yet.
+        </p>
+      `;
+      return;
+    }
+
+    wrap.innerHTML = `
+      <div class="upload-preview-grid">
+        ${photos.map(photo => `
+          <div class="upload-preview-item">
+            <img
+              src="${escapeAttr(photo.url)}"
+              alt=""
+              loading="lazy"
+            >
+            <div class="upload-preview-name">
+              ${escapeHtml(photo.filename || "")}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+
+  } catch (err) {
+
+    wrap.innerHTML = `
+      <p class="muted">
+        Failed to load photos.
+      </p>
+    `;
+  }
 }
 
 async function loadInventory() {
