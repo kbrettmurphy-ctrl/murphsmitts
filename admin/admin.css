@@ -292,6 +292,48 @@ button.secondary{
   color:var(--muted);
 }
 
+.upload-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:14px;
+}
+
+.upload-actions button:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+
+.upload-preview-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(86px,1fr));
+  gap:10px;
+  margin-top:14px;
+}
+
+.upload-preview-item{
+  border:1px solid rgba(218,202,177,.24);
+  border-radius:14px;
+  overflow:hidden;
+  background:rgba(255,255,255,.06);
+}
+
+.upload-preview-item img{
+  display:block;
+  width:100%;
+  aspect-ratio:1 / 1;
+  object-fit:cover;
+}
+
+.upload-preview-name{
+  padding:7px 8px;
+  font-size:.72rem;
+  color:var(--muted);
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+
 
 .menu-backdrop{
   position:fixed;
