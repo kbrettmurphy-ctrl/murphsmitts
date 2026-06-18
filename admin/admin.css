@@ -279,7 +279,8 @@ button.secondary{
   font-size:.9rem;
 }
 
-#galleryUploadInput{
+#galleryUploadInput,
+#saleGlovePhotoInput{
   position:absolute;
   width:1px;
   height:1px;
