@@ -587,6 +587,65 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "getSaleGlove") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const id = cleanText(body.id);
+
+      if (!id) {
+        return json(
+          {
+            ok: false,
+            error: "Missing glove id."
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      const supa = await supabaseFetch(
+        env,
+        `/rest/v1/gloves_for_sale?select=*&id=eq.${encodeURIComponent(id)}&limit=1`
+      );
+
+      if (!supa.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Failed to load glove listing.",
+            details: supa.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      const row = Array.isArray(supa.data) ? supa.data[0] : null;
+
+      if (!row) {
+        return json(
+          {
+            ok: false,
+            error: "Glove listing not found."
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json(
+        {
+          ok: true,
+          glove: mapSaleGloveFromDb(row)
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     if (action === "createSaleGlove") {
       const auth = await validateTokenFromBody(
         body,
