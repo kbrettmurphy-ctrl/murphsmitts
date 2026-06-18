@@ -1945,6 +1945,127 @@ async function loadSaleGloves() {
   }
 }
 
+function renderSaleGloveEditor(glove) {
+  const isNew = !glove;
+
+  saleGlovesList.innerHTML = `
+    <div class="upload-panel">
+      <div class="upload-card">
+        <h2>${isNew ? "Add Glove" : "Edit Glove"}</h2>
+        <p class="muted">Create or update a glove listing.</p>
+
+        <div class="detail-grid">
+          <div class="detail-block full">
+            <div class="label">Title</div>
+            <input id="saleTitle" type="text" value="${escapeAttr(glove?.title || "")}">
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Slug</div>
+            <input id="saleSlug" type="text" value="${escapeAttr(glove?.slug || "")}" placeholder="rawlings-pro200-4s">
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Price</div>
+            <input id="salePrice" type="text" inputmode="decimal" value="${escapeAttr(formatMoneyForInput(glove?.price || ""))}" placeholder="$0.00">
+          </div>
+
+          <div class="detail-block full">
+            <div class="label">Short Description</div>
+            <textarea id="saleShortDescription" rows="2">${escapeHtml(glove?.shortDescription || "")}</textarea>
+          </div>
+
+          <div class="detail-block full">
+            <div class="label">Full Description</div>
+            <textarea id="saleDescription" rows="5">${escapeHtml(glove?.description || "")}</textarea>
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Brand</div>
+            <input id="saleBrand" type="text" value="${escapeAttr(glove?.brand || "")}">
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Model</div>
+            <input id="saleModel" type="text" value="${escapeAttr(glove?.model || "")}">
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Size</div>
+            <input id="saleSize" type="text" value="${escapeAttr(glove?.gloveSize || "")}" placeholder='11.5"'>
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Position</div>
+            <input id="salePosition" type="text" value="${escapeAttr(glove?.position || "")}" placeholder="Infield">
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Web</div>
+            <input id="saleWeb" type="text" value="${escapeAttr(glove?.web || "")}" placeholder="I-Web">
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Throw Hand</div>
+            <select id="saleThrowHand">
+              <option value="">Select</option>
+              <option value="Right Hand Throw" ${glove?.throwHand === "Right Hand Throw" ? "selected" : ""}>Right Hand Throw</option>
+              <option value="Left Hand Throw" ${glove?.throwHand === "Left Hand Throw" ? "selected" : ""}>Left Hand Throw</option>
+            </select>
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Condition</div>
+            <input id="saleCondition" type="text" value="${escapeAttr(glove?.condition || "")}" placeholder="Used / Restored / Game-ready">
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Status</div>
+            <select id="saleStatus">
+              <option value="available" ${glove?.status === "available" ? "selected" : ""}>Available</option>
+              <option value="sold" ${glove?.status === "sold" ? "selected" : ""}>Sold</option>
+              <option value="hidden" ${glove?.status === "hidden" ? "selected" : ""}>Hidden</option>
+            </select>
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Featured?</div>
+            <select id="saleFeatured">
+              <option value="false" ${!glove?.featured ? "selected" : ""}>No</option>
+              <option value="true" ${glove?.featured ? "selected" : ""}>Yes</option>
+            </select>
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Sort Order</div>
+            <input id="saleSortOrder" type="number" value="${escapeAttr(glove?.sortOrder ?? 0)}">
+          </div>
+
+          <div class="detail-block full">
+            <div class="label">Purchase URL</div>
+            <input id="salePurchaseUrl" type="url" value="${escapeAttr(glove?.purchaseUrl || "")}">
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:18px;">
+          <button id="saveSaleGloveBtn" class="secondary" type="button">
+            ${isNew ? "Create Glove" : "Save Changes"}
+          </button>
+          <button id="cancelSaleGloveBtn" class="secondary" type="button">Cancel</button>
+        </div>
+
+        <p id="saleGloveEditStatus" class="upload-status"></p>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("cancelSaleGloveBtn")?.addEventListener("click", loadSaleGloves);
+
+  document.getElementById("saveSaleGloveBtn")?.addEventListener("click", async () => {
+    alert("Save action comes next.");
+  });
+}
+
 async function loadInventory() {
   const data = await postJson({ action: "listInventory" }, true);
   laceInventory = data.inventory || [];
@@ -2215,7 +2336,7 @@ saleGlovesLogoutBtn?.addEventListener("click", () => {
 });
 
 addSaleGloveBtn?.addEventListener("click", () => {
-  alert("Create glove form coming next.");
+  renderSaleGloveEditor(null);
 });
 
 if (saveOrderBtn) {
