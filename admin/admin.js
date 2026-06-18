@@ -2061,9 +2061,65 @@ function renderSaleGloveEditor(glove) {
 
   document.getElementById("cancelSaleGloveBtn")?.addEventListener("click", loadSaleGloves);
 
-  document.getElementById("saveSaleGloveBtn")?.addEventListener("click", async () => {
-    alert("Save action comes next.");
-  });
+  document.getElementById("saveSaleGloveBtn")
+     ?.addEventListener("click", async () => {
+
+     const statusEl =
+       document.getElementById("saleGloveEditStatus");
+
+     try {
+       statusEl.textContent = "Saving...";
+
+       await postJson({
+         action: "createSaleGlove",
+
+         slug: val("saleSlug"),
+         title: val("saleTitle"),
+
+         shortDescription:
+           val("saleShortDescription"),
+
+         description:
+           val("saleDescription"),
+
+         price: parseMoneyInput(
+           val("salePrice")
+         ),
+
+         brand: val("saleBrand"),
+         model: val("saleModel"),
+
+         gloveSize: val("saleSize"),
+         position: val("salePosition"),
+         web: val("saleWeb"),
+
+         throwHand: val("saleThrowHand"),
+
+         condition: val("saleCondition"),
+   
+         status: val("saleStatus"),
+
+         featured:
+           val("saleFeatured") === "true",
+
+         sortOrder:
+           Number(val("saleSortOrder") || 0),
+
+         purchaseUrl:
+           val("salePurchaseUrl")
+
+       }, true);
+
+       statusEl.textContent =
+         "Glove created.";
+
+       await loadSaleGloves();
+
+     } catch (err) {
+       statusEl.textContent =
+         err.message || "Save failed.";
+     }
+   });
 }
 
 async function loadInventory() {
