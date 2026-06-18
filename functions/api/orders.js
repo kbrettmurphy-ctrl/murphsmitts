@@ -554,6 +554,39 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "listSaleGloves") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const supa = await supabaseFetch(
+        env,
+        `/rest/v1/gloves_for_sale?select=*&order=sort_order.asc,created_at.desc`
+      );
+
+      if (!supa.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Failed to load gloves for sale from Supabase.",
+            details: supa.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json(
+        {
+          ok: true,
+          gloves: (supa.data || []).map(mapSaleGloveFromDb)
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     if (action === "listGalleryPhotos") {
       const sections = [
         "fielding-gloves",
@@ -839,6 +872,32 @@ function mapOrderFromDb(row) {
     smsOptIn: row.sms_opt_in === true,
     lastStatusTexted: row.last_status_texted,
 
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function mapSaleGloveFromDb(row) {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    shortDescription: row.short_description,
+    description: row.description,
+    price: row.price,
+    brand: row.brand,
+    model: row.model,
+    gloveSize: row.glove_size,
+    position: row.position,
+    web: row.web,
+    throwHand: row.throw_hand,
+    condition: row.condition,
+    status: row.status,
+    featuredImageUrl: row.featured_image_url,
+    hoverImageUrl: row.hover_image_url,
+    purchaseUrl: row.purchase_url,
+    featured: row.featured === true,
+    sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
