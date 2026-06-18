@@ -975,7 +975,8 @@ button.secondary{
   }
 
   #orderCount,
-  #uploadCount{
+  #uploadCount,
+  #saleGlovesCount{
     font-size:.8rem;
   }
 
