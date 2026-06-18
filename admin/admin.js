@@ -2073,12 +2073,19 @@ function renderSaleGloveEditor(glove) {
           </div>
         </div>
 
-        <div style="display:flex; gap:10px; margin-top:18px;">
-          <button id="saveSaleGloveBtn" class="secondary" type="button">
-            ${isNew ? "Create Glove" : "Save Changes"}
-          </button>
-          <button id="cancelSaleGloveBtn" class="secondary" type="button">Cancel</button>
-        </div>
+        <div style="display:flex; gap:10px; margin-top:18px; flex-wrap:wrap;">
+           <button id="saveSaleGloveBtn" class="secondary" type="button">
+             ${isNew ? "Create Glove" : "Save Changes"}
+           </button>
+
+           <button id="cancelSaleGloveBtn" class="secondary" type="button">Cancel</button>
+
+           ${isNew ? "" : `
+             <button id="deleteSaleGloveBtn" class="secondary" type="button">
+               Delete
+             </button>
+           `}
+         </div>
 
         <p id="saleGloveEditStatus" class="upload-status"></p>
       </div>
@@ -2147,7 +2154,31 @@ function renderSaleGloveEditor(glove) {
        statusEl.textContent =
          err.message || "Save failed.";
      }
-   });
+  });
+
+  document.getElementById("deleteSaleGloveBtn")
+  ?.addEventListener("click", async () => {
+    if (isNew || !glove?.id) return;
+
+    const ok = confirm(`Delete "${glove.title || "this glove"}"? This cannot be undone.`);
+    if (!ok) return;
+
+    const statusEl = document.getElementById("saleGloveEditStatus");
+
+    try {
+      statusEl.textContent = "Deleting...";
+
+      await postJson({
+        action: "deleteSaleGlove",
+        id: glove.id
+      }, true);
+
+      await loadSaleGloves();
+
+    } catch (err) {
+      statusEl.textContent = err.message || "Delete failed.";
+    }
+  });
 }
 
 async function loadInventory() {
