@@ -119,10 +119,22 @@
 
             <label class="upload-drop" for="galleryUploadInput">
               <span class="upload-drop-title">Choose gallery photos</span>
-              <span class="upload-drop-note">Select one or mulitple photos.</span>
+              <span class="upload-drop-note">Select one or multiple photos, then review before uploading.</span>
             </label>
 
             <input id="galleryUploadInput" type="file" accept="image/*" multiple>
+
+            <div id="galleryUploadPreview" class="upload-preview-grid"></div>
+
+            <div class="upload-actions">
+              <button id="galleryUploadBtn" class="secondary" type="button" disabled>
+                Upload Selected Photos
+              </button>
+
+              <button id="galleryClearBtn" class="secondary" type="button" disabled>
+                Clear Selection
+              </button>
+            </div>
 
             <p id="galleryUploadStatus" class="upload-status">
               No photos selected.
