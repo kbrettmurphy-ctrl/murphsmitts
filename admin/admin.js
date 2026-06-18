@@ -2321,18 +2321,65 @@ function initUploadView() {
   const input = document.getElementById("galleryUploadInput");
   const status = document.getElementById("galleryUploadStatus");
   const sectionSelect = document.getElementById("gallerySectionSelect");
+  const preview = document.getElementById("galleryUploadPreview");
+  const uploadBtn = document.getElementById("galleryUploadBtn");
+  const clearBtn = document.getElementById("galleryClearBtn");
 
-  if (!input || !status) return;
+  if (!input || !status || !preview || !uploadBtn || !clearBtn) return;
 
-  input.addEventListener("change", async () => {
-    const files = Array.from(input.files || []);
-    const section = sectionSelect?.value || "fielding-gloves";
+  let stagedFiles = [];
 
-    if (!files.length) {
-      status.textContent = "Choose photos to upload.";
+  function clearSelection() {
+    stagedFiles = [];
+    input.value = "";
+    preview.innerHTML = "";
+    uploadBtn.disabled = true;
+    clearBtn.disabled = true;
+    status.textContent = "No photos selected.";
+  }
+
+  function renderPreview() {
+    preview.innerHTML = "";
+
+    if (!stagedFiles.length) {
+      clearSelection();
       return;
     }
 
+    preview.innerHTML = stagedFiles.map((file, index) => `
+      <div class="upload-preview-item">
+        <img src="${escapeAttr(URL.createObjectURL(file))}" alt="Selected photo ${index + 1}">
+        <div class="upload-preview-name">${escapeHtml(file.name)}</div>
+      </div>
+    `).join("");
+
+    uploadBtn.disabled = false;
+    clearBtn.disabled = false;
+    status.textContent = `${stagedFiles.length} photo${stagedFiles.length === 1 ? "" : "s"} selected. Review, then click Upload.`;
+  }
+
+  input.addEventListener("change", () => {
+    stagedFiles = Array.from(input.files || []).filter(file => {
+      const type = file.type || "image/jpeg";
+      return type.startsWith("image/");
+    });
+
+    renderPreview();
+  });
+
+  clearBtn.addEventListener("click", clearSelection);
+
+  uploadBtn.addEventListener("click", async () => {
+    const files = stagedFiles;
+    const section = sectionSelect?.value || "fielding-gloves";
+
+    if (!files.length) {
+      status.textContent = "Choose photos before uploading.";
+      return;
+    }
+
+    uploadBtn.disabled = true;
+    clearBtn.disabled = true;
     status.textContent = `Uploading ${files.length} photo${files.length === 1 ? "" : "s"}...`;
 
     let uploaded = 0;
@@ -2348,16 +2395,13 @@ function initUploadView() {
 
         const dataUrl = await fileToDataUrl(file);
 
-        await postJson(
-          {
-            action: "uploadGalleryPhoto",
-            section,
-            filename: file.name,
-            contentType: type,
-            dataUrl
-          },
-          true
-        );
+        await postJson({
+          action: "uploadGalleryPhoto",
+          section,
+          filename: file.name,
+          contentType: type,
+          dataUrl
+        }, true);
 
         uploaded++;
         status.textContent = `Uploaded ${uploaded} of ${files.length} photo${files.length === 1 ? "" : "s"} to ${section}...`;
@@ -2366,13 +2410,14 @@ function initUploadView() {
       }
     }
 
-    input.value = "";
-
     if (failed.length) {
       status.textContent = `Uploaded ${uploaded}. Failed: ${failed.join(" | ")}`;
+      uploadBtn.disabled = false;
+      clearBtn.disabled = false;
       return;
     }
 
+    clearSelection();
     status.textContent = `Uploaded ${uploaded} photo${uploaded === 1 ? "" : "s"} to the website gallery.`;
   });
 }
@@ -2514,8 +2559,14 @@ document.getElementById("uploadLogoutBtn")?.addEventListener("click", () => {
 document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
   const input = document.getElementById("galleryUploadInput");
   const status = document.getElementById("galleryUploadStatus");
+  const preview = document.getElementById("galleryUploadPreview");
+  const uploadBtn = document.getElementById("galleryUploadBtn");
+  const clearBtn = document.getElementById("galleryClearBtn");
 
   if (input) input.value = "";
+  if (preview) preview.innerHTML = "";
+  if (uploadBtn) uploadBtn.disabled = true;
+  if (clearBtn) clearBtn.disabled = true;
   if (status) status.textContent = "No photos selected.";
 });
 
