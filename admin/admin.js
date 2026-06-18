@@ -2073,6 +2073,35 @@ function renderSaleGloveEditor(glove) {
           </div>
         </div>
 
+        ${isNew ? "" : `
+           <div class="detail-block full">
+             <div class="detail-section-title full">Photos</div>
+
+             <label class="upload-drop" for="saleGlovePhotoInput">
+               <span class="upload-drop-title">Choose glove photos</span>
+               <span class="upload-drop-note">Select photos, review them, then upload.</span>
+             </label>
+
+             <input id="saleGlovePhotoInput" type="file" accept="image/*" multiple>
+
+             <div id="saleGlovePhotoPreview" class="upload-preview-grid"></div>
+
+             <div class="upload-actions">
+               <button id="saleGloveUploadBtn" class="secondary" type="button" disabled>
+                 Upload Selected Photos
+               </button>
+
+               <button id="saleGloveClearBtn" class="secondary" type="button" disabled>
+                 Clear Selection
+               </button>
+             </div>
+
+             <p id="saleGloveUploadStatus" class="upload-status">
+               No photos selected.
+             </p>
+           </div>
+        `}
+
         <div style="display:flex; gap:10px; margin-top:18px; flex-wrap:wrap;">
            <button id="saveSaleGloveBtn" class="secondary" type="button">
              ${isNew ? "Create Glove" : "Save Changes"}
@@ -2178,6 +2207,113 @@ function renderSaleGloveEditor(glove) {
     } catch (err) {
       statusEl.textContent = err.message || "Delete failed.";
     }
+  });
+
+  if (!isNew && glove?.id) {
+    initSaleGlovePhotoUploader(glove);
+  }
+}
+
+function initSaleGlovePhotoUploader(glove) {
+  const input = document.getElementById("saleGlovePhotoInput");
+  const preview = document.getElementById("saleGlovePhotoPreview");
+  const uploadBtn = document.getElementById("saleGloveUploadBtn");
+  const clearBtn = document.getElementById("saleGloveClearBtn");
+  const status = document.getElementById("saleGloveUploadStatus");
+
+  if (!input || !preview || !uploadBtn || !clearBtn || !status) return;
+
+  let stagedFiles = [];
+
+  function clearSelection() {
+    stagedFiles = [];
+    input.value = "";
+    preview.innerHTML = "";
+    uploadBtn.disabled = true;
+    clearBtn.disabled = true;
+    status.textContent = "No photos selected.";
+  }
+
+  function renderPreview() {
+    preview.innerHTML = "";
+
+    if (!stagedFiles.length) {
+      clearSelection();
+      return;
+    }
+
+    preview.innerHTML = stagedFiles.map((file, index) => `
+      <div class="upload-preview-item">
+        <img src="${escapeAttr(URL.createObjectURL(file))}" alt="Selected photo ${index + 1}">
+        <div class="upload-preview-name">${escapeHtml(file.name)}</div>
+      </div>
+    `).join("");
+
+    uploadBtn.disabled = false;
+    clearBtn.disabled = false;
+
+    status.textContent =
+      `${stagedFiles.length} photo${stagedFiles.length === 1 ? "" : "s"} selected. Review, then click Upload.`;
+  }
+
+  input.addEventListener("change", () => {
+    stagedFiles = Array.from(input.files || []).filter(file => {
+      const type = file.type || "image/jpeg";
+      return type.startsWith("image/");
+    });
+
+    renderPreview();
+  });
+
+  clearBtn.addEventListener("click", clearSelection);
+
+  uploadBtn.addEventListener("click", async () => {
+    if (!stagedFiles.length) {
+      status.textContent = "Choose photos before uploading.";
+      return;
+    }
+
+    uploadBtn.disabled = true;
+    clearBtn.disabled = true;
+
+    let uploaded = 0;
+    const failed = [];
+
+    status.textContent =
+      `Uploading ${stagedFiles.length} photo${stagedFiles.length === 1 ? "" : "s"}...`;
+
+    for (const file of stagedFiles) {
+      try {
+        const contentType = file.type || "image/jpeg";
+        const dataUrl = await fileToDataUrl(file);
+
+        await postJson({
+          action: "uploadSaleGlovePhoto",
+          gloveId: glove.id,
+          filename: file.name,
+          contentType,
+          dataUrl
+        }, true);
+
+        uploaded++;
+
+        status.textContent =
+          `Uploaded ${uploaded} of ${stagedFiles.length} photo${stagedFiles.length === 1 ? "" : "s"}...`;
+      } catch (err) {
+        failed.push(`${file.name}: ${err.message || "Upload failed"}`);
+      }
+    }
+
+    if (failed.length) {
+      status.textContent = `Uploaded ${uploaded}. Failed: ${failed.join(" | ")}`;
+      uploadBtn.disabled = false;
+      clearBtn.disabled = false;
+      return;
+    }
+
+    clearSelection();
+    status.textContent =
+      `Uploaded ${uploaded} photo${uploaded === 1 ? "" : "s"}.`;
   });
 }
 
