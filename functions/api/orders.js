@@ -940,6 +940,53 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "listSaleGlovePhotos") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const gloveId = cleanText(body.gloveId);
+
+      if (!gloveId) {
+        return json(
+          {
+            ok: false,
+            error: "Missing glove id."
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      const photos = await supabaseFetch(
+        env,
+        `/rest/v1/glove_sale_photos?glove_id=eq.${encodeURIComponent(gloveId)}&select=*&order=sort_order.asc,id.asc`
+      );
+
+      if (!photos.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Failed to load glove photos.",
+            details: photos.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json(
+        {
+          ok: true,
+          photos: photos.data || []
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     if (action === "listGalleryPhotos") {
       const sections = [
         "fielding-gloves",
