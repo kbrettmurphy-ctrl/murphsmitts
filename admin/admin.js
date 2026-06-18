@@ -2132,7 +2132,7 @@ function renderSaleGloveEditor(glove) {
      try {
        statusEl.textContent = "Saving...";
 
-       await postJson({
+       const result = await postJson({
          action: isNew ? "createSaleGlove" : "updateSaleGlove",
          id: glove?.id,
 
@@ -2174,8 +2174,13 @@ function renderSaleGloveEditor(glove) {
        }, true);
 
        statusEl.textContent = isNew
-         ? "Glove created."
-         : "Glove updated.";
+        ? "Glove created."
+        : "Glove updated.";
+
+       if (isNew && result.glove?.id) {
+        renderSaleGloveEditor(result.glove);
+        return;
+       }
 
        await loadSaleGloves();
 
