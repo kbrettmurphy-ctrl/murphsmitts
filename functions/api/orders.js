@@ -774,6 +774,52 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "deleteSaleGlove") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const id = cleanText(body.id);
+
+      if (!id) {
+        return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
+      }
+
+      const result = await supabaseFetch(
+        env,
+        `/rest/v1/gloves_for_sale?id=eq.${encodeURIComponent(id)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Prefer: "return=representation"
+          }
+        }
+      );
+
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Failed to delete glove listing.",
+            details: result.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json(
+        {
+          ok: true,
+          deleted: true,
+          id
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     if (action === "listGalleryPhotos") {
       const sections = [
         "fielding-gloves",
