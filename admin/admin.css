@@ -340,16 +340,18 @@ button.secondary{
 }
 
 .sale-photo-action-select{
-  width:100%;
+  width:auto;
+  min-width:90px;
+  max-width:110px;
   background:#244866;
   color:var(--cream);
   border:1px solid rgba(218,202,177,.18);
   border-radius:10px;
 
-  padding:6px 8px;
-  min-height:32px;
+  padding:4px 4px;
+  min-height:24px;
 
-  font-size:.72rem;
+  font-size:.6rem;
   line-height:1.2;
 }
 
