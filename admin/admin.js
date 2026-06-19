@@ -2364,15 +2364,27 @@ async function loadSaleGlovePhotos(gloveId) {
                ${escapeHtml(photo.filename || "")}
              </div>
 
-             <button
-               class="secondary sale-photo-primary-btn"
-               type="button"
-               data-glove-id="${escapeAttr(gloveId)}"
-               data-photo-id="${escapeAttr(photo.id)}"
-               ${photo.is_primary ? "disabled" : ""}
-             >
-               ${photo.is_primary ? "Primary Photo" : "Set Primary"}
-             </button>
+             <div class="sale-photo-actions">
+                <button
+                 class="secondary sale-photo-primary-btn"
+                 type="button"
+                 data-glove-id="${escapeAttr(gloveId)}"
+                 data-photo-id="${escapeAttr(photo.id)}"
+                 ${photo.is_primary ? "disabled" : ""}
+               >
+                 ${photo.is_primary ? "Primary" : "Set Primary"}
+               </button>
+
+               <button
+                 class="secondary sale-photo-hover-btn"
+                 type="button"
+                 data-glove-id="${escapeAttr(gloveId)}"
+                 data-photo-id="${escapeAttr(photo.id)}"
+                 ${photo.is_hover ? "disabled" : ""}
+               >
+                 ${photo.is_hover ? "Hover" : "Set Hover"}
+               </button>
+             </div>
            </div>
          `).join("")}
       </div>
@@ -2404,6 +2416,28 @@ async function loadSaleGlovePhotos(gloveId) {
           btn.textContent = "Set Primary";
           btn.disabled = false;
           alert(err.message || "Failed to set primary photo.");
+        }
+      });
+    });
+
+    wrap.querySelectorAll(".sale-photo-hover-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        try {
+          btn.textContent = "Saving...";
+          btn.disabled = true;
+
+          await postJson({
+            action: "setSalePhotoHover",
+            gloveId: btn.dataset.gloveId,
+            photoId: btn.dataset.photoId
+          }, true);
+
+          await loadSaleGlovePhotos(gloveId);
+
+        } catch (err) {
+          btn.textContent = "Set Hover";
+          btn.disabled = false;
+          alert(err.message || "Failed to set hover photo.");
         }
       });
     });
