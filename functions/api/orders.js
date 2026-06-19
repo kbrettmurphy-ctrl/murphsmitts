@@ -1070,6 +1070,89 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "setSalePhotoHover") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const gloveId = cleanText(body.gloveId);
+      const photoId = cleanText(body.photoId);
+
+      if (!gloveId || !photoId) {
+        return json(
+          {
+            ok: false,
+            error: "Missing gloveId or photoId."
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      const clearHover = await supabaseFetch(
+        env,
+        `/rest/v1/glove_sale_photos?glove_id=eq.${encodeURIComponent(gloveId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            Prefer: "return=representation"
+          },
+          body: JSON.stringify({
+            is_hover: false
+          })
+        }
+      );
+
+      if (!clearHover.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Failed to clear existing hover photo.",
+            details: clearHover.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      const setHover = await supabaseFetch(
+        env,
+        `/rest/v1/glove_sale_photos?id=eq.${encodeURIComponent(photoId)}&glove_id=eq.${encodeURIComponent(gloveId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            Prefer: "return=representation"
+          },
+          body: JSON.stringify({
+            is_hover: true
+          })
+        }
+      );
+
+      if (!setHover.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Failed to set hover photo.",
+            details: setHover.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json(
+        {
+          ok: true,
+          photo: Array.isArray(setHover.data) ? setHover.data[0] : null
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     if (action === "listGalleryPhotos") {
       const sections = [
         "fielding-gloves",
