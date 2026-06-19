@@ -2352,17 +2352,29 @@ async function loadSaleGlovePhotos(gloveId) {
     wrap.innerHTML = `
       <div class="upload-preview-grid">
         ${photos.map(photo => `
-          <div class="upload-preview-item">
-            <img
-              src="${escapeAttr(photo.url)}"
-              alt=""
-              loading="lazy"
-            >
-            <div class="upload-preview-name">
-              ${escapeHtml(photo.filename || "")}
-            </div>
-          </div>
-        `).join("")}
+           <div class="upload-preview-item sale-photo-item">
+             <img
+               src="${escapeAttr(photo.url)}"
+               alt=""
+               loading="lazy"
+             >
+
+             <div class="upload-preview-name">
+               ${photo.is_primary ? "★ Primary · " : ""}
+               ${escapeHtml(photo.filename || "")}
+             </div>
+
+             <button
+               class="secondary sale-photo-primary-btn"
+               type="button"
+               data-glove-id="${escapeAttr(gloveId)}"
+               data-photo-id="${escapeAttr(photo.id)}"
+               ${photo.is_primary ? "disabled" : ""}
+             >
+               ${photo.is_primary ? "Primary Photo" : "Set Primary"}
+             </button>
+           </div>
+         `).join("")}
       </div>
     `;
 
@@ -2373,6 +2385,28 @@ async function loadSaleGlovePhotos(gloveId) {
         Failed to load photos.
       </p>
     `;
+
+    wrap.querySelectorAll(".sale-photo-primary-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        try {
+          btn.textContent = "Saving...";
+          btn.disabled = true;
+
+          await postJson({
+            action: "setSalePhotoPrimary",
+            gloveId: btn.dataset.gloveId,
+            photoId: btn.dataset.photoId
+          }, true);
+
+          await loadSaleGlovePhotos(gloveId);
+
+        } catch (err) {
+          btn.textContent = "Set Primary";
+          btn.disabled = false;
+          alert(err.message || "Failed to set primary photo.");
+        }
+      });
+    });
   }
 }
 
