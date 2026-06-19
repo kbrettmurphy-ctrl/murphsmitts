@@ -411,6 +411,7 @@ body.home .footer{margin-top:0;}
   border-radius:16px;
   overflow:hidden;
   box-shadow:0 10px 22px rgba(0,0,0,.08);
+  cursor:pointer;
 }
 
 .sale-card-img{
