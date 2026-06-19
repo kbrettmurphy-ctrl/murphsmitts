@@ -2326,13 +2326,10 @@ function initSaleGlovePhotoUploader(glove) {
 }
 
 async function loadSaleGlovePhotos(gloveId) {
-  const wrap =
-    document.getElementById("saleGlovePhotosList");
-
+  const wrap = document.getElementById("saleGlovePhotosList");
   if (!wrap) return;
 
   try {
-
     const data = await postJson({
       action: "listSaleGlovePhotos",
       gloveId
@@ -2341,7 +2338,7 @@ async function loadSaleGlovePhotos(gloveId) {
     const photos = data.photos || [];
 
     if (!photos.length) {
-      innerHTML = `
+      wrap.innerHTML = `
         <p class="muted">
           No uploaded photos yet.
         </p>
@@ -2352,20 +2349,20 @@ async function loadSaleGlovePhotos(gloveId) {
     wrap.innerHTML = `
       <div class="upload-preview-grid">
         ${photos.map(photo => `
-           <div class="upload-preview-item sale-photo-item">
-             <img
-               src="${escapeAttr(photo.url)}"
-               alt=""
-               loading="lazy"
-             >
+          <div class="upload-preview-item sale-photo-item">
+            <img
+              src="${escapeAttr(photo.url)}"
+              alt=""
+              loading="lazy"
+            >
 
-             <div class="upload-preview-name">
-               ${photo.is_primary ? "★ Primary · " : ""}
-               ${photo.is_hover ? "↔ Hover · " : ""}
-               ${escapeHtml(photo.filename || "")}
-             </div>
+            <div class="upload-preview-name">
+              ${photo.is_primary ? "★ Primary · " : ""}
+              ${photo.is_hover ? "↔ Hover · " : ""}
+              ${escapeHtml(photo.filename || "")}
+            </div>
 
-             <div class="sale-photo-actions">
+            <div class="sale-photo-actions">
               <select
                 class="sale-photo-action-select"
                 data-glove-id="${escapeAttr(gloveId)}"
@@ -2381,60 +2378,59 @@ async function loadSaleGlovePhotos(gloveId) {
                 <option value="delete">🗑</option>
               </select>
             </div>
-           </div>
-         `).join("")}
+          </div>
+        `).join("")}
       </div>
     `;
 
-  } catch (err) {
+    wrap.querySelectorAll(".sale-photo-action-select").forEach(select => {
+      select.addEventListener("change", async () => {
+        const actionValue = select.value;
+        if (!actionValue) return;
 
+        const gloveIdFromSelect = select.dataset.gloveId;
+        const photoId = select.dataset.photoId;
+
+        if (actionValue === "delete") {
+          const ok = confirm("Delete this photo from the listing?");
+          if (!ok) {
+            select.value = "";
+            return;
+          }
+        }
+
+        try {
+          select.disabled = true;
+
+          const action =
+            actionValue === "primary"
+              ? "setSalePhotoPrimary"
+              : actionValue === "hover"
+                ? "setSalePhotoHover"
+                : "deleteSaleGlovePhoto";
+
+          await postJson({
+            action,
+            gloveId: gloveIdFromSelect,
+            photoId
+          }, true);
+
+          await loadSaleGlovePhotos(gloveId);
+
+        } catch (err) {
+          alert(err.message || "Photo action failed.");
+          select.disabled = false;
+          select.value = "";
+        }
+      });
+    });
+
+  } catch (err) {
     wrap.innerHTML = `
       <p class="muted">
         Failed to load photos.
       </p>
     `;
-
-    wrap.querySelectorAll(".sale-photo-action-select").forEach(select => {
-     select.addEventListener("change", async () => {
-       const actionValue = select.value;
-       if (!actionValue) return;
-   
-       const gloveIdFromSelect = select.dataset.gloveId;
-       const photoId = select.dataset.photoId;
-   
-       if (actionValue === "delete") {
-         const ok = confirm("Delete this photo from the listing?");
-         if (!ok) {
-           select.value = "";
-           return;
-         }
-       }
-   
-       try {
-         select.disabled = true;
-   
-         const action =
-           actionValue === "primary"
-             ? "setSalePhotoPrimary"
-             : actionValue === "hover"
-               ? "setSalePhotoHover"
-               : "deleteSaleGlovePhoto";
-   
-         await postJson({
-           action,
-           gloveId: gloveIdFromSelect,
-           photoId
-         }, true);
-   
-         await loadSaleGlovePhotos(gloveId);
-   
-       } catch (err) {
-         alert(err.message || "Photo action failed.");
-         select.disabled = false;
-         select.value = "";
-       }
-     });
-   });
   }
 }
 
