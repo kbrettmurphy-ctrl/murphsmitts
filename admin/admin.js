@@ -2373,12 +2373,12 @@ async function loadSaleGlovePhotos(gloveId) {
               >
                 <option value="">...</option>
                 <option value="primary" ${photo.is_primary ? "disabled" : ""}>
-                  ${photo.is_primary ? "Already Primary" : "Set Primary"}
+                  ${photo.is_primary ? "Already Primary" : "A"}
                 </option>
                 <option value="hover" ${photo.is_hover ? "disabled" : ""}>
-                  ${photo.is_hover ? "Already Hover" : "Set Hover"}
+                  ${photo.is_hover ? "Already Hover" : "B"}
                 </option>
-                <option value="delete">Delete Photo</option>
+                <option value="delete">🗑</option>
               </select>
             </div>
            </div>
