@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <title>Glove Details | Murph's Mitt Maintenance</title>
+
+  <link rel="stylesheet" href="/assets/css/styles-16.css">
+</head>
+
+<body>
+
+  <header class="site-header">
+    <div class="container header-inner">
+
+      <a href="/" class="brand">
+        <img src="/assets/img/logo.png" alt="Murph's Mitt Maintenance">
+        <span class="brand-text">
+          MURPH'S MITT<br>
+          MAINTENANCE
+        </span>
+      </a>
+
+    </div>
+  </header>
+
+  <main class="page">
+
+    <div class="container">
+
+      <div id="gloveDetail">
+        Loading...
+      </div>
+
+    </div>
+
+  </main>
+
+  <script>
+
+    async function loadGlove() {
+
+      const slug =
+        new URLSearchParams(location.search)
+          .get("slug");
+
+      const container =
+        document.getElementById("gloveDetail");
+
+      if (!slug) {
+        container.innerHTML =
+          "<p>Glove not found.</p>";
+        return;
+      }
+
+      try {
+
+        const resp =
+          await fetch("/api/gloves-for-sale");
+
+        const data =
+          await resp.json();
+
+        const glove =
+          data.gloves.find(
+            g => g.slug === slug
+          );
+
+        if (!glove) {
+
+          container.innerHTML =
+            "<p>Glove not found.</p>";
+
+          return;
+        }
+
+        container.innerHTML = `
+          <h1>${glove.title}</h1>
+
+          <img
+            src="${glove.primaryPhoto || ""}"
+            alt="${glove.title}"
+            style="
+              width:100%;
+              max-width:600px;
+              border-radius:16px;
+            "
+          >
+
+          <p><strong>Price:</strong> $${Number(glove.price).toFixed(2)}</p>
+
+          <p><strong>Brand:</strong> ${glove.brand || ""}</p>
+
+          <p><strong>Model:</strong> ${glove.model || ""}</p>
+
+          <p><strong>Size:</strong> ${glove.gloveSize || ""}</p>
+
+          <p><strong>Position:</strong> ${glove.position || ""}</p>
+
+          <p><strong>Web:</strong> ${glove.web || ""}</p>
+
+          <p><strong>Throw Hand:</strong> ${glove.throwHand || ""}</p>
+
+          <p><strong>Condition:</strong> ${glove.condition || ""}</p>
+
+          <p>${glove.description || ""}</p>
+        `;
+
+      } catch (err) {
+
+        container.innerHTML =
+          `<p>${err.message}</p>`;
+
+      }
+    }
+
+    loadGlove();
+
+  </script>
+
+</body>
+</html>
