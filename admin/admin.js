@@ -2371,7 +2371,7 @@ async function loadSaleGlovePhotos(gloveId) {
                 data-glove-id="${escapeAttr(gloveId)}"
                 data-photo-id="${escapeAttr(photo.id)}"
               >
-                <option value="">Photo Action</option>
+                <option value="">...</option>
                 <option value="primary" ${photo.is_primary ? "disabled" : ""}>
                   ${photo.is_primary ? "Already Primary" : "Set Primary"}
                 </option>
