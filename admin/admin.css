@@ -341,15 +341,15 @@ button.secondary{
 
 .sale-photo-action-select{
   width:auto;
-  min-width:90px;
-  max-width:110px;
+  min-width:50px;
+  max-width:90px;
   background:#244866;
   color:var(--cream);
   border:1px solid rgba(218,202,177,.18);
   border-radius:10px;
 
   padding:4px 4px;
-  min-height:24px;
+  min-height:18px;
 
   font-size:.6rem;
   line-height:1.2;
