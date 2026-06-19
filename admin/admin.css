@@ -341,12 +341,16 @@ button.secondary{
 
 .sale-photo-action-select{
   width:100%;
-  border:none;
-  border-radius:10px;
   background:#244866;
   color:var(--cream);
-  padding:9px 8px;
+  border:1px solid rgba(218,202,177,.18);
+  border-radius:10px;
+
+  padding:6px 8px;
+  min-height:32px;
+
   font-size:.72rem;
+  line-height:1.2;
 }
 
 .menu-backdrop{
