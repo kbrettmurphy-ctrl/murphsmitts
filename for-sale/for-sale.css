@@ -1,0 +1,86 @@
+:root{
+  --cream:#dacab1;
+  --navy:#092f4d;
+  --rust:#924a21;
+  --ink:#020b12;
+  --paper:#f4eee4;
+  --line:rgba(9,47,77,.16);
+}
+
+*{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--navy);
+  font-family:Montserrat, Arial, sans-serif;
+}
+
+.sale-page{
+  padding:28px 16px 46px;
+}
+
+.page-header{
+  max-width:1100px;
+  margin:0 auto 26px;
+  text-align:center;
+}
+
+.page-header h1{
+  margin:0 0 8px;
+  font-size:2rem;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+
+.page-header p{
+  margin:0;
+  color:rgba(9,47,77,.72);
+}
+
+.sale-grid{
+  max-width:1100px;
+  margin:0 auto;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:22px;
+}
+
+.sale-card{
+  background:#fffdf9;
+  border:1px solid var(--line);
+  border-radius:18px;
+  overflow:hidden;
+  box-shadow:0 10px 22px rgba(0,0,0,.08);
+}
+
+.sale-card-img{
+  width:100%;
+  aspect-ratio:1 / 1;
+  object-fit:cover;
+  display:block;
+  background:#e8dccb;
+}
+
+.sale-card-body{
+  padding:14px 14px 16px;
+}
+
+.sale-card h2{
+  margin:0 0 8px;
+  font-size:1rem;
+  line-height:1.25;
+}
+
+.sale-price{
+  margin:0 0 8px;
+  font-weight:800;
+  color:var(--rust);
+}
+
+.sale-meta,
+.sale-condition{
+  margin:0 0 6px;
+  font-size:.9rem;
+  color:rgba(9,47,77,.72);
+}
