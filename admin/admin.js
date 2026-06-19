@@ -2356,10 +2356,9 @@ async function loadSaleGlovePhotos(gloveId) {
               loading="lazy"
             >
 
-            <div class="upload-preview-name">
-              ${photo.is_primary ? "★ Primary · " : ""}
-              ${photo.is_hover ? "↔ Hover · " : ""}
-              ${escapeHtml(photo.filename || "")}
+            <div class="upload-preview-name sale-photo-badges">
+              ${photo.is_primary ? "★Primary★" : ""}
+              ${photo.is_hover ? "↔Hover↔" : ""}
             </div>
 
             <div class="sale-photo-actions">
