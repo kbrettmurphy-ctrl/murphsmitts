@@ -400,7 +400,8 @@ body.home .footer{margin-top:0;}
   width:min(var(--max), calc(100% - 48px));
   margin:0 auto;
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  grid-template-columns:repeat(auto-fit,minmax(220px,320px));
+  justify-content:center;
   gap:22px;
 }
 
