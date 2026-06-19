@@ -1153,6 +1153,61 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "deleteSaleGlovePhoto") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const gloveId = cleanText(body.gloveId);
+      const photoId = cleanText(body.photoId);
+
+      if (!gloveId || !photoId) {
+        return json(
+          {
+            ok: false,
+            error: "Missing gloveId or photoId."
+          },
+          200,
+          jsonHeaders
+        );
+      }
+    
+      const del = await supabaseFetch(
+        env,
+        `/rest/v1/glove_sale_photos?id=eq.${encodeURIComponent(photoId)}&glove_id=eq.${encodeURIComponent(gloveId)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Prefer: "return=representation"
+          }
+        }
+      );
+    
+      if (!del.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Failed to delete glove photo.",
+            details: del.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+    
+      return json(
+        {
+          ok: true,
+          deleted: true,
+          photo: Array.isArray(del.data) ? del.data[0] : null
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     if (action === "listGalleryPhotos") {
       const sections = [
         "fielding-gloves",
