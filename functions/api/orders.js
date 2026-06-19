@@ -987,6 +987,89 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "setSalePhotoPrimary") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const gloveId = cleanText(body.gloveId);
+      const photoId = cleanText(body.photoId);
+
+      if (!gloveId || !photoId) {
+        return json(
+          {
+            ok: false,
+            error: "Missing gloveId or photoId."
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      const clearPrimary = await supabaseFetch(
+        env,
+        `/rest/v1/glove_sale_photos?glove_id=eq.${encodeURIComponent(gloveId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            Prefer: "return=representation"
+          },
+          body: JSON.stringify({
+            is_primary: false
+          })
+        }
+      );
+
+      if (!clearPrimary.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Failed to clear existing primary photo.",
+            details: clearPrimary.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      const setPrimary = await supabaseFetch(
+        env,
+        `/rest/v1/glove_sale_photos?id=eq.${encodeURIComponent(photoId)}&glove_id=eq.${encodeURIComponent(gloveId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            Prefer: "return=representation"
+          },
+          body: JSON.stringify({
+            is_primary: true
+          })
+        }
+      );
+
+      if (!setPrimary.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Failed to set primary photo.",
+            details: setPrimary.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json(
+        {
+          ok: true,
+          photo: Array.isArray(setPrimary.data) ? setPrimary.data[0] : null
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     if (action === "listGalleryPhotos") {
       const sections = [
         "fielding-gloves",
