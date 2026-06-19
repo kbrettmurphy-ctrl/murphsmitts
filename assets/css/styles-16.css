@@ -416,9 +416,10 @@ body.home .footer{margin-top:0;}
 .sale-card-img{
   width:100%;
   aspect-ratio:1 / 1;
-  object-fit:cover;
+  object-fit:contain;
   display:block;
-  background:rgba(255,255,255,.28);
+  background:#e8dccb;
+  padding:12px;
 }
 
 .sale-card-body{
