@@ -2361,6 +2361,7 @@ async function loadSaleGlovePhotos(gloveId) {
 
              <div class="upload-preview-name">
                ${photo.is_primary ? "★ Primary · " : ""}
+               ${photo.is_hover ? "↔ Hover · " : ""}
                ${escapeHtml(photo.filename || "")}
              </div>
 
