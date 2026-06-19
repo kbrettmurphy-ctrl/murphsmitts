@@ -27,31 +27,29 @@ async function loadGloves() {
 
     grid.innerHTML =
       data.gloves.map(glove => `
-
-        <div class="sale-card">
-
+        <article class="sale-card">
           <img
+            class="sale-card-img"
             src="${glove.primaryPhoto || ""}"
-            alt="${glove.title}"
+            alt="${glove.title || "Glove for sale"}"
           >
-
-          <h2>${glove.title}</h2>
-
-          <p class="sale-price">
-            $${Number(glove.price || 0).toFixed(2)}
-          </p>
-
-          <p>
-            ${glove.brand}
-            ${glove.model}
-          </p>
-
-          <p>
-            ${glove.condition}
-          </p>
-
-        </div>
-
+    
+          <div class="sale-card-body">
+            <h2>${glove.title || ""}</h2>
+    
+            <p class="sale-price">
+              $${Number(glove.price || 0).toFixed(2)}
+            </p>
+    
+            <p class="sale-meta">
+              ${[glove.brand, glove.model].filter(Boolean).join(" ")}
+            </p>
+    
+            <p class="sale-condition">
+              ${glove.condition || ""}
+            </p>
+          </div>
+        </article>
       `).join("");
 
   } catch (err) {
