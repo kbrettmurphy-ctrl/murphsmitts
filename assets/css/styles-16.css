@@ -368,6 +368,83 @@ body.home .footer{margin-top:0;}
   opacity: .92;
 }
 
+/* =========================
+   GLOVES FOR SALE
+   ========================= */
+
+.sale-page{
+  padding:110px 0 56px; /* matches fixed header spacing */
+}
+
+.sale-page .page-header{
+  width:min(var(--max), calc(100% - 48px));
+  margin:0 auto 26px;
+  text-align:center;
+}
+
+.sale-page .page-header h1{
+  margin:22px 0 8px;
+  color:var(--navy);
+  font-size:clamp(24px, 4vw, 34px);
+  font-weight:500;
+  letter-spacing:-0.03em;
+  text-transform:none;
+}
+
+.sale-page .page-header p{
+  margin:0;
+  opacity:.82;
+}
+
+.sale-grid{
+  width:min(var(--max), calc(100% - 48px));
+  margin:0 auto;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:22px;
+}
+
+.sale-card{
+  background:rgba(218,202,177,.35);
+  border:1px solid rgba(9,47,77,.30);
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow:0 10px 22px rgba(0,0,0,.08);
+}
+
+.sale-card-img{
+  width:100%;
+  aspect-ratio:1 / 1;
+  object-fit:cover;
+  display:block;
+  background:rgba(255,255,255,.28);
+}
+
+.sale-card-body{
+  padding:14px 14px 16px;
+}
+
+.sale-card h2{
+  margin:0 0 8px;
+  color:var(--navy);
+  font-size:1rem;
+  font-weight:600;
+  line-height:1.25;
+}
+
+.sale-price{
+  margin:0 0 8px;
+  font-weight:800;
+  color:var(--red);
+}
+
+.sale-meta,
+.sale-condition{
+  margin:0 0 6px;
+  font-size:.9rem;
+  opacity:.78;
+}
+
 /* Cards / grids */
 .split{
   display:grid;
