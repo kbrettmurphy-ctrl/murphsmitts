@@ -2088,11 +2088,11 @@ function renderSaleGloveEditor(glove) {
 
              <div class="upload-actions">
                <button id="saleGloveUploadBtn" class="secondary" type="button" disabled>
-                 Upload Selected Photos
+                 Upload
                </button>
 
                <button id="saleGloveClearBtn" class="secondary" type="button" disabled>
-                 Clear Selection
+                 Clear
                </button>
              </div>
 
