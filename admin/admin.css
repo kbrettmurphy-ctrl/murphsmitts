@@ -340,20 +340,29 @@ button.secondary{
 }
 
 .sale-photo-action-select{
-  width:auto;
-  min-width:50px;
-  max-width:90px;
-  background:#244866;
-  color:var(--cream);
-  border:1px solid rgba(218,202,177,.18);
-  border-radius:10px;
+  width:100%;
+  max-width:70px;
+  height:24px;
+  min-height:24px;
 
-  padding:4px 4px;
-  min-height:12px;
-  max-height:18px
+  display:block;
+  margin:0 auto;
 
-  font-size:.6rem;
-  line-height:1.2;
+  background:#fff;
+  color:var(--light-ink);
+  border:2px solid #d1ccc2;
+  border-radius:999px;
+
+  padding:1px 8px;
+  font-size:.58rem;
+  line-height:1;
+}
+
+.sale-photo-badges{
+  min-height:28px;
+  display:flex;
+  align-items:center;
+  gap:4px;
 }
 
 .menu-backdrop{
