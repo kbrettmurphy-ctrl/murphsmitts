@@ -2341,7 +2341,7 @@ async function loadSaleGlovePhotos(gloveId) {
     const photos = data.photos || [];
 
     if (!photos.length) {
-      wrap.innerHTML = `
+      innerHTML = `
         <p class="muted">
           No uploaded photos yet.
         </p>
@@ -2394,74 +2394,47 @@ async function loadSaleGlovePhotos(gloveId) {
       </p>
     `;
 
-    wrap.querySelectorAll(".sale-photo-primary-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        try {
-          btn.textContent = "Saving...";
-          btn.disabled = true;
-
-          await postJson({
-            action: "setSalePhotoPrimary",
-            gloveId: btn.dataset.gloveId,
-            photoId: btn.dataset.photoId
-          }, true);
-
-          await loadSaleGlovePhotos(gloveId);
-
-        } catch (err) {
-          btn.textContent = "Set Primary";
-          btn.disabled = false;
-          alert(err.message || "Failed to set primary photo.");
-        }
-      });
-    });
-
-    wrap.querySelectorAll(".sale-photo-hover-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        try {
-          btn.textContent = "Saving...";
-          btn.disabled = true;
-
-          await postJson({
-            action: "setSalePhotoHover",
-            gloveId: btn.dataset.gloveId,
-            photoId: btn.dataset.photoId
-          }, true);
-
-          await loadSaleGlovePhotos(gloveId);
-
-        } catch (err) {
-          btn.textContent = "Set Hover";
-          btn.disabled = false;
-          alert(err.message || "Failed to set hover photo.");
-        }
-      });
-    });
-
-    wrap.querySelectorAll(".sale-photo-delete-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const ok = confirm("Delete this photo from the listing?");
-        if (!ok) return;
-
-        try {
-          btn.textContent = "Deleting...";
-          btn.disabled = true;
-
-          await postJson({
-            action: "deleteSaleGlovePhoto",
-            gloveId: btn.dataset.gloveId,
-            photoId: btn.dataset.photoId
-          }, true);
-
-          await loadSaleGlovePhotos(gloveId);
-    
-        } catch (err) {
-          btn.textContent = "Delete";
-          btn.disabled = false;
-          alert(err.message || "Failed to delete photo.");
-        }
-      });
-    });
+    wrap.querySelectorAll(".sale-photo-action-select").forEach(select => {
+     select.addEventListener("change", async () => {
+       const actionValue = select.value;
+       if (!actionValue) return;
+   
+       const gloveIdFromSelect = select.dataset.gloveId;
+       const photoId = select.dataset.photoId;
+   
+       if (actionValue === "delete") {
+         const ok = confirm("Delete this photo from the listing?");
+         if (!ok) {
+           select.value = "";
+           return;
+         }
+       }
+   
+       try {
+         select.disabled = true;
+   
+         const action =
+           actionValue === "primary"
+             ? "setSalePhotoPrimary"
+             : actionValue === "hover"
+               ? "setSalePhotoHover"
+               : "deleteSaleGlovePhoto";
+   
+         await postJson({
+           action,
+           gloveId: gloveIdFromSelect,
+           photoId
+         }, true);
+   
+         await loadSaleGlovePhotos(gloveId);
+   
+       } catch (err) {
+         alert(err.message || "Photo action failed.");
+         select.disabled = false;
+         select.value = "";
+       }
+     });
+   });
   }
 }
 
