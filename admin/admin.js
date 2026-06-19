@@ -2366,35 +2366,21 @@ async function loadSaleGlovePhotos(gloveId) {
              </div>
 
              <div class="sale-photo-actions">
-                <button
-                 class="secondary sale-photo-primary-btn"
-                 type="button"
-                 data-glove-id="${escapeAttr(gloveId)}"
-                 data-photo-id="${escapeAttr(photo.id)}"
-                 ${photo.is_primary ? "disabled" : ""}
-               >
-                 ${photo.is_primary ? "Primary" : "Primary"}
-               </button>
-
-               <button
-                 class="secondary sale-photo-hover-btn"
-                 type="button"
-                 data-glove-id="${escapeAttr(gloveId)}"
-                 data-photo-id="${escapeAttr(photo.id)}"
-                 ${photo.is_hover ? "disabled" : ""}
-               >
-                 ${photo.is_hover ? "Hover" : "Hover"}
-               </button>
-
-               <button
-                 class="secondary sale-photo-delete-btn"
-                 type="button"
-                 data-glove-id="${escapeAttr(gloveId)}"
-                 data-photo-id="${escapeAttr(photo.id)}"
-               >
-                 Delete
-               </button>
-             </div>
+              <select
+                class="sale-photo-action-select"
+                data-glove-id="${escapeAttr(gloveId)}"
+                data-photo-id="${escapeAttr(photo.id)}"
+              >
+                <option value="">Photo Action</option>
+                <option value="primary" ${photo.is_primary ? "disabled" : ""}>
+                  ${photo.is_primary ? "Already Primary" : "Set Primary"}
+                </option>
+                <option value="hover" ${photo.is_hover ? "disabled" : ""}>
+                  ${photo.is_hover ? "Already Hover" : "Set Hover"}
+                </option>
+                <option value="delete">Delete Photo</option>
+              </select>
+            </div>
            </div>
          `).join("")}
       </div>
