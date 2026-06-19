@@ -2372,7 +2372,7 @@ async function loadSaleGlovePhotos(gloveId) {
                  data-photo-id="${escapeAttr(photo.id)}"
                  ${photo.is_primary ? "disabled" : ""}
                >
-                 ${photo.is_primary ? "Primary" : "Set Primary"}
+                 ${photo.is_primary ? "Primary" : "Primary"}
                </button>
 
                <button
@@ -2382,7 +2382,16 @@ async function loadSaleGlovePhotos(gloveId) {
                  data-photo-id="${escapeAttr(photo.id)}"
                  ${photo.is_hover ? "disabled" : ""}
                >
-                 ${photo.is_hover ? "Hover" : "Set Hover"}
+                 ${photo.is_hover ? "Hover" : "Hover"}
+               </button>
+
+               <button
+                 class="secondary sale-photo-delete-btn"
+                 type="button"
+                 data-glove-id="${escapeAttr(gloveId)}"
+                 data-photo-id="${escapeAttr(photo.id)}"
+               >
+                 Delete
                </button>
              </div>
            </div>
@@ -2438,6 +2447,31 @@ async function loadSaleGlovePhotos(gloveId) {
           btn.textContent = "Set Hover";
           btn.disabled = false;
           alert(err.message || "Failed to set hover photo.");
+        }
+      });
+    });
+
+    wrap.querySelectorAll(".sale-photo-delete-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const ok = confirm("Delete this photo from the listing?");
+        if (!ok) return;
+
+        try {
+          btn.textContent = "Deleting...";
+          btn.disabled = true;
+
+          await postJson({
+            action: "deleteSaleGlovePhoto",
+            gloveId: btn.dataset.gloveId,
+            photoId: btn.dataset.photoId
+          }, true);
+
+          await loadSaleGlovePhotos(gloveId);
+    
+        } catch (err) {
+          btn.textContent = "Delete";
+          btn.disabled = false;
+          alert(err.message || "Failed to delete photo.");
         }
       });
     });
