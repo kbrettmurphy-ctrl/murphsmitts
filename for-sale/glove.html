@@ -84,6 +84,18 @@ body_class: for-sale
             <div class="sale-detail-description">
               ${glove.description || ""}
             </div>
+            
+            <div class="sale-detail-actions">
+              ${
+                glove.purchaseUrl
+                  ? `<a class="btn btn-primary" href="${glove.purchaseUrl}" target="_blank" rel="noopener">Buy This Glove</a>`
+                  : `<a class="btn btn-primary" href="/contact/">Ask About This Glove</a>`
+              }
+            
+              <a class="btn btn-secondary" href="/for-sale/">
+                Back to Gloves
+              </a>
+            </div>
           </section>
       
         </article>
