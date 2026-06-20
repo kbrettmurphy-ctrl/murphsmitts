@@ -523,6 +523,17 @@ body.home .footer{margin-top:0;}
   display:block;
 }
 
+.sale-detail-actions{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-top:22px;
+}
+
+.sale-detail-actions .btn{
+  text-decoration:none;
+}
+
 /* Cards / grids */
 .split{
   display:grid;
