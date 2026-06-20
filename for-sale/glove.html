@@ -41,41 +41,52 @@ body_class: for-sale
       }
 
       container.innerHTML = `
-        <h1>${glove.title}</h1>
-
-        <div class="sale-detail-gallery">
-          <img
-            id="saleDetailMainPhoto"
-            class="sale-detail-main-img"
-            src="${glove.primaryPhoto || ""}"
-            alt="${glove.title}"
-          >
-        
-          <div class="sale-detail-thumbs">
-            ${(glove.photos || []).map(photo => `
-              <button
-                type="button"
-                class="sale-detail-thumb"
-                onclick="document.getElementById('saleDetailMainPhoto').src='${photo.url}'"
-              >
-                <img
-                  src="${photo.url}"
-                  alt=""
+        <article class="sale-detail">
+      
+          <div class="sale-detail-gallery">
+            <img
+              id="saleDetailMainPhoto"
+              class="sale-detail-main-img"
+              src="${glove.primaryPhoto || ""}"
+              alt="${glove.title}"
+            >
+      
+            <div class="sale-detail-thumbs">
+              ${(glove.photos || []).map(photo => `
+                <button
+                  type="button"
+                  class="sale-detail-thumb"
+                  onclick="document.getElementById('saleDetailMainPhoto').src='${photo.url}'"
                 >
-              </button>
-            `).join("")}
+                  <img src="${photo.url}" alt="">
+                </button>
+              `).join("")}
+            </div>
           </div>
-        </div>
-
-        <p><strong>Price:</strong> $${Number(glove.price).toFixed(2)}</p>
-        <p><strong>Brand:</strong> ${glove.brand || ""}</p>
-        <p><strong>Model:</strong> ${glove.model || ""}</p>
-        <p><strong>Size:</strong> ${glove.gloveSize || ""}</p>
-        <p><strong>Position:</strong> ${glove.position || ""}</p>
-        <p><strong>Web:</strong> ${glove.web || ""}</p>
-        <p><strong>Throw Hand:</strong> ${glove.throwHand || ""}</p>
-        <p><strong>Condition:</strong> ${glove.condition || ""}</p>
-        <p>${glove.description || ""}</p>
+      
+          <section class="sale-detail-info">
+            <h1>${glove.title}</h1>
+      
+            <p class="sale-detail-price">
+              $${Number(glove.price).toFixed(2)}
+            </p>
+      
+            <div class="sale-detail-specs">
+              <p><strong>Brand:</strong> ${glove.brand || ""}</p>
+              <p><strong>Model:</strong> ${glove.model || ""}</p>
+              <p><strong>Size:</strong> ${glove.gloveSize || ""}</p>
+              <p><strong>Position:</strong> ${glove.position || ""}</p>
+              <p><strong>Web:</strong> ${glove.web || ""}</p>
+              <p><strong>Throw Hand:</strong> ${glove.throwHand || ""}</p>
+              <p><strong>Condition:</strong> ${glove.condition || ""}</p>
+            </div>
+      
+            <div class="sale-detail-description">
+              ${glove.description || ""}
+            </div>
+          </section>
+      
+        </article>
       `;
     } catch (err) {
       container.innerHTML = `<p>${err.message}</p>`;
