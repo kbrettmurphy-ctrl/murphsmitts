@@ -89,8 +89,8 @@ body_class: for-sale
               ${
                 glove.purchaseUrl
                   ? `<a class="btn btn-primary" href="${glove.purchaseUrl}" target="_blank" rel="noopener">Buy This Glove</a>`
-                  : `<a class="btn btn-primary" href="/contact/">Ask About This Glove</a>`
-              }
+                  : `<a class="btn btn-primary" href="/contact/?glove=${encodeURIComponent(glove.title)}">Ask About This Glove</a>`
+                }
             
               <a class="btn btn-secondary" href="/for-sale/">
                 Back to Gloves
