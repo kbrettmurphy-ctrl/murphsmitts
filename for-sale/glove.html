@@ -43,15 +43,29 @@ body_class: for-sale
       container.innerHTML = `
         <h1>${glove.title}</h1>
 
-        <img
-          src="${glove.primaryPhoto || ""}"
-          alt="${glove.title}"
-          style="
-            width:100%;
-            max-width:600px;
-            border-radius:16px;
-          "
-        >
+        <div class="sale-detail-gallery">
+          <img
+            id="saleDetailMainPhoto"
+            class="sale-detail-main-img"
+            src="${glove.primaryPhoto || ""}"
+            alt="${glove.title}"
+          >
+        
+          <div class="sale-detail-thumbs">
+            ${(glove.photos || []).map(photo => `
+              <button
+                type="button"
+                class="sale-detail-thumb"
+                onclick="document.getElementById('saleDetailMainPhoto').src='${photo.url}'"
+              >
+                <img
+                  src="${photo.url}"
+                  alt=""
+                >
+              </button>
+            `).join("")}
+          </div>
+        </div>
 
         <p><strong>Price:</strong> $${Number(glove.price).toFixed(2)}</p>
         <p><strong>Brand:</strong> ${glove.brand || ""}</p>
