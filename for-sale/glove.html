@@ -71,14 +71,14 @@ body_class: for-sale
               $${Number(glove.price).toFixed(2)}
             </p>
       
-            <div class="sale-detail-specs">
-              <p><strong>Brand:</strong> ${glove.brand || ""}</p>
-              <p><strong>Model:</strong> ${glove.model || ""}</p>
-              <p><strong>Size:</strong> ${glove.gloveSize || ""}</p>
-              <p><strong>Position:</strong> ${glove.position || ""}</p>
-              <p><strong>Web:</strong> ${glove.web || ""}</p>
-              <p><strong>Throw Hand:</strong> ${glove.throwHand || ""}</p>
-              <p><strong>Condition:</strong> ${glove.condition || ""}</p>
+            <div class="glove-specs">
+              <div><strong>Brand:</strong> ${glove.brand}</div>
+              <div><strong>Model:</strong> ${glove.model}</div>
+              <div><strong>Size:</strong> ${glove.size}</div>
+              <div><strong>Position:</strong> ${glove.position}</div>
+              <div><strong>Web:</strong> ${glove.web}</div>
+              <div><strong>Throw Hand:</strong> ${glove.throwHand}</div>
+              <div><strong>Condition:</strong> ${glove.condition}</div>
             </div>
       
             <div class="sale-detail-description">
