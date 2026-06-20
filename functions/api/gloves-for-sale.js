@@ -13,7 +13,7 @@ export async function onRequestGet(context) {
 
     const glovesResp = await supabaseFetch(
       env,
-      `/rest/v1/gloves_for_sale?select=*&status=neq.hidden&order=sort_order.asc,created_at.desc`
+      `/rest/v1/gloves_for_sale?select=*&status=eq.available&order=sort_order.asc,created_at.desc`
     );
 
     if (!glovesResp.ok) {
