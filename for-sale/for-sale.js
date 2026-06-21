@@ -28,11 +28,11 @@ async function loadGloves() {
     grid.innerHTML =
       data.gloves.map(glove => `
         <article
-          class="sale-card ${glove.status === 'Sold' ? 'sold' : ''}"
+          class="sale-card ${glove.status === 'sold' ? 'sold' : ''}"
           onclick="location.href='/for-sale/glove?slug=${glove.slug}'"
         >
         
-        ${glove.status === "Sold"
+        ${glove.status === "sold"
           ? '<div class="sale-badge">SOLD</div>'
           : ""}
           <img
