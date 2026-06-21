@@ -404,6 +404,14 @@ body.home .footer{margin-top:0;}
   gap:22px 16px;
 }
 
+@media (min-width:900px){
+  .sale-grid{
+    width:min(1200px, calc(100% - 96px));
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:52px 44px;
+  }
+}
+
 .sale-card{
   position:relative;
   background:transparent;
