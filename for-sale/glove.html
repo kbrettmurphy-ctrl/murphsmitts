@@ -141,6 +141,17 @@ function initSaleSlider() {
     });
   });
 
+  slider.addEventListener("click", e => {
+    const rect = slider.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+
+    if (x < rect.width / 2) {
+      goToSlide(current - 1);
+    } else {
+      goToSlide(current + 1);
+    }
+  });
+
   slider.addEventListener("touchstart", e => {
     startX = e.touches[0].clientX;
     currentX = startX;
