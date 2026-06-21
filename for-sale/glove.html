@@ -87,7 +87,11 @@ body_class: for-sale
             </div>
       
             <div class="sale-detail-description">
-              ${glove.description || ""}
+              ${
+                (glove.description || "")
+                  .replace(/\n\n/g, "<br><br>")
+                  .replace(/\n/g, "<br>")
+              }
             </div>
             
             <div class="sale-detail-actions">
