@@ -44,22 +44,27 @@ body_class: for-sale
         <article class="sale-detail">
       
           <div class="sale-detail-gallery">
-            <img
-              id="saleDetailMainPhoto"
-              class="sale-detail-main-img"
-              src="${glove.primaryPhoto || ""}"
-              alt="${glove.title}"
-            >
-      
-            <div class="sale-detail-thumbs">
-              ${(glove.photos || []).map(photo => `
+            <div class="sale-slider" id="saleSlider">
+              <div class="sale-slider-track" id="saleSliderTrack">
+                ${(glove.photos?.length ? glove.photos : [{ url: glove.primaryPhoto }]).map(photo => `
+                  <div class="sale-slide">
+                    <img
+                      src="${photo.url || ""}"
+                      alt="${glove.title}"
+                    >
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+          
+            <div class="sale-slider-dots" id="saleSliderDots">
+              ${(glove.photos?.length ? glove.photos : [{ url: glove.primaryPhoto }]).map((photo, index) => `
                 <button
                   type="button"
-                  class="sale-detail-thumb"
-                  onclick="document.getElementById('saleDetailMainPhoto').src='${photo.url}'"
-                >
-                  <img src="${photo.url}" alt="">
-                </button>
+                  class="sale-slider-dot ${index === 0 ? "active" : ""}"
+                  data-slide="${index}"
+                  aria-label="Show photo ${index + 1}"
+                ></button>
               `).join("")}
             </div>
           </div>
@@ -100,10 +105,65 @@ body_class: for-sale
       
         </article>
       `;
+      initSaleSlider();
     } catch (err) {
       container.innerHTML = `<p>${err.message}</p>`;
     }
   }
+function initSaleSlider() {
+  const slider = document.getElementById("saleSlider");
+  const track = document.getElementById("saleSliderTrack");
+  const dots = Array.from(document.querySelectorAll(".sale-slider-dot"));
 
+  if (!slider || !track || !dots.length) return;
+
+  let current = 0;
+  let startX = 0;
+  let currentX = 0;
+  let dragging = false;
+
+  function goToSlide(index) {
+    current = Math.max(0, Math.min(dots.length - 1, index));
+    track.style.transform = `translateX(-${current * 100}%)`;
+
+    dots.forEach((dot, i) => {
+      dot.classList.toggle("active", i === current);
+    });
+  }
+
+  dots.forEach(dot => {
+    dot.addEventListener("click", () => {
+      goToSlide(Number(dot.dataset.slide || 0));
+    });
+  });
+
+  slider.addEventListener("touchstart", e => {
+    startX = e.touches[0].clientX;
+    currentX = startX;
+    dragging = true;
+  }, { passive: true });
+
+  slider.addEventListener("touchmove", e => {
+    if (!dragging) return;
+    currentX = e.touches[0].clientX;
+  }, { passive: true });
+
+  slider.addEventListener("touchend", () => {
+    if (!dragging) return;
+    dragging = false;
+
+    const diff = currentX - startX;
+
+    if (Math.abs(diff) < 45) return;
+
+    if (diff < 0) {
+      goToSlide(current + 1);
+    } else {
+      goToSlide(current - 1);
+    }
+  });
+
+  goToSlide(0);
+}
   loadGlove();
 </script>
