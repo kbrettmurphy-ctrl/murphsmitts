@@ -38,7 +38,11 @@ async function loadGloves() {
           <img
             class="sale-card-img"
             src="${glove.primaryPhoto || ""}"
+            data-primary="${glove.primaryPhoto || ""}"
+            data-hover="${glove.hoverPhoto || glove.primaryPhoto || ""}"
             alt="${glove.title || "Glove for sale"}"
+            onmouseenter="this.src=this.dataset.hover"
+            onmouseleave="this.src=this.dataset.primary"
           >
     
           <div class="sale-card-body">
