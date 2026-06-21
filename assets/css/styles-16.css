@@ -471,6 +471,10 @@ body.home .footer{margin-top:0;}
   padding:18px;
 }
 
+.sale-detail-info h1{
+  font-size:1.4rem;
+}
+
 .sale-detail-price{
   color:var(--red);
   font-size:1.3rem;
