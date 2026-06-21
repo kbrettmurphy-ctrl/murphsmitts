@@ -886,3 +886,32 @@ body_class: inner
   toggleConditionalFields();
 })();
 </script>
+
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const glove = params.get("glove");
+
+  if (!glove) return;
+
+  const messageBox = document.getElementById("msg");
+  const questionsTab = document.getElementById("tab-questions");
+
+  if (!messageBox) return;
+
+  if (questionsTab) {
+    questionsTab.checked = true;
+  }
+
+  const message =
+    `I'm interested in this glove: ${glove}`;
+
+  messageBox.value = messageBox.value
+    ? `${message}\n\n${messageBox.value}`
+    : message;
+
+  messageBox.dispatchEvent(
+    new Event("input", { bubbles: true })
+  );
+})();
+</script>
