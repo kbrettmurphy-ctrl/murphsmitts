@@ -1161,15 +1161,18 @@ function renderOrders(list) {
       <div class="order-card clickable-card" tabindex="0">
         <div class="order-top">
           <div class="order-main">
-            <div class="order-name">
-              <span class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</span> ${escapeHtml(order.customerName || "")}
+              <div class="order-name order-name-with-chip">
+                ${renderLaceChips(order)}
+                <span>${escapeHtml(order.customerName || "")}</span>
+              </div>
             </div>
-          </div>
           <div class="order-status">${escapeHtml(order.status || "")}</div>
         </div>
 
         <div class="action-row">
-          ${renderLaceChips(order)}
+          <div class="order-number ${paidClass}">
+            ${escapeHtml(order.orderNumber || "")}
+          </div>
           <button class="action-btn action-email" type="button" aria-label="Email">
             <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="m4 7 8 6 8-6"/></svg>
           </button>
