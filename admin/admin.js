@@ -1161,8 +1161,9 @@ function renderOrders(list) {
       <div class="order-card clickable-card" tabindex="0">
         <div class="order-top">
           <div class="order-main">
-            <div class="order-name">${escapeHtml(order.customerName || "")}</div>
-            <div class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</div>
+            <div class="order-name">
+              ${escapeHtml(order.orderNumber || "")} - ${escapeHtml(order.customerName || "")}
+            </div>
           </div>
           <div class="order-status">${escapeHtml(order.status || "")}</div>
         </div>
