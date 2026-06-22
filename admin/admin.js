@@ -1162,7 +1162,7 @@ function renderOrders(list) {
         <div class="order-top">
           <div class="order-main">
             <div class="order-name">
-              <span class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</span>${escapeHtml(order.customerName || "")}
+              <span class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</span> ${escapeHtml(order.customerName || "")}
             </div>
           </div>
           <div class="order-status">${escapeHtml(order.status || "")}</div>
