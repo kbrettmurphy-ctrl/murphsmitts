@@ -1161,11 +1161,11 @@ function renderOrders(list) {
       <div class="order-card clickable-card" tabindex="0">
         <div class="order-top">
           <div class="order-main">
-              <div class="order-name order-name-with-chip">
-                ${renderLaceChips(order)}
-                <span>${escapeHtml(order.customerName || "")}</span>
-              </div>
+            <div class="order-name">
+              ${renderLaceChips(order)}
+              <span>${escapeHtml(order.customerName || "")}</span>
             </div>
+          </div>
           <div class="order-status">${escapeHtml(order.status || "")}</div>
         </div>
 
