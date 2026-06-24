@@ -260,7 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!header || !hero) return;
 
   const updateHeaderNavColor = () => {
-    const headerBottom = header.getBoundingClientRect().bottom;
+    const headerBottom = header.getBoundingClientRect().bottom - 40;
     const heroBottom = hero.getBoundingClientRect().bottom;
 
     document.body.classList.toggle(
