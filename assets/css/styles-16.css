@@ -160,6 +160,16 @@ body.home .site-header{
    /* color: var(--red); */
 /* } */
 
+/* Home only: cream nav while header is over the hero */
+body.home.header-over-hero .site-nav a{
+  color: #dacab1;
+}
+
+body.home.header-over-hero .site-nav a.active,
+body.home.header-over-hero .site-nav a:hover{
+  color: #dacab1;
+}
+
 .actions{
   min-width: 140px;
   display:flex;
