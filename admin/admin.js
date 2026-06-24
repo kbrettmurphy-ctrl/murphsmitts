@@ -1292,6 +1292,16 @@ function renderOrderDetail(order) {
       </div>
 
       <div class="detail-block">
+        <div class="label">Shipping Cost</div>
+        <input id="editShippingCost" type="text" inputmode="decimal" placeholder="$0.00" />
+      </div>
+      
+      <div class="detail-block">
+        <div class="label">Total Due</div>
+        <div id="editTotalDue" class="field-like readonly">$0.00</div>
+      </div>
+
+      <div class="detail-block">
         <div class="label">Date Received</div>
         <input id="editDateReceived" type="date" />
       </div>
@@ -1410,6 +1420,13 @@ function renderOrderDetail(order) {
   document.getElementById("editStatus").value = order.status || "Received";
   document.getElementById("editPaid").value = normalizeText(order.paid) === "paid" ? "Paid" : "Unpaid";
   document.getElementById("editPriceQuoted").value = formatMoneyForInput(order.priceQuoted);
+  document.getElementById("editShippingCost").value = formatMoneyForInput(order.shippingCost);
+
+  const totalDue =
+     moneyNumber(order.priceQuoted) + moneyNumber(order.shippingCost);
+
+  document.getElementById("editTotalDue").textContent =
+     formatMoneyForInput(totalDue);
   document.getElementById("editDateReceived").value = formatDateForInput(order.dateReceived);
   document.getElementById("editEstimatedCompletion").value = formatDateForInput(order.estimatedCompletion);
   document.getElementById("editDateCompleted").value = formatDateForInput(order.dateCompleted);
@@ -1662,12 +1679,14 @@ async function saveCurrentOrderFromForm() {
   }
 
   const parsedPrice = parseMoneyInput(val("editPriceQuoted"));
+  const parsedShipping = parseMoneyInput(val("editShippingCost"));
 
   const updates = {
     status: newStatus,
     paid: val("editPaid"),
     phoneNumber: formatPhoneForInput(val("editPhoneNumber")),
     priceQuoted: parsedPrice === "" ? null : parsedPrice,
+    shippingCost: parsedShipping === "" ? null : parsedShipping,
     dateReceived: emptyToNull(val("editDateReceived")),
     estimatedCompletion: emptyToNull(val("editEstimatedCompletion")),
     dateCompleted: emptyToNull(dateCompleted),
