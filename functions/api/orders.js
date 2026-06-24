@@ -1482,6 +1482,7 @@ function mapOrderFromDb(row) {
     dateReceived: row.date_received,
     estimatedCompletion: row.estimated_completion,
     priceQuoted: row.price_quoted,
+    shippingCost: row.shipping_cost,
     paid: row.paid,
     allowShipWithoutPayment: row.allow_ship_without_payment,
     trackingNumber: row.tracking_number,
@@ -1566,6 +1567,7 @@ function mapUpdatesToDb(updates) {
   if ("referralSource" in updates) out.referral_source = cleanText(updates.referralSource);
 
   if ("priceQuoted" in updates) out.price_quoted = cleanNumeric(updates.priceQuoted);
+  if ("shippingCost" in updates) out.shipping_cost = cleanNumeric(updates.shippingCost);
   if ("paid" in updates) out.paid = cleanText(updates.paid);
 
   if ("allowShipWithoutPayment" in updates) out.allow_ship_without_payment = toBoolean(updates.allowShipWithoutPayment);
