@@ -209,6 +209,14 @@ function parseMoneyInput(value) {
   return Number.isNaN(num) ? "" : num.toFixed(2);
 }
 
+function moneyNumber(value) {
+  const n = Number(
+    String(value ?? "").replace(/[^\d.-]/g, "")
+  );
+
+  return Number.isNaN(n) ? 0 : n;
+}
+
 function todayForInput() {
   const d = new Date();
   const y = d.getFullYear();
