@@ -250,3 +250,27 @@ if (document.readyState === "loading") {
     img.addEventListener("contextmenu", e => e.preventDefault());
   });
 })();
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (!document.body.classList.contains("home")) return;
+
+  const header = document.querySelector(".site-header");
+  const hero = document.querySelector(".hero");
+
+  if (!header || !hero) return;
+
+  const updateHeaderNavColor = () => {
+    const headerBottom = header.getBoundingClientRect().bottom;
+    const heroBottom = hero.getBoundingClientRect().bottom;
+
+    document.body.classList.toggle(
+      "header-over-hero",
+      heroBottom > headerBottom
+    );
+  };
+
+  updateHeaderNavColor();
+
+  window.addEventListener("scroll", updateHeaderNavColor, { passive: true });
+  window.addEventListener("resize", updateHeaderNavColor);
+});
