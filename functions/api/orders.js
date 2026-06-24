@@ -1893,6 +1893,48 @@ const BRAND_NAME = "Murph's Mitt Maintenance";
 const THANKS_LINE = "Thanks again for choosing Murph's Mitts!";
 const REVIEW_URL = "https://g.page/r/CRL9ZI21aIheEBM/review";
 
+const PAYMENT = {
+  venmoUser: "murphsmitts",
+  paypalMe: "kbrettmurphy",
+  zelle: "214-356-1233"
+};
+
+function moneyNumber(value) {
+  const n = Number(
+    String(value ?? "").replace(/[^\d.-]/g, "")
+  );
+
+  return Number.isNaN(n) ? 0 : n;
+}
+
+function buildPaymentLinks(order) {
+  const service = moneyNumber(order.priceQuoted);
+  const shipping = moneyNumber(order.shippingCost);
+
+  const total = service + shipping;
+  const amount = total.toFixed(2);
+
+  const note = encodeURIComponent(
+    `Murph's Mitts Order #${order.orderNumber || ""}`
+  );
+
+  return {
+    service,
+    shipping,
+    total,
+    amount,
+
+    venmo:
+      `https://account.venmo.com/pay?recipients=${PAYMENT.venmoUser}&amount=${amount}&note=${note}`,
+
+    paypal:
+      `https://paypal.me/${PAYMENT.paypalMe}/${amount}`,
+
+    zelle:
+      PAYMENT.zelle
+  };
+}
+
 async function sendStatusEmail(env, row, statusDisplay) {
   const order = mapOrderFromDb(row);
   const email = String(order.emailAddress || "").trim();
