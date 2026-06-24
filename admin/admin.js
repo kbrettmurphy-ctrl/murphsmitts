@@ -1336,21 +1336,22 @@ function renderOrderDetail(order) {
       ${renderServicesEditor(order.servicesRequested || "")}
 
       ${renderLaceInput("Primary Lace Color", "editPrimaryLaceColor", primaryLaceColor, "Choose")}
-      ${renderLaceInput("Secondary / Accent Lace Color", "editSecondaryLaceColor", secondaryLaceColor, "Only if multi-colors wanted")}
-
-      <div class="detail-block full">
-        <div class="label">Custom Color Request</div>
-        <textarea id="editCustomColorRequest" rows="1" placeholder="Don’t see your color? Describe it here.">${escapeHtml(customColorRequest)}</textarea>
-      </div>
 
       <div class="detail-block">
         <div class="label">Primary Lace Used</div>
         <input id="editPrimaryLaceUsed" type="number" step="0.25" min="0" placeholder="0" />
       </div>
+      
+      ${renderLaceInput("Secondary / Accent Lace Color", "editSecondaryLaceColor", secondaryLaceColor, "Only if multi-colors wanted")}
 
       <div class="detail-block">
         <div class="label">Secondary Lace Used</div>
         <input id="editSecondaryLaceUsed" type="number" step="0.25" min="0" placeholder="0" />
+      </div>
+
+      <div class="detail-block full">
+        <div class="label">Custom Color Request</div>
+        <textarea id="editCustomColorRequest" rows="1" placeholder="Don’t see your color? Describe it here.">${escapeHtml(customColorRequest)}</textarea>
       </div>
 
       <div class="detail-block full">
