@@ -2283,7 +2283,7 @@ Shipping: ${formatCurrency(pay.shipping)}
 Total Due: ${formatCurrency(pay.total)}
 
 Pay:
-Venmo: @${pay.venmoText}
+Venmo: ${pay.venmo}
 PayPal: ${pay.paypalText}
 Zelle: ${pay.zelle}
 
@@ -2295,7 +2295,7 @@ Your glove will ship once payment is received.`;
 Total Due: ${formatCurrency(pay.total)}
 
 Pay:
-Venmo: @${pay.venmoText}
+Venmo: ${pay.venmo}
 PayPal: ${pay.paypalText}
 Zelle: ${pay.zelle}
 
