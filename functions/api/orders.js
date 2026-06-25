@@ -1981,15 +1981,19 @@ ${msg}`.trimEnd();
 
 -Brett`;
 
+  const plainBody = isCompleted
+    ? `${beforeThanks}\n\n${reviewText()}\n\n${afterThanks}`
+    : `${beforeThanks}\n\n${afterThanks}`;
+
   const htmlBody = status === "ready to go"
-    ? wrapReadyToGoEmailHtml(order, {
-        firstName,
-        orderNum,
-        statusDisplay
-      })
-    : isCompleted
-      ? wrapEmailHtmlSplit(beforeThanks, afterThanks, true)
-      : wrapEmailHtmlSplit(beforeThanks, afterThanks, false);
+  ? wrapReadyToGoEmailHtml(order, {
+      firstName,
+      orderNum,
+      statusDisplay
+    })
+  : isCompleted
+    ? wrapEmailHtmlSplit(beforeThanks, afterThanks, true)
+    : wrapEmailHtmlSplit(beforeThanks, afterThanks, false);
 
   return await sendBrandedEmail(env, {
     to: email,
@@ -2357,8 +2361,8 @@ function wrapReadyToGoEmailHtml(order, { firstName, orderNum, statusDisplay }) {
   const pay = buildPaymentLinks(order);
 
   const intro = ship
-    ? "Your glove is finished and ready to ship!"
-    : "Your glove is finished and ready for pickup!";
+    ? "Your glove is finished and ready to ship."
+    : "Your glove is finished and ready for pickup.";
 
   const closing = ship
     ? "Once payment is received, I'll ship your glove and send your tracking information."
