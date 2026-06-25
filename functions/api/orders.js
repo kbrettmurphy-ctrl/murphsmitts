@@ -2096,7 +2096,7 @@ Once payment is received, I'll ship your glove and send your tracking informatio
   PayPal: ${pay.paypal}
   Zelle: ${pay.zelle}
   
-  Once payment is received, I'll coordinate pickup with you.`;
+  Once payment is received, I'll coordinate pickup with you unless you are paying cash.`;
   }
   
   if (s === "completed") {
@@ -2372,7 +2372,7 @@ function wrapReadyToGoEmailHtml(order, { firstName, orderNum, statusDisplay }) {
 
   const closing = ship
     ? "Once payment is received, I'll ship your glove and send your tracking information."
-    : "Once payment is received, I'll coordinate pickup with you.";
+    : "Once payment is received, I'll coordinate pickup with you unless you are paying cash.";
 
   const amountHtml = ship
     ? `
