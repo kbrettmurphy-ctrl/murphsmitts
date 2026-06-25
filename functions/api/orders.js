@@ -1913,6 +1913,7 @@ function buildPaymentLinks(order) {
 
   const total = service + shipping;
   const amount = total.toFixed(2);
+  const shortAmount = String(Number(amount));
 
   const note = encodeURIComponent(
     `Murph's Mitts Order #${order.orderNumber || ""}`
@@ -1923,12 +1924,19 @@ function buildPaymentLinks(order) {
     shipping,
     total,
     amount,
+    shortAmount,
 
     venmo:
       `https://account.venmo.com/pay?recipients=${PAYMENT.venmoUser}&amount=${amount}&note=${note}`,
 
+    venmoText:
+      PAYMENT.venmoUser,
+
     paypal:
       `https://paypal.me/${PAYMENT.paypalMe}/${amount}`,
+
+    paypalText:
+      `paypal.me/${PAYMENT.paypalMe}/${shortAmount}`,
 
     zelle:
       PAYMENT.zelle
@@ -2039,48 +2047,52 @@ I'll keep you updated if anything changes.`;
     const paid = normalizePaidValue(order.paid);
     const pay = buildPaymentLinks(order);
   
-    const serviceLine = `Service Total: ${formatCurrency(pay.service)}`;
-    const shippingLine = pay.shipping > 0
-      ? `\nShipping: ${formatCurrency(pay.shipping)}`
-      : "";
-  
-    const paymentBlock =
-  `Amount Due:
-  ${serviceLine}${shippingLine}
-  Total Due: ${formatCurrency(pay.total)}
-  
-  Pay here:
-  Venmo: ${pay.venmo}
-  PayPal: ${pay.paypal}
-  Zelle: ${pay.zelle}`;
-  
     if (ship) {
       if (paid === "paid") {
-        return `Your glove is done and ready to be shipped!
+        return `Your glove is finished and ready to ship.
   
-  I'll be reaching out shortly to confirm shipping details and get this sent out to you.`;
+  I'll get it packaged up and send tracking once it's on the way.`;
       }
   
-      return `Your glove is done and ready to be shipped!
+      return `Your glove is finished and ready to ship.
   
-  ${paymentBlock}
+  Amount Due
   
-Once payment is received, I'll get your glove shipped out.`;
+  Service:   ${formatCurrency(pay.service)}
+  Shipping:  ${formatCurrency(pay.shipping)}
+  ----------------------
+  Total:     ${formatCurrency(pay.total)}
+  
+  Payment Options
+  
+  Venmo: ${pay.venmo}
+  PayPal: ${pay.paypal}
+  Zelle: ${pay.zelle}
+  
+  Once payment is received, I'll ship your glove and send your tracking information.`;
     }
   
     if (paid === "paid") {
-      return `Your glove is done and ready for pickup!
+      return `Your glove is finished and ready for pickup.
   
   I'll call/text shortly to coordinate a pickup time.`;
     }
   
-    return `Your glove is done and ready for pickup!
+    return `Your glove is finished and ready for pickup.
   
-  ${paymentBlock}
+  Amount Due
   
-Once payment is received, I'll coordinate pickup with you.`;
+  Total: ${formatCurrency(pay.total)}
+  
+  Payment Options
+  
+  Venmo: ${pay.venmo}
+  PayPal: ${pay.paypal}
+  Zelle: ${pay.zelle}
+  
+  Once payment is received, I'll coordinate pickup with you.`;
   }
-
+  
   if (s === "completed") {
     const ship = looksLikeShipMethod(order.dropOffMethod);
     const paid = normalizePaidValue(order.paid);
@@ -2247,23 +2259,42 @@ function smsMessageSmart(order, status) {
   }
 
   if (status === "ready to go") {
-    const ship = looksLikeShipMethod(order.dropOffMethod);
-    const paid = normalizePaidValue(order.paid);
-  
-    if (paid === "paid") {
-      return ship
-        ? "Your glove is finished and ready to ship. I’ll contact you shortly with shipping details."
-        : "Your glove is finished and ready for pickup. I’ll contact you shortly to coordinate pickup.";
-    }
-  
-    const pay = buildPaymentLinks(order);
-  
-    const shippingLine = pay.shipping > 0
-      ? ` Shipping: ${formatCurrency(pay.shipping)}.`
-      : "";
-  
-    return `${ship ? "Your glove is finished and ready to ship." : "Your glove is finished and ready for pickup."} Service: ${formatCurrency(pay.service)}.${shippingLine} Total Due: ${formatCurrency(pay.total)}. Venmo: ${pay.venmo} PayPal: ${pay.paypal} Zelle: ${pay.zelle}`;
+  const ship = looksLikeShipMethod(order.dropOffMethod);
+  const paid = normalizePaidValue(order.paid);
+  const pay = buildPaymentLinks(order);
+
+  if (paid === "paid") {
+    return ship
+      ? "Your glove is finished and ready to ship. I’ll send tracking once it’s on the way."
+      : "Your glove is finished and ready for pickup. I’ll contact you shortly to coordinate pickup.";
   }
+
+  if (ship) {
+    return `Your glove is finished and ready to ship.
+
+Service: ${formatCurrency(pay.service)}
+Shipping: ${formatCurrency(pay.shipping)}
+Total Due: ${formatCurrency(pay.total)}
+
+Pay:
+Venmo: @${pay.venmoText}
+PayPal: ${pay.paypalText}
+Zelle: ${pay.zelle}
+
+Your glove will ship once payment is received.`;
+  }
+
+  return `Your glove is finished and ready for pickup.
+
+Total Due: ${formatCurrency(pay.total)}
+
+Pay:
+Venmo: @${pay.venmoText}
+PayPal: ${pay.paypalText}
+Zelle: ${pay.zelle}
+
+I'll coordinate pickup once payment is received.`;
+}
 
   if (status === "completed") {
     const tracking = cleanDisplay(order.trackingNumber || order.tracking);
