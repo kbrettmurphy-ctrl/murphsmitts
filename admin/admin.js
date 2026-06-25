@@ -348,6 +348,56 @@ function looksLocalDropOff(order) {
   ) && !text.includes("ship");
 }
 
+function buildPirateShipClipboardText(order) {
+  const lines = [
+    order.customerName,
+    order.streetAddress || order.address,
+    `${order.city || ""}, ${order.state || ""} ${order.zipCode || order.zip || ""}`.trim(),
+    order.phoneNumber,
+    order.emailAddress,
+    "",
+    `Reference: Murph's Mitts Order #${order.orderNumber || ""}`,
+    "Package: Glove",
+    "Suggested weight: 3 lb"
+  ];
+
+  return lines
+    .map(v => String(v || "").trim())
+    .filter((v, i, arr) => v || arr[i - 1])
+    .join("\n");
+}
+
+async function copyPirateShipInfo(order) {
+  if (looksLocalDropOff(order)) {
+    alert("This is a local order. No shipping info to copy.");
+    return;
+  }
+
+  const missing = [];
+  if (!order.customerName) missing.push("customer name");
+  if (!(order.streetAddress || order.address)) missing.push("street address");
+  if (!order.city) missing.push("city");
+  if (!order.state) missing.push("state");
+  if (!(order.zipCode || order.zip)) missing.push("zip");
+
+  if (missing.length) {
+    alert(`Missing shipping info: ${missing.join(", ")}.`);
+    return;
+  }
+
+  const text = buildPirateShipClipboardText(order);
+
+  try {
+    await navigator.clipboard.writeText(text);
+    alert("Shipping info copied. Pirate Ship is opening now.");
+  } catch {
+    const box = prompt("Copy this shipping info:", text);
+    if (box === null) return;
+  }
+
+  window.open("https://ship.pirateship.com/", "_blank");
+}
+
 function hasMeaningfulValue(value) {
   return String(value || "").trim() !== "";
 }
@@ -1186,6 +1236,11 @@ function renderOrders(list) {
           <button class="action-btn action-text" type="button" aria-label="Text">
             <svg viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
           </button>
+            ${!looksLocalDropOff(order) ? `
+              <button class="action-btn action-ship" type="button" aria-label="Ship">
+                📦
+              </button>
+            ` : ""}
           <button class="action-btn action-delete" type="button" aria-label="Delete">
             <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
           </button>
@@ -1219,6 +1274,11 @@ function renderOrders(list) {
       e.stopPropagation();
       const phone = String(order.phoneNumber || "").replace(/[^\d+]/g, "").trim();
       if (phone) window.location.href = `sms:${phone}`;
+    });
+    
+    row.querySelector(".action-ship")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await copyPirateShipInfo(order);
     });
 
     row.querySelector(".action-delete").addEventListener("click", async (e) => {
