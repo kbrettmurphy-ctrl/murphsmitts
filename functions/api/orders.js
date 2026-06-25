@@ -2055,12 +2055,12 @@ I'll keep you updated if anything changes.`;
   
     if (ship) {
       if (paid === "paid") {
-        return `Your glove is finished and ready to ship.
+        return `Your glove is finished and ready to ship!
   
   I'll get it packaged up and send tracking once it's on the way.`;
       }
   
-      return `Your glove is finished and ready to ship.
+      return `Your glove is finished and ready to ship!
   
   Amount Due
   
@@ -2079,12 +2079,12 @@ Once payment is received, I'll ship your glove and send your tracking informatio
     }
   
     if (paid === "paid") {
-      return `Your glove is finished and ready for pickup.
+      return `Your glove is finished and ready for pickup!
   
   I'll call/text shortly to coordinate a pickup time.`;
     }
   
-    return `Your glove is finished and ready for pickup.
+    return `Your glove is finished and ready for pickup!
   
   Amount Due
   
@@ -2271,12 +2271,12 @@ function smsMessageSmart(order, status) {
 
   if (paid === "paid") {
     return ship
-      ? "Your glove is finished and ready to ship. I’ll send tracking once it’s on the way."
-      : "Your glove is finished and ready for pickup. I’ll contact you shortly to coordinate pickup.";
+      ? "Your glove is finished and ready to ship! I’ll send tracking once it’s on the way."
+      : "Your glove is finished and ready for pickup! I’ll contact you shortly to coordinate pickup.";
   }
 
   if (ship) {
-    return `Your glove is finished and ready to ship.
+    return `Your glove is finished and ready to ship!
 
 Service: ${formatCurrency(pay.service)}
 Shipping: ${formatCurrency(pay.shipping)}
@@ -2290,7 +2290,7 @@ Zelle: ${pay.zelle}
 Your glove will ship once payment is received.`;
   }
 
-  return `Your glove is finished and ready for pickup.
+  return `Your glove is finished and ready for pickup!
 
 Total Due: ${formatCurrency(pay.total)}
 
