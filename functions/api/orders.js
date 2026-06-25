@@ -1991,10 +1991,6 @@ ${msg}`.trimEnd();
       ? wrapEmailHtmlSplit(beforeThanks, afterThanks, true)
       : wrapEmailHtmlSplit(beforeThanks, afterThanks, false);
 
-  const htmlBody = isCompleted
-    ? wrapEmailHtmlSplit(beforeThanks, afterThanks, true)
-    : wrapEmailHtmlSplit(beforeThanks, afterThanks, false);
-
   return await sendBrandedEmail(env, {
     to: email,
     subject,
