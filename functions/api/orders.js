@@ -2256,7 +2256,13 @@ async function sendStatusText(env, row, statusDisplay) {
 
 function smsMessageSmart(order, status) {
   if (status === "estimate sent") {
-    return "Your estimate has been sent to your email with a quote and service details. Reply YES to this text to approve, or NO to place the request on hold.";
+    const estimate = formatCurrency(order.priceQuoted);
+  
+    return `Your estimate has been sent to your email.
+  
+  Estimated Total: ${estimate}
+  
+  Reply YES to approve or NO to place the request on hold.`;
   }
 
   if (status === "in progress") {
