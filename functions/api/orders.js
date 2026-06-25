@@ -2065,7 +2065,7 @@ I'll keep you updated if anything changes.`;
   
   ${paymentBlock}
   
-  Once payment is received, I'll get your glove shipped out.`;
+Once payment is received, I'll get your glove shipped out.`;
     }
   
     if (paid === "paid") {
@@ -2078,7 +2078,7 @@ I'll keep you updated if anything changes.`;
   
   ${paymentBlock}
   
-  Once payment is received, I'll coordinate pickup with you.`;
+Once payment is received, I'll coordinate pickup with you.`;
   }
 
   if (s === "completed") {
