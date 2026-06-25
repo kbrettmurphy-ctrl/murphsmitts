@@ -2069,7 +2069,7 @@ I'll keep you updated if anything changes.`;
   PayPal: ${pay.paypal}
   Zelle: ${pay.zelle}
   
-  Once payment is received, I'll ship your glove and send your tracking information.`;
+Once payment is received, I'll ship your glove and send your tracking information.`;
     }
   
     if (paid === "paid") {
