@@ -1981,9 +1981,15 @@ ${msg}`.trimEnd();
 
 -Brett`;
 
-  const plainBody = isCompleted
-    ? `${beforeThanks}\n\n${reviewText()}\n\n${afterThanks}`
-    : `${beforeThanks}\n\n${afterThanks}`;
+  const htmlBody = status === "ready to go"
+    ? wrapReadyToGoEmailHtml(order, {
+        firstName,
+        orderNum,
+        statusDisplay
+      })
+    : isCompleted
+      ? wrapEmailHtmlSplit(beforeThanks, afterThanks, true)
+      : wrapEmailHtmlSplit(beforeThanks, afterThanks, false);
 
   const htmlBody = isCompleted
     ? wrapEmailHtmlSplit(beforeThanks, afterThanks, true)
@@ -2346,6 +2352,88 @@ function wrapEmailHtmlSplit(beforeThanks, afterThanks, includeReview) {
     <div style="white-space:pre-wrap; margin:0;">${escapeHtml(beforeThanks)}</div>
     ${includeReview ? reviewHtml() : ""}
     <div style="white-space:pre-wrap; margin:0;">${escapeHtml(afterThanks)}</div>
+  </div>`;
+}
+
+function wrapReadyToGoEmailHtml(order, { firstName, orderNum, statusDisplay }) {
+  const ship = looksLikeShipMethod(order.dropOffMethod);
+  const paid = normalizePaidValue(order.paid);
+  const pay = buildPaymentLinks(order);
+
+  const intro = ship
+    ? "Your glove is finished and ready to ship!"
+    : "Your glove is finished and ready for pickup!";
+
+  const closing = ship
+    ? "Once payment is received, I'll ship your glove and send your tracking information."
+    : "Once payment is received, I'll coordinate pickup with you.";
+
+  const amountHtml = ship
+    ? `
+      <p style="margin:18px 0 8px;"><strong>Amount Due</strong></p>
+      <table style="border-collapse:collapse; margin:0 0 14px;">
+        <tr>
+          <td style="padding:2px 20px 2px 0;">Service:</td>
+          <td style="padding:2px 0;">${escapeHtml(formatCurrency(pay.service))}</td>
+        </tr>
+        <tr>
+          <td style="padding:2px 20px 2px 0;">Shipping:</td>
+          <td style="padding:2px 0;">${escapeHtml(formatCurrency(pay.shipping))}</td>
+        </tr>
+        <tr>
+          <td colspan="2" style="border-top:1px solid #999; padding-top:6px;"></td>
+        </tr>
+        <tr>
+          <td style="padding:2px 20px 2px 0;"><strong>Total:</strong></td>
+          <td style="padding:2px 0;"><strong>${escapeHtml(formatCurrency(pay.total))}</strong></td>
+        </tr>
+      </table>
+    `
+    : `
+      <p style="margin:18px 0 8px;"><strong>Amount Due</strong></p>
+      <p style="margin:0 0 14px;"><strong>Total:</strong> ${escapeHtml(formatCurrency(pay.total))}</p>
+    `;
+
+  const paymentHtml = paid === "paid"
+    ? ""
+    : `
+      ${amountHtml}
+
+      <p style="margin:18px 0 8px;"><strong>Payment Options</strong></p>
+
+      <p style="margin:0 0 6px;">
+        <a href="${escapeHtml(pay.venmo)}" target="_blank" style="color:#0645ad; text-decoration:underline;">Venmo</a>
+      </p>
+
+      <p style="margin:0 0 6px;">
+        <a href="${escapeHtml(pay.paypal)}" target="_blank" style="color:#0645ad; text-decoration:underline;">PayPal</a>
+      </p>
+
+      <p style="margin:0 0 18px;">
+        Zelle: ${escapeHtml(pay.zelle)}
+      </p>
+
+      <p style="margin:0 0 18px;">${escapeHtml(closing)}</p>
+    `;
+
+  return `
+  <div style="font-family: Arial, sans-serif; max-width: 640px; line-height: 1.45; text-align:left;">
+    <p>Hey${firstName ? " " + escapeHtml(firstName) : ""},</p>
+
+    <p>Quick update on your glove service.</p>
+
+    <p>
+      Order #: ${escapeHtml(orderNum)}<br>
+      New Status: ${escapeHtml(statusDisplay)}
+    </p>
+
+    <p>${escapeHtml(intro)}</p>
+
+    ${paymentHtml}
+
+    <p>${escapeHtml(THANKS_LINE)}</p>
+
+    <p>-Brett</p>
   </div>`;
 }
 
