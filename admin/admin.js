@@ -1299,12 +1299,12 @@ function renderOrderDetail(order) {
         <input id="editPriceQuoted" type="text" inputmode="decimal" placeholder="$0.00" />
       </div>
 
-      <div class="detail-block">
+      <div id="editShippingCostWrap" class="detail-block ${isLocal ? "is-hidden" : ""}">
         <div class="label">Shipping Cost</div>
         <input id="editShippingCost" type="text" inputmode="decimal" placeholder="$0.00" />
       </div>
       
-      <div class="detail-block">
+      <div id="editTotalDueWrap" class="detail-block ${isLocal ? "is-hidden" : ""}">
         <div class="label">Total Due</div>
         <div id="editTotalDue" class="field-like readonly">$0.00</div>
       </div>
@@ -1614,6 +1614,13 @@ function wireDetailForm() {
     }
 
     const isLocal = looksLocalDropOff({ dropOffMethod: dropOffEl?.value || "" });
+    document
+      .getElementById("editShippingCostWrap")
+      ?.classList.toggle("is-hidden", isLocal);
+    
+    document
+      .getElementById("editTotalDueWrap")
+      ?.classList.toggle("is-hidden", isLocal);
     if (shippingSection) {
       shippingSection.classList.toggle("is-hidden", isLocal);
     }
