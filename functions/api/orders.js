@@ -1927,7 +1927,7 @@ function buildPaymentLinks(order) {
     shortAmount,
 
     venmo:
-      `https://account.venmo.com/pay?recipients=${PAYMENT.venmoUser}&amount=${amount}&note=${note}`,
+      `venmo://paycharge?txn=pay&recipients=${PAYMENT.venmoUser}&amount=${amount}&note=${note}`,
 
     venmoText:
       PAYMENT.venmoUser,
