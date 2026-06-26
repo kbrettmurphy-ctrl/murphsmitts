@@ -349,21 +349,17 @@ function looksLocalDropOff(order) {
 }
 
 function buildPirateShipClipboardText(order) {
-  const lines = [
+  return [
     order.customerName,
     order.streetAddress || order.address,
-    `${order.city || ""}, ${order.state || ""} ${order.zipCode || order.zip || ""}`.trim(),
-    order.phoneNumber,
+    order.address2 || order.aptUnit || order.apartment || "",
+    `${order.city || ""}, ${order.state || ""} ${order.zipCode || order.zip || ""}`,
+    "United States",
     order.emailAddress,
-    "",
-    `Reference: Murph's Mitts Order #${order.orderNumber || ""}`,
-    "Package: Glove",
-    "Suggested weight: 3 lb"
-  ];
-
-  return lines
+    order.phoneNumber
+  ]
     .map(v => String(v || "").trim())
-    .filter((v, i, arr) => v || arr[i - 1])
+    .filter(Boolean)
     .join("\n");
 }
 
