@@ -1223,7 +1223,6 @@ function renderOrders(list) {
         </div>
 
         <div class="order-subrow">
-          <div class="order-number-label">Order #${escapeHtml(order.orderNumber || "")}</div>
           ${renderWorkflowProgress(order)}
         </div>
 
