@@ -1221,11 +1221,11 @@ function renderOrders(list) {
 
         <div class="action-row">
           ${renderLaceChips(order)}
-          <button class="action-btn action-email" type="button" aria-label="Email">
-            ✉️
-          </button>
           <button class="action-btn action-text" type="button" aria-label="Text">
             💬
+          </button>
+          <button class="action-btn action-email" type="button" aria-label="Email">
+            ✉️
           </button>
             ${!looksLocalDropOff(order) ? `
               <button class="action-btn action-ship" type="button" aria-label="Ship">
