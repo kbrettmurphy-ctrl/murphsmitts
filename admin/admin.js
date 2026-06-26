@@ -1225,9 +1225,6 @@ function renderOrders(list) {
           <button class="action-btn action-email" type="button" aria-label="Email">
             ✉️
           </button>
-          <button class="action-btn action-phone" type="button" aria-label="Call">
-            📱
-          </button>
           <button class="action-btn action-text" type="button" aria-label="Text">
             💬
           </button>
@@ -1257,12 +1254,6 @@ function renderOrders(list) {
       e.stopPropagation();
       const email = String(order.emailAddress || "").trim();
       if (email) window.location.href = `mailto:${email}`;
-    });
-
-    row.querySelector(".action-phone").addEventListener("click", (e) => {
-      e.stopPropagation();
-      const phone = String(order.phoneNumber || "").trim();
-      if (phone) window.location.href = `tel:${phone}`;
     });
 
     row.querySelector(".action-text").addEventListener("click", (e) => {
