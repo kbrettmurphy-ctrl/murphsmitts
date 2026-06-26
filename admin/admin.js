@@ -384,7 +384,6 @@ async function copyPirateShipInfo(order) {
 
   try {
     await navigator.clipboard.writeText(text);
-    alert("Shipping info copied. Pirate Ship is opening now.");
   } catch {
     const box = prompt("Copy this shipping info:", text);
     if (box === null) return;
@@ -2872,7 +2871,6 @@ document.getElementById("refreshBtn")?.addEventListener("click", async () => {
     localStorage.removeItem("mm_orders_cache");
     await loadOrders();
     applyFilters();
-    alert("Orders refreshed.");
   } catch (err) {
     alert("Refresh failed: " + err.message);
   }
