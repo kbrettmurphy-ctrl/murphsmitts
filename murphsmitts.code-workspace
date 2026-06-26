@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"chat.tools.terminal.autoApprove": {
+			"/^cd /Users/brett/murphsmitts && python - <<'PY'\nimport os\nwith open\\('supabase\\.env','rb'\\) as f:\n    data=f\\.read\\(\\)\nprint\\(repr\\(data\\)\\)\nPY$/": {
+				"approve": true,
+				"matchCommandLine": true
+			},
+			"/^cd /Users/brett/murphsmitts && python3 - <<'PY'\nwith open\\('supabase\\.env','rb'\\) as f:\n    data=f\\.read\\(\\)\nprint\\(data\\)\nprint\\('---'\\)\nfor i,line in enumerate\\(data\\.splitlines\\(\\),1\\):\n    print\\(i,repr\\(line\\)\\)\nPY$/": {
+				"approve": true,
+				"matchCommandLine": true
+			}
+		}
+	}
+}

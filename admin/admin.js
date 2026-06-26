@@ -40,6 +40,9 @@ let reorderBannerDismissed = false;
 let allOrders = [];
 let activeView = "current";
 let currentOrder = null;
+let workflowSheetEl = null;
+let workflowPressTimer = null;
+let workflowToastTimeout = null;
 let loginInProgress = false;
 let listScrollY = 0;
 
@@ -1219,6 +1222,11 @@ function renderOrders(list) {
           <div class="order-status">${escapeHtml(order.status || "")}</div>
         </div>
 
+        <div class="order-subrow">
+          <div class="order-number-label">Order #${escapeHtml(order.orderNumber || "")}</div>
+          ${renderWorkflowProgress(order)}
+        </div>
+
         <div class="action-row">
           ${renderLaceChips(order)}
           <button class="action-btn action-text" type="button" aria-label="Text">
@@ -1248,6 +1256,21 @@ function renderOrders(list) {
         openOrder(order.orderNumber);
       }
     });
+
+    card.addEventListener("contextmenu", (e) => {
+      if (e.target.closest(".action-btn") || e.target.closest(".swipe-delete-btn")) return;
+      e.preventDefault();
+      openWorkflowSheet(order);
+    });
+
+    card.addEventListener("touchstart", (e) => {
+      if (e.target.closest(".action-btn") || e.target.closest(".swipe-delete-btn")) return;
+      startWorkflowPress(e, order);
+    }, { passive: true });
+
+    card.addEventListener("touchmove", cancelWorkflowPress, { passive: true });
+    card.addEventListener("touchend", cancelWorkflowPress);
+    card.addEventListener("touchcancel", cancelWorkflowPress);
 
     row.querySelector(".action-email").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -1915,6 +1938,386 @@ function renderLaceChips(order) {
   return chips.length
     ? `<div class="lace-dot-row">${chips.join("")}</div>`
     : "";
+}
+
+function getWorkflowStep(order) {
+  const status = normalizeStatus(order.status);
+  if (status === "received") return 1;
+  if (status === "estimate sent" || status === "pending response" || status === "on hold") return 2;
+  if (
+    status === "customer approved" ||
+    status === "in transit to me" ||
+    status === "waiting on lace/parts" ||
+    status === "in progress"
+  ) return 3;
+  if (status === "ready to go") return 4;
+  if (status === "completed" || status === "picked up") return 5;
+  return 1;
+}
+
+function getWorkflowLabel(order) {
+  const step = getWorkflowStep(order);
+  if (step === 1) return "Received";
+  if (step === 2) return "Estimate";
+  if (step === 3) return "Work";
+  if (step === 4) return "Ready";
+  return "Completed";
+}
+
+function renderWorkflowProgress(order) {
+  const step = getWorkflowStep(order);
+  const label = getWorkflowLabel(order);
+  const dots = [1, 2, 3, 4, 5]
+    .map((value) => {
+      const done = value <= step;
+      const active = value === step;
+      return `
+        <span class="workflow-step${done ? " complete" : ""}${active ? " active" : ""}"></span>
+        ${value < 5 ? `<span class="workflow-connector${value < step ? " complete" : ""}"></span>` : ""}`;
+    })
+    .join("");
+
+  return `
+    <div class="workflow-progress">
+      <div class="workflow-meter">${dots}</div>
+      <div class="workflow-label">${escapeHtml(label)}</div>
+    </div>
+  `;
+}
+
+function openWorkflowSheet(order) {
+  if (!workflowSheetEl) createWorkflowSheet();
+
+  workflowSheetEl.order = order;
+  const headerCustomer = workflowSheetEl.querySelector(".workflow-customer-name");
+  const headerNumber = workflowSheetEl.querySelector(".workflow-order-number");
+  const headerStatus = workflowSheetEl.querySelector(".workflow-current-status");
+  const actions = workflowSheetEl.querySelector(".workflow-action-list");
+  const form = workflowSheetEl.querySelector(".workflow-sheet-form");
+
+  headerCustomer.textContent = order.customerName || "Unknown";
+  headerNumber.textContent = `Order #${order.orderNumber || ""}`;
+  headerStatus.textContent = order.status || "";
+  actions.innerHTML = getWorkflowActions(order)
+    .map(action => `
+      <button class="workflow-action-btn" type="button" data-action="${action.key}">
+        ${escapeHtml(action.label)}
+      </button>
+    `)
+    .join("");
+
+  form.innerHTML = "";
+  workflowSheetEl.querySelector(".workflow-sheet-title").textContent = "Workflow actions";
+  workflowSheetEl.classList.add("open");
+  document.body.classList.add("workflow-open");
+}
+
+function closeWorkflowSheet() {
+  if (!workflowSheetEl) return;
+  workflowSheetEl.classList.remove("open");
+  workflowSheetEl.querySelector(".workflow-action-list").innerHTML = "";
+  workflowSheetEl.querySelector(".workflow-sheet-form").innerHTML = "";
+  document.body.classList.remove("workflow-open");
+}
+
+function createWorkflowSheet() {
+  workflowSheetEl = document.createElement("div");
+  workflowSheetEl.className = "workflow-sheet-root";
+  workflowSheetEl.innerHTML = `
+    <div class="workflow-backdrop"></div>
+    <div class="workflow-sheet">
+      <div class="workflow-sheet-header">
+        <div>
+          <div class="workflow-customer-name"></div>
+          <div class="workflow-order-number"></div>
+          <div class="workflow-current-status"></div>
+        </div>
+        <button class="workflow-close-btn" type="button" aria-label="Close">✕</button>
+      </div>
+      <div class="workflow-section">
+        <div class="workflow-sheet-title">Workflow actions</div>
+        <div class="workflow-action-list"></div>
+      </div>
+      <div class="workflow-sheet-form"></div>
+    </div>
+  `;
+
+  workflowSheetEl.querySelector(".workflow-backdrop").addEventListener("click", closeWorkflowSheet);
+  workflowSheetEl.querySelector(".workflow-close-btn").addEventListener("click", closeWorkflowSheet);
+
+  workflowSheetEl.addEventListener("click", (e) => {
+    const actionBtn = e.target.closest(".workflow-action-btn");
+    if (actionBtn) {
+      openWorkflowActionForm(workflowSheetEl.order, actionBtn.dataset.action);
+      return;
+    }
+
+    if (e.target.closest(".workflow-form-submit")) {
+      e.preventDefault();
+      submitWorkflowAction(workflowSheetEl.order, workflowSheetEl.actionKey);
+      return;
+    }
+
+    if (e.target.closest(".workflow-form-cancel")) {
+      e.preventDefault();
+      closeWorkflowSheet();
+      return;
+    }
+  });
+
+  document.body.appendChild(workflowSheetEl);
+}
+
+function getWorkflowActions(order) {
+  const status = normalizeStatus(order.status);
+  const actions = [];
+
+  const add = (key, label) => actions.push({ key, label });
+
+  if (status === "received") {
+    add("sendEstimate", "Send Estimate");
+    add("onHold", "On Hold");
+  } else if (status === "estimate sent") {
+    add("customerApproved", "Customer Approved");
+    add("pendingResponse", "Pending Response");
+    add("onHold", "On Hold");
+  } else if (status === "pending response") {
+    add("customerApproved", "Customer Approved");
+    add("onHold", "On Hold");
+  } else if (status === "customer approved") {
+    add("inTransitToMe", "In Transit to Me");
+    add("waitingOnLaceParts", "Waiting on Lace/Parts");
+    add("startWork", "Start Work");
+    add("onHold", "On Hold");
+  } else if (status === "in transit to me") {
+    add("waitingOnLaceParts", "Waiting on Lace/Parts");
+    add("startWork", "Start Work");
+    add("onHold", "On Hold");
+  } else if (status === "waiting on lace/parts") {
+    add("startWork", "Start Work");
+    add("onHold", "On Hold");
+  } else if (status === "in progress") {
+    add("readyToGo", "Ready to Go");
+    add("onHold", "On Hold");
+  } else if (status === "on hold") {
+    add("sendEstimate", "Send Estimate");
+    add("customerApproved", "Customer Approved");
+    add("inTransitToMe", "In Transit to Me");
+    add("waitingOnLaceParts", "Waiting on Lace/Parts");
+    add("startWork", "Start Work");
+  } else if (status === "ready to go") {
+    add("completed", "Completed");
+  }
+
+  add("viewDetails", "View Details");
+  add("cancel", "Cancel");
+  return actions;
+}
+
+function openWorkflowActionForm(order, actionKey) {
+  const form = workflowSheetEl.querySelector(".workflow-sheet-form");
+  workflowSheetEl.actionKey = actionKey;
+  const isLocal = looksLocalDropOff(order);
+  const existingNote = order.internalNotes || "";
+  const priceQuoted = order.priceQuoted ?? "";
+  const estimatedCompletion = order.estimatedCompletion || todayForInput();
+  const dateCompleted = order.dateCompleted || todayForInput();
+  const shippingCost = order.shippingCost ?? "";
+  const primaryLaceUsed = order.primaryLaceUsed ?? "";
+  const secondaryLaceUsed = order.secondaryLaceUsed ?? "";
+
+  if (actionKey === "viewDetails") {
+    closeWorkflowSheet();
+    openOrder(order.orderNumber);
+    return;
+  }
+
+  if (actionKey === "cancel") {
+    closeWorkflowSheet();
+    return;
+  }
+
+  let inner = "";
+
+  if (actionKey === "sendEstimate") {
+    inner = `
+      <div class="workflow-action-form">
+        <label>Estimated amount</label>
+        <input id="workflowPriceQuoted" type="text" inputmode="decimal" value="${escapeAttr(formatMoneyForInput(priceQuoted))}" />
+      </div>
+    `;
+  } else if (actionKey === "customerApproved") {
+    inner = `<div class="workflow-action-form"><p>Mark this order as Customer Approved?</p></div>`;
+  } else if (actionKey === "pendingResponse") {
+    inner = `<div class="workflow-action-form"><p>Place this order in Pending Response?</p></div>`;
+  } else if (actionKey === "inTransitToMe") {
+    inner = `<div class="workflow-action-form"><p>Mark this order as In Transit to Me?</p></div>`;
+  } else if (actionKey === "waitingOnLaceParts") {
+    inner = `
+      <div class="workflow-action-form">
+        <label>Internal note (optional)</label>
+        <textarea id="workflowInternalNote" rows="3">${escapeHtml(existingNote)}</textarea>
+      </div>
+    `;
+  } else if (actionKey === "startWork") {
+    inner = `
+      <div class="workflow-action-form">
+        <label>Estimated completion</label>
+        <input id="workflowEstimatedCompletion" type="date" value="${escapeAttr(estimatedCompletion)}" />
+      </div>
+    `;
+  } else if (actionKey === "onHold") {
+    inner = `
+      <div class="workflow-action-form">
+        <label>Internal note (optional)</label>
+        <textarea id="workflowInternalNote" rows="3">${escapeHtml(existingNote)}</textarea>
+      </div>
+    `;
+  } else if (actionKey === "readyToGo") {
+    inner = `
+      <div class="workflow-action-form">
+        <label>Date completed</label>
+        <input id="workflowDateCompleted" type="date" value="${escapeAttr(dateCompleted)}" />
+        ${!isLocal ? `
+          <label>Shipping cost</label>
+          <input id="workflowShippingCost" type="text" inputmode="decimal" value="${escapeAttr(formatMoneyForInput(shippingCost))}" />
+        ` : ""}
+        <label>Primary lace used</label>
+        <input id="workflowPrimaryLaceUsed" type="text" inputmode="decimal" value="${escapeAttr(primaryLaceUsed)}" />
+        ${order.secondaryLaceColor || order.laceAccent ? `
+          <label>Secondary lace used</label>
+          <input id="workflowSecondaryLaceUsed" type="text" inputmode="decimal" value="${escapeAttr(secondaryLaceUsed)}" />
+        ` : ""}
+      </div>
+    `;
+  } else if (actionKey === "completed") {
+    inner = `
+      <div class="workflow-action-form">
+        <label>Paid?</label>
+        <select id="workflowPaid">
+          <option value="Paid"${normalizeText(order.paid) === "paid" ? " selected" : ""}>Paid</option>
+          <option value="Unpaid"${normalizeText(order.paid) !== "paid" ? " selected" : ""}>Unpaid</option>
+        </select>
+        ${!isLocal ? `
+          <label>Carrier</label>
+          <select id="workflowCarrier">
+            <option value="">Select carrier</option>
+            <option value="USPS"${order.carrier === "USPS" ? " selected" : ""}>USPS</option>
+            <option value="UPS"${order.carrier === "UPS" ? " selected" : ""}>UPS</option>
+            <option value="FedEx"${order.carrier === "FedEx" ? " selected" : ""}>FedEx</option>
+          </select>
+          <label>Tracking number</label>
+          <input id="workflowTrackingNumber" type="text" value="${escapeAttr(order.trackingNumber || order.tracking || "")}" />
+        ` : ""}
+      </div>
+    `;
+  }
+
+  form.innerHTML = `
+    <div class="workflow-form-content">
+      ${inner}
+      <div class="workflow-form-actions">
+        <button class="secondary workflow-form-cancel" type="button">Cancel</button>
+        <button class="primary workflow-form-submit" type="button">Save</button>
+      </div>
+    </div>
+  `;
+}
+
+async function submitWorkflowAction(order, actionKey) {
+  const updates = {};
+  const isLocal = looksLocalDropOff(order);
+  const note = document.getElementById("workflowInternalNote")?.value.trim();
+
+  if (actionKey === "sendEstimate") {
+    const value = document.getElementById("workflowPriceQuoted")?.value || "";
+    const parsed = parseMoneyInput(value);
+    updates.status = "Estimate Sent";
+    updates.priceQuoted = parsed === "" ? null : parsed;
+  } else if (actionKey === "customerApproved") {
+    updates.status = "Customer Approved";
+  } else if (actionKey === "pendingResponse") {
+    updates.status = "Pending Response";
+  } else if (actionKey === "inTransitToMe") {
+    updates.status = "In Transit to Me";
+  } else if (actionKey === "waitingOnLaceParts") {
+    updates.status = "Waiting on Lace/Parts";
+    if (note) updates.internalNotes = appendInternalNote(order.internalNotes, note);
+  } else if (actionKey === "startWork") {
+    updates.status = "In Progress";
+    updates.estimatedCompletion = document.getElementById("workflowEstimatedCompletion")?.value || null;
+  } else if (actionKey === "onHold") {
+    updates.status = "On Hold";
+    if (note) updates.internalNotes = appendInternalNote(order.internalNotes, note);
+  } else if (actionKey === "readyToGo") {
+    updates.status = "Ready to Go";
+    updates.dateCompleted = document.getElementById("workflowDateCompleted")?.value || null;
+    updates.shippingCost = !isLocal ? (parseMoneyInput(document.getElementById("workflowShippingCost")?.value || "") || null) : null;
+    updates.primaryLaceUsed = document.getElementById("workflowPrimaryLaceUsed")?.value || null;
+    if (order.secondaryLaceColor || order.laceAccent) {
+      updates.secondaryLaceUsed = document.getElementById("workflowSecondaryLaceUsed")?.value || null;
+    }
+  } else if (actionKey === "completed") {
+    updates.status = "Completed";
+    updates.paid = document.getElementById("workflowPaid")?.value || "Unpaid";
+    if (!isLocal) {
+      updates.carrier = document.getElementById("workflowCarrier")?.value || null;
+      updates.trackingNumber = document.getElementById("workflowTrackingNumber")?.value || null;
+    }
+  }
+
+  try {
+    await saveOrderUpdate(order.orderNumber, updates, true);
+    closeWorkflowSheet();
+    showWorkflowToast(`Order #${order.orderNumber} updated to ${updates.status || order.status}`);
+  } catch (err) {
+    const form = workflowSheetEl.querySelector(".workflow-sheet-form");
+    form.insertAdjacentHTML("afterbegin", `<div class="workflow-form-message">${escapeHtml(err.message || "Unable to save.")}</div>`);
+  }
+}
+
+function appendInternalNote(existingNotes, newNote) {
+  if (!newNote) return existingNotes || "";
+  const timestamp = new Date().toLocaleString();
+  const noteLine = `[${timestamp}] ${newNote}`;
+  if (!existingNotes || !existingNotes.trim()) {
+    return noteLine;
+  }
+  return `${existingNotes.trim()}\n\n${noteLine}`;
+}
+
+function startWorkflowPress(e, order) {
+  cancelWorkflowPress();
+  workflowPressTimer = setTimeout(() => {
+    openWorkflowSheet(order);
+  }, 500);
+}
+
+function cancelWorkflowPress() {
+  if (workflowPressTimer) {
+    clearTimeout(workflowPressTimer);
+    workflowPressTimer = null;
+  }
+}
+
+function showWorkflowToast(message) {
+  let toast = document.querySelector(".workflow-toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.className = "workflow-toast";
+    document.body.appendChild(toast);
+  }
+
+  toast.textContent = message;
+  toast.classList.add("show");
+
+  if (workflowToastTimeout) {
+    clearTimeout(workflowToastTimeout);
+  }
+
+  workflowToastTimeout = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 2500);
 }
 
 function isValidCssColor(value) {
