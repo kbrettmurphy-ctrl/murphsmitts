@@ -1223,13 +1223,13 @@ function renderOrders(list) {
         <div class="action-row">
           ${renderLaceChips(order)}
           <button class="action-btn action-email" type="button" aria-label="Email">
-            <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="m4 7 8 6 8-6"/></svg>
+            ✉️
           </button>
           <button class="action-btn action-phone" type="button" aria-label="Call">
-            <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.08 4.18 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.63 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.15a2 2 0 0 1 2.11-.45c.83.3 1.71.51 2.61.63A2 2 0 0 1 22 16.92z"/></svg>
+            📱
           </button>
           <button class="action-btn action-text" type="button" aria-label="Text">
-            <svg viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+            💬
           </button>
             ${!looksLocalDropOff(order) ? `
               <button class="action-btn action-ship" type="button" aria-label="Ship">
@@ -1237,7 +1237,7 @@ function renderOrders(list) {
               </button>
             ` : ""}
           <button class="action-btn action-delete" type="button" aria-label="Delete">
-            <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            🗑️
           </button>
         </div>
       </div>
