@@ -355,8 +355,7 @@ function buildPirateShipClipboardText(order) {
     order.address2 || order.aptUnit || order.apartment || "",
     `${order.city || ""}, ${order.state || ""} ${order.zipCode || order.zip || ""}`,
     "United States",
-    order.emailAddress,
-    order.phoneNumber
+    order.emailAddress
   ]
     .map(v => String(v || "").trim())
     .filter(Boolean)
