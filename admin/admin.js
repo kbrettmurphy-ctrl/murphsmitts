@@ -41,6 +41,7 @@ const mapLogoutBtn = document.getElementById("mapLogoutBtn");
 const mapCount = document.getElementById("mapCount");
 const mapStatus = document.getElementById("mapStatus");
 const orderMapEl = document.getElementById("orderMap");
+const mapUnmappedList = document.getElementById("mapUnmappedList");
 
 let laceInventory = [];
 let reorderBannerDismissed = false;
@@ -2381,6 +2382,7 @@ async function renderMapView() {
 
   if (mapStatus) mapStatus.textContent = "Preparing map...";
   if (mapCount) mapCount.textContent = "Customer reach";
+  renderUnmappedAddresses([]);
 
   if (!window.L) {
     if (mapStatus) mapStatus.textContent = "Map library failed to load.";
@@ -2532,12 +2534,14 @@ async function renderOrderMapMarkers(items, token) {
 
   let mapped = 0;
   const bounds = [];
+  const failures = [];
 
   for (const item of items) {
     if (token !== mapRenderToken) return;
 
+    const hadCache = !!getCachedCoordinates(item.address);
+
     try {
-      const hadCache = !!getCachedCoordinates(item.address);
       const coords = await geocodeAddress(item.address);
       if (token !== mapRenderToken) return;
 
@@ -2549,14 +2553,22 @@ async function renderOrderMapMarkers(items, token) {
       mapped += 1;
 
       if (mapStatus) {
-        mapStatus.textContent = `Mapped ${mapped} of ${items.length} address${items.length === 1 ? "" : "es"}.`;
+        mapStatus.textContent = getMapStatusText(mapped, items.length, failures.length);
       }
+    } catch (err) {
+      failures.push({
+        order: item.order,
+        address: item.address,
+        reason: getGeocodeFailureMessage(err)
+      });
 
-      if (!hadCache) {
+      if (mapStatus) {
+        mapStatus.textContent = getMapStatusText(mapped, items.length, failures.length);
+      }
+    } finally {
+      if (!hadCache && token === mapRenderToken) {
         await delay(1000);
       }
-    } catch {
-      // Skip failed addresses and keep drawing the rest.
     }
   }
 
@@ -2572,11 +2584,12 @@ async function renderOrderMapMarkers(items, token) {
   }
 
   if (mapStatus) {
-    mapStatus.textContent = `Mapped ${mapped} of ${items.length} address${items.length === 1 ? "" : "es"}.`;
+    mapStatus.textContent = getMapStatusText(mapped, items.length, failures.length);
   }
   if (mapCount) {
     mapCount.textContent = `${mapped} mapped`;
   }
+  renderUnmappedAddresses(failures);
 }
 
 function renderMapPopup(order, address) {
@@ -2591,6 +2604,45 @@ function renderMapPopup(order, address) {
       <button class="map-popup-btn" type="button" data-map-order="${escapeAttr(order.orderNumber || "")}">View Order</button>
       <a class="map-popup-link" href="${escapeAttr(appleMapsUrl)}" target="_blank" rel="noopener noreferrer">Open in Apple Maps</a>
     </div>
+  `;
+}
+
+function getMapStatusText(mapped, total, unmapped) {
+  const addressLabel = `address${total === 1 ? "" : "es"}`;
+  const unmappedText = unmapped ? ` ${unmapped} unmapped.` : "";
+  return `Mapped ${mapped} of ${total} ${addressLabel}.${unmappedText}`;
+}
+
+function getGeocodeFailureMessage(err) {
+  const message = String(err?.message || "").trim();
+  if (!message) return "Unable to find coordinates.";
+  if (message === "No coordinates found.") return "No coordinates found.";
+  return message;
+}
+
+function renderUnmappedAddresses(failures) {
+  if (!mapUnmappedList) return;
+
+  if (!failures.length) {
+    mapUnmappedList.hidden = true;
+    mapUnmappedList.innerHTML = "";
+    return;
+  }
+
+  mapUnmappedList.hidden = false;
+  mapUnmappedList.innerHTML = `
+    <div class="map-unmapped-title">Unmapped addresses (${failures.length})</div>
+    ${failures.map(({ order, address, reason }) => `
+      <div class="map-unmapped-item">
+        <div class="map-unmapped-main">
+          <strong>${escapeHtml(order.customerName || "Customer")}</strong>
+          <span>Order #${escapeHtml(order.orderNumber || "")}</span>
+          <span class="map-unmapped-address">${escapeHtml(address)}</span>
+          <span class="map-unmapped-reason">${escapeHtml(reason)}</span>
+        </div>
+        <button class="map-unmapped-btn" type="button" data-map-order="${escapeAttr(order.orderNumber || "")}">View Order</button>
+      </div>
+    `).join("")}
   `;
 }
 
@@ -3518,6 +3570,12 @@ mapRefreshBtn?.addEventListener("click", async () => {
   if (mapStatus) mapStatus.textContent = "Refreshing orders...";
   await loadOrders();
   renderMapView();
+});
+
+mapUnmappedList?.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-map-order]");
+  if (!btn) return;
+  openOrder(btn.dataset.mapOrder);
 });
 
 mapLogoutBtn?.addEventListener("click", () => {

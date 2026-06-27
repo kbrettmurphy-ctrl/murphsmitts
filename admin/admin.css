@@ -708,6 +708,65 @@ button.secondary{
   border:1px solid rgba(218,202,177,.18);
 }
 
+.map-unmapped-list{
+  display:grid;
+  gap:10px;
+  margin-top:14px;
+}
+
+.map-unmapped-list[hidden]{
+  display:none;
+}
+
+.map-unmapped-title{
+  color:var(--cream);
+  font-weight:800;
+}
+
+.map-unmapped-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:12px 14px;
+  border:1px solid rgba(218,202,177,.14);
+  border-radius:10px;
+  background:rgba(255,255,255,.045);
+}
+
+.map-unmapped-main{
+  display:grid;
+  gap:4px;
+  min-width:0;
+  color:var(--muted);
+  font-size:.9rem;
+}
+
+.map-unmapped-main strong{
+  color:var(--cream);
+}
+
+.map-unmapped-address,
+.map-unmapped-reason{
+  overflow-wrap:anywhere;
+}
+
+.map-unmapped-reason{
+  color:#c99090;
+}
+
+.map-unmapped-btn{
+  flex:0 0 auto;
+  border:none;
+  border-radius:10px;
+  background:#2a5475;
+  color:var(--cream);
+  padding:10px 14px;
+  font:inherit;
+  font-weight:800;
+  cursor:pointer;
+}
+
 .map-popup{
   display:grid;
   gap:6px;
@@ -1342,8 +1401,18 @@ button.secondary{
 
   #orderCount,
   #uploadCount,
-  #saleGlovesCount{
+  #saleGlovesCount,
+  #mapCount{
     font-size:.8rem;
+  }
+
+  .map-unmapped-item{
+    align-items:stretch;
+    flex-direction:column;
+  }
+
+  .map-unmapped-btn{
+    width:100%;
   }
 
   .detail-topbar-actions{
