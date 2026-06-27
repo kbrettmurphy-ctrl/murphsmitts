@@ -2124,6 +2124,7 @@ function getWorkflowActions(order) {
     add("completed", "Completed");
   }
 
+  add("markPaid", "Mark as Paid");
   add("viewDetails", "View Details");
   add("cancel", "Cancel");
   return actions;
@@ -2226,6 +2227,12 @@ function openWorkflowActionForm(order, actionKey) {
         ` : ""}
       </div>
     `;
+  } else if (actionKey === "markPaid") {
+    inner = `
+      <div class="workflow-action-form">
+        <p>${normalizeText(order.paid) === "paid" ? "This order is already marked paid." : "Mark this order as paid?"}</p>
+      </div>
+    `;
   }
 
   form.innerHTML = `
@@ -2279,12 +2286,18 @@ async function submitWorkflowAction(order, actionKey) {
       updates.carrier = document.getElementById("workflowCarrier")?.value || null;
       updates.trackingNumber = document.getElementById("workflowTrackingNumber")?.value || null;
     }
+  } else if (actionKey === "markPaid") {
+    updates.paid = "Paid";
   }
 
   try {
     await saveOrderUpdate(order.orderNumber, updates, true);
     closeWorkflowSheet();
-    showWorkflowToast(`Order #${order.orderNumber} updated to ${updates.status || order.status}`);
+    showWorkflowToast(
+      actionKey === "markPaid"
+        ? `Order #${order.orderNumber} marked paid`
+        : `Order #${order.orderNumber} updated to ${updates.status || order.status}`
+    );
   } catch (err) {
     const form = workflowSheetEl.querySelector(".workflow-sheet-form");
     form.insertAdjacentHTML("afterbegin", `<div class="workflow-form-message">${escapeHtml(err.message || "Unable to save.")}</div>`);
