@@ -2321,8 +2321,8 @@ async function submitWorkflowAction(order, actionKey) {
     closeWorkflowSheet();
     showWorkflowToast(
       actionKey === "markPaid"
-        ? `Order #${order.orderNumber} marked paid`
-        : `Order #${order.orderNumber} updated to ${updates.status || order.status}`
+        ? `Order #${order.orderNumber}: Paid`
+        : `Order #${order.orderNumber}: ${updates.status || order.status}`
     );
   } catch (err) {
     const form = workflowSheetEl.querySelector(".workflow-sheet-form");
