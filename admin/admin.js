@@ -2409,7 +2409,11 @@ async function renderMapView() {
   if (mapStatus) mapStatus.textContent = `Checking ${orders.length} address${orders.length === 1 ? "" : "es"}...`;
   if (mapCount) mapCount.textContent = `${orders.length} address${orders.length === 1 ? "" : "es"}`;
 
-  await renderOrderMapMarkers(orders, token);
+  if (mapStatus) mapStatus.textContent = "Resolving addresses...";
+  const geocoded = await geocodeMapAddresses(orders, token);
+  if (token !== mapRenderToken) return;
+
+  await renderOrderMapMarkers(applyServerMapGeocodes(orders, geocoded), token);
 }
 
 function initOrderMap() {
@@ -2444,7 +2448,14 @@ function getMappableOrders() {
   return allOrders
     .map(order => ({
       order,
-      address: buildFullAddress(order)
+      key: String(order.orderNumber || "").trim(),
+      streetAddress: String(order.streetAddress || order.address || "").trim(),
+      address2: String(order.address2 || order.aptUnit || order.apartment || "").trim(),
+      city: String(order.city || "").trim(),
+      state: String(order.state || "").trim(),
+      zipCode: String(order.zipCode || order.zip || "").trim(),
+      address: buildFullAddress(order),
+      addressCandidates: buildMapAddressCandidates(order)
     }))
     .filter(item => item.address);
 }
@@ -2458,6 +2469,101 @@ function buildFullAddress(order) {
   if (!street || !city || !state || !zip) return "";
 
   return `${street}, ${city}, ${state} ${zip}`;
+}
+
+function buildMapAddressCandidates(order) {
+  const street = String(order.streetAddress || order.address || "").trim();
+  const city = String(order.city || "").trim();
+  const state = String(order.state || "").trim();
+  const zip = String(order.zipCode || order.zip || "").trim();
+
+  if (!street || !city || !state || !zip) return [];
+
+  const cleanedStreet = cleanMapStreetAddress(street);
+  const zip5 = zip.match(/\d{5}/)?.[0] || zip;
+  const cityStateZip = `${city}, ${state} ${zip}`;
+  const cityStateZip5 = `${city}, ${state} ${zip5}`;
+
+  return uniqueAddresses([
+    `${street}, ${city}, ${state} ${zip}`,
+    `${cleanedStreet}, ${city}, ${state} ${zip}`,
+    `${cleanedStreet}, ${city}, ${state} ${zip5}`,
+    cityStateZip,
+    cityStateZip5,
+    zip5
+  ]);
+}
+
+function cleanMapStreetAddress(street) {
+  return String(street || "")
+    .replace(/\b(?:apt|apartment|unit|ste|suite|bldg|building|fl|floor|#)\s*[\w-]+.*$/i, "")
+    .replace(/[.,;]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function geocodeMapAddresses(items, token) {
+  const input = items
+    .filter(item => item.key)
+    .map(item => ({
+      key: item.key,
+      candidates: item.addressCandidates?.length ? item.addressCandidates : [item.address]
+    }));
+
+  if (!input.length) return new Map();
+
+  try {
+    const data = await postJson({
+      action: "geocodeAddresses",
+      items: input
+    }, true);
+
+    if (token !== mapRenderToken) return new Map();
+
+    return new Map(
+      (data.results || [])
+        .filter(result => result?.key)
+        .map(result => [String(result.key), result])
+    );
+  } catch (err) {
+    if (mapStatus && token === mapRenderToken) {
+      mapStatus.textContent = `Server geocoding skipped. ${err.message || "Using browser fallback."}`;
+    }
+    return new Map();
+  }
+}
+
+function applyServerMapGeocodes(items, geocoded) {
+  return items.map(item => {
+    const result = item.key ? geocoded.get(item.key) : null;
+
+    return {
+      ...item,
+      serverGeocode: result?.ok && Number.isFinite(Number(result.lat)) && Number.isFinite(Number(result.lng)) ? {
+        address: result.address || item.address,
+        coords: {
+          lat: Number(result.lat),
+          lng: Number(result.lng)
+        },
+        source: result.source || ""
+      } : null,
+      serverGeocodeReason: result?.reason || ""
+    };
+  });
+}
+
+function uniqueAddresses(addresses) {
+  const seen = new Set();
+  const out = [];
+
+  addresses.forEach(address => {
+    const key = normalizeAddress(address);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push(address);
+  });
+
+  return out;
 }
 
 function normalizeAddress(address) {
@@ -2544,17 +2650,22 @@ async function renderOrderMapMarkers(items, token) {
   for (const item of items) {
     if (token !== mapRenderToken) return;
 
-    const hadCache = !!getCachedCoordinates(item.address);
+    const candidates = item.addressCandidates?.length ? item.addressCandidates : [item.address];
+    const hadCache = !!item.serverGeocode?.coords || candidates.some(address => !!getCachedCoordinates(address));
 
     try {
-      const coords = await geocodeAddress(item.address);
+      const geocoded = item.serverGeocode?.coords
+        ? item.serverGeocode
+        : await geocodeAddressCandidates(candidates);
       if (token !== mapRenderToken) return;
 
-      const marker = L.marker([coords.lat, coords.lng]);
-      marker.bindPopup(renderMapPopup(item.order, item.address));
+      setCachedCoordinates(geocoded.address, geocoded.coords);
+
+      const marker = L.marker([geocoded.coords.lat, geocoded.coords.lng]);
+      marker.bindPopup(renderMapPopup(item.order, geocoded.address));
       marker.addTo(orderMapMarkers);
 
-      bounds.push([coords.lat, coords.lng]);
+      bounds.push([geocoded.coords.lat, geocoded.coords.lng]);
       mapped += 1;
 
       if (mapStatus) {
@@ -2595,6 +2706,29 @@ async function renderOrderMapMarkers(items, token) {
     mapCount.textContent = `${mapped} mapped`;
   }
   renderUnmappedAddresses(failures);
+}
+
+async function geocodeAddressCandidates(addresses) {
+  let lastError = null;
+
+  for (let i = 0; i < addresses.length; i += 1) {
+    const address = addresses[i];
+    const hadCache = !!getCachedCoordinates(address);
+
+    try {
+      return {
+        address,
+        coords: await geocodeAddress(address)
+      };
+    } catch (err) {
+      lastError = err;
+      if (!hadCache && i < addresses.length - 1) {
+        await delay(1000);
+      }
+    }
+  }
+
+  throw lastError || new Error("No coordinates found.");
 }
 
 function renderMapPopup(order, address) {

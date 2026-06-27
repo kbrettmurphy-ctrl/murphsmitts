@@ -491,6 +491,25 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "geocodeAddresses") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const items = Array.isArray(body.items) ? body.items : [];
+      const results = await geocodeAddresses(items);
+
+      return json(
+        {
+          ok: true,
+          results
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     if (action === "uploadGalleryPhoto") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -2441,6 +2460,186 @@ function wrapReadyToGoEmailHtml(order, { firstName, orderNum, statusDisplay }) {
 
     <p>-Brett</p>
   </div>`;
+}
+
+async function geocodeAddresses(rawItems) {
+  const items = rawItems
+    .map(parseGeocodeItem)
+    .filter(Boolean)
+    .slice(0, 250);
+  const results = [];
+
+  for (const item of items) {
+    const result = await geocodeCandidateAddresses(item);
+    results.push(result);
+
+    if (result.source === "nominatim") {
+      await delayMs(1000);
+    }
+  }
+
+  return results;
+}
+
+function parseGeocodeItem(input) {
+  const key = cleanDisplay(input?.key || input?.orderNumber);
+  const candidates = Array.isArray(input?.candidates)
+    ? input.candidates.map(cleanDisplay).filter(Boolean).slice(0, 8)
+    : [];
+
+  if (!key || !candidates.length) return null;
+
+  return {
+    key,
+    candidates: uniqueTextValues(candidates)
+  };
+}
+
+async function geocodeCandidateAddresses(item) {
+  let lastReason = "No coordinates found.";
+
+  for (let i = 0; i < item.candidates.length; i += 1) {
+    const address = item.candidates[i];
+    const census = await geocodeWithCensus(address);
+    if (census.ok) {
+      return {
+        key: item.key,
+        ok: true,
+        address: census.address || address,
+        lat: census.lat,
+        lng: census.lng,
+        source: "census"
+      };
+    }
+    lastReason = census.reason || lastReason;
+
+    const nominatim = await geocodeWithNominatim(address);
+    if (nominatim.ok) {
+      return {
+        key: item.key,
+        ok: true,
+        address,
+        lat: nominatim.lat,
+        lng: nominatim.lng,
+        source: "nominatim"
+      };
+    }
+    lastReason = nominatim.reason || lastReason;
+
+    if (i < item.candidates.length - 1) {
+      await delayMs(1000);
+    }
+  }
+
+  return {
+    key: item.key,
+    ok: false,
+    reason: lastReason
+  };
+}
+
+async function geocodeWithCensus(address) {
+  const url =
+    "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress" +
+    `?benchmark=Public_AR_Current&format=json&address=${encodeURIComponent(address)}`;
+
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/json"
+      }
+    });
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+      return { ok: false, reason: `Census geocoding failed: ${res.status}` };
+    }
+
+    const match = data?.result?.addressMatches?.[0];
+    const lat = Number(match?.coordinates?.y);
+    const lng = Number(match?.coordinates?.x);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return { ok: false, reason: "No Census coordinates found." };
+    }
+
+    return {
+      ok: true,
+      address: cleanDisplay(match.matchedAddress),
+      lat,
+      lng
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err?.message || "Census geocoding failed."
+    };
+  }
+}
+
+async function geocodeWithNominatim(address) {
+  const url =
+    "https://nominatim.openstreetmap.org/search" +
+    `?format=jsonv2&limit=1&countrycodes=us&q=${encodeURIComponent(address)}`;
+
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "MurphsMittsAdmin/1.0"
+      }
+    });
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+      return { ok: false, reason: `OpenStreetMap geocoding failed: ${res.status}` };
+    }
+
+    const first = Array.isArray(data) ? data[0] : null;
+    const lat = Number(first?.lat);
+    const lng = Number(first?.lon);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return { ok: false, reason: "No OpenStreetMap coordinates found." };
+    }
+
+    return {
+      ok: true,
+      lat,
+      lng
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err?.message || "OpenStreetMap geocoding failed."
+    };
+  }
+}
+
+function uniqueTextValues(values) {
+  const seen = new Set();
+  const out = [];
+
+  values.forEach(value => {
+    const key = String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push(value);
+  });
+
+  return out;
+}
+
+async function safeJson(res) {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function delayMs(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /* =========================

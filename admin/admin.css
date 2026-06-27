@@ -699,6 +699,9 @@ button.secondary{
 }
 
 .order-map{
+  position:relative;
+  isolation:isolate;
+  z-index:0;
   width:100%;
   height:calc(100vh - 210px);
   min-height:420px;
