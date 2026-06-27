@@ -1297,7 +1297,7 @@ function renderOrders(list) {
     card.addEventListener("contextmenu", (e) => {
       if (e.target.closest(".action-btn") || e.target.closest(".swipe-delete-btn")) return;
       e.preventDefault();
-      openWorkflowSheet(order);
+      openWorkflowSheet(order, e);
     });
 
     card.addEventListener("touchstart", (e) => {
@@ -2020,10 +2020,16 @@ function renderWorkflowProgress(order) {
   `;
 }
 
-function openWorkflowSheet(order, suppressOpeningTouch = false) {
+function openWorkflowSheet(order, source, suppressOpeningTouch = false) {
   if (!workflowSheetEl) createWorkflowSheet();
 
+  if (typeof source === "boolean") {
+    suppressOpeningTouch = source;
+    source = null;
+  }
+
   workflowSheetEl.order = order;
+  workflowSheetEl.anchor = getMenuAnchorPosition(source, source?.currentTarget);
   workflowSuppressOpeningTouch = suppressOpeningTouch;
   clearWorkflowOpeningTouchTimer();
   document.removeEventListener("touchend", consumeWorkflowOpeningTouchEnd, true);
@@ -2049,8 +2055,9 @@ function openWorkflowSheet(order, suppressOpeningTouch = false) {
   headerStatus.textContent = order.status || "";
   actions.innerHTML = getWorkflowActions(order)
     .map(action => `
-      <button class="workflow-action-btn" type="button" data-action="${action.key}">
-        ${escapeHtml(action.label)}
+      <button class="workflow-action-btn" type="button" role="menuitem" aria-haspopup="true" data-action="${action.key}">
+        <span>${escapeHtml(action.label)}</span>
+        <span class="workflow-menu-chevron" aria-hidden="true">›</span>
       </button>
     `)
     .join("");
@@ -2059,6 +2066,10 @@ function openWorkflowSheet(order, suppressOpeningTouch = false) {
   workflowSheetEl.querySelector(".workflow-sheet-title").textContent = "Workflow actions";
   workflowSheetEl.classList.add("open");
   document.body.classList.add("workflow-open");
+  document.addEventListener("keydown", handleWorkflowMenuKeydown);
+  requestAnimationFrame(() => {
+    positionWorkflowMenu(workflowSheetEl.querySelector(".workflow-sheet"), workflowSheetEl.anchor);
+  });
 }
 
 function closeWorkflowSheet() {
@@ -2066,10 +2077,15 @@ function closeWorkflowSheet() {
   workflowSuppressOpeningTouch = false;
   clearWorkflowOpeningTouchTimer();
   document.removeEventListener("touchend", consumeWorkflowOpeningTouchEnd, true);
+  document.removeEventListener("keydown", handleWorkflowMenuKeydown);
   workflowSheetEl.classList.remove("open");
   workflowSheetEl.querySelector(".workflow-action-list").innerHTML = "";
   workflowSheetEl.querySelector(".workflow-sheet-form").innerHTML = "";
   document.body.classList.remove("workflow-open");
+}
+
+function closeWorkflowMenu() {
+  closeWorkflowSheet();
 }
 
 function createWorkflowSheet() {
@@ -2077,7 +2093,7 @@ function createWorkflowSheet() {
   workflowSheetEl.className = "workflow-sheet-root";
   workflowSheetEl.innerHTML = `
     <div class="workflow-backdrop"></div>
-    <div class="workflow-sheet">
+    <div class="workflow-sheet" role="menu" aria-label="Workflow actions">
       <div class="workflow-sheet-header">
         <div>
           <div class="workflow-customer-name"></div>
@@ -2118,6 +2134,65 @@ function createWorkflowSheet() {
   });
 
   document.body.appendChild(workflowSheetEl);
+}
+
+function handleWorkflowMenuKeydown(e) {
+  if (e.key !== "Escape") return;
+  closeWorkflowMenu();
+}
+
+function getMenuAnchorPosition(event, element) {
+  const source = event || window.event;
+
+  if (Number.isFinite(source?.x) && Number.isFinite(source?.y)) {
+    return { x: source.x, y: source.y };
+  }
+
+  const touch = source?.touches?.[0] || source?.changedTouches?.[0];
+  if (touch) {
+    return { x: touch.clientX, y: touch.clientY };
+  }
+
+  if (Number.isFinite(source?.clientX) && Number.isFinite(source?.clientY)) {
+    return { x: source.clientX, y: source.clientY };
+  }
+
+  const rect = element?.getBoundingClientRect?.();
+  if (rect) {
+    return {
+      x: rect.left + Math.min(rect.width / 2, 32),
+      y: rect.top + Math.min(rect.height / 2, 32)
+    };
+  }
+
+  return {
+    x: Math.round(window.innerWidth / 2),
+    y: Math.round(window.innerHeight / 2)
+  };
+}
+
+function positionWorkflowMenu(menu, anchor) {
+  if (!menu || !anchor) return;
+
+  menu.style.left = "0px";
+  menu.style.top = "0px";
+  menu.style.right = "auto";
+  menu.style.bottom = "auto";
+
+  const margin = 12;
+  const rect = menu.getBoundingClientRect();
+  const width = rect.width;
+  const height = rect.height;
+  const maxLeft = Math.max(margin, window.innerWidth - width - margin);
+  const maxTop = Math.max(margin, window.innerHeight - height - margin);
+  const preferTouchMenu = window.matchMedia("(pointer: coarse)").matches;
+  const offsetY = preferTouchMenu ? 10 : 2;
+
+  const left = Math.min(Math.max(margin, anchor.x), maxLeft);
+  const top = Math.min(Math.max(margin, anchor.y + offsetY), maxTop);
+
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
 }
 
 function consumeWorkflowOpeningTouchEnd(e) {
@@ -2293,6 +2368,9 @@ function openWorkflowActionForm(order, actionKey) {
       </div>
     </div>
   `;
+  requestAnimationFrame(() => {
+    positionWorkflowMenu(workflowSheetEl.querySelector(".workflow-sheet"), workflowSheetEl.anchor);
+  });
 }
 
 async function submitWorkflowAction(order, actionKey) {
@@ -2360,9 +2438,10 @@ function appendInternalNote(existingNotes, newNote) {
 
 function startWorkflowPress(e, order) {
   cancelWorkflowPress();
+  const anchor = getMenuAnchorPosition(e, e.currentTarget);
   workflowPressTimer = setTimeout(() => {
     clearTextSelection();
-    openWorkflowSheet(order, true);
+    openWorkflowSheet(order, anchor, true);
   }, 500);
 }
 
