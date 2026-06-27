@@ -38,23 +38,8 @@ body_class: home
       <h2>Before &amp; After</h2>
       <p class="lede">A few examples of gloves that showed up tired and left ready for another round.</p>
 
-      <div class="gallery-strip" data-gallery-group="home-featured">
-        {% assign featured = site.data.gallery | slice: 0, 6 %}
-        {% for item in featured %}
-          <button
-            class="gallery-thumb"
-            type="button"
-            data-gallery-group="home-featured"
-            data-gallery-index="{{ forloop.index0 }}"
-            aria-label="Open image: {{ item.alt | escape }}">
-            <img
-              src="{{ '/assets/img/beforeafter/' | append: item.file | relative_url }}"
-              alt="{{ item.alt | escape }}"
-              loading="lazy"
-              decoding="async">
-          </button>
-        {% endfor %}
-      </div>
+      <div id="homeGalleryStatus" class="home-gallery-status">Loading recent glove photos...</div>
+      <div id="homeGalleryPreview" class="gallery-strip" data-gallery-group="home-featured"></div>
 
       <div class="home-actions">
         <a class="btn btn-secondary" href="{{ '/gallery/' | relative_url }}">View Full Gallery</a>

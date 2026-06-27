@@ -1604,6 +1604,11 @@ body.home footer{
   flex-wrap: wrap;
 }
 
+.home-gallery-status{
+  margin-top:18px;
+  color: var(--muted);
+}
+
 .home-services-grid{
   display:grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

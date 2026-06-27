@@ -7,11 +7,10 @@ This repository is a Jekyll-based marketing and service website for Murph’s Mi
 ## Runtime model
 
 ### Static site layer
-- Jekyll builds the public-facing pages from the repository’s HTML templates, includes, layouts, and data files.
+- Jekyll builds the public-facing pages from the repository’s HTML templates, includes, and layouts.
 - The main layout is [
 _layouts/default.html](_layouts/default.html), and the home page is [index.html](index.html).
-- The site uses page front matter and Liquid templates to render content from [
-_data/gallery.yml](_data/gallery.yml) and other static assets.
+- The homepage and gallery page load gallery photos from the Cloudflare Functions gallery endpoint backed by Supabase Storage.
 
 ### Client-side behavior
 - Public pages use [assets/js/main.js](assets/js/main.js) for gallery lightbox interactions, mobile navigation, and other UI enhancements.

@@ -166,6 +166,101 @@ if (document.readyState === "loading") {
 }
 
 // =========================
+// Home gallery preview
+// =========================
+(() => {
+  if (!document.body.classList.contains("home")) return;
+
+  const preview = document.getElementById("homeGalleryPreview");
+  const status = document.getElementById("homeGalleryStatus");
+  if (!preview) return;
+
+  const sections = [
+    ["fielding-gloves", "Fielding glove"],
+    ["catchers-mitts", "Catcher's mitt"],
+    ["first-base-mitts", "First base mitt"],
+    ["custom-color-relaces", "Custom color relace"],
+    ["vintage", "Vintage glove"]
+  ];
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function shuffle(items) {
+    const result = [...items];
+    for (let i = result.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  }
+
+  function pickPreviewPhotos(gallery) {
+    return sections.flatMap(([key, label]) => {
+      const photos = Array.isArray(gallery[key]) ? gallery[key] : [];
+      return shuffle(photos)
+        .slice(0, 2)
+        .map(photo => ({ ...photo, label }));
+    });
+  }
+
+  function renderPreview(photos) {
+    preview.innerHTML = photos.map((photo, index) => {
+      const alt = `${photo.label} restoration photo ${index + 1}`;
+      return `
+        <button
+          class="gallery-thumb"
+          type="button"
+          data-gallery-group="home-featured"
+          data-gallery-index="${index}"
+          aria-label="Open image: ${escapeHtml(alt)}">
+          <img
+            src="${escapeHtml(photo.url)}"
+            alt="${escapeHtml(alt)}"
+            loading="lazy"
+            decoding="async">
+        </button>
+      `;
+    }).join("");
+  }
+
+  async function loadPreview() {
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+        body: JSON.stringify({
+          action: "listGalleryPhotos"
+        })
+      });
+
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Gallery failed to load.");
+
+      const photos = shuffle(pickPreviewPhotos(data.gallery || {}));
+      if (!photos.length) {
+        if (status) status.textContent = "Gallery photos are coming soon.";
+        return;
+      }
+
+      renderPreview(photos);
+      if (status) status.textContent = "";
+    } catch {
+      if (status) status.textContent = "Gallery preview is unavailable right now.";
+    }
+  }
+
+  loadPreview();
+})();
+
+// =========================
 // Mobile menu toggle
 // =========================
 (() => {
