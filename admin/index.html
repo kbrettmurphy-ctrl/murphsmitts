@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Murph's Mitt Maintenance Orders</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="admin.css" />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
@@ -43,6 +44,7 @@
           </div>
         </div>
 
+        <button class="nav-link nav-main" data-view="map">Map</button>
         <button class="nav-link nav-main" data-view="inventory">Lace Inventory</button>
         <button class="nav-link nav-main" data-view="upload">Upload</button>
         <button class="nav-link nav-main" data-view="gloves-sale">Gloves For Sale</button>
@@ -81,6 +83,35 @@
         </div>
 
         <div id="ordersList" class="orders-list"></div>
+      </section>
+
+      <section id="mapView" class="view">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="mapMenuBtn" class="icon-btn" aria-label="Open menu">☰</button>
+            <div>
+              <h1>Map</h1>
+              <p id="mapCount" class="muted">Customer reach</p>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px;">
+            <button id="mapRefreshBtn" class="secondary">🔄</button>
+            <button id="mapLogoutBtn" class="secondary">Log Out</button>
+          </div>
+        </header>
+
+        <div class="map-panel">
+          <div class="map-card">
+            <div class="map-header-row">
+              <div>
+                <h2>Shipped Glove Map</h2>
+                <p id="mapStatus" class="muted">Loading map...</p>
+              </div>
+            </div>
+            <div id="orderMap" class="order-map" aria-label="Map of shipped glove order locations"></div>
+          </div>
+        </div>
       </section>
 
       <section id="uploadView" class="view">
@@ -184,6 +215,7 @@
   </div>
 
   <script src="config.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>

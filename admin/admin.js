@@ -5,6 +5,7 @@ const loginView = document.getElementById("loginView");
 const dashboardView = document.getElementById("dashboardView");
 const detailView = document.getElementById("detailView");
 const uploadView = document.getElementById("uploadView");
+const mapView = document.getElementById("mapView");
 const detailTitle = document.getElementById("detailTitle");
 const pinInput = document.getElementById("pinInput");
 const loginStatus = document.getElementById("loginStatus");
@@ -34,6 +35,12 @@ const saleGlovesMenuBtn = document.getElementById("saleGlovesMenuBtn");
 const saleGlovesRefreshBtn = document.getElementById("saleGlovesRefreshBtn");
 const saleGlovesLogoutBtn = document.getElementById("saleGlovesLogoutBtn");
 const addSaleGloveBtn = document.getElementById("addSaleGloveBtn");
+const mapMenuBtn = document.getElementById("mapMenuBtn");
+const mapRefreshBtn = document.getElementById("mapRefreshBtn");
+const mapLogoutBtn = document.getElementById("mapLogoutBtn");
+const mapCount = document.getElementById("mapCount");
+const mapStatus = document.getElementById("mapStatus");
+const orderMapEl = document.getElementById("orderMap");
 
 let laceInventory = [];
 let reorderBannerDismissed = false;
@@ -46,6 +53,9 @@ let workflowSuppressOpeningTouch = false;
 let workflowSuppressOpeningTouchTimer = null;
 let loginInProgress = false;
 let listScrollY = 0;
+let orderMap = null;
+let orderMapMarkers = null;
+let mapRenderToken = 0;
 
 window.inventoryNeedsOrderOnly = false;
 
@@ -53,7 +63,7 @@ window.inventoryNeedsOrderOnly = false;
    VIEW / MENU
 ========================= */
 function showView(view) {
-  [loginView, dashboardView, detailView, uploadView, saleGlovesView]
+  [loginView, dashboardView, detailView, uploadView, mapView, saleGlovesView]
     .filter(Boolean)
     .forEach(v => v.classList.remove("active"));
 
@@ -272,6 +282,7 @@ function isInTransitToMe(order) {
 
 function getViewTitle(viewName) {
   switch (viewName) {
+    case "map": return "Map";
     case "upload": return "Upload";
     case "inventory": return "Lace Inventory";
     case "waiting": return "Waiting on Lace/Parts";
@@ -1108,6 +1119,13 @@ function setActiveView(viewName) {
      loadSaleGloves();
      showView(saleGlovesView);
      closeMenu();
+     return;
+  }
+
+  if (viewName === "map") {
+     showView(mapView);
+     closeMenu();
+     renderMapView();
      return;
   }
 
@@ -2356,6 +2374,230 @@ function clearTextSelection() {
   }
 }
 
+async function renderMapView() {
+  const token = ++mapRenderToken;
+
+  if (!mapView || !orderMapEl) return;
+
+  if (mapStatus) mapStatus.textContent = "Preparing map...";
+  if (mapCount) mapCount.textContent = "Customer reach";
+
+  if (!window.L) {
+    if (mapStatus) mapStatus.textContent = "Map library failed to load.";
+    return;
+  }
+
+  const orders = getMappableOrders();
+
+  if (!orders.length) {
+    initOrderMap();
+    orderMapMarkers.clearLayers();
+    if (mapStatus) mapStatus.textContent = "No shipped addresses found.";
+    if (mapCount) mapCount.textContent = "0 addresses";
+    return;
+  }
+
+  initOrderMap();
+
+  if (mapStatus) mapStatus.textContent = `Checking ${orders.length} address${orders.length === 1 ? "" : "es"}...`;
+  if (mapCount) mapCount.textContent = `${orders.length} address${orders.length === 1 ? "" : "es"}`;
+
+  await renderOrderMapMarkers(orders, token);
+}
+
+function initOrderMap() {
+  if (!window.L || !orderMapEl) return;
+
+  if (!orderMap) {
+    orderMap = L.map(orderMapEl, {
+      scrollWheelZoom: true
+    }).setView([39.5, -98.35], 4);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(orderMap);
+
+    orderMapMarkers = L.layerGroup().addTo(orderMap);
+
+    orderMapEl.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-map-order]");
+      if (!btn) return;
+      e.preventDefault();
+      openOrder(btn.dataset.mapOrder);
+    });
+  }
+
+  requestAnimationFrame(() => {
+    orderMap.invalidateSize();
+  });
+}
+
+function getMappableOrders() {
+  return allOrders
+    .map(order => ({
+      order,
+      address: buildFullAddress(order)
+    }))
+    .filter(item => item.address);
+}
+
+function buildFullAddress(order) {
+  const street = String(order.streetAddress || order.address || "").trim();
+  const city = String(order.city || "").trim();
+  const state = String(order.state || "").trim();
+  const zip = String(order.zipCode || order.zip || "").trim();
+
+  if (!street || !city || !state || !zip) return "";
+
+  return `${street}, ${city}, ${state} ${zip}`;
+}
+
+function normalizeAddress(address) {
+  return String(address || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+async function geocodeAddress(address) {
+  const cached = getCachedCoordinates(address);
+  if (cached) return cached;
+
+  const url =
+    "https://nominatim.openstreetmap.org/search" +
+    `?format=jsonv2&limit=1&countrycodes=us&q=${encodeURIComponent(address)}`;
+
+  const res = await fetch(url, {
+    headers: {
+      Accept: "application/json"
+    }
+  });
+
+  if (!res.ok) throw new Error(`Geocoding failed: ${res.status}`);
+
+  const data = await res.json();
+  const first = Array.isArray(data) ? data[0] : null;
+  const lat = Number(first?.lat);
+  const lng = Number(first?.lon);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error("No coordinates found.");
+  }
+
+  const coords = { lat, lng };
+  setCachedCoordinates(address, coords);
+  return coords;
+}
+
+function getCachedCoordinates(address) {
+  const key = normalizeAddress(address);
+  if (!key) return null;
+
+  try {
+    const cache = JSON.parse(localStorage.getItem("mm_geocode_cache_v1") || "{}");
+    const coords = cache[key];
+    if (!coords) return null;
+
+    const lat = Number(coords.lat);
+    const lng = Number(coords.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}
+
+function setCachedCoordinates(address, coords) {
+  const key = normalizeAddress(address);
+  if (!key) return;
+
+  try {
+    const cache = JSON.parse(localStorage.getItem("mm_geocode_cache_v1") || "{}");
+    cache[key] = {
+      lat: Number(coords.lat),
+      lng: Number(coords.lng)
+    };
+    localStorage.setItem("mm_geocode_cache_v1", JSON.stringify(cache));
+  } catch {
+    // Local cache is helpful, but the map still works without it.
+  }
+}
+
+async function renderOrderMapMarkers(items, token) {
+  if (!orderMap || !orderMapMarkers || !window.L) return;
+
+  orderMapMarkers.clearLayers();
+
+  let mapped = 0;
+  const bounds = [];
+
+  for (const item of items) {
+    if (token !== mapRenderToken) return;
+
+    try {
+      const hadCache = !!getCachedCoordinates(item.address);
+      const coords = await geocodeAddress(item.address);
+      if (token !== mapRenderToken) return;
+
+      const marker = L.marker([coords.lat, coords.lng]);
+      marker.bindPopup(renderMapPopup(item.order, item.address));
+      marker.addTo(orderMapMarkers);
+
+      bounds.push([coords.lat, coords.lng]);
+      mapped += 1;
+
+      if (mapStatus) {
+        mapStatus.textContent = `Mapped ${mapped} of ${items.length} address${items.length === 1 ? "" : "es"}.`;
+      }
+
+      if (!hadCache) {
+        await delay(1000);
+      }
+    } catch {
+      // Skip failed addresses and keep drawing the rest.
+    }
+  }
+
+  if (token !== mapRenderToken) return;
+
+  if (bounds.length === 1) {
+    orderMap.setView(bounds[0], 9);
+  } else if (bounds.length > 1) {
+    orderMap.fitBounds(bounds, {
+      padding: [28, 28],
+      maxZoom: 10
+    });
+  }
+
+  if (mapStatus) {
+    mapStatus.textContent = `Mapped ${mapped} of ${items.length} address${items.length === 1 ? "" : "es"}.`;
+  }
+  if (mapCount) {
+    mapCount.textContent = `${mapped} mapped`;
+  }
+}
+
+function renderMapPopup(order, address) {
+  const appleMapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(address)}`;
+
+  return `
+    <div class="map-popup">
+      <div class="map-popup-name">${escapeHtml(order.customerName || "Customer")}</div>
+      <div class="map-popup-meta">Order #${escapeHtml(order.orderNumber || "")}</div>
+      <div class="map-popup-meta">${escapeHtml(order.status || "")}</div>
+      <div class="map-popup-address">${escapeHtml(address)}</div>
+      <button class="map-popup-btn" type="button" data-map-order="${escapeAttr(order.orderNumber || "")}">View Order</button>
+      <a class="map-popup-link" href="${escapeAttr(appleMapsUrl)}" target="_blank" rel="noopener noreferrer">Open in Apple Maps</a>
+    </div>
+  `;
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 function isValidCssColor(value) {
   const s = String(value || "").trim();
   if (!s) return false;
@@ -3268,6 +3510,22 @@ saleGlovesLogoutBtn?.addEventListener("click", () => {
 
 addSaleGloveBtn?.addEventListener("click", () => {
   renderSaleGloveEditor(null);
+});
+
+mapMenuBtn?.addEventListener("click", openMenu);
+
+mapRefreshBtn?.addEventListener("click", async () => {
+  if (mapStatus) mapStatus.textContent = "Refreshing orders...";
+  await loadOrders();
+  renderMapView();
+});
+
+mapLogoutBtn?.addEventListener("click", () => {
+  clearToken();
+  currentOrder = null;
+  closeMenu();
+  syncAuthUI();
+  showView(loginView);
 });
 
 if (saveOrderBtn) {

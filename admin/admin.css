@@ -670,6 +670,88 @@ button.secondary{
   color:var(--muted);
 }
 
+/* =========================
+   MAP VIEW
+   ========================= */
+.map-panel{
+  padding:14px 16px 24px;
+}
+
+.map-card{
+  background:var(--panel);
+  border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+  padding:16px;
+}
+
+.map-header-row{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:14px;
+}
+
+.map-header-row h2{
+  margin:0 0 6px;
+  color:var(--cream);
+  font-size:1.1rem;
+}
+
+.order-map{
+  width:100%;
+  height:calc(100vh - 210px);
+  min-height:420px;
+  border-radius:14px;
+  overflow:hidden;
+  background:#10263a;
+  border:1px solid rgba(218,202,177,.18);
+}
+
+.map-popup{
+  display:grid;
+  gap:6px;
+  min-width:190px;
+  color:#092f4d;
+  font-family:'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.map-popup-name{
+  font-weight:800;
+  font-size:.95rem;
+}
+
+.map-popup-meta,
+.map-popup-address{
+  font-size:.82rem;
+  line-height:1.35;
+}
+
+.map-popup-btn{
+  border:none;
+  border-radius:8px;
+  background:#092f4d;
+  color:#dacab1;
+  padding:8px 10px;
+  font:inherit;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.map-popup-link{
+  color:#092f4d;
+  font-weight:700;
+  text-decoration:none;
+}
+
+.leaflet-container{
+  font:inherit;
+}
+
+.leaflet-popup-content{
+  margin:12px;
+}
+
 .lace-dot-row{
   display:flex;
   align-items:center;
