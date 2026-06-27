@@ -925,9 +925,19 @@ button.secondary{
   white-space:nowrap;
 }
 
+.workflow-action-btn.active{
+  background:var(--cream);
+  color:var(--dark);
+  font-weight:700;
+}
+
 @media (hover:hover) and (pointer:fine){
   .workflow-action-btn:hover{
     background:rgba(255,255,255,.12);
+  }
+
+  .workflow-action-btn.active:hover{
+    background:var(--cream);
   }
 }
 

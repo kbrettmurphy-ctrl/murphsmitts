@@ -2188,6 +2188,11 @@ function getWorkflowActions(order) {
 function openWorkflowActionForm(order, actionKey) {
   const form = workflowSheetEl.querySelector(".workflow-sheet-form");
   workflowSheetEl.actionKey = actionKey;
+  workflowSheetEl.querySelectorAll(".workflow-action-btn").forEach((button) => {
+    const active = button.dataset.action === actionKey;
+    button.hidden = !active;
+    button.classList.toggle("active", active);
+  });
   const isLocal = looksLocalDropOff(order);
   const existingNote = order.internalNotes || "";
   const priceQuoted = order.priceQuoted ?? "";
