@@ -2124,7 +2124,9 @@ function getWorkflowActions(order) {
     add("completed", "Completed");
   }
 
-  add("markPaid", "Mark as Paid");
+  if (normalizeText(order.paid) !== "paid") {
+    add("markPaid", "Mark as Paid");
+  }
   add("viewDetails", "View Details");
   add("cancel", "Cancel");
   return actions;
