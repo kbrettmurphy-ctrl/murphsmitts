@@ -771,8 +771,14 @@ function installSwipeDeleteStyles() {
       display:flex;
       justify-content:flex-end;
       align-items:stretch;
-      background:#921a24;
+      background:transparent;
       border-radius:0;
+      pointer-events:none;
+    }
+
+    .swipe-row.swiped .swipe-delete-bg{
+      background:#921a24;
+      pointer-events:auto;
     }
 
     .swipe-delete-btn{
