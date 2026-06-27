@@ -1142,17 +1142,23 @@ button.secondary{
   display: flex;
   justify-content: flex-end;
   align-items: stretch;
-  background: #921a24;
+  background: transparent;
 }
 
 .swipe-delete-btn{
   min-width: 92px;
   border: 0;
-  background: #921a24;
-  color: #fff;
+  background: transparent;
+  color: transparent;
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+}
+
+.swipe-row.swiped .swipe-delete,
+.swipe-row.swiped .swipe-delete-btn{
+  background: #921a24;
+  color: #fff;
 }
 
 .swipe-row .order-card{

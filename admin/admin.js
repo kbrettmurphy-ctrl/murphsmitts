@@ -784,12 +784,17 @@ function installSwipeDeleteStyles() {
     .swipe-delete-btn{
       min-width:94px;
       border:0;
-      background:#921a24;
-      color:#fff;
+      background:transparent;
+      color:transparent;
       font:inherit;
       font-weight:700;
       padding:0 18px;
       cursor:pointer;
+    }
+
+    .swipe-row.swiped .swipe-delete-btn{
+      background:#921a24;
+      color:#fff;
     }
 
     .swipe-row .order-card{
