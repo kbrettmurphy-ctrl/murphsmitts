@@ -708,6 +708,19 @@ button.secondary{
   overflow-y:auto;
 }
 
+@media (min-width: 900px){
+  .workflow-sheet{
+    left:50%;
+    right:auto;
+    bottom:24px;
+    transform:translateX(-50%);
+    width:max-content;
+    min-width:280px;
+    max-width:min(520px, calc(100vw - 48px));
+    border-radius:18px;
+  }
+}
+
 .workflow-sheet-header{
   display:flex;
   justify-content:space-between;
@@ -767,6 +780,7 @@ button.secondary{
   text-align:left;
   cursor:pointer;
   -webkit-tap-highlight-color:transparent;
+  white-space:nowrap;
 }
 
 @media (hover:hover) and (pointer:fine){
@@ -780,6 +794,12 @@ button.secondary{
   gap:12px;
 }
 
+.workflow-form-content{
+  display:grid;
+  gap:12px;
+  min-width:0;
+}
+
 .workflow-action-form label,
 .workflow-action-form p{
   display:block;
@@ -790,12 +810,19 @@ button.secondary{
 .workflow-action-form input,
 .workflow-action-form textarea,
 .workflow-action-form select{
+  display:block;
   width:100%;
+  max-width:100%;
+  min-width:0;
+  min-height:46px;
   padding:10px 12px;
   border-radius:10px;
   border:1px solid rgba(255,255,255,.15);
   background:rgba(255,255,255,.04);
   color:var(--cream);
+  line-height:1.2;
+  -webkit-appearance:none;
+  appearance:none;
 }
 
 .workflow-form-actions{
@@ -803,6 +830,28 @@ button.secondary{
   gap:10px;
   justify-content:flex-end;
   margin-top:8px;
+}
+
+.workflow-form-actions button{
+  border:none;
+  border-radius:12px;
+  min-width:88px;
+  min-height:46px;
+  padding:12px 16px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  line-height:1.2;
+}
+
+.workflow-form-actions .workflow-form-cancel{
+  background:#244866;
+  color:var(--cream);
+}
+
+.workflow-form-actions .workflow-form-submit{
+  background:var(--cream);
+  color:var(--dark);
 }
 
 .workflow-form-message{

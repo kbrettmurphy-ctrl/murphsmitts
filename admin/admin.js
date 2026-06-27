@@ -43,8 +43,6 @@ let currentOrder = null;
 let workflowSheetEl = null;
 let workflowPressTimer = null;
 let workflowSuppressOpeningTouch = false;
-let workflowSuppressOpeningClick = false;
-let workflowSuppressOpeningClickTimer = null;
 let workflowToastTimeout = null;
 let loginInProgress = false;
 let listScrollY = 0;
@@ -2008,14 +2006,6 @@ function openWorkflowSheet(order, suppressOpeningTouch = false) {
 
   workflowSheetEl.order = order;
   workflowSuppressOpeningTouch = suppressOpeningTouch;
-  workflowSuppressOpeningClick = suppressOpeningTouch;
-  clearWorkflowOpeningClickTimer();
-  if (suppressOpeningTouch) {
-    workflowSuppressOpeningClickTimer = setTimeout(() => {
-      workflowSuppressOpeningClick = false;
-      workflowSuppressOpeningClickTimer = null;
-    }, 1200);
-  }
   const headerCustomer = workflowSheetEl.querySelector(".workflow-customer-name");
   const headerNumber = workflowSheetEl.querySelector(".workflow-order-number");
   const headerStatus = workflowSheetEl.querySelector(".workflow-current-status");
@@ -2042,8 +2032,6 @@ function openWorkflowSheet(order, suppressOpeningTouch = false) {
 function closeWorkflowSheet() {
   if (!workflowSheetEl) return;
   workflowSuppressOpeningTouch = false;
-  workflowSuppressOpeningClick = false;
-  clearWorkflowOpeningClickTimer();
   workflowSheetEl.classList.remove("open");
   workflowSheetEl.querySelector(".workflow-action-list").innerHTML = "";
   workflowSheetEl.querySelector(".workflow-sheet-form").innerHTML = "";
@@ -2083,14 +2071,6 @@ function createWorkflowSheet() {
   }, { capture: true });
 
   workflowSheetEl.addEventListener("click", (e) => {
-    if (!workflowSuppressOpeningClick) return;
-    workflowSuppressOpeningClick = false;
-    clearWorkflowOpeningClickTimer();
-    e.preventDefault();
-    e.stopImmediatePropagation();
-  }, { capture: true });
-
-  workflowSheetEl.addEventListener("click", (e) => {
     const actionBtn = e.target.closest(".workflow-action-btn");
     if (actionBtn) {
       openWorkflowActionForm(workflowSheetEl.order, actionBtn.dataset.action);
@@ -2111,12 +2091,6 @@ function createWorkflowSheet() {
   });
 
   document.body.appendChild(workflowSheetEl);
-}
-
-function clearWorkflowOpeningClickTimer() {
-  if (!workflowSuppressOpeningClickTimer) return;
-  clearTimeout(workflowSuppressOpeningClickTimer);
-  workflowSuppressOpeningClickTimer = null;
 }
 
 function getWorkflowActions(order) {
@@ -2163,8 +2137,6 @@ function getWorkflowActions(order) {
   if (normalizeText(order.paid) !== "paid") {
     add("markPaid", "Mark as Paid");
   }
-  add("viewDetails", "View Details");
-  add("cancel", "Cancel");
   return actions;
 }
 
@@ -2179,17 +2151,6 @@ function openWorkflowActionForm(order, actionKey) {
   const shippingCost = order.shippingCost ?? "";
   const primaryLaceUsed = order.primaryLaceUsed ?? "";
   const secondaryLaceUsed = order.secondaryLaceUsed ?? "";
-
-  if (actionKey === "viewDetails") {
-    closeWorkflowSheet();
-    openOrder(order.orderNumber);
-    return;
-  }
-
-  if (actionKey === "cancel") {
-    closeWorkflowSheet();
-    return;
-  }
 
   let inner = "";
 
