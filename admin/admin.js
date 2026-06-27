@@ -42,6 +42,9 @@ let activeView = "current";
 let currentOrder = null;
 let workflowSheetEl = null;
 let workflowPressTimer = null;
+let workflowSuppressOpeningTouch = false;
+let workflowSuppressOpeningClick = false;
+let workflowSuppressOpeningClickTimer = null;
 let workflowToastTimeout = null;
 let loginInProgress = false;
 let listScrollY = 0;
@@ -2000,10 +2003,19 @@ function renderWorkflowProgress(order) {
   `;
 }
 
-function openWorkflowSheet(order) {
+function openWorkflowSheet(order, suppressOpeningTouch = false) {
   if (!workflowSheetEl) createWorkflowSheet();
 
   workflowSheetEl.order = order;
+  workflowSuppressOpeningTouch = suppressOpeningTouch;
+  workflowSuppressOpeningClick = suppressOpeningTouch;
+  clearWorkflowOpeningClickTimer();
+  if (suppressOpeningTouch) {
+    workflowSuppressOpeningClickTimer = setTimeout(() => {
+      workflowSuppressOpeningClick = false;
+      workflowSuppressOpeningClickTimer = null;
+    }, 1200);
+  }
   const headerCustomer = workflowSheetEl.querySelector(".workflow-customer-name");
   const headerNumber = workflowSheetEl.querySelector(".workflow-order-number");
   const headerStatus = workflowSheetEl.querySelector(".workflow-current-status");
@@ -2029,6 +2041,9 @@ function openWorkflowSheet(order) {
 
 function closeWorkflowSheet() {
   if (!workflowSheetEl) return;
+  workflowSuppressOpeningTouch = false;
+  workflowSuppressOpeningClick = false;
+  clearWorkflowOpeningClickTimer();
   workflowSheetEl.classList.remove("open");
   workflowSheetEl.querySelector(".workflow-action-list").innerHTML = "";
   workflowSheetEl.querySelector(".workflow-sheet-form").innerHTML = "";
@@ -2060,6 +2075,21 @@ function createWorkflowSheet() {
   workflowSheetEl.querySelector(".workflow-backdrop").addEventListener("click", closeWorkflowSheet);
   workflowSheetEl.querySelector(".workflow-close-btn").addEventListener("click", closeWorkflowSheet);
 
+  workflowSheetEl.addEventListener("touchend", (e) => {
+    if (!workflowSuppressOpeningTouch) return;
+    workflowSuppressOpeningTouch = false;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, { capture: true });
+
+  workflowSheetEl.addEventListener("click", (e) => {
+    if (!workflowSuppressOpeningClick) return;
+    workflowSuppressOpeningClick = false;
+    clearWorkflowOpeningClickTimer();
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, { capture: true });
+
   workflowSheetEl.addEventListener("click", (e) => {
     const actionBtn = e.target.closest(".workflow-action-btn");
     if (actionBtn) {
@@ -2081,6 +2111,12 @@ function createWorkflowSheet() {
   });
 
   document.body.appendChild(workflowSheetEl);
+}
+
+function clearWorkflowOpeningClickTimer() {
+  if (!workflowSuppressOpeningClickTimer) return;
+  clearTimeout(workflowSuppressOpeningClickTimer);
+  workflowSuppressOpeningClickTimer = null;
 }
 
 function getWorkflowActions(order) {
@@ -2320,7 +2356,7 @@ function startWorkflowPress(e, order) {
   cancelWorkflowPress();
   workflowPressTimer = setTimeout(() => {
     clearTextSelection();
-    openWorkflowSheet(order);
+    openWorkflowSheet(order, true);
   }, 500);
 }
 
