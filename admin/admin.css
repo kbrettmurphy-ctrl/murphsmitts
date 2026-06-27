@@ -766,10 +766,13 @@ button.secondary{
   border-radius:12px;
   text-align:left;
   cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
 }
 
-.workflow-action-btn:hover{
-  background:rgba(255,255,255,.12);
+@media (hover:hover) and (pointer:fine){
+  .workflow-action-btn:hover{
+    background:rgba(255,255,255,.12);
+  }
 }
 
 .workflow-sheet-form{
