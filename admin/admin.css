@@ -1166,6 +1166,9 @@ button.secondary{
   z-index: 1;
   transition: transform .18s ease;
   will-change: transform;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .swipe-row.swiped .order-card{

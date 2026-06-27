@@ -804,6 +804,9 @@ function installSwipeDeleteStyles() {
       transition:transform .18s ease;
       will-change:transform;
       touch-action:pan-y;
+      -webkit-touch-callout:none;
+      -webkit-user-select:none;
+      user-select:none;
     }
 
     .swipe-row.swiped .order-card{
@@ -1258,6 +1261,10 @@ function renderOrders(list) {
     `;
 
     const card = row.querySelector(".order-card");
+
+    card.addEventListener("selectstart", (e) => {
+      e.preventDefault();
+    });
 
     card.addEventListener("click", () => openOrder(order.orderNumber));
     card.addEventListener("keydown", (e) => {
@@ -2297,6 +2304,7 @@ function appendInternalNote(existingNotes, newNote) {
 function startWorkflowPress(e, order) {
   cancelWorkflowPress();
   workflowPressTimer = setTimeout(() => {
+    clearTextSelection();
     openWorkflowSheet(order);
   }, 500);
 }
@@ -2305,6 +2313,13 @@ function cancelWorkflowPress() {
   if (workflowPressTimer) {
     clearTimeout(workflowPressTimer);
     workflowPressTimer = null;
+  }
+}
+
+function clearTextSelection() {
+  const selection = window.getSelection?.();
+  if (selection && typeof selection.removeAllRanges === "function") {
+    selection.removeAllRanges();
   }
 }
 
