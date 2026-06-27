@@ -564,7 +564,7 @@ button.secondary{
   font-size:1.05rem;
   font-weight:800;
   letter-spacing:.04em;
-  margin-top:2px;
+  margin-top:0;
 }
 
 .order-number.paid{ color:var(--green); }
@@ -580,21 +580,16 @@ button.secondary{
 
 .order-subrow{
   display:grid;
-  grid-template-columns:1fr auto;
-  gap:12px;
+  grid-template-columns:auto minmax(0, auto);
+  gap:10px;
   align-items:center;
-  margin-top:10px;
-}
-
-.order-number-label{
-  font-size:.95rem;
-  color:var(--muted);
+  margin-top:8px;
 }
 
 .workflow-progress{
   display:flex;
   align-items:center;
-  gap:8px;
+  gap:6px;
   justify-content:flex-end;
 }
 
@@ -612,10 +607,10 @@ button.secondary{
 }
 
 .workflow-step{
-  width:10px;
-  height:10px;
+  width:8px;
+  height:8px;
   border-radius:999px;
-  background:rgba(255,255,255,.26);
+  background:rgba(255,255,255,.24);
 }
 
 .workflow-step.complete{
@@ -627,20 +622,13 @@ button.secondary{
 }
 
 .workflow-connector{
-  width:18px;
+  width:12px;
   height:2px;
-  background:rgba(255,255,255,.26);
+  background:rgba(255,255,255,.20);
 }
 
 .workflow-connector.complete{
-  background:rgba(255,255,255,.7);
-}
-
-.workflow-label{
-  font-size:.88rem;
-  font-weight:600;
-  color:var(--cream);
-  white-space:nowrap;
+  background:rgba(255,255,255,.6);
 }
 
 .action-row{

@@ -1217,12 +1217,12 @@ function renderOrders(list) {
         <div class="order-top">
           <div class="order-main">
             <div class="order-name">${escapeHtml(order.customerName || "")}</div>
-            <div class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</div>
           </div>
           <div class="order-status">${escapeHtml(order.status || "")}</div>
         </div>
 
         <div class="order-subrow">
+          <div class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</div>
           ${renderWorkflowProgress(order)}
         </div>
 
@@ -1965,7 +1965,6 @@ function getWorkflowLabel(order) {
 
 function renderWorkflowProgress(order) {
   const step = getWorkflowStep(order);
-  const label = getWorkflowLabel(order);
   const dots = [1, 2, 3, 4, 5]
     .map((value) => {
       const done = value <= step;
@@ -1979,7 +1978,6 @@ function renderWorkflowProgress(order) {
   return `
     <div class="workflow-progress">
       <div class="workflow-meter">${dots}</div>
-      <div class="workflow-label">${escapeHtml(label)}</div>
     </div>
   `;
 }
