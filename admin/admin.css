@@ -867,34 +867,6 @@ button.secondary{
   margin-bottom:10px;
 }
 
-.workflow-toast{
-  position:fixed;
-  left:50%;
-  bottom:calc(18px + env(safe-area-inset-bottom));
-  transform:translate(-50%, 8px);
-  width:max-content;
-  max-width:min(360px, calc(100vw - 48px));
-  background:rgba(19,41,61,.96);
-  color:var(--cream);
-  padding:10px 14px;
-  border:1px solid rgba(218,202,177,.22);
-  border-radius:12px;
-  box-shadow:0 10px 24px rgba(0,0,0,.28);
-  opacity:0;
-  font-size:.92rem;
-  font-weight:700;
-  line-height:1.25;
-  text-align:center;
-  overflow-wrap:break-word;
-  transition:opacity .18s ease, transform .18s ease;
-  z-index:10000;
-}
-
-.workflow-toast.show{
-  opacity:1;
-  transform:translate(-50%, 0);
-}
-
 .lace-dot{
   width:18px;
   height:18px;

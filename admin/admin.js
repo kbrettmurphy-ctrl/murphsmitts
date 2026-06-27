@@ -44,7 +44,6 @@ let workflowSheetEl = null;
 let workflowPressTimer = null;
 let workflowSuppressOpeningTouch = false;
 let workflowSuppressOpeningTouchTimer = null;
-let workflowToastTimeout = null;
 let loginInProgress = false;
 let listScrollY = 0;
 
@@ -2319,11 +2318,6 @@ async function submitWorkflowAction(order, actionKey) {
   try {
     await saveOrderUpdate(order.orderNumber, updates, true);
     closeWorkflowSheet();
-    showWorkflowToast(
-      actionKey === "markPaid"
-        ? `Order #${order.orderNumber}: Paid`
-        : `Order #${order.orderNumber}: ${updates.status || order.status}`
-    );
   } catch (err) {
     const form = workflowSheetEl.querySelector(".workflow-sheet-form");
     form.insertAdjacentHTML("afterbegin", `<div class="workflow-form-message">${escapeHtml(err.message || "Unable to save.")}</div>`);
@@ -2360,26 +2354,6 @@ function clearTextSelection() {
   if (selection && typeof selection.removeAllRanges === "function") {
     selection.removeAllRanges();
   }
-}
-
-function showWorkflowToast(message) {
-  let toast = document.querySelector(".workflow-toast");
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.className = "workflow-toast";
-    document.body.appendChild(toast);
-  }
-
-  toast.textContent = message;
-  toast.classList.add("show");
-
-  if (workflowToastTimeout) {
-    clearTimeout(workflowToastTimeout);
-  }
-
-  workflowToastTimeout = setTimeout(() => {
-    toast.classList.remove("show");
-  }, 2500);
 }
 
 function isValidCssColor(value) {
