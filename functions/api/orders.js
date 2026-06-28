@@ -510,6 +510,25 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "geocodeMissingOrderAddresses") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const items = Array.isArray(body.items) ? body.items : [];
+      const results = await geocodeMissingOrderAddresses(env, items);
+
+      return json(
+        {
+          ok: true,
+          results
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     if (action === "uploadGalleryPhoto") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -1512,6 +1531,14 @@ function mapOrderFromDb(row) {
     lastStatusEmailed: row.last_status_emailed,
     smsOptIn: row.sms_opt_in === true,
     lastStatusTexted: row.last_status_texted,
+    mapLat: row.map_lat,
+    mapLng: row.map_lng,
+    mapGeocodedAddress: row.map_geocoded_address,
+    mapGeocodeSource: row.map_geocode_source,
+    mapGeocodeStatus: row.map_geocode_status,
+    mapGeocodeError: row.map_geocode_error,
+    mapAddressHash: row.map_address_hash,
+    mapGeocodedAt: row.map_geocoded_at,
 
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -1602,6 +1629,14 @@ function mapUpdatesToDb(updates) {
 
   if ("internalNotes" in updates) out.internal_notes = cleanText(updates.internalNotes);
   if ("lastStatusEmailed" in updates) out.last_status_emailed = cleanText(updates.lastStatusEmailed);
+  if ("mapLat" in updates) out.map_lat = cleanNumeric(updates.mapLat);
+  if ("mapLng" in updates) out.map_lng = cleanNumeric(updates.mapLng);
+  if ("mapGeocodedAddress" in updates) out.map_geocoded_address = cleanText(updates.mapGeocodedAddress);
+  if ("mapGeocodeSource" in updates) out.map_geocode_source = cleanText(updates.mapGeocodeSource);
+  if ("mapGeocodeStatus" in updates) out.map_geocode_status = cleanText(updates.mapGeocodeStatus);
+  if ("mapGeocodeError" in updates) out.map_geocode_error = cleanText(updates.mapGeocodeError);
+  if ("mapAddressHash" in updates) out.map_address_hash = cleanText(updates.mapAddressHash);
+  if ("mapGeocodedAt" in updates) out.map_geocoded_at = cleanText(updates.mapGeocodedAt);
 
   return out;
 }
@@ -2481,6 +2516,103 @@ async function geocodeAddresses(rawItems) {
   return results;
 }
 
+async function geocodeMissingOrderAddresses(env, rawItems) {
+  const items = rawItems
+    .map(parseMissingOrderGeocodeItem)
+    .filter(Boolean)
+    .slice(0, 250);
+  const results = {};
+
+  for (const item of items) {
+    const existing = await fetchOrderByNumber(env, item.orderNumber);
+    if (!existing.ok || !existing.data) {
+      results[item.orderNumber] = {
+        ok: false,
+        error: "Order not found."
+      };
+      continue;
+    }
+
+    if (hasMatchingStoredMapLocation(existing.data, item.addressHash)) {
+      const order = mapOrderFromDb(existing.data);
+      results[item.orderNumber] = {
+        ok: true,
+        skipped: true,
+        order,
+        lat: Number(order.mapLat),
+        lng: Number(order.mapLng),
+        address: order.mapGeocodedAddress,
+        source: order.mapGeocodeSource,
+        status: order.mapGeocodeStatus
+      };
+      continue;
+    }
+
+    const geocode = await geocodeCandidateAddresses({
+      key: item.orderNumber,
+      candidates: item.candidates
+    });
+    const geocodedAt = new Date().toISOString();
+    const patchBody = geocode.ok
+      ? {
+          map_lat: geocode.lat,
+          map_lng: geocode.lng,
+          map_geocoded_address: geocode.address || item.candidates[0],
+          map_geocode_source: geocode.source || null,
+          map_geocode_status: "ok",
+          map_geocode_error: null,
+          map_address_hash: item.addressHash || null,
+          map_geocoded_at: geocodedAt
+        }
+      : {
+          map_lat: null,
+          map_lng: null,
+          map_geocoded_address: null,
+          map_geocode_source: null,
+          map_geocode_status: "failed",
+          map_geocode_error: geocode.reason || "No coordinates found.",
+          map_address_hash: item.addressHash || null,
+          map_geocoded_at: geocodedAt
+        };
+
+    const patch = await supabaseFetch(
+      env,
+      `/rest/v1/orders?order_number=eq.${encodeURIComponent(item.orderNumber)}`,
+      {
+        method: "PATCH",
+        headers: {
+          Prefer: "return=representation"
+        },
+        body: JSON.stringify(patchBody)
+      }
+    );
+
+    if (!patch.ok) {
+      results[item.orderNumber] = {
+        ok: false,
+        error: "Failed to store geocode result.",
+        details: patch.error
+      };
+      continue;
+    }
+
+    const updated = Array.isArray(patch.data) ? patch.data[0] : null;
+    const order = updated ? mapOrderFromDb(updated) : null;
+    results[item.orderNumber] = {
+      ok: !!geocode.ok,
+      order,
+      lat: geocode.ok ? geocode.lat : null,
+      lng: geocode.ok ? geocode.lng : null,
+      address: geocode.ok ? (geocode.address || item.candidates[0]) : null,
+      source: geocode.ok ? (geocode.source || null) : null,
+      status: geocode.ok ? "ok" : "failed",
+      error: geocode.ok ? null : (geocode.reason || "No coordinates found.")
+    };
+  }
+
+  return results;
+}
+
 function parseGeocodeItem(input) {
   const key = cleanDisplay(input?.key || input?.orderNumber);
   const candidates = Array.isArray(input?.candidates)
@@ -2493,6 +2625,32 @@ function parseGeocodeItem(input) {
     key,
     candidates: uniqueTextValues(candidates)
   };
+}
+
+function parseMissingOrderGeocodeItem(input) {
+  const orderNumber = cleanDisplay(input?.orderNumber);
+  const addressHash = cleanDisplay(input?.addressHash);
+  const candidates = Array.isArray(input?.candidates)
+    ? input.candidates.map(cleanDisplay).filter(Boolean).slice(0, 8)
+    : [];
+
+  if (!orderNumber || !candidates.length) return null;
+
+  return {
+    orderNumber,
+    addressHash,
+    candidates: uniqueTextValues(candidates)
+  };
+}
+
+function hasMatchingStoredMapLocation(row, addressHash) {
+  const lat = Number(row?.map_lat);
+  const lng = Number(row?.map_lng);
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    cleanDisplay(row?.map_address_hash) === cleanDisplay(addressHash)
+  );
 }
 
 async function geocodeCandidateAddresses(item) {

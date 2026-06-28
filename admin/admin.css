@@ -791,19 +791,16 @@ button.secondary{
 
 .map-popup-btn{
   border:none;
-  border-radius:8px;
-  background:#092f4d;
-  color:#dacab1;
-  padding:8px 10px;
-  font:inherit;
-  font-weight:800;
-  cursor:pointer;
-}
-
-.map-popup-link{
+  background:transparent;
   color:#092f4d;
+  padding:2px 0;
+  font:inherit;
+  font-size:.82rem;
   font-weight:700;
-  text-decoration:none;
+  cursor:pointer;
+  text-align:left;
+  justify-self:start;
+  line-height:1.25;
 }
 
 .leaflet-container{

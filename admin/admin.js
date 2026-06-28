@@ -2485,14 +2485,46 @@ async function renderMapView() {
 
   initOrderMap();
 
-  if (mapStatus) mapStatus.textContent = `Checking ${orders.length} address${orders.length === 1 ? "" : "es"}...`;
+  const storedItems = orders
+    .map(applyStoredMapLocation)
+    .filter(item => item.mapLocation);
+  const needsGeocode = orders.filter(item => !getStoredMapLocation(item));
+
   if (mapCount) mapCount.textContent = `${orders.length} address${orders.length === 1 ? "" : "es"}`;
 
-  if (mapStatus) mapStatus.textContent = "Resolving addresses...";
-  const geocoded = await geocodeMapAddresses(orders, token);
-  if (token !== mapRenderToken) return;
+  if (storedItems.length) {
+    if (mapStatus) mapStatus.textContent = `Using ${storedItems.length} saved location${storedItems.length === 1 ? "" : "s"}.`;
+    renderOrderMapMarkers(storedItems, token, {
+      includeFailures: false,
+      updateStatus: false,
+      total: orders.length
+    });
+  } else {
+    renderOrderMapMarkers([], token, {
+      includeFailures: false,
+      updateStatus: false,
+      total: orders.length
+    });
+  }
 
-  await renderOrderMapMarkers(applyServerMapGeocodes(orders, geocoded), token);
+  let geocodeResults = new Map();
+  if (needsGeocode.length) {
+    if (mapStatus) mapStatus.textContent = `Resolving ${needsGeocode.length} new/changed address${needsGeocode.length === 1 ? "" : "es"}...`;
+    geocodeResults = await geocodeMissingMapAddresses(needsGeocode, token);
+    if (token !== mapRenderToken) return;
+  }
+
+  const finalItems = getMappableOrders()
+    .map(applyStoredMapLocation)
+    .map(item => applyTransientMapGeocodeResult(item, geocodeResults))
+    .map(applyLocalMapCacheFallback);
+  const finalRender = renderOrderMapMarkers(finalItems, token, {
+    total: finalItems.length
+  });
+
+  if (!needsGeocode.length && storedItems.length && finalRender && mapStatus) {
+    mapStatus.textContent = `Using ${storedItems.length} saved location${storedItems.length === 1 ? "" : "s"}. ${getMapStatusText(finalRender.mapped, finalItems.length, finalRender.failures.length)}`;
+  }
 }
 
 function initOrderMap() {
@@ -2534,7 +2566,15 @@ function getMappableOrders() {
       state: String(order.state || "").trim(),
       zipCode: String(order.zipCode || order.zip || "").trim(),
       address: buildFullAddress(order),
-      addressCandidates: buildMapAddressCandidates(order)
+      addressCandidates: buildMapAddressCandidates(order),
+      storedLat: order.mapLat,
+      storedLng: order.mapLng,
+      storedGeocodedAddress: order.mapGeocodedAddress,
+      storedGeocodeStatus: order.mapGeocodeStatus,
+      storedGeocodeError: order.mapGeocodeError,
+      storedGeocodeSource: order.mapGeocodeSource,
+      storedAddressHash: order.mapAddressHash,
+      currentAddressHash: buildMapAddressHash(order)
     }))
     .filter(item => item.address);
 }
@@ -2548,6 +2588,24 @@ function buildFullAddress(order) {
   if (!street || !city || !state || !zip) return "";
 
   return `${street}, ${city}, ${state} ${zip}`;
+}
+
+function buildMapAddressHash(order) {
+  return [
+    order.streetAddress || order.address,
+    order.city,
+    order.state,
+    order.zipCode || order.zip
+  ]
+    .map(normalizeMapAddressHashPart)
+    .join("|");
+}
+
+function normalizeMapAddressHashPart(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
 }
 
 function buildMapAddressCandidates(order) {
@@ -2581,11 +2639,85 @@ function cleanMapStreetAddress(street) {
     .trim();
 }
 
-async function geocodeMapAddresses(items, token) {
+function getStoredMapLocation(item) {
+  const lat = Number(item.storedLat);
+  const lng = Number(item.storedLng);
+
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    item.storedAddressHash !== item.currentAddressHash
+  ) {
+    return null;
+  }
+
+  return {
+    address: item.storedGeocodedAddress || item.address,
+    coords: { lat, lng },
+    source: item.storedGeocodeSource || "stored"
+  };
+}
+
+function applyStoredMapLocation(item) {
+  return {
+    ...item,
+    mapLocation: getStoredMapLocation(item),
+    mapFailureReason:
+      item.storedGeocodeStatus === "failed" && item.storedAddressHash === item.currentAddressHash
+        ? item.storedGeocodeError
+        : ""
+  };
+}
+
+function applyLocalMapCacheFallback(item) {
+  if (item.mapLocation) return item;
+
+  for (const address of item.addressCandidates || [item.address]) {
+    const coords = getCachedCoordinates(address);
+    if (coords) {
+      return {
+        ...item,
+        mapLocation: {
+          address,
+          coords,
+          source: "local-cache"
+        }
+      };
+    }
+  }
+
+  return item;
+}
+
+function applyTransientMapGeocodeResult(item, geocodeResults) {
+  if (item.mapLocation || !geocodeResults?.size) return item;
+
+  const result = geocodeResults.get(String(item.key));
+  if (!result || result.ok || item.mapFailureReason) return item;
+
+  return {
+    ...item,
+    mapFailureReason: formatMapGeocodeResultError(result)
+  };
+}
+
+function formatMapGeocodeResultError(result) {
+  if (!result) return "No coordinates found.";
+  if (result.error) return String(result.error);
+  if (result.details) {
+    return typeof result.details === "string"
+      ? result.details
+      : JSON.stringify(result.details);
+  }
+  return "No coordinates found.";
+}
+
+async function geocodeMissingMapAddresses(items, token) {
   const input = items
-    .filter(item => item.key)
+    .filter(item => item.key && item.addressCandidates?.length)
     .map(item => ({
-      key: item.key,
+      orderNumber: item.key,
+      addressHash: item.currentAddressHash,
       candidates: item.addressCandidates?.length ? item.addressCandidates : [item.address]
     }));
 
@@ -2593,42 +2725,52 @@ async function geocodeMapAddresses(items, token) {
 
   try {
     const data = await postJson({
-      action: "geocodeAddresses",
+      action: "geocodeMissingOrderAddresses",
       items: input
     }, true);
 
     if (token !== mapRenderToken) return new Map();
 
-    return new Map(
-      (data.results || [])
-        .filter(result => result?.key)
-        .map(result => [String(result.key), result])
-    );
+    mergeMapGeocodeResults(data.results || {});
+    return new Map(Object.entries(data.results || {}));
   } catch (err) {
     if (mapStatus && token === mapRenderToken) {
-      mapStatus.textContent = `Server geocoding skipped. ${err.message || "Using browser fallback."}`;
+      mapStatus.textContent = `Server geocoding failed. ${err.message || "Using saved locations."}`;
     }
     return new Map();
   }
 }
 
-function applyServerMapGeocodes(items, geocoded) {
-  return items.map(item => {
-    const result = item.key ? geocoded.get(item.key) : null;
+function mergeMapGeocodeResults(results) {
+  let changed = false;
 
-    return {
-      ...item,
-      serverGeocode: result?.ok && Number.isFinite(Number(result.lat)) && Number.isFinite(Number(result.lng)) ? {
-        address: result.address || item.address,
-        coords: {
-          lat: Number(result.lat),
-          lng: Number(result.lng)
-        },
-        source: result.source || ""
-      } : null,
-      serverGeocodeReason: result?.reason || ""
-    };
+  Object.values(results || {}).forEach(result => {
+    if (!result?.order?.orderNumber) return;
+
+    const idx = allOrders.findIndex(order => String(order.orderNumber) === String(result.order.orderNumber));
+    if (idx === -1) {
+      allOrders.push(result.order);
+    } else {
+      allOrders[idx] = result.order;
+    }
+
+    if (currentOrder && String(currentOrder.orderNumber) === String(result.order.orderNumber)) {
+      currentOrder = result.order;
+    }
+
+    if (result.ok && result.address && Number.isFinite(Number(result.lat)) && Number.isFinite(Number(result.lng))) {
+      setCachedCoordinates(result.address, {
+        lat: Number(result.lat),
+        lng: Number(result.lng)
+      });
+    }
+
+    changed = true;
   });
+
+  if (changed) {
+    localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
+  }
 }
 
 function uniqueAddresses(addresses) {
@@ -2650,36 +2792,6 @@ function normalizeAddress(address) {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, " ");
-}
-
-async function geocodeAddress(address) {
-  const cached = getCachedCoordinates(address);
-  if (cached) return cached;
-
-  const url =
-    "https://nominatim.openstreetmap.org/search" +
-    `?format=jsonv2&limit=1&countrycodes=us&q=${encodeURIComponent(address)}`;
-
-  const res = await fetch(url, {
-    headers: {
-      Accept: "application/json"
-    }
-  });
-
-  if (!res.ok) throw new Error(`Geocoding failed: ${res.status}`);
-
-  const data = await res.json();
-  const first = Array.isArray(data) ? data[0] : null;
-  const lat = Number(first?.lat);
-  const lng = Number(first?.lon);
-
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    throw new Error("No coordinates found.");
-  }
-
-  const coords = { lat, lng };
-  setCachedCoordinates(address, coords);
-  return coords;
 }
 
 function getCachedCoordinates(address) {
@@ -2717,57 +2829,39 @@ function setCachedCoordinates(address, coords) {
   }
 }
 
-async function renderOrderMapMarkers(items, token) {
-  if (!orderMap || !orderMapMarkers || !window.L) return;
+function renderOrderMapMarkers(items, token, options = {}) {
+  if (!orderMap || !orderMapMarkers || !window.L) return null;
 
   orderMapMarkers.clearLayers();
 
   let mapped = 0;
   const bounds = [];
   const failures = [];
+  const total = Number.isFinite(options.total) ? options.total : items.length;
+  const includeFailures = options.includeFailures !== false;
+  const updateStatus = options.updateStatus !== false;
 
   for (const item of items) {
-    if (token !== mapRenderToken) return;
+    if (token !== mapRenderToken) return null;
 
-    const candidates = item.addressCandidates?.length ? item.addressCandidates : [item.address];
-    const hadCache = !!item.serverGeocode?.coords || candidates.some(address => !!getCachedCoordinates(address));
-
-    try {
-      const geocoded = item.serverGeocode?.coords
-        ? item.serverGeocode
-        : await geocodeAddressCandidates(candidates);
-      if (token !== mapRenderToken) return;
-
-      setCachedCoordinates(geocoded.address, geocoded.coords);
-
-      const marker = L.marker([geocoded.coords.lat, geocoded.coords.lng]);
-      marker.bindPopup(renderMapPopup(item.order, geocoded.address));
+    if (item.mapLocation?.coords) {
+      const { coords } = item.mapLocation;
+      const marker = L.marker([coords.lat, coords.lng]);
+      marker.bindPopup(renderMapPopup(item.order, item.mapLocation.address || item.address));
       marker.addTo(orderMapMarkers);
 
-      bounds.push([geocoded.coords.lat, geocoded.coords.lng]);
+      bounds.push([coords.lat, coords.lng]);
       mapped += 1;
-
-      if (mapStatus) {
-        mapStatus.textContent = getMapStatusText(mapped, items.length, failures.length);
-      }
-    } catch (err) {
+    } else if (includeFailures) {
       failures.push({
         order: item.order,
         address: item.address,
-        reason: getGeocodeFailureMessage(err)
+        reason: item.mapFailureReason || "No coordinates found."
       });
-
-      if (mapStatus) {
-        mapStatus.textContent = getMapStatusText(mapped, items.length, failures.length);
-      }
-    } finally {
-      if (!hadCache && token === mapRenderToken) {
-        await delay(1000);
-      }
     }
   }
 
-  if (token !== mapRenderToken) return;
+  if (token !== mapRenderToken) return null;
 
   if (bounds.length === 1) {
     orderMap.setView(bounds[0], 9);
@@ -2778,41 +2872,17 @@ async function renderOrderMapMarkers(items, token) {
     });
   }
 
-  if (mapStatus) {
-    mapStatus.textContent = getMapStatusText(mapped, items.length, failures.length);
+  if (mapStatus && updateStatus) {
+    mapStatus.textContent = getMapStatusText(mapped, total, failures.length);
   }
   if (mapCount) {
     mapCount.textContent = `${mapped} mapped`;
   }
   renderUnmappedAddresses(failures);
-}
-
-async function geocodeAddressCandidates(addresses) {
-  let lastError = null;
-
-  for (let i = 0; i < addresses.length; i += 1) {
-    const address = addresses[i];
-    const hadCache = !!getCachedCoordinates(address);
-
-    try {
-      return {
-        address,
-        coords: await geocodeAddress(address)
-      };
-    } catch (err) {
-      lastError = err;
-      if (!hadCache && i < addresses.length - 1) {
-        await delay(1000);
-      }
-    }
-  }
-
-  throw lastError || new Error("No coordinates found.");
+  return { mapped, failures };
 }
 
 function renderMapPopup(order, address) {
-  const appleMapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(address)}`;
-
   return `
     <div class="map-popup">
       <div class="map-popup-name">${escapeHtml(order.customerName || "Customer")}</div>
@@ -2820,7 +2890,6 @@ function renderMapPopup(order, address) {
       <div class="map-popup-meta">${escapeHtml(order.status || "")}</div>
       <div class="map-popup-address">${escapeHtml(address)}</div>
       <button class="map-popup-btn" type="button" data-map-order="${escapeAttr(order.orderNumber || "")}">View Order</button>
-      <a class="map-popup-link" href="${escapeAttr(appleMapsUrl)}" target="_blank" rel="noopener noreferrer">Open in Apple Maps</a>
     </div>
   `;
 }
@@ -2829,13 +2898,6 @@ function getMapStatusText(mapped, total, unmapped) {
   const addressLabel = `address${total === 1 ? "" : "es"}`;
   const unmappedText = unmapped ? ` ${unmapped} unmapped.` : "";
   return `Mapped ${mapped} of ${total} ${addressLabel}.${unmappedText}`;
-}
-
-function getGeocodeFailureMessage(err) {
-  const message = String(err?.message || "").trim();
-  if (!message) return "Unable to find coordinates.";
-  if (message === "No coordinates found.") return "No coordinates found.";
-  return message;
 }
 
 function renderUnmappedAddresses(failures) {
@@ -2862,10 +2924,6 @@ function renderUnmappedAddresses(failures) {
       </div>
     `).join("")}
   `;
-}
-
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function isValidCssColor(value) {
