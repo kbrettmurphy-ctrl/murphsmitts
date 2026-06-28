@@ -1,5 +1,21 @@
 # MurphOS Design Language
 
+High-level.
+
+Exactly what we’ve been talking about.
+
+Quiet confidence.
+
+Respect the glove.
+
+Whitespace.
+
+Small typography.
+
+No clutter.
+
+This is the soul.
+
 MurphOS should feel like software built specifically for Murph’s Mitts.
 
 ## Core Philosophy
