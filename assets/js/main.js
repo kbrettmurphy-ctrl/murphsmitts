@@ -14,30 +14,47 @@ function initGalleryLightbox() {
 
   if (!track || !viewport || !prevBtn || !nextBtn || !closeBtn) return;
 
-  let index = 0;
-  let slides = [];
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let panStartX = 0;
-  let panStartY = 0;
-  let panStartPanX = 0;
-  let panStartPanY = 0;
-  let pinchStartDistance = 0;
-  let pinchStartScale = 1;
-  let imageScale = 1;
-  let panX = 0;
-  let panY = 0;
-  let dragging = false;
-  let ignoreTouchGesture = false;
-  let suppressImageClickUntil = 0;
-  let gestureMode = "";
-  let dx = 0;
   const MIN_SCALE = 1;
   const MAX_SCALE = 4;
+  const DOUBLE_TAP_SCALE = 2.4;
   const ZOOM_EPSILON = 0.015;
+  const TAP_DELAY_MS = 250;
+  const TAP_MOVE_TOLERANCE = 18;
+  const SWIPE_AXIS_RATIO = 1.15;
 
-  function suppressImageClick(duration = 1200) {
-    suppressImageClickUntil = Date.now() + duration;
+  // Keep all viewer gestures in one state object so zoom, pan, swipe, and tap timing cannot drift apart.
+  const state = {
+    index: 0,
+    slides: [],
+    scale: MIN_SCALE,
+    panX: 0,
+    panY: 0,
+    gesture: "idle",
+    startedMultiTouch: false,
+    touchMoved: false,
+    touchStartX: 0,
+    touchStartY: 0,
+    swipeDx: 0,
+    swipeDy: 0,
+    panStartX: 0,
+    panStartY: 0,
+    panStartPanX: 0,
+    panStartPanY: 0,
+    pinchStartDistance: 0,
+    pinchStartScale: MIN_SCALE,
+    lastTapTime: 0,
+    lastTapX: 0,
+    lastTapY: 0,
+    singleTapTimer: 0,
+    suppressClickUntil: 0
+  };
+
+  function isOpen() {
+    return lb.classList.contains("open");
+  }
+
+  function suppressSyntheticClick(duration = 500) {
+    state.suppressClickUntil = Date.now() + duration;
   }
 
   function clamp(value, min, max) {
@@ -45,11 +62,11 @@ function initGalleryLightbox() {
   }
 
   function getActiveImage() {
-    return slides[index]?.querySelector("img") || null;
+    return state.slides[state.index]?.querySelector("img") || null;
   }
 
   function isZoomed() {
-    return imageScale > MIN_SCALE + ZOOM_EPSILON;
+    return state.scale > MIN_SCALE + ZOOM_EPSILON;
   }
 
   function getTouchDistance(touches) {
@@ -57,6 +74,19 @@ function initGalleryLightbox() {
     const x = touches[0].clientX - touches[1].clientX;
     const y = touches[0].clientY - touches[1].clientY;
     return Math.hypot(x, y);
+  }
+
+  function clearPendingTap() {
+    if (!state.singleTapTimer) return;
+    window.clearTimeout(state.singleTapTimer);
+    state.singleTapTimer = 0;
+  }
+
+  function resetTapState() {
+    clearPendingTap();
+    state.lastTapTime = 0;
+    state.lastTapX = 0;
+    state.lastTapY = 0;
   }
 
   function getPanBounds() {
@@ -68,15 +98,15 @@ function initGalleryLightbox() {
     const imageHeight = activeImg.offsetHeight || activeImg.naturalHeight || 0;
 
     return {
-      x: Math.max(0, ((imageWidth * imageScale) - viewportRect.width) / 2),
-      y: Math.max(0, ((imageHeight * imageScale) - viewportRect.height) / 2)
+      x: Math.max(0, ((imageWidth * state.scale) - viewportRect.width) / 2),
+      y: Math.max(0, ((imageHeight * state.scale) - viewportRect.height) / 2)
     };
   }
 
   function clampPan() {
     const bounds = getPanBounds();
-    panX = clamp(panX, -bounds.x, bounds.x);
-    panY = clamp(panY, -bounds.y, bounds.y);
+    state.panX = clamp(state.panX, -bounds.x, bounds.x);
+    state.panY = clamp(state.panY, -bounds.y, bounds.y);
   }
 
   function applyImageTransform() {
@@ -84,29 +114,29 @@ function initGalleryLightbox() {
     if (!activeImg) return;
 
     if (!isZoomed()) {
-      imageScale = MIN_SCALE;
-      panX = 0;
-      panY = 0;
+      state.scale = MIN_SCALE;
+      state.panX = 0;
+      state.panY = 0;
       activeImg.style.transform = "";
       activeImg.classList.remove("is-zoomed", "is-panning", "is-zooming");
       return;
     }
 
     clampPan();
-    activeImg.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${imageScale})`;
+    activeImg.style.transform = `translate3d(${state.panX}px, ${state.panY}px, 0) scale(${state.scale})`;
     activeImg.classList.add("is-zoomed");
-    activeImg.classList.toggle("is-panning", gestureMode === "pan");
-    activeImg.classList.toggle("is-zooming", gestureMode === "pinch");
+    activeImg.classList.toggle("is-panning", state.gesture === "pan");
+    activeImg.classList.toggle("is-zooming", state.gesture === "pinch");
   }
 
   function resetImageState() {
-    imageScale = MIN_SCALE;
-    panX = 0;
-    panY = 0;
-    gestureMode = "";
-    pinchStartDistance = 0;
-    pinchStartScale = MIN_SCALE;
-    slides.forEach((slide) => {
+    state.scale = MIN_SCALE;
+    state.panX = 0;
+    state.panY = 0;
+    state.gesture = "idle";
+    state.pinchStartDistance = 0;
+    state.pinchStartScale = MIN_SCALE;
+    state.slides.forEach((slide) => {
       const img = slide.querySelector("img");
       if (!img) return;
       img.style.transform = "";
@@ -115,26 +145,29 @@ function initGalleryLightbox() {
   }
 
   function resetTouchState() {
-    dragging = false;
-    ignoreTouchGesture = false;
-    gestureMode = "";
-    dx = 0;
-    pinchStartDistance = 0;
+    state.gesture = "idle";
+    state.startedMultiTouch = false;
+    state.touchMoved = false;
+    state.swipeDx = 0;
+    state.swipeDy = 0;
+    state.pinchStartDistance = 0;
   }
 
   function updateCounter() {
-    counter.textContent = slides.length ? `${index + 1} / ${slides.length}` : "";
+    counter.textContent = state.slides.length ? `${state.index + 1} / ${state.slides.length}` : "";
   }
 
   function goTo(i, animate = true) {
-    if (!slides.length) return;
+    if (!state.slides.length) return;
 
+    resetTapState();
+    resetTouchState();
     resetImageState();
-    index = (i + slides.length) % slides.length;
+    state.index = (i + state.slides.length) % state.slides.length;
     const w = viewport.getBoundingClientRect().width || 1;
 
     track.style.transition = animate ? "transform .28s ease" : "none";
-    track.style.transform = `translateX(${-index * w}px)`;
+    track.style.transform = `translateX(${-state.index * w}px)`;
 
     updateCounter();
   }
@@ -142,7 +175,7 @@ function initGalleryLightbox() {
   function buildSlides(thumbButtons) {
     track.innerHTML = "";
 
-    slides = thumbButtons.map((btn) => {
+    state.slides = thumbButtons.map((btn) => {
       const sourceImg = btn.querySelector("img");
       const slide = document.createElement("div");
       const slideImg = document.createElement("img");
@@ -154,6 +187,91 @@ function initGalleryLightbox() {
       track.appendChild(slide);
       return slide;
     });
+  }
+
+  function getImageHit(clientX, clientY) {
+    const activeImg = getActiveImage();
+    if (!activeImg) return null;
+
+    const rect = activeImg.getBoundingClientRect();
+    return {
+      activeImg,
+      rect,
+      inside:
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+    };
+  }
+
+  function zoomToPoint(targetScale, clientX, clientY) {
+    const hit = getImageHit(clientX, clientY);
+    if (!hit) return;
+
+    const nextScale = clamp(targetScale, MIN_SCALE, MAX_SCALE);
+    if (nextScale <= MIN_SCALE + ZOOM_EPSILON) {
+      resetImageState();
+      return;
+    }
+
+    const centerX = hit.rect.left + (hit.rect.width / 2);
+    const centerY = hit.rect.top + (hit.rect.height / 2);
+
+    state.scale = nextScale;
+    state.panX = (centerX - clientX) * (nextScale - MIN_SCALE);
+    state.panY = (centerY - clientY) * (nextScale - MIN_SCALE);
+    applyImageTransform();
+  }
+
+  function toggleZoomAtPoint(clientX, clientY) {
+    clearPendingTap();
+    if (isZoomed()) {
+      resetImageState();
+      return;
+    }
+
+    zoomToPoint(DOUBLE_TAP_SCALE, clientX, clientY);
+  }
+
+  function navigateFromImagePoint(clientX) {
+    if (isZoomed()) return;
+
+    const activeImg = getActiveImage();
+    if (!activeImg) return;
+
+    const rect = activeImg.getBoundingClientRect();
+    if (clientX < rect.left + (rect.width / 2)) prev();
+    else next();
+  }
+
+  function handleImageTap(clientX, clientY) {
+    const hit = getImageHit(clientX, clientY);
+    if (!hit || !hit.inside) return false;
+
+    const now = Date.now();
+    const closeEnough =
+      Math.abs(clientX - state.lastTapX) <= TAP_MOVE_TOLERANCE &&
+      Math.abs(clientY - state.lastTapY) <= TAP_MOVE_TOLERANCE;
+
+    if (now - state.lastTapTime <= TAP_DELAY_MS && closeEnough) {
+      resetTapState();
+      toggleZoomAtPoint(clientX, clientY);
+      return true;
+    }
+
+    clearPendingTap();
+    state.lastTapTime = now;
+    state.lastTapX = clientX;
+    state.lastTapY = clientY;
+    state.singleTapTimer = window.setTimeout(() => {
+      state.singleTapTimer = 0;
+      state.lastTapTime = 0;
+      if (!isOpen() || isZoomed()) return;
+      navigateFromImagePoint(clientX);
+    }, TAP_DELAY_MS);
+
+    return true;
   }
 
   function openFromButton(button) {
@@ -168,6 +286,8 @@ function initGalleryLightbox() {
 
     buildSlides(thumbs);
     resetImageState();
+    resetTouchState();
+    resetTapState();
 
     lb.classList.add("open");
     lb.setAttribute("aria-hidden", "false");
@@ -180,16 +300,17 @@ function initGalleryLightbox() {
     lb.classList.remove("open");
     lb.setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
+    resetTapState();
     resetImageState();
     resetTouchState();
   }
 
   function next() {
-    goTo(index + 1);
+    goTo(state.index + 1);
   }
 
   function prev() {
-    goTo(index - 1);
+    goTo(state.index - 1);
   }
 
   document.addEventListener("click", (e) => {
@@ -201,11 +322,13 @@ function initGalleryLightbox() {
 
   prevBtn.addEventListener("click", (e) => {
     e.stopPropagation();
+    resetTapState();
     prev();
   });
 
   nextBtn.addEventListener("click", (e) => {
     e.stopPropagation();
+    resetTapState();
     next();
   });
 
@@ -221,13 +344,8 @@ function initGalleryLightbox() {
     e.preventDefault();
     e.stopPropagation();
 
-    if (Date.now() < suppressImageClickUntil) return;
-    if (isZoomed()) return;
-
-    const rect = activeImg.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    if (clickX < rect.width / 2) prev();
-    else next();
+    if (Date.now() < state.suppressClickUntil) return;
+    handleImageTap(e.clientX, e.clientY);
   });
 
   // close when clicking anywhere outside the current image
@@ -241,7 +359,7 @@ function initGalleryLightbox() {
   });
 
   window.addEventListener("keydown", (e) => {
-    if (!lb.classList.contains("open")) return;
+    if (!isOpen()) return;
 
     if (e.key === "Escape") closeLightbox();
     if (e.key === "ArrowLeft") prev();
@@ -249,61 +367,62 @@ function initGalleryLightbox() {
   });
 
   viewport.addEventListener("touchstart", (e) => {
-    if (!lb.classList.contains("open")) return;
+    if (!isOpen()) return;
+
+    clearPendingTap();
+    state.touchMoved = false;
+    state.swipeDx = 0;
+    state.swipeDy = 0;
 
     if (e.touches.length > 1) {
-      dragging = false;
-      ignoreTouchGesture = true;
-      gestureMode = "pinch";
-      pinchStartDistance = getTouchDistance(e.touches);
-      pinchStartScale = imageScale;
-      suppressImageClick();
+      if (e.cancelable) e.preventDefault();
+      state.startedMultiTouch = true;
+      state.gesture = "pinch";
+      state.pinchStartDistance = getTouchDistance(e.touches);
+      state.pinchStartScale = state.scale;
+      suppressSyntheticClick();
       return;
     }
 
     const touch = e.touches[0];
-    touchStartX = touch.clientX;
-    touchStartY = touch.clientY;
-    ignoreTouchGesture = false;
-    dx = 0;
+    state.startedMultiTouch = false;
+    state.touchStartX = touch.clientX;
+    state.touchStartY = touch.clientY;
 
     if (isZoomed()) {
-      gestureMode = "pan";
-      dragging = false;
-      panStartX = touch.clientX;
-      panStartY = touch.clientY;
-      panStartPanX = panX;
-      panStartPanY = panY;
-      const activeImg = getActiveImage();
-      if (activeImg) activeImg.classList.add("is-panning");
+      state.gesture = "zoomed-tap";
+      state.panStartX = touch.clientX;
+      state.panStartY = touch.clientY;
+      state.panStartPanX = state.panX;
+      state.panStartPanY = state.panY;
       return;
     }
 
-    gestureMode = "swipe";
-    dragging = true;
+    state.gesture = "tap";
     track.style.transition = "none";
-  }, { passive: true });
+  }, { passive: false });
 
   viewport.addEventListener("touchmove", (e) => {
-    if (!lb.classList.contains("open")) return;
+    if (!isOpen()) return;
 
     if (e.touches.length > 1) {
       if (e.cancelable) e.preventDefault();
-      dragging = false;
-      ignoreTouchGesture = true;
-      gestureMode = "pinch";
-      suppressImageClick();
-      dx = 0;
+      clearPendingTap();
+      state.startedMultiTouch = true;
+      state.touchMoved = true;
+      state.gesture = "pinch";
+      state.swipeDx = 0;
+      suppressSyntheticClick();
 
-      if (!pinchStartDistance) {
-        pinchStartDistance = getTouchDistance(e.touches);
-        pinchStartScale = imageScale;
+      if (!state.pinchStartDistance) {
+        state.pinchStartDistance = getTouchDistance(e.touches);
+        state.pinchStartScale = state.scale;
       }
 
       const currentDistance = getTouchDistance(e.touches);
-      if (pinchStartDistance && currentDistance) {
-        imageScale = clamp(
-          pinchStartScale * (currentDistance / pinchStartDistance),
+      if (state.pinchStartDistance && currentDistance) {
+        state.scale = clamp(
+          state.pinchStartScale * (currentDistance / state.pinchStartDistance),
           MIN_SCALE,
           MAX_SCALE
         );
@@ -312,94 +431,123 @@ function initGalleryLightbox() {
       return;
     }
 
-    if (ignoreTouchGesture || gestureMode === "pinch") return;
-
-    if (gestureMode === "pan" || isZoomed()) {
+    if (state.startedMultiTouch || state.gesture === "pinch") {
       if (e.cancelable) e.preventDefault();
-      const touch = e.touches[0];
-      gestureMode = "pan";
-      panX = panStartPanX + (touch.clientX - panStartX);
-      panY = panStartPanY + (touch.clientY - panStartY);
-      suppressImageClick();
+      return;
+    }
+
+    const touch = e.touches[0];
+    const dx = touch.clientX - state.touchStartX;
+    const dy = touch.clientY - state.touchStartY;
+    state.swipeDx = dx;
+    state.swipeDy = dy;
+
+    if (Math.abs(dx) > TAP_MOVE_TOLERANCE || Math.abs(dy) > TAP_MOVE_TOLERANCE) {
+      state.touchMoved = true;
+      clearPendingTap();
+      suppressSyntheticClick();
+    }
+
+    if (state.gesture === "pan" || state.gesture === "zoomed-tap" || isZoomed()) {
+      if (!state.touchMoved && state.gesture === "zoomed-tap") return;
+      if (e.cancelable) e.preventDefault();
+      state.gesture = "pan";
+      const activeImg = getActiveImage();
+      if (activeImg) activeImg.classList.add("is-panning");
+      state.panX = state.panStartPanX + (touch.clientX - state.panStartX);
+      state.panY = state.panStartPanY + (touch.clientY - state.panStartY);
+      suppressSyntheticClick();
       applyImageTransform();
       return;
     }
 
-    if (!dragging || gestureMode !== "swipe") return;
+    if (!state.touchMoved) return;
+    if (Math.abs(dx) <= Math.abs(dy) * SWIPE_AXIS_RATIO) return;
 
-    dx = e.touches[0].clientX - touchStartX;
-    const dy = e.touches[0].clientY - touchStartY;
-    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
-      suppressImageClick();
-    }
-    if (Math.abs(dy) > Math.abs(dx) * 1.25) return;
     if (e.cancelable) e.preventDefault();
+    state.gesture = "swipe";
 
     const w = viewport.getBoundingClientRect().width || 1;
-    track.style.transform = `translateX(${(-index * w) + dx}px)`;
+    track.style.transform = `translateX(${(-state.index * w) + dx}px)`;
   }, { passive: false });
 
   viewport.addEventListener("touchend", (e) => {
-    if (gestureMode === "pinch" || ignoreTouchGesture) {
+    if (!isOpen()) return;
+
+    if (state.gesture === "pinch" || state.startedMultiTouch) {
       if (e.touches.length) return;
       if (!isZoomed()) resetImageState();
       else {
-        gestureMode = "";
+        state.gesture = "idle";
         applyImageTransform();
       }
       resetTouchState();
-      suppressImageClick();
+      suppressSyntheticClick();
       return;
     }
 
-    if (gestureMode === "pan") {
+    if (state.gesture === "pan") {
       if (e.touches.length) return;
       const activeImg = getActiveImage();
       if (activeImg) activeImg.classList.remove("is-panning");
-      gestureMode = "";
+      state.gesture = "idle";
       if (!isZoomed()) resetImageState();
       else applyImageTransform();
       resetTouchState();
-      suppressImageClick();
+      suppressSyntheticClick();
       return;
     }
 
-    if (!dragging) {
-      dragging = false;
-      gestureMode = "";
+    if (state.gesture === "swipe") {
+      if (e.cancelable) e.preventDefault();
+      const w = viewport.getBoundingClientRect().width || 1;
+      const threshold = w * 0.18;
+
+      if (state.swipeDx < -threshold) next();
+      else if (state.swipeDx > threshold) prev();
+      else goTo(state.index);
+
+      resetTouchState();
+      suppressSyntheticClick();
       return;
     }
 
-    dragging = false;
+    const touch = e.changedTouches[0];
+    if (!touch) {
+      resetTouchState();
+      return;
+    }
 
-    const w = viewport.getBoundingClientRect().width || 1;
-    const threshold = w * 0.18;
-
-    if (dx < -threshold) next();
-    else if (dx > threshold) prev();
-    else goTo(index);
+    const hit = getImageHit(touch.clientX, touch.clientY);
+    if (!state.touchMoved && hit?.inside) {
+      if (e.cancelable) e.preventDefault();
+      suppressSyntheticClick();
+      handleImageTap(touch.clientX, touch.clientY);
+    } else if (!state.touchMoved) {
+      closeLightbox();
+    }
 
     resetTouchState();
-  });
+  }, { passive: false });
 
   viewport.addEventListener("touchcancel", () => {
-    if (gestureMode === "pinch" || gestureMode === "pan" || isZoomed()) {
-      gestureMode = "";
+    if (state.gesture === "pinch" || state.gesture === "pan" || isZoomed()) {
+      state.gesture = "idle";
       if (!isZoomed()) resetImageState();
       else applyImageTransform();
       resetTouchState();
-      suppressImageClick();
+      suppressSyntheticClick();
       return;
     }
 
     resetTouchState();
-    goTo(index);
+    goTo(state.index);
   });
 
   window.addEventListener("resize", () => {
-    if (lb.classList.contains("open")) {
+    if (isOpen()) {
       resetImageState();
-      goTo(index, false);
+      goTo(state.index, false);
     }
   });
 
