@@ -23,6 +23,10 @@ function initGalleryLightbox() {
   let suppressImageClickUntil = 0;
   let dx = 0;
 
+  function suppressImageClick(duration = 1200) {
+    suppressImageClickUntil = Date.now() + duration;
+  }
+
   function updateCounter() {
     counter.textContent = slides.length ? `${index + 1} / ${slides.length}` : "";
   }
@@ -44,12 +48,15 @@ function initGalleryLightbox() {
 
     slides = thumbButtons.map((btn) => {
       const sourceImg = btn.querySelector("img");
+      const slide = document.createElement("div");
       const slideImg = document.createElement("img");
+      slide.className = "lb-slide";
       slideImg.src = sourceImg.currentSrc || sourceImg.src;
       slideImg.alt = sourceImg.alt || "Gallery image";
       slideImg.draggable = false;
-      track.appendChild(slideImg);
-      return slideImg;
+      slide.appendChild(slideImg);
+      track.appendChild(slide);
+      return slide;
     });
   }
 
@@ -109,8 +116,12 @@ function initGalleryLightbox() {
   });
 
   track.addEventListener("click", (e) => {
-    const activeImg = track.children[index];
+    const activeImg = slides[index]?.querySelector("img");
     if (!activeImg || e.target !== activeImg) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
     if (Date.now() < suppressImageClickUntil) return;
 
     const rect = activeImg.getBoundingClientRect();
@@ -121,7 +132,7 @@ function initGalleryLightbox() {
 
   // close when clicking anywhere outside the current image
   lb.addEventListener("click", (e) => {
-    const activeImg = track.children[index];
+    const activeImg = slides[index]?.querySelector("img");
     if (!activeImg) return;
 
     if (e.target === lb || e.target === track || !activeImg.contains(e.target)) {
@@ -143,7 +154,7 @@ function initGalleryLightbox() {
     if (e.touches.length !== 1) {
       dragging = false;
       ignoreTouchGesture = true;
-      suppressImageClickUntil = Date.now() + 400;
+      suppressImageClick();
       return;
     }
 
@@ -161,7 +172,7 @@ function initGalleryLightbox() {
     if (e.touches.length !== 1) {
       dragging = false;
       ignoreTouchGesture = true;
-      suppressImageClickUntil = Date.now() + 400;
+      suppressImageClick();
       goTo(index);
       return;
     }
@@ -169,7 +180,7 @@ function initGalleryLightbox() {
     dx = e.touches[0].clientX - touchStartX;
     const dy = e.touches[0].clientY - touchStartY;
     if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
-      suppressImageClickUntil = Date.now() + 400;
+      suppressImageClick();
     }
     if (Math.abs(dy) > Math.abs(dx) * 1.25) return;
 
