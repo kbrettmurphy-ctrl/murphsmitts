@@ -1,6 +1,6 @@
 # MurphOS Human Interface Guidelines
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Locked
 **Last Updated:** June 2026
 
@@ -119,6 +119,48 @@ The glove, the customer task, or the key message should always be the focus. The
 
 ---
 
+# Decision Support & Findability
+
+Important customer decisions should be supported where the customer is making the decision.
+
+Do not make customers hunt for information they need to take the next step.
+
+A customer should not have to wonder:
+
+* What options are available?
+* Where do I find this?
+* Is this still in stock?
+* What happens if I choose this?
+* Am I supposed to scroll more?
+* Did I miss something?
+
+MurphOS should surface choice-support information at the moment it becomes useful.
+
+Examples include:
+
+* Lace colors near relacing information.
+* Lace colors inside or near the service request form.
+* Shipping instructions after estimate approval.
+* Payment instructions when payment is needed.
+* Pickup or drop-off instructions when the order is local.
+* Availability status where choices are shown.
+
+Anchor links are useful.
+
+They are not a complete solution by themselves.
+
+A section like `/services/#lace-colors` can help customers reach information quickly, but the interface should still make that information visible or discoverable where the customer naturally needs it.
+
+If a customer has to remember that information exists somewhere else, the interface is making them carry the system in their head.
+
+That is friction.
+
+The system should carry the system.
+
+Humans are busy enough misplacing sunglasses that are already on their face.
+
+---
+
 # Layout & Whitespace
 
 Whitespace is not empty space.
@@ -221,6 +263,34 @@ Show errors clearly and respectfully.
 A form should feel like a guided conversation, not paperwork handed over by a bored government office worker with a grudge against society.
 
 When a customer submits a form, MurphOS should clearly confirm what happened and what happens next.
+
+---
+
+# Choice Inputs
+
+When a customer is choosing between visual options, the interface should show those options visually whenever practical.
+
+A visual choice should not be reduced to a plain dropdown if the visual difference matters.
+
+Good examples include:
+
+* Primary lace color.
+* Secondary lace color.
+* Glove photo selection.
+* For-sale glove photo selection.
+* Service options when imagery improves understanding.
+
+For lace colors, a customer should be able to see the color while choosing it.
+
+The best version is a swatch picker.
+
+The acceptable version is a clear link or expandable view placed directly near the color field.
+
+The weak version is a plain dropdown that forces the customer to remember what the color looked like from another section.
+
+Memory-based interfaces are lazy interfaces.
+
+The user already has enough to remember, like passwords, oil change dates, and why they walked into the garage.
 
 ---
 
@@ -432,7 +502,8 @@ Before finalizing any interface decision, ask:
 6. Can this be simpler?
 7. Can this be quieter?
 8. Does this support the glove, the customer, or the task?
-9. Will this still feel appropriate years from now?
+9. Does this surface important information where the customer needs it?
+10. Will this still feel appropriate years from now?
 
 If the answer to most of these questions is no, rethink the solution.
 
