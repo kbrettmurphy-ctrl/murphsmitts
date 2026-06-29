@@ -169,8 +169,11 @@ body_class: inner
 
   <section class="reviews" id="reviews">
     <div class="reviews-wrap">
-      <h2>Customer Reviews</h2>
-      <p class="lede">Real feedback from players, parents, and glove collectors.</p>
+      <div class="service-section-heading">
+        <p class="kicker">Customer Trust</p>
+        <h2>Customer Reviews</h2>
+        <p class="lede">Real feedback from players, parents, and glove collectors.</p>
+      </div>
 
       <div class="reviews-grid">
         <article class="review-card">
@@ -236,9 +239,17 @@ body_class: inner
     </div>
   </section>
 
-  <div class="page-actions services-actions">
-    <a class="btn btn-secondary" href="{{ '/contact/' | relative_url }}">Contact Me</a>
-    <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Service Request</a>
-  </div>
+  <section class="services-final-cta" aria-labelledby="services-start-title">
+    <div class="service-section-heading">
+      <p class="kicker">Ready when you are</p>
+      <h2 id="services-start-title">Have a glove that needs attention?</h2>
+      <p>Send the details, choose local drop-off or mail-in service, and I’ll follow up with the next step.</p>
+    </div>
+
+    <div class="page-actions services-actions">
+      <a class="btn btn-secondary" href="{{ '/contact/' | relative_url }}">Contact Me</a>
+      <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Service Request</a>
+    </div>
+  </section>
 
 </main>

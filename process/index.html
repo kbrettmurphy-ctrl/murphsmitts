@@ -1,91 +1,172 @@
 ---
 layout: default
 title: Glove Relacing Process
-description: Process for requesting your glove service.
+description: What happens from service request to glove return.
 nav: process
 body_class: inner
 ---
 
-<main class="container page page-under-header">
-    <h1>How It Works</h1>
-    <p class="lede">Simple process. Professional results.</p>
-    
-    <div class="process-gallery">
-      <figure class="process-shot">
-        <div class="process-shot-media">
-          <img src="{{ '/assets/img/process/IMG_6577.jpg' | relative_url }}" alt="Glove disassembly">
-        </div>
-        <figcaption>Disassemble</figcaption>
-      </figure>
+<main class="container page page-under-header process-page">
+  <section class="process-hero" aria-labelledby="process-title">
+    <p class="kicker">Process</p>
+    <h1 id="process-title">What happens after you send a glove in</h1>
+    <p class="lede">The process is simple: send the request, I review the glove, we confirm the work, then the glove is cleaned, conditioned, relaced, or repaired based on what it actually needs.</p>
 
-      <figure class="process-shot">
-        <div class="process-shot-media">
-          <img src="{{ '/assets/img/process/IMG_6637.jpg' | relative_url }}" alt="Cleaning glove leather">
-        </div>
-        <figcaption>Clean</figcaption>
-      </figure>
-
-      <figure class="process-shot">
-        <div class="process-shot-media">
-          <img src="{{ '/assets/img/process/IMG_6636.jpg' | relative_url }}" alt="Restoring glove leather">
-        </div>
-        <figcaption>Restore Leather</figcaption>
-      </figure>
-
-      <figure class="process-shot">
-        <div class="process-shot-media">
-          <img src="{{ '/assets/img/process/IMG_6640.jpg' | relative_url }}" alt="Relacing glove">
-        </div>
-        <figcaption>Relace</figcaption>
-      </figure>
-
-      <figure class="process-shot">
-        <div class="process-shot-media">
-          <img src="{{ '/assets/img/process/IMG_6635.jpg' | relative_url }}" alt="Conditioning finished glove">
-        </div>
-        <figcaption>Condition</figcaption>
-      </figure>
-    </div>
-    
-    <div class="card">
-      <div class="process-step">
-        <h2>1. Submit Service Request</h2>
-        <ul>
-          <li>Request service using the Service Request button below.</li>
-          <li>Select the service(s) and <a href="{{ '/services/#Lace-Colors' | relative_url }}" class="content-link">lace color</a>(s) you want, send photos of your glove (if you have them).</li>
-          <li>You will receive an email with a summary of work requested with a quote.</li>
-        </ul>
-      </div>
-
-      <hr class="rule">
-
-      <div class="process-step">
-        <h2>2. I Restore Your Glove</h2>
-        <ul>
-          <li>Once you agree to price and service requested, I will:</li>
-        </ul>
-        <ul>
-          <li>Disassemble the glove</li>
-          <li>Thoroughly clean, condition with the highest quality products from <a href="https://thecraftsmansworks.com" class="content-link" target="_blank" rel="noopener noreferrer">The Craftsman’s Works</a>, then relace with only the best quality leather lace from Tennessee Tannery.</li>
-          <li>If any other work is needed or recommended after disassembly, I will contact you before moving forward.</li>
-        </ul>
-      </div>
-
-      <hr class="rule">
-
-      <div class="process-step">
-        <h2>3. Game-Ready Return</h2>
-        <ul>
-          <li>You will be contacted via email that your glove is ready.</li>
-          <li>Payment and pick-up / shipping details will be coordinated. <span class="note">Gloves will not be shipped until payment is received.</span></li>
-          <li>Tracking information will be provided in the “Completed” email for shipped orders.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- BUTTONS OUTSIDE THE CARD, 32px GAP -->
-    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:32px">
-      <a class="btn btn-secondary" href="{{ '/services/' | relative_url }}">Price List</a>
+    <div class="process-actions">
       <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Service Request</a>
+      <a class="btn btn-secondary" href="{{ '/services/' | relative_url }}">Price List</a>
     </div>
-  </main>
+  </section>
+
+  <section class="process-gallery" aria-label="Glove service photos">
+    <figure class="process-shot">
+      <div class="process-shot-media">
+        <img src="{{ '/assets/img/process/IMG_6577.jpg' | relative_url }}" alt="Glove with old lace removed during service">
+      </div>
+      <figcaption>Disassemble</figcaption>
+    </figure>
+
+    <figure class="process-shot">
+      <div class="process-shot-media">
+        <img src="{{ '/assets/img/process/IMG_6637.jpg' | relative_url }}" alt="Cleaning dirt and grime from glove leather">
+      </div>
+      <figcaption>Clean</figcaption>
+    </figure>
+
+    <figure class="process-shot">
+      <div class="process-shot-media">
+        <img src="{{ '/assets/img/process/IMG_6636.jpg' | relative_url }}" alt="Conditioning glove leather during service">
+      </div>
+      <figcaption>Condition</figcaption>
+    </figure>
+
+    <figure class="process-shot">
+      <div class="process-shot-media">
+        <img src="{{ '/assets/img/process/IMG_6640.jpg' | relative_url }}" alt="Relacing a baseball glove">
+      </div>
+      <figcaption>Relace</figcaption>
+    </figure>
+
+    <figure class="process-shot">
+      <div class="process-shot-media">
+        <img src="{{ '/assets/img/process/IMG_6635.jpg' | relative_url }}" alt="Finished glove after cleaning, conditioning, and lace work">
+      </div>
+      <figcaption>Final check</figcaption>
+    </figure>
+  </section>
+
+  <section class="process-section" aria-labelledby="process-steps-title">
+    <div class="process-section-header">
+      <p class="kicker">Step by step</p>
+      <h2 id="process-steps-title">From request to return</h2>
+      <p>Every glove is a little different. Photos help me see the lace, leather, pocket, and structure before we decide what makes sense.</p>
+    </div>
+
+    <ol class="process-journey-list">
+      <li class="process-journey-item">
+        <span class="process-step-number">01</span>
+        <div>
+          <h3>Send the request</h3>
+          <p>Tell me what is going on with the glove and upload photos if you have them. Include the service you are considering and any <a class="mm-text-link" href="{{ '/services/#lace-colors' | relative_url }}">lace color</a> preferences.</p>
+        </div>
+      </li>
+
+      <li class="process-journey-item">
+        <span class="process-step-number">02</span>
+        <div>
+          <h3>I review the glove</h3>
+          <p>I look at the lace, leather condition, pocket, web, and overall structure, then send the recommended work and price before anything starts.</p>
+        </div>
+      </li>
+
+      <li class="process-journey-item">
+        <span class="process-step-number">03</span>
+        <div>
+          <h3>Local drop-off or mail-in</h3>
+          <p>Local customers coordinate drop-off near Surf City. Shipped orders receive shipping instructions after the work is approved.</p>
+        </div>
+      </li>
+
+      <li class="process-journey-item">
+        <span class="process-step-number">04</span>
+        <div>
+          <h3>Work begins</h3>
+          <p>Once the plan is approved, the glove is cleaned and conditioned with products from <a class="mm-text-link" href="https://thecraftsmansworks.com" target="_blank" rel="noopener noreferrer">The Craftsman’s Works</a>, then relaced, tightened, or repaired based on the agreed work. If something unexpected shows up during disassembly, I check with you first.</p>
+        </div>
+      </li>
+
+      <li class="process-journey-item">
+        <span class="process-step-number">05</span>
+        <div>
+          <h3>Return or pickup</h3>
+          <p>When the glove is ready, I’ll send the completion update and coordinate pickup, payment, or return shipping. Tracking is provided for shipped orders.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="process-section" aria-labelledby="process-handoff-title">
+    <div class="process-section-header">
+      <p class="kicker">Getting the glove here</p>
+      <h2 id="process-handoff-title">Local drop-off or mail-in service</h2>
+      <p>Start with the service request either way. That keeps the glove details, photos, contact information, and service notes in one place.</p>
+    </div>
+
+    <div class="process-handoff-grid">
+      <article class="process-info-panel">
+        <h3>Local drop-off</h3>
+        <p>If you are near Surf City, Hampstead, Topsail, or the surrounding area, we’ll coordinate a local drop-off after I review the request.</p>
+        <p>Pickup is handled the same way once the glove is finished.</p>
+      </article>
+
+      <article class="process-info-panel">
+        <h3>Mail-in service</h3>
+        <p>If you are shipping the glove, wait for the review and approval first. I’ll send shipping instructions so the glove is tied to the right request.</p>
+        <p>Return shipping and tracking are handled when the work is complete.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="process-section" aria-labelledby="process-review-title">
+    <div class="process-section-header">
+      <p class="kicker">Glove review</p>
+      <h2 id="process-review-title">What I look for</h2>
+      <p>The goal is to understand what will help the glove feel solid and usable again without doing work it does not need.</p>
+    </div>
+
+    <div class="process-review-grid">
+      <article class="process-review-item">
+        <h3>Lace condition</h3>
+        <p>Broken, dry, stretched, missing, or loose lace that affects structure or pocket shape.</p>
+      </article>
+
+      <article class="process-review-item">
+        <h3>Leather condition</h3>
+        <p>Dirt, sweat, dryness, stiffness, or areas that need cleaning and conditioning before lace work.</p>
+      </article>
+
+      <article class="process-review-item">
+        <h3>Pocket and structure</h3>
+        <p>How the glove closes, where it feels loose, and whether the web, fingers, or heel need attention.</p>
+      </article>
+
+      <article class="process-review-item">
+        <h3>Service fit</h3>
+        <p>Whether the glove needs a full relace, targeted lace work, cleaning and conditioning, or a smaller repair.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="process-cta" aria-labelledby="process-cta-title">
+    <div class="process-section-header">
+      <p class="kicker">Ready to start</p>
+      <h2 id="process-cta-title">Send the glove details when you are ready.</h2>
+      <p>Photos are helpful, but they are not required. Start with what you know, and I’ll follow up with the next step.</p>
+    </div>
+
+    <div class="process-actions">
+      <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Service Request</a>
+      <a class="btn btn-secondary" href="{{ '/services/' | relative_url }}">Price List</a>
+    </div>
+  </section>
+</main>
