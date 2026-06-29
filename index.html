@@ -6,48 +6,61 @@ nav: home
 body_class: home
 ---
 
-<section class="hero" aria-label="Hero">
-  <div class="hero-content container">
-    <p class="hero-kicker">Murph’s Mitt Maintenance · Surf City, NC</p>
-    <h1>Baseball &amp; softball glove relacing, cleaning &amp; conditioning</h1>
-    <p>Careful glove work from Surf City, North Carolina, with local drop-off and nationwide mail-in service available.</p>
+<section class="hero" aria-labelledby="home-hero-title">
+  <div class="hero-inner container">
+    <div class="hero-content">
+      <p class="hero-kicker">MURPH’S MITT MAINTENANCE · SURF CITY, NC</p>
+      <h1 id="home-hero-title">Keep your glove in the game.</h1>
+      <p>I relace, clean, and condition baseball and softball gloves so they feel solid, usable, and ready for more innings without starting over with a new glove.</p>
 
-    <div class="cta">
-      <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Service Request</a>
-      <a class="btn btn-secondary" href="{{ '/services/' | relative_url }}">View Services</a>
-    </div>
-  </div>
-
-  <div class="trust-strip hero-trust" aria-label="Trust signals">
-    <div class="container">
-      <div class="trust-items">
-        <div class="trust-item">Local drop-off in Surf City, NC</div>
-        <div class="trust-item">Mail-in service available</div>
-        <div class="trust-item">Estimate before work begins</div>
+      <div class="cta">
+        <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Start a Service Request</a>
+        <a class="btn btn-secondary" href="{{ '/services/' | relative_url }}">View Services</a>
       </div>
     </div>
+
+    <figure class="hero-media">
+      <img src="{{ '/assets/img/IMG_7977.jpeg' | relative_url }}" alt="Baseball glove on Murph's Mitt Maintenance workbench">
+    </figure>
   </div>
 </section>
 
 <main class="home-sections">
+
+  <section class="home-trust-cues" aria-label="Trust cues">
+    <div class="container home-trust-list">
+      <div class="home-trust-cue">
+        <strong>Surf City local drop-off</strong>
+        <span>Simple handoff for local players and families.</span>
+      </div>
+      <div class="home-trust-cue">
+        <strong>Mail-in service available</strong>
+        <span>Ship your glove in from anywhere in the U.S.</span>
+      </div>
+      <div class="home-trust-cue">
+        <strong>Personally reviewed</strong>
+        <span>I’ll review the glove and confirm the plan before work begins.</span>
+      </div>
+    </div>
+  </section>
 
   <section class="home-section">
     <div class="container">
       <div class="home-section-split">
         <div class="home-section-header">
           <p class="kicker">Services</p>
-          <h2>Work that fits what your glove needs</h2>
-          <p class="lede">Every glove is different. I’ll look at the lace, leather, pocket, and structure, then confirm the work before anything starts.</p>
+          <h2>What I do</h2>
+          <p class="lede">Most gloves come in needing new lace, a deep clean, conditioning, tighter structure, or a specific repair. I’ll look it over and recommend only what makes sense.</p>
         </div>
 
         <div class="home-trust-panel" aria-label="Service trust cues">
           <div>
-            <strong>Local or shipped</strong>
-            <span>Drop off near Surf City or mail your glove in from anywhere in the U.S.</span>
+            <strong>Only what it needs.</strong>
+            <span>I’ll recommend the work that makes sense for the glove, not a one-size-fits-all package.</span>
           </div>
           <div>
-            <strong>Reviewed first</strong>
-            <span>You get a clear scope and estimate before the glove goes on the bench.</span>
+            <strong>Small shop attention</strong>
+            <span>The work stays personal from intake to return.</span>
           </div>
         </div>
       </div>
@@ -60,12 +73,12 @@ body_class: home
 
         <article class="home-service-item">
           <h3>Clean &amp; Condition</h3>
-          <p>Remove field grime, condition dry leather, and preserve the glove’s character.</p>
+          <p>Remove dirt, sweat, and grime, then condition the leather without stripping away its character.</p>
         </article>
 
         <article class="home-service-item">
-          <h3>Color changes / targeted lace work</h3>
-          <p>Change lace color or handle a specific section when a full relace is not needed.</p>
+          <h3>Targeted lace work</h3>
+          <p>Handle a broken section, color change, or smaller lace repair when a full relace is not needed.</p>
         </article>
       </div>
 
@@ -76,7 +89,7 @@ body_class: home
     </div>
   </section>
 
-  <section class="home-section home-section-alt home-proof-section">
+  <section class="home-section home-proof-section">
     <div class="container">
       <div class="home-section-header">
         <p class="kicker">Real Work</p>
@@ -84,7 +97,7 @@ body_class: home
         <p class="lede">A few examples from the bench. Every glove comes in with its own wear, shape, and story.</p>
       </div>
 
-      <div id="homeGalleryStatus" class="home-gallery-status">Loading recent glove photos...</div>
+      <div id="homeGalleryStatus" class="home-gallery-status">Loading photos...</div>
       <div id="homeGalleryPreview" class="gallery-strip" data-gallery-group="home-featured"></div>
 
       <div class="home-actions">
@@ -98,8 +111,7 @@ body_class: home
     <div class="container">
       <div class="home-section-header">
         <p class="kicker">Process</p>
-        <h2>Simple process, no guesswork</h2>
-        <p class="lede">The goal is to make the next step clear before your glove is opened up, cleaned, relaced, or shipped back.</p>
+        <h2>How it works</h2>
       </div>
 
       <div class="home-process-grid">
@@ -107,23 +119,23 @@ body_class: home
           <div>
             <span>01</span>
             <h3>Send the request</h3>
-            <p>Tell me what the glove needs and whether you prefer local drop-off or mail-in service.</p>
+            <p>Tell me what the glove needs and upload photos if available.</p>
           </div>
         </article>
 
         <article class="home-process-step">
           <div>
             <span>02</span>
-            <h3>Confirm the plan</h3>
-            <p>I review the glove, confirm the scope, and send the estimate before work begins.</p>
+            <h3>Review the glove</h3>
+            <p>I check the lace, leather, pocket, and structure before confirming the plan.</p>
           </div>
         </article>
 
         <article class="home-process-step">
           <div>
             <span>03</span>
-            <h3>Care, relace, return</h3>
-            <p>The glove is cleaned, conditioned, relaced where needed, checked, and returned ready for the field.</p>
+            <h3>Work begins</h3>
+            <p>The glove is cleaned, conditioned, relaced or repaired, then checked before return.</p>
           </div>
         </article>
       </div>
@@ -135,7 +147,7 @@ body_class: home
     </div>
   </section>
 
-  <section class="home-section home-section-alt">
+  <section class="home-section">
     <div class="container">
       <div class="home-section-header">
         <p class="kicker">Customer Trust</p>
@@ -147,7 +159,7 @@ body_class: home
         <article class="review-card">
           <div class="review-stars" aria-label="5 out of 5 stars">★★★★★</div>
           <p class="review-text">
-            "Huge shoutout to Murph's Mitt Maintenance for bringing my softball catcher’s glove back to life! The leather looks rich and refreshed, and the new laces are tight, strong, and game-ready."
+            "The leather looks rich and refreshed, and the new laces are tight, strong, and game-ready."
           </p>
           <div class="review-meta">— Sergio Vazquez · Google Review</div>
         </article>
@@ -155,7 +167,7 @@ body_class: home
         <article class="review-card">
           <div class="review-stars" aria-label="5 out of 5 stars">★★★★★</div>
           <p class="review-text">
-            "I had three gloves done by Murph's Mitt Maintenance. Each came back better than expected. I have had relacing done in the past, but there was no difference in the structure. That was not the case after getting the gloves back from Murph."
+            "I had three gloves done by Murph's Mitt Maintenance. Each came back better than expected."
           </p>
           <div class="review-meta">— Beau Bilock · Google Review</div>
         </article>
@@ -179,10 +191,10 @@ body_class: home
   <section class="home-section home-final-section">
     <div class="container">
       <div class="home-final-cta">
-        <div>
+        <div class="home-section-header">
           <p class="kicker">Ready When You Are</p>
           <h2>Have a glove that needs attention?</h2>
-          <p class="lede">Send the details, choose local drop-off or mail-in service, and I’ll review the request before confirming the estimate.</p>
+          <p class="lede">Send the details, choose local drop-off or mail-in service, and I’ll follow up with the next step.</p>
         </div>
         <div class="home-final-actions">
           <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Start a Service Request</a>
