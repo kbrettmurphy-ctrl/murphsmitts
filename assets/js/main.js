@@ -18,13 +18,108 @@ function initGalleryLightbox() {
   let slides = [];
   let touchStartX = 0;
   let touchStartY = 0;
+  let panStartX = 0;
+  let panStartY = 0;
+  let panStartPanX = 0;
+  let panStartPanY = 0;
+  let pinchStartDistance = 0;
+  let pinchStartScale = 1;
+  let imageScale = 1;
+  let panX = 0;
+  let panY = 0;
   let dragging = false;
   let ignoreTouchGesture = false;
   let suppressImageClickUntil = 0;
+  let gestureMode = "";
   let dx = 0;
+  const MIN_SCALE = 1;
+  const MAX_SCALE = 4;
+  const ZOOM_EPSILON = 0.015;
 
   function suppressImageClick(duration = 1200) {
     suppressImageClickUntil = Date.now() + duration;
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function getActiveImage() {
+    return slides[index]?.querySelector("img") || null;
+  }
+
+  function isZoomed() {
+    return imageScale > MIN_SCALE + ZOOM_EPSILON;
+  }
+
+  function getTouchDistance(touches) {
+    if (touches.length < 2) return 0;
+    const x = touches[0].clientX - touches[1].clientX;
+    const y = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(x, y);
+  }
+
+  function getPanBounds() {
+    const activeImg = getActiveImage();
+    if (!activeImg) return { x: 0, y: 0 };
+
+    const viewportRect = viewport.getBoundingClientRect();
+    const imageWidth = activeImg.offsetWidth || activeImg.naturalWidth || 0;
+    const imageHeight = activeImg.offsetHeight || activeImg.naturalHeight || 0;
+
+    return {
+      x: Math.max(0, ((imageWidth * imageScale) - viewportRect.width) / 2),
+      y: Math.max(0, ((imageHeight * imageScale) - viewportRect.height) / 2)
+    };
+  }
+
+  function clampPan() {
+    const bounds = getPanBounds();
+    panX = clamp(panX, -bounds.x, bounds.x);
+    panY = clamp(panY, -bounds.y, bounds.y);
+  }
+
+  function applyImageTransform() {
+    const activeImg = getActiveImage();
+    if (!activeImg) return;
+
+    if (!isZoomed()) {
+      imageScale = MIN_SCALE;
+      panX = 0;
+      panY = 0;
+      activeImg.style.transform = "";
+      activeImg.classList.remove("is-zoomed", "is-panning", "is-zooming");
+      return;
+    }
+
+    clampPan();
+    activeImg.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${imageScale})`;
+    activeImg.classList.add("is-zoomed");
+    activeImg.classList.toggle("is-panning", gestureMode === "pan");
+    activeImg.classList.toggle("is-zooming", gestureMode === "pinch");
+  }
+
+  function resetImageState() {
+    imageScale = MIN_SCALE;
+    panX = 0;
+    panY = 0;
+    gestureMode = "";
+    pinchStartDistance = 0;
+    pinchStartScale = MIN_SCALE;
+    slides.forEach((slide) => {
+      const img = slide.querySelector("img");
+      if (!img) return;
+      img.style.transform = "";
+      img.classList.remove("is-zoomed", "is-panning", "is-zooming");
+    });
+  }
+
+  function resetTouchState() {
+    dragging = false;
+    ignoreTouchGesture = false;
+    gestureMode = "";
+    dx = 0;
+    pinchStartDistance = 0;
   }
 
   function updateCounter() {
@@ -34,6 +129,7 @@ function initGalleryLightbox() {
   function goTo(i, animate = true) {
     if (!slides.length) return;
 
+    resetImageState();
     index = (i + slides.length) % slides.length;
     const w = viewport.getBoundingClientRect().width || 1;
 
@@ -71,6 +167,7 @@ function initGalleryLightbox() {
     if (clickedIndex === -1) return;
 
     buildSlides(thumbs);
+    resetImageState();
 
     lb.classList.add("open");
     lb.setAttribute("aria-hidden", "false");
@@ -83,6 +180,8 @@ function initGalleryLightbox() {
     lb.classList.remove("open");
     lb.setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
+    resetImageState();
+    resetTouchState();
   }
 
   function next() {
@@ -116,13 +215,14 @@ function initGalleryLightbox() {
   });
 
   track.addEventListener("click", (e) => {
-    const activeImg = slides[index]?.querySelector("img");
+    const activeImg = getActiveImage();
     if (!activeImg || e.target !== activeImg) return;
 
     e.preventDefault();
     e.stopPropagation();
 
     if (Date.now() < suppressImageClickUntil) return;
+    if (isZoomed()) return;
 
     const rect = activeImg.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -132,7 +232,7 @@ function initGalleryLightbox() {
 
   // close when clicking anywhere outside the current image
   lb.addEventListener("click", (e) => {
-    const activeImg = slides[index]?.querySelector("img");
+    const activeImg = getActiveImage();
     if (!activeImg) return;
 
     if (e.target === lb || e.target === track || !activeImg.contains(e.target)) {
@@ -151,31 +251,81 @@ function initGalleryLightbox() {
   viewport.addEventListener("touchstart", (e) => {
     if (!lb.classList.contains("open")) return;
 
-    if (e.touches.length !== 1) {
+    if (e.touches.length > 1) {
       dragging = false;
       ignoreTouchGesture = true;
+      gestureMode = "pinch";
+      pinchStartDistance = getTouchDistance(e.touches);
+      pinchStartScale = imageScale;
       suppressImageClick();
       return;
     }
 
-    dragging = true;
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
     ignoreTouchGesture = false;
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
     dx = 0;
+
+    if (isZoomed()) {
+      gestureMode = "pan";
+      dragging = false;
+      panStartX = touch.clientX;
+      panStartY = touch.clientY;
+      panStartPanX = panX;
+      panStartPanY = panY;
+      const activeImg = getActiveImage();
+      if (activeImg) activeImg.classList.add("is-panning");
+      return;
+    }
+
+    gestureMode = "swipe";
+    dragging = true;
     track.style.transition = "none";
   }, { passive: true });
 
   viewport.addEventListener("touchmove", (e) => {
-    if (!dragging || ignoreTouchGesture) return;
+    if (!lb.classList.contains("open")) return;
 
-    if (e.touches.length !== 1) {
+    if (e.touches.length > 1) {
+      if (e.cancelable) e.preventDefault();
       dragging = false;
       ignoreTouchGesture = true;
+      gestureMode = "pinch";
       suppressImageClick();
-      goTo(index);
+      dx = 0;
+
+      if (!pinchStartDistance) {
+        pinchStartDistance = getTouchDistance(e.touches);
+        pinchStartScale = imageScale;
+      }
+
+      const currentDistance = getTouchDistance(e.touches);
+      if (pinchStartDistance && currentDistance) {
+        imageScale = clamp(
+          pinchStartScale * (currentDistance / pinchStartDistance),
+          MIN_SCALE,
+          MAX_SCALE
+        );
+        applyImageTransform();
+      }
       return;
     }
+
+    if (ignoreTouchGesture || gestureMode === "pinch") return;
+
+    if (gestureMode === "pan" || isZoomed()) {
+      if (e.cancelable) e.preventDefault();
+      const touch = e.touches[0];
+      gestureMode = "pan";
+      panX = panStartPanX + (touch.clientX - panStartX);
+      panY = panStartPanY + (touch.clientY - panStartY);
+      suppressImageClick();
+      applyImageTransform();
+      return;
+    }
+
+    if (!dragging || gestureMode !== "swipe") return;
 
     dx = e.touches[0].clientX - touchStartX;
     const dy = e.touches[0].clientY - touchStartY;
@@ -183,21 +333,43 @@ function initGalleryLightbox() {
       suppressImageClick();
     }
     if (Math.abs(dy) > Math.abs(dx) * 1.25) return;
+    if (e.cancelable) e.preventDefault();
 
     const w = viewport.getBoundingClientRect().width || 1;
     track.style.transform = `translateX(${(-index * w) + dx}px)`;
-  }, { passive: true });
+  }, { passive: false });
 
-  viewport.addEventListener("touchend", () => {
-    if (ignoreTouchGesture) {
-      dragging = false;
-      ignoreTouchGesture = false;
-      dx = 0;
-      goTo(index);
+  viewport.addEventListener("touchend", (e) => {
+    if (gestureMode === "pinch" || ignoreTouchGesture) {
+      if (e.touches.length) return;
+      if (!isZoomed()) resetImageState();
+      else {
+        gestureMode = "";
+        applyImageTransform();
+      }
+      resetTouchState();
+      suppressImageClick();
       return;
     }
 
-    if (!dragging) return;
+    if (gestureMode === "pan") {
+      if (e.touches.length) return;
+      const activeImg = getActiveImage();
+      if (activeImg) activeImg.classList.remove("is-panning");
+      gestureMode = "";
+      if (!isZoomed()) resetImageState();
+      else applyImageTransform();
+      resetTouchState();
+      suppressImageClick();
+      return;
+    }
+
+    if (!dragging) {
+      dragging = false;
+      gestureMode = "";
+      return;
+    }
+
     dragging = false;
 
     const w = viewport.getBoundingClientRect().width || 1;
@@ -206,17 +378,29 @@ function initGalleryLightbox() {
     if (dx < -threshold) next();
     else if (dx > threshold) prev();
     else goTo(index);
+
+    resetTouchState();
   });
 
   viewport.addEventListener("touchcancel", () => {
-    dragging = false;
-    ignoreTouchGesture = false;
-    dx = 0;
+    if (gestureMode === "pinch" || gestureMode === "pan" || isZoomed()) {
+      gestureMode = "";
+      if (!isZoomed()) resetImageState();
+      else applyImageTransform();
+      resetTouchState();
+      suppressImageClick();
+      return;
+    }
+
+    resetTouchState();
     goTo(index);
   });
 
   window.addEventListener("resize", () => {
-    if (lb.classList.contains("open")) goTo(index, false);
+    if (lb.classList.contains("open")) {
+      resetImageState();
+      goTo(index, false);
+    }
   });
 
   updateCounter();
