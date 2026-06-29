@@ -270,27 +270,49 @@ if (document.readyState === "loading") {
 
   if (!openBtn || !closeBtn || !menu) return;
 
-  const openMenu = () => {
-    menu.classList.add("open");
-    document.body.classList.add("menu-open");
+  let lastFocused = null;
+
+  const setMenuState = (isOpen, restoreFocus = false) => {
+    menu.classList.toggle("open", isOpen);
+    document.body.classList.toggle("menu-open", isOpen);
+    menu.setAttribute("aria-hidden", String(!isOpen));
+    openBtn.setAttribute("aria-expanded", String(isOpen));
+
+    if (isOpen) {
+      lastFocused = document.activeElement;
+      requestAnimationFrame(() => closeBtn.focus({ preventScroll: true }));
+      return;
+    }
+
+    if (restoreFocus && lastFocused && document.contains(lastFocused)) {
+      lastFocused.focus({ preventScroll: true });
+    }
   };
 
-  const closeMenu = () => {
-    menu.classList.remove("open");
-    document.body.classList.remove("menu-open");
+  const openMenu = () => {
+    setMenuState(true);
+  };
+
+  const closeMenu = (restoreFocus = false) => {
+    if (!menu.classList.contains("open")) return;
+    setMenuState(false, restoreFocus);
   };
 
   openBtn.addEventListener("click", openMenu);
-  closeBtn.addEventListener("click", closeMenu);
+  closeBtn.addEventListener("click", () => closeMenu(true));
+
+  menu.addEventListener("click", (e) => {
+    if (e.target === menu) closeMenu(true);
+  });
 
   // Close if you tap a link
   menu.querySelectorAll("a").forEach(a => {
-    a.addEventListener("click", closeMenu);
+    a.addEventListener("click", () => closeMenu(false));
   });
 
   // Close on ESC
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeMenu();
+    if (e.key === "Escape") closeMenu(true);
   });
 })();
 
@@ -346,26 +368,40 @@ if (document.readyState === "loading") {
   });
 })();
 
-document.addEventListener("DOMContentLoaded", () => {
-  if (!document.body.classList.contains("home")) return;
+(() => {
+  const initHeaderState = () => {
+    const header = document.querySelector("[data-site-header]");
+    const hero = document.querySelector(".hero");
+    const isHome = document.body.classList.contains("home");
 
-  const header = document.querySelector(".site-header");
-  const hero = document.querySelector(".hero");
+    if (!header) return;
 
-  if (!header || !hero) return;
+    const updateHeaderState = () => {
+      document.body.classList.toggle("header-scrolled", window.scrollY > 8);
 
-  const updateHeaderNavColor = () => {
-    const headerBottom = header.getBoundingClientRect().bottom - 40;
-    const heroBottom = hero.getBoundingClientRect().bottom;
+      if (!isHome || !hero) {
+        document.body.classList.remove("header-over-hero");
+        return;
+      }
 
-    document.body.classList.toggle(
-      "header-over-hero",
-      heroBottom > headerBottom
-    );
+      const headerBottom = header.getBoundingClientRect().bottom - 40;
+      const heroBottom = hero.getBoundingClientRect().bottom;
+
+      document.body.classList.toggle(
+        "header-over-hero",
+        heroBottom > headerBottom
+      );
+    };
+
+    updateHeaderState();
+
+    window.addEventListener("scroll", updateHeaderState, { passive: true });
+    window.addEventListener("resize", updateHeaderState);
   };
 
-  updateHeaderNavColor();
-
-  window.addEventListener("scroll", updateHeaderNavColor, { passive: true });
-  window.addEventListener("resize", updateHeaderNavColor);
-});
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initHeaderState);
+  } else {
+    initHeaderState();
+  }
+})();
