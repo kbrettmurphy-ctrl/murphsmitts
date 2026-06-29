@@ -1,26 +1,40 @@
 ---
 layout: default
-title: Glove Relace Photos
-description: Glove restoration before and after photos.
+title: Glove Work Gallery
+description: Baseball and softball glove relacing, cleaning, conditioning, and repair photos.
 nav: gallery
 body_class: inner
 ---
 
-<main class="container page page-under-header">
-  <h1>Before &amp; After</h1>
-  <p class="lede">A small selection of gloves that showed up hopeless and left with a second chance.</p>
+<main class="container page page-under-header gallery-page">
+  <header class="mm-section-intro">
+    <p class="mm-eyebrow">Gallery</p>
+    <h1 class="mm-section-title">Glove work from the bench</h1>
+    <p class="mm-section-copy">A look at baseball and softball gloves that came in for relacing, cleaning, conditioning, color changes, and targeted repair work.</p>
+  </header>
 
-  <div id="galleryStatus" class="lede" style="margin-top:18px;">Loading gallery...</div>
+  <div id="galleryStatus" class="mm-status-message gallery-status">Loading gallery...</div>
   <div id="dynamicGallery"></div>
+
+  <section class="gallery-cta" aria-labelledby="gallery-cta-title">
+    <div class="mm-section-intro">
+      <p class="mm-eyebrow">Start a request</p>
+      <h2 id="gallery-cta-title" class="mm-section-title">Have a glove that needs attention?</h2>
+      <p class="mm-section-copy">Send a few details and photos if you have them. I’ll review the glove and follow up with the next step.</p>
+    </div>
+
+    <div class="gallery-actions">
+      <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Start a Service Request</a>
+      <a class="btn btn-secondary" href="{{ '/services/' | relative_url }}">View Services</a>
+    </div>
+  </section>
 
   <div class="lightbox" aria-hidden="true">
     <button class="lb-close" aria-label="Close">×</button>
     <button class="lb-prev" aria-label="Previous image">←</button>
 
     <div class="lb-viewport">
-      <div class="lb-card">
-        <img class="lb-img" alt="">
-      </div>
+      <div class="lb-track"></div>
     </div>
 
     <button class="lb-next" aria-label="Next image">→</button>
@@ -45,29 +59,6 @@ body_class: inner
 
   const galleryRoot = document.getElementById("dynamicGallery");
   const statusEl = document.getElementById("galleryStatus");
-
-  const lightbox = document.querySelector(".lightbox");
-  const track = document.querySelector(".lb-track");
-  const closeBtn = document.querySelector(".lb-close");
-  const prevBtn = document.querySelector(".lb-prev");
-  const nextBtn = document.querySelector(".lb-next");
-  const counter = document.querySelector(".lb-counter");
-
-  let activePhotos = [];
-  let activeIndex = 0;
-  let zoom = 1;
-  let panX = 0;
-  let panY = 0;
-  
-  let startX = 0;
-  let startY = 0;
-  let startPanX = 0;
-  let startPanY = 0;
-  
-  let startDistance = 0;
-  let startZoom = 1;
-  let isZooming = false;
-  let isPanning = false;
 
   function escapeHtml(value) {
     return String(value || "")
@@ -97,7 +88,10 @@ body_class: inner
       section.id = key;
 
       section.innerHTML = `
-        <h2>${escapeHtml(label)}</h2>
+        <div class="mm-section-intro">
+          <p class="mm-eyebrow">Gallery</p>
+          <h2 class="mm-section-title">${escapeHtml(label)}</h2>
+        </div>
         <div class="gallery-strip" data-gallery-group="${escapeHtml(key)}">
           ${photos.map((photo, index) => `
             <button
@@ -116,12 +110,6 @@ body_class: inner
         </div>
       `;
 
-      section.querySelectorAll(".gallery-thumb").forEach(btn => {
-        btn.addEventListener("click", () => {
-          openLightbox(photos, Number(btn.dataset.galleryIndex || 0));
-        });
-      });
-
       galleryRoot.appendChild(section);
     });
 
@@ -129,121 +117,6 @@ body_class: inner
       statusEl.textContent = total ? "" : "No gallery photos have been uploaded yet.";
     }
   }
-
-  const lbImg = document.querySelector(".lb-img");
-  const lbCard = document.querySelector(".lb-card");
-  
-  function showActivePhoto() {
-    if (!activePhotos.length || !lbImg) return;
-  
-    const photo = activePhotos[activeIndex];
-  
-    lbImg.src = photo.url || "";
-    lbImg.alt = "";
-  
-    if (counter) {
-      counter.textContent = `${activeIndex + 1} / ${activePhotos.length}`;
-    }
-  
-    prevBtn.style.display = activePhotos.length > 1 ? "" : "none";
-    nextBtn.style.display = activePhotos.length > 1 ? "" : "none";
-  }
-  
-  function openLightbox(photos, index) {
-    activePhotos = photos || [];
-    activeIndex = index || 0;
-  
-    showActivePhoto();
-  
-    lightbox.classList.add("open");
-    lightbox.setAttribute("aria-hidden", "false");
-    document.body.style.overflow = "hidden";
-  }
-  
-  function closeLightbox() {
-    lightbox.classList.remove("open");
-    lightbox.setAttribute("aria-hidden", "true");
-  
-    if (lbImg) {
-      lbImg.removeAttribute("src");
-      lbImg.alt = "";
-    }
-  
-    document.body.style.overflow = "";
-  }
-  
-  function moveLightbox(direction) {
-    if (!activePhotos.length) return;
-  
-    activeIndex += direction;
-  
-    if (activeIndex < 0) activeIndex = activePhotos.length - 1;
-    if (activeIndex >= activePhotos.length) activeIndex = 0;
-  
-    showActivePhoto();
-  }
-  
-  closeBtn.addEventListener("click", closeLightbox);
-  prevBtn.addEventListener("click", () => moveLightbox(-1));
-  nextBtn.addEventListener("click", () => moveLightbox(1));
-  
-  lightbox.addEventListener("click", (e) => {
-    if (!e.target.closest(".lb-card") &&
-        !e.target.closest(".lb-close") &&
-        !e.target.closest(".lb-prev") &&
-        !e.target.closest(".lb-next")) {
-      closeLightbox();
-    }
-  });
-  
-  let tapStartX = 0;
-  let tapStartY = 0;
-  let tapStartedWithMultiTouch = false;
-  
-  lbImg?.addEventListener("pointerdown", (e) => {
-    tapStartX = e.clientX || 0;
-    tapStartY = e.clientY || 0;
-    tapStartedWithMultiTouch = false;
-  });
-  
-  lbImg?.addEventListener("touchstart", (e) => {
-    tapStartedWithMultiTouch = e.touches.length > 1;
-  }, { passive: true });
-  
-  lbImg?.addEventListener("touchmove", (e) => {
-    if (e.touches.length > 1) {
-      tapStartedWithMultiTouch = true;
-    }
-  }, { passive: true });
-  
-  lbImg?.addEventListener("click", (e) => {
-    if (tapStartedWithMultiTouch) return;
-  
-    const dx = Math.abs((e.clientX || 0) - tapStartX);
-    const dy = Math.abs((e.clientY || 0) - tapStartY);
-  
-    if (dx > 8 || dy > 8) return;
-  
-    e.preventDefault();
-    e.stopPropagation();
-  
-    const rect = lbImg.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-  
-    if (x < rect.width / 2) {
-      moveLightbox(-1);
-    } else {
-      moveLightbox(1);
-    }
-  });
-  
-  document.addEventListener("keydown", (e) => {
-    if (!lightbox.classList.contains("open")) return;
-  
-    if (e.key === "Escape") closeLightbox();
-    if (e.key === "ArrowLeft") moveLightbox(-1);
-    if (e.key === "ArrowRight") moveLightbox(1);
-  });
   
   async function loadGallery() {
     try {

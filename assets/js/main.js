@@ -17,7 +17,10 @@ function initGalleryLightbox() {
   let index = 0;
   let slides = [];
   let touchStartX = 0;
+  let touchStartY = 0;
   let dragging = false;
+  let ignoreTouchGesture = false;
+  let suppressImageClickUntil = 0;
   let dx = 0;
 
   function updateCounter() {
@@ -105,6 +108,17 @@ function initGalleryLightbox() {
     closeLightbox();
   });
 
+  track.addEventListener("click", (e) => {
+    const activeImg = track.children[index];
+    if (!activeImg || e.target !== activeImg) return;
+    if (Date.now() < suppressImageClickUntil) return;
+
+    const rect = activeImg.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    if (clickX < rect.width / 2) prev();
+    else next();
+  });
+
   // close when clicking anywhere outside the current image
   lb.addEventListener("click", (e) => {
     const activeImg = track.children[index];
@@ -125,21 +139,53 @@ function initGalleryLightbox() {
 
   viewport.addEventListener("touchstart", (e) => {
     if (!lb.classList.contains("open")) return;
+
+    if (e.touches.length !== 1) {
+      dragging = false;
+      ignoreTouchGesture = true;
+      suppressImageClickUntil = Date.now() + 400;
+      return;
+    }
+
     dragging = true;
+    ignoreTouchGesture = false;
     touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
     dx = 0;
     track.style.transition = "none";
   }, { passive: true });
 
   viewport.addEventListener("touchmove", (e) => {
-    if (!dragging) return;
+    if (!dragging || ignoreTouchGesture) return;
+
+    if (e.touches.length !== 1) {
+      dragging = false;
+      ignoreTouchGesture = true;
+      suppressImageClickUntil = Date.now() + 400;
+      goTo(index);
+      return;
+    }
 
     dx = e.touches[0].clientX - touchStartX;
+    const dy = e.touches[0].clientY - touchStartY;
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      suppressImageClickUntil = Date.now() + 400;
+    }
+    if (Math.abs(dy) > Math.abs(dx) * 1.25) return;
+
     const w = viewport.getBoundingClientRect().width || 1;
     track.style.transform = `translateX(${(-index * w) + dx}px)`;
   }, { passive: true });
 
   viewport.addEventListener("touchend", () => {
+    if (ignoreTouchGesture) {
+      dragging = false;
+      ignoreTouchGesture = false;
+      dx = 0;
+      goTo(index);
+      return;
+    }
+
     if (!dragging) return;
     dragging = false;
 
@@ -149,6 +195,13 @@ function initGalleryLightbox() {
     if (dx < -threshold) next();
     else if (dx > threshold) prev();
     else goTo(index);
+  });
+
+  viewport.addEventListener("touchcancel", () => {
+    dragging = false;
+    ignoreTouchGesture = false;
+    dx = 0;
+    goTo(index);
   });
 
   window.addEventListener("resize", () => {
@@ -211,7 +264,7 @@ if (document.readyState === "loading") {
 
   function renderPreview(photos) {
     preview.innerHTML = photos.map((photo, index) => {
-      const alt = `${photo.label} restoration photo ${index + 1}`;
+      const alt = `${photo.label} glove work photo ${index + 1}`;
       return `
         <button
           class="gallery-thumb"

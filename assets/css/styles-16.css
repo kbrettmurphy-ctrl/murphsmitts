@@ -1069,13 +1069,31 @@ hr.rule{
 }
 
 .gallery-group{
-  margin-top: 34px;
+  padding: var(--space-7) 0;
+  border-top: 1px solid var(--mm-border);
   scroll-margin-top: calc(var(--headerH) + 24px);
 }
 
 /* =========================
    GALLERY
    ========================= */
+
+.gallery-page{
+  max-width: var(--max-content);
+  padding-bottom: var(--space-8);
+}
+
+.gallery-status{
+  margin: var(--space-5) 0 0;
+}
+
+.gallery-status:empty{
+  display:none;
+}
+
+#dynamicGallery{
+  margin-top: var(--space-7);
+}
 
 .gallery-grid{
   display:grid;
@@ -1095,21 +1113,10 @@ hr.rule{
 }
 .gallery-grid img:hover{transform: scale(1.01); filter: brightness(.98)}
 
-.gallery-group{
-  margin-top: 34px;
-}
-
-.gallery-group h2{
-  margin: 0 0 12px;
-  color: var(--navy);
-  font-weight: 600;
-  font-size: clamp(20px, 3vw, 28px);
-}
-
 .lightbox{
   position: fixed;
   inset: 0;
-  background: rgba(2,11,18,.86);
+  background: rgba(2,11,18,.88);
   display: none;
   align-items: center;
   justify-content: center;
@@ -1125,23 +1132,26 @@ hr.rule{
   display:flex;
   align-items:center;
   justify-content:center;
+  overflow:hidden;
 }
 
-.lb-card{
+.lb-track{
   width:100%;
   height:100%;
   display:flex;
   align-items:center;
-  justify-content:center;
+  will-change:transform;
 }
 
-.lb-img{
+.lb-track img{
+  flex:0 0 100%;
+  width:100%;
+  height:100%;
   max-width:100%;
   max-height:100%;
   object-fit:contain;
   display:block;
-
-  touch-action:auto;
+  touch-action:pan-y pinch-zoom;
   user-select:none;
   -webkit-user-drag:none;
   -webkit-touch-callout:none;
@@ -1200,6 +1210,65 @@ hr.rule{
 }
 
 .lb-counter{ opacity:.85; }
+
+.gallery-cta{
+  display:grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-6);
+  align-items:center;
+  padding: var(--space-7) 0 0;
+  border-top: 1px solid var(--mm-border);
+}
+
+.gallery-cta .mm-section-intro{
+  margin-bottom:0;
+}
+
+.gallery-actions{
+  display:flex;
+  gap: var(--space-3);
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+@media (max-width:820px){
+  .gallery-cta{
+    grid-template-columns:1fr;
+  }
+
+  .gallery-actions{
+    justify-content:flex-start;
+  }
+}
+
+@media (max-width:700px){
+  .gallery-page{
+    padding-bottom: var(--space-7);
+  }
+
+  #dynamicGallery{
+    margin-top: var(--space-6);
+  }
+
+  .gallery-group{
+    padding: var(--space-6) 0;
+  }
+
+  .gallery-cta{
+    padding-top: var(--space-6);
+  }
+
+  .gallery-actions{
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  .gallery-page .btn{
+    min-height:44px;
+    padding:10px 14px;
+    font-size: var(--text-xs);
+  }
+}
 
 /* =========================
    PROCESS PAGE
