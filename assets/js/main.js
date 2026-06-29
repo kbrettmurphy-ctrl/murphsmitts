@@ -328,6 +328,280 @@ if (document.readyState === "loading") {
 })();
 
 // =========================
+// Public lace inventory
+// =========================
+function initPublicLaceInventory() {
+  const servicesGrid = document.querySelector("[data-customer-lace-grid]");
+  const contactReference = document.querySelector("[data-customer-lace-reference]");
+  const laceSelects = Array.from(document.querySelectorAll("[data-lace-select]"));
+
+  if (!servicesGrid && !contactReference && !laceSelects.length) return;
+
+  const OUT_OF_STOCK_THRESHOLD = 3;
+  const PHOTO_BASE_PATH = "/assets/img/lace/";
+  const PHOTO_EXTENSIONS = [".png", ".jpeg", ".jpg"];
+  const FALLBACK_LACE_VALUE = "Discuss lace color after review";
+  const LEGACY_PHOTO_SLUGS = new Map([
+    ["blue - carolina", "carolinablue"],
+    ["blue - navy", "navyblue"],
+    ["blue - royal", "royalblue"],
+    ["brown - chocolate", "darkbrown"],
+    ["red - dark", "darkred"],
+    ["tan - camel", "camel"],
+    ["tan - indian", "indiantan"],
+    ["tan - japan", "japantan"]
+  ]);
+  const LABEL_OVERRIDES = new Map([
+    ["blue - carolina", "Carolina Blue"],
+    ["blue - navy", "Navy Blue"],
+    ["blue - royal", "Royal Blue"],
+    ["brown - chocolate", "Chocolate"],
+    ["red - dark", "Dark Red"],
+    ["tan - camel", "Camel"],
+    ["tan - indian", "Indian Tan"],
+    ["tan - japan", "Japan Tan"]
+  ]);
+  const SORT_ORDER = new Map([
+    ["black", 10],
+    ["gray", 20],
+    ["tan - camel", 30],
+    ["tan - indian", 40],
+    ["tan - japan", 50],
+    ["brown - chocolate", 60],
+    ["blue - carolina", 80],
+    ["blue - royal", 90],
+    ["blue - navy", 100],
+    ["red", 110],
+    ["red - dark", 120],
+    ["orange", 130],
+    ["yellow", 140]
+  ]);
+
+  function normalizeColor(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\u2013|\u2014/g, "-")
+      .replace(/\s*-\s*/g, " - ")
+      .replace(/\s+/g, " ");
+  }
+
+  function slugifyColor(value) {
+    return normalizeColor(value)
+      .replace(/&/g, " and ")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
+
+  function titleCase(value) {
+    return String(value || "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(word => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+      .join(" ");
+  }
+
+  function labelForColor(color) {
+    const normalized = normalizeColor(color);
+    if (LABEL_OVERRIDES.has(normalized)) return LABEL_OVERRIDES.get(normalized);
+
+    const parts = normalized.split(" - ");
+    if (parts.length === 2) return `${titleCase(parts[1])} ${titleCase(parts[0])}`;
+
+    return titleCase(normalized);
+  }
+
+  function shouldHideColor(color) {
+    const normalized = normalizeColor(color);
+    return normalized.includes("pink") || normalized.includes("vintage");
+  }
+
+  function photoSlugForColor(color) {
+    const normalized = normalizeColor(color);
+    return LEGACY_PHOTO_SLUGS.get(normalized) || slugifyColor(color);
+  }
+
+  function loadImage(src) {
+    return new Promise(resolve => {
+      const image = new Image();
+      image.onload = () => resolve(src);
+      image.onerror = () => resolve("");
+      image.src = src;
+    });
+  }
+
+  async function resolvePhotoSource(color) {
+    const slug = photoSlugForColor(color);
+    if (!slug) return "";
+
+    for (const extension of PHOTO_EXTENSIONS) {
+      const src = `${PHOTO_BASE_PATH}${slug}${extension}`;
+      const loaded = await loadImage(src);
+      if (loaded) return loaded;
+    }
+
+    return "";
+  }
+
+  function stockState(item) {
+    return item.quantity < OUT_OF_STOCK_THRESHOLD
+      ? { state: "out", label: "Out of stock" }
+      : { state: "in", label: "In stock" };
+  }
+
+  function createStatusMessage(text) {
+    const message = document.createElement("div");
+    message.className = "mm-status-message lace-loading";
+    message.textContent = text;
+    return message;
+  }
+
+  function createLaceSwatch(item) {
+    const status = stockState(item);
+    const figure = document.createElement("figure");
+    figure.className = "mm-lace-swatch lace-item";
+    figure.dataset.laceColor = item.value;
+    figure.dataset.stockState = status.state;
+
+    const image = document.createElement("img");
+    image.src = item.photo;
+    image.alt = `${item.label} lace`;
+    image.loading = "lazy";
+
+    const caption = document.createElement("figcaption");
+    caption.className = "lace-label";
+    caption.textContent = item.label;
+
+    const badge = document.createElement("span");
+    badge.className = `mm-availability-badge mm-availability-badge--${status.state}`;
+    badge.dataset.laceStatus = "";
+    badge.textContent = status.label;
+
+    figure.append(image, caption, badge);
+    return figure;
+  }
+
+  function renderGrid(container, items) {
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    if (!items.length) {
+      container.appendChild(createStatusMessage("Lace colors are unavailable right now. Submit the request and we can confirm color after review."));
+      return;
+    }
+
+    items.forEach(item => {
+      container.appendChild(createLaceSwatch(item));
+    });
+  }
+
+  function renderSelect(select, items) {
+    const previousValue = select.value;
+    const isSecondary = select.dataset.laceSelect === "secondary";
+    const placeholderText = isSecondary
+      ? "Only if multi-colors wanted"
+      : "Choose";
+
+    select.innerHTML = "";
+
+    if (!items.length) {
+      if (isSecondary) {
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "No accent color selected";
+        select.appendChild(placeholder);
+      }
+
+      const fallback = document.createElement("option");
+      fallback.value = FALLBACK_LACE_VALUE;
+      fallback.textContent = FALLBACK_LACE_VALUE;
+      select.appendChild(fallback);
+
+      select.value = previousValue === FALLBACK_LACE_VALUE || !isSecondary
+        ? FALLBACK_LACE_VALUE
+        : "";
+      return;
+    }
+
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = placeholderText;
+    select.appendChild(placeholder);
+
+    items.forEach(item => {
+      const option = document.createElement("option");
+      option.value = item.value;
+      option.textContent = item.label;
+      select.appendChild(option);
+    });
+
+    if (previousValue && items.some(item => item.value === previousValue)) {
+      select.value = previousValue;
+    }
+  }
+
+  async function getCustomerLaceColors() {
+    const res = await fetch("/api/lace-inventory", { cache: "no-store" });
+    const data = await res.json();
+
+    if (!res.ok || !data.ok || !Array.isArray(data.inventory)) {
+      throw new Error("Lace inventory unavailable.");
+    }
+
+    const seen = new Set();
+    const colors = await Promise.all(data.inventory.map(async item => {
+      const value = String(item.color || "").trim();
+      const normalized = normalizeColor(value);
+
+      if (!value || seen.has(normalized) || item.active === false || shouldHideColor(value)) {
+        return null;
+      }
+
+      seen.add(normalized);
+
+      const photo = await resolvePhotoSource(value);
+      if (!photo) return null;
+
+      return {
+        value,
+        normalized,
+        label: labelForColor(value),
+        photo,
+        quantity: Number(item.quantity_on_hand ?? 0)
+      };
+    }));
+
+    return colors
+      .filter(Boolean)
+      .sort((a, b) => {
+        const aOrder = SORT_ORDER.get(a.normalized) ?? 1000;
+        const bOrder = SORT_ORDER.get(b.normalized) ?? 1000;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        return a.label.localeCompare(b.label);
+      });
+  }
+
+  getCustomerLaceColors()
+    .then(items => {
+      renderGrid(servicesGrid, items);
+      renderGrid(contactReference, items);
+      laceSelects.forEach(select => renderSelect(select, items));
+    })
+    .catch(() => {
+      renderGrid(servicesGrid, []);
+      renderGrid(contactReference, []);
+      laceSelects.forEach(select => renderSelect(select, []));
+    });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initPublicLaceInventory);
+} else {
+  initPublicLaceInventory();
+}
+
+// =========================
 // Lace tap toggle (mobile)
 // =========================
 (() => {

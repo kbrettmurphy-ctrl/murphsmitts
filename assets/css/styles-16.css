@@ -1459,6 +1459,11 @@ hr.rule{
   filter: grayscale(.25) opacity(.62);
 }
 
+.lace-loading{
+  grid-column:1 / -1;
+  margin:0;
+}
+
 @media (max-width: 700px){
   .service-list,
   .service-list-primary{
@@ -2133,6 +2138,10 @@ footer{
   margin:0;
 }
 
+.form-lace-reference-grid .mm-lace-swatch{
+  padding:var(--space-2);
+}
+
 .form-lace-reference-grid img{
   display:block;
   width:100%;
@@ -2148,6 +2157,12 @@ footer{
   font-size:var(--text-xs);
   font-weight:800;
   line-height:1.2;
+}
+
+.form-lace-reference-grid .mm-availability-badge{
+  min-height:22px;
+  padding:4px 7px;
+  font-size:10px;
 }
 
 .lace-select-grid{
