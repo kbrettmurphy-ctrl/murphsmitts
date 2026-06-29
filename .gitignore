@@ -6,3 +6,9 @@
 !.env.example
 .supabase.env
 supabase.env
+
+# Jekyll local build output
+_site/
+.jekyll-cache/
+.sass-cache/
+.jekyll-metadata

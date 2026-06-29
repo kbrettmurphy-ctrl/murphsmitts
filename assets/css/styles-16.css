@@ -2096,29 +2096,37 @@ footer{
 
 .inline-lace-reference{
   margin:0 0 var(--space-4);
-  border:1px solid var(--mm-border);
-  border-radius:var(--radius-md);
-  background:rgba(255, 250, 243, .72);
-  overflow:hidden;
+  border:0;
+  background:transparent;
 }
 
 .inline-lace-reference summary{
   cursor:pointer;
-  padding:12px 14px;
+  display:inline-flex;
+  align-items:center;
+  gap:var(--space-1);
+  padding:0;
   color:var(--mm-navy);
-  font-weight:800;
-  list-style-position:inside;
+  font-size:var(--text-sm);
+  font-weight:700;
+  line-height:1.35;
+  text-underline-offset:4px;
+  list-style-position:outside;
 }
 
 .inline-lace-reference summary:hover{
-  background:rgba(9, 47, 77, .05);
+  text-decoration:underline;
 }
 
 .form-lace-reference-grid{
   display:grid;
   grid-template-columns:repeat(auto-fill, minmax(92px, 1fr));
   gap:var(--space-3);
-  padding:0 var(--space-4) var(--space-4);
+  margin-top:var(--space-3);
+  padding:var(--space-3);
+  border:1px solid var(--mm-border);
+  border-radius:var(--radius-md);
+  background:rgba(255, 250, 243, .58);
 }
 
 .form-lace-reference-grid figure{
