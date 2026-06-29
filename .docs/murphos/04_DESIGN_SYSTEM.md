@@ -1,6 +1,6 @@
 # MurphOS Design System
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Locked
 **Last Updated:** June 2026
 
@@ -170,7 +170,9 @@ Red is reserved for:
 
 Red should not be a normal call-to-action color.
 
-If everything is red, nothing is urgent. Humanity keeps learning this the hard way.
+If everything is red, nothing is urgent.
+
+Humanity keeps learning this the hard way.
 
 ---
 
@@ -186,8 +188,8 @@ Typography should guide attention without shouting.
 
 MurphOS uses two font roles:
 
-* **Brand Font**
-* **Interface Font**
+* Brand Font
+* Interface Font
 
 Montserrat remains part of the Murph's Mitts identity, but it should not carry every word of the interface.
 
@@ -234,7 +236,9 @@ Use the interface font for:
 * Admin interface text.
 * Customer-facing instructional text.
 
-System fonts feel native, load quickly, and reduce friction. They support the MurphOS goal of making the interface feel effortless.
+System fonts feel native, load quickly, and reduce friction.
+
+They support the MurphOS goal of making the interface feel effortless.
 
 ## Font Usage
 
@@ -276,12 +280,13 @@ Avoid overusing bold text.
 
 Montserrat Light may be used only for large display moments if it remains readable.
 
-Montserrat Condensed should not be used as a primary interface or body font. It may be considered only for rare brand or label moments where a condensed style has a clear purpose.
+Montserrat Condensed should not be used as a primary interface or body font.
+
+It may be considered only for rare brand or label moments where a condensed style has a clear purpose.
 
 Readability wins.
 
 Always.
-
 
 ## Type Scale
 
@@ -450,6 +455,7 @@ Internal tools may be denser when density improves speed.
 * Let each section have one clear purpose.
 * Avoid visual clutter around primary content.
 * Use consistent max-widths.
+* Surface important decision-support content near the relevant decision.
 
 ## Suggested Section Spacing
 
@@ -485,7 +491,11 @@ Suggested values:
 
 Long text should not span the full page width.
 
-Readable line length matters. Apparently eyeballs have limits. Who knew.
+Readable line length matters.
+
+Apparently eyeballs have limits.
+
+Who knew.
 
 ---
 
@@ -560,6 +570,7 @@ Good for:
 * View gallery.
 * Read FAQs.
 * Supporting navigation.
+* View available lace colors.
 
 Text links should be clear and accessible.
 
@@ -594,6 +605,7 @@ Cards are useful, but they should not be the default wrapper for every section.
 * Gallery items.
 * Order/admin items.
 * Important callouts.
+* Choice groups where comparison is important.
 
 ## Avoid Cards For
 
@@ -653,6 +665,7 @@ They should not feel like paperwork.
 * Avoid unnecessary fields.
 * Show clear confirmation after submission.
 * Show useful errors when something goes wrong.
+* Use visual choice inputs when the option is visual.
 
 ## Inputs
 
@@ -678,6 +691,129 @@ Do not expose technical errors unless the user is an admin and the detail is use
 
 ---
 
+# Choice Support Components
+
+Some interface elements exist to help the customer make a decision.
+
+These should be designed as decision tools, not decorative content.
+
+Examples:
+
+* Lace color swatches.
+* Service option selectors.
+* For-sale glove cards.
+* Photo selectors.
+* Availability indicators.
+* Shipping vs local delivery choices.
+
+Choice support components should be:
+
+* Easy to scan.
+* Close to the decision point.
+* Clearly labeled.
+* Consistent.
+* Accessible.
+* Honest.
+* Quiet, but visible.
+
+A choice support component should reduce guessing.
+
+If it makes the customer remember information from another page, it is not doing enough work.
+
+---
+
+# Lace Color Swatches
+
+Lace color swatches are a core MurphOS component.
+
+They help customers choose primary and secondary lace colors.
+
+They should not be treated as a buried image gallery.
+
+## Lace Swatch Uses
+
+Use lace swatches:
+
+* Near relacing service information.
+* In the service request form.
+* Near primary and secondary lace color fields.
+* In a dedicated lace color section.
+* In admin order views when showing selected colors.
+* Anywhere color choice affects customer confidence.
+
+## Lace Swatch Style
+
+Recommended visual structure:
+
+```css
+background: var(--mm-surface);
+border: 1px solid rgba(9, 47, 77, 0.12);
+border-radius: var(--radius-lg);
+overflow: hidden;
+```
+
+Swatch image:
+
+```css
+aspect-ratio: 1 / 1;
+object-fit: cover;
+```
+
+Swatch label:
+
+```css
+font-size: var(--text-sm);
+font-family: var(--font-brand);
+font-weight: 500;
+color: var(--mm-navy);
+```
+
+Availability text:
+
+```css
+font-size: var(--text-xs);
+font-family: var(--font-ui);
+color: rgba(2, 11, 18, 0.68);
+```
+
+## Lace Swatch Rules
+
+* Show the color name clearly.
+* Do not rely on color alone.
+* Show availability when helpful.
+* Keep swatch photos visually consistent.
+* Avoid mixed label treatments.
+* Avoid inconsistent image sizes.
+* Avoid forcing customers to scroll sideways on desktop unless the layout clearly supports it.
+* On mobile, horizontal scrolling may be acceptable if obvious and smooth.
+* In forms, selected swatches should have a clear selected state.
+
+## Selected State
+
+A selected lace color should feel obvious but not loud.
+
+Recommended selected treatment:
+
+```css
+border: 2px solid var(--mm-navy);
+box-shadow: 0 0 0 3px rgba(9, 47, 77, 0.10);
+```
+
+## Unavailable State
+
+Unavailable colors should remain visible if customers can still request them, but their status must be clear.
+
+Recommended unavailable treatment:
+
+* Slightly reduced opacity.
+* Clear `Out of stock` label.
+* Optional note if special order is possible.
+* Do not hide colors unless they should not be requested.
+
+Customers should understand the option, not solve a tiny inventory riddle because the website got shy.
+
+---
+
 # Navigation
 
 Navigation should feel effortless.
@@ -692,6 +828,8 @@ It should be visible, consistent, and easy to use without demanding attention.
 * Make the active location clear.
 * Keep labels short and obvious.
 * Do not make customers hunt for the next step.
+* Use anchor links for deep sections when helpful.
+* Do not rely on anchor links as the only way to surface important decisions.
 
 Customer-facing navigation should be quiet and refined.
 
@@ -742,6 +880,14 @@ Hero images:
 large scale;
 strong composition;
 minimal text overlap when possible;
+```
+
+Lace color images:
+
+```css
+aspect-ratio: 1 / 1;
+object-fit: cover;
+border-radius: var(--radius-lg);
 ```
 
 Patina should remain visible.
@@ -846,6 +992,7 @@ Mobile is not a compressed desktop site.
 * Keep forms easy to complete.
 * Avoid horizontal scrolling unless the interaction specifically requires it.
 * Use enough spacing between tap targets.
+* Make visual choice components easy to compare.
 
 Minimum tap target:
 
@@ -860,6 +1007,7 @@ Minimum tap target:
 * Let imagery carry more of the page.
 * Use whitespace intentionally.
 * Avoid filling space just because it exists.
+* Avoid unnecessary horizontal scrolling when a grid would make comparison easier.
 
 ---
 
@@ -884,6 +1032,8 @@ Use more whitespace.
 Use fewer controls.
 
 Use photography prominently.
+
+Surface customer choices where the decision happens.
 
 ---
 
@@ -923,6 +1073,8 @@ Both must feel intentional.
 * Let photography carry the page.
 * Keep primary actions obvious.
 * Make the next step clear.
+* Show visual choices visually.
+* Put choice-support content near the customer decision.
 
 ## Don't
 
@@ -936,6 +1088,8 @@ Both must feel intentional.
 * Make type huge just to create emphasis.
 * Let the interface compete with the glove.
 * Create one-off styles unless absolutely necessary.
+* Bury customer decision tools at the bottom of unrelated sections.
+* Force customers to remember options from another page.
 
 ---
 
@@ -945,7 +1099,7 @@ This document defines the system.
 
 Actual CSS variables, utility classes, and reusable components should be implemented in the codebase according to these standards.
 
-When implementing or refactoring, Codex and future developers should reference this document before introducing new colors, spacing values, typography sizes, button styles, card treatments, or layout patterns.
+When implementing or refactoring, Codex and future developers should reference this document before introducing new colors, spacing values, typography sizes, button styles, card treatments, choice components, image treatments, or layout patterns.
 
 If a new visual pattern is needed, it should either fit this system or justify why the system must evolve.
 
@@ -965,6 +1119,6 @@ Clean, but not empty.
 
 Every element should feel like it belongs.
 
-Every visual decision should reduce friction, build trust, or showcase craftsmanship.
+Every visual decision should reduce friction, build trust, showcase craftsmanship, or support a customer decision.
 
 That is the MurphOS Design System.
