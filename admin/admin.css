@@ -693,13 +693,9 @@ button.secondary{
 }
 
 .map-header-row h2{
-  margin:0;
+  margin:0 0 6px;
   color:var(--cream);
   font-size:1.1rem;
-}
-
-#mapStatus{
-  margin:6px 0 0;
 }
 
 .order-map{

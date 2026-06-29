@@ -57,7 +57,6 @@ let listScrollY = 0;
 let orderMap = null;
 let orderMapMarkers = null;
 let mapRenderToken = 0;
-let mapStatusTimer = null;
 
 window.inventoryNeedsOrderOnly = false;
 
@@ -2460,54 +2459,17 @@ function clearTextSelection() {
   }
 }
 
-function setMapStatusMessage(message, options = {}) {
-  if (!mapStatus) return;
-
-  if (mapStatusTimer) {
-    clearTimeout(mapStatusTimer);
-    mapStatusTimer = null;
-  }
-
-  const text = String(message || "").trim();
-  if (!text) {
-    hideMapStatusMessage();
-    return;
-  }
-
-  mapStatus.textContent = text;
-  mapStatus.hidden = false;
-
-  if (options.temporary) {
-    mapStatusTimer = setTimeout(() => {
-      if (mapStatus.textContent === text) {
-        hideMapStatusMessage();
-      }
-    }, options.duration || 4000);
-  }
-}
-
-function hideMapStatusMessage() {
-  if (mapStatusTimer) {
-    clearTimeout(mapStatusTimer);
-    mapStatusTimer = null;
-  }
-
-  if (!mapStatus) return;
-  mapStatus.textContent = "";
-  mapStatus.hidden = true;
-}
-
 async function renderMapView() {
   const token = ++mapRenderToken;
 
   if (!mapView || !orderMapEl) return;
 
-  hideMapStatusMessage();
+  if (mapStatus) mapStatus.textContent = "Preparing map...";
   if (mapCount) mapCount.textContent = "Customer reach";
   renderUnmappedAddresses([]);
 
   if (!window.L) {
-    setMapStatusMessage("Map library failed to load.");
+    if (mapStatus) mapStatus.textContent = "Map library failed to load.";
     return;
   }
 
@@ -2516,7 +2478,7 @@ async function renderMapView() {
   if (!orders.length) {
     initOrderMap();
     orderMapMarkers.clearLayers();
-    setMapStatusMessage("No shipped addresses found.");
+    if (mapStatus) mapStatus.textContent = "No shipped addresses found.";
     if (mapCount) mapCount.textContent = "0 addresses";
     return;
   }
@@ -2531,6 +2493,7 @@ async function renderMapView() {
   if (mapCount) mapCount.textContent = `${orders.length} address${orders.length === 1 ? "" : "es"}`;
 
   if (storedItems.length) {
+    if (mapStatus) mapStatus.textContent = `Using ${storedItems.length} saved location${storedItems.length === 1 ? "" : "s"}.`;
     renderOrderMapMarkers(storedItems, token, {
       includeFailures: false,
       updateStatus: false,
@@ -2546,7 +2509,7 @@ async function renderMapView() {
 
   let geocodeResults = new Map();
   if (needsGeocode.length) {
-    setMapStatusMessage(`Resolving ${needsGeocode.length} new/changed address${needsGeocode.length === 1 ? "" : "es"}...`);
+    if (mapStatus) mapStatus.textContent = `Resolving ${needsGeocode.length} new/changed address${needsGeocode.length === 1 ? "" : "es"}...`;
     geocodeResults = await geocodeMissingMapAddresses(needsGeocode, token);
     if (token !== mapRenderToken) return;
   }
@@ -2556,16 +2519,11 @@ async function renderMapView() {
     .map(item => applyTransientMapGeocodeResult(item, geocodeResults))
     .map(applyLocalMapCacheFallback);
   const finalRender = renderOrderMapMarkers(finalItems, token, {
-    total: finalItems.length,
-    updateStatus: false
+    total: finalItems.length
   });
 
-  if (needsGeocode.length && finalRender) {
-    setMapStatusMessage(getMapStatusText(finalRender.mapped, finalItems.length, finalRender.failures.length), {
-      temporary: true
-    });
-  } else {
-    hideMapStatusMessage();
+  if (!needsGeocode.length && storedItems.length && finalRender && mapStatus) {
+    mapStatus.textContent = `Using ${storedItems.length} saved location${storedItems.length === 1 ? "" : "s"}. ${getMapStatusText(finalRender.mapped, finalItems.length, finalRender.failures.length)}`;
   }
 }
 
@@ -2776,11 +2734,8 @@ async function geocodeMissingMapAddresses(items, token) {
     mergeMapGeocodeResults(data.results || {});
     return new Map(Object.entries(data.results || {}));
   } catch (err) {
-    if (token === mapRenderToken) {
-      setMapStatusMessage(`Server geocoding failed. ${err.message || "Using saved locations."}`, {
-        temporary: true,
-        duration: 6000
-      });
+    if (mapStatus && token === mapRenderToken) {
+      mapStatus.textContent = `Server geocoding failed. ${err.message || "Using saved locations."}`;
     }
     return new Map();
   }
@@ -3888,7 +3843,7 @@ addSaleGloveBtn?.addEventListener("click", () => {
 mapMenuBtn?.addEventListener("click", openMenu);
 
 mapRefreshBtn?.addEventListener("click", async () => {
-  setMapStatusMessage("Refreshing orders...");
+  if (mapStatus) mapStatus.textContent = "Refreshing orders...";
   await loadOrders();
   renderMapView();
 });
