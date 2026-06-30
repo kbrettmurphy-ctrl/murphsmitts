@@ -1,21 +1,43 @@
 ---
 layout: default
 title: Gloves For Sale
-description: Restored and game-ready gloves available now.
+description: Clean, serviced gloves available from Murph's Mitt Maintenance.
 nav: for-sale
-body_class: for-sale
+body_class: inner for-sale
 ---
 
-<main class="sale-page">
+<main class="container page page-under-header sale-page">
 
-  <header class="page-header">
-    <h1>Gloves For Sale</h1>
-    <p>Restored and game-ready gloves available now.</p>
+  <header class="sale-hero mm-section-intro">
+    <p class="mm-eyebrow">Gloves For Sale</p>
+    <h1 class="mm-section-title">Available gloves from the bench</h1>
+    <p class="mm-section-copy">A small selection of baseball and softball gloves that have been cleaned, serviced, photographed, and listed with the details I have on hand.</p>
   </header>
 
-  <div id="saleGloveGrid" class="sale-grid">
-    Loading...
-  </div>
+  <section class="sale-section" aria-labelledby="sale-listings-title">
+    <div class="mm-section-intro">
+      <p class="mm-eyebrow">Current Listings</p>
+      <h2 id="sale-listings-title" class="mm-section-title">Gloves available now</h2>
+      <p class="mm-section-copy">Open a listing for more photos, condition notes, price, and the next step to buy or ask a question.</p>
+    </div>
+
+    <div id="saleGloveGrid" class="sale-grid" aria-live="polite">
+      <div class="mm-status-message">Loading gloves...</div>
+    </div>
+  </section>
+
+  <section class="mm-final-cta" aria-labelledby="sale-cta-title">
+    <div class="mm-section-intro">
+      <p class="mm-eyebrow">Need Work Instead?</p>
+      <h2 id="sale-cta-title" class="mm-section-title">Send the glove details when you are ready.</h2>
+      <p class="mm-section-copy">If you already have a glove that needs lace, cleaning, conditioning, or a smaller repair, start with a service request.</p>
+    </div>
+
+    <div class="mm-final-actions">
+      <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Start a Service Request</a>
+      <a class="btn btn-secondary" href="{{ '/services/' | relative_url }}">View Services</a>
+    </div>
+  </section>
 
 </main>
 

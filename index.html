@@ -195,19 +195,15 @@ body_class: home
     </div>
   </section>
 
-  <section class="home-section home-final-section">
-    <div class="container">
-      <div class="home-final-cta">
-        <div class="mm-section-intro">
-          <p class="mm-eyebrow">Ready When You Are</p>
-          <h2 class="mm-section-title">Have a glove that needs attention?</h2>
-          <p class="mm-section-copy">Send the details, choose local drop-off or mail-in service, and I’ll follow up with the next step.</p>
-        </div>
-        <div class="home-final-actions">
-          <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Start a Service Request</a>
-          <a class="btn btn-secondary" href="{{ '/services/' | relative_url }}">Compare Services</a>
-        </div>
-      </div>
+  <section class="container mm-final-cta" aria-labelledby="home-final-title">
+    <div class="mm-section-intro">
+      <p class="mm-eyebrow">Ready When You Are</p>
+      <h2 id="home-final-title" class="mm-section-title">Have a glove that needs attention?</h2>
+      <p class="mm-section-copy">Send the details, choose local drop-off or mail-in service, and I’ll follow up with the next step.</p>
+    </div>
+    <div class="mm-final-actions">
+      <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Start a Service Request</a>
+      <a class="btn btn-secondary" href="{{ '/services/' | relative_url }}">Compare Services</a>
     </div>
   </section>
 

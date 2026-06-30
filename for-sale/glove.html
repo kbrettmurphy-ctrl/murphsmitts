@@ -1,184 +1,28 @@
 ---
 layout: default
 title: Glove Details
-description: Restored glove listing from Murph's Mitt Maintenance.
+description: Glove listing from Murph's Mitt Maintenance.
 nav: for-sale
-body_class: for-sale
+body_class: inner for-sale
 ---
 
-<main class="page">
-  <div class="container">
-    <div id="gloveDetail">
-      Loading...
-    </div>
+<main class="container page page-under-header sale-page sale-detail-page">
+  <div id="gloveDetail">
+    <div class="mm-status-message">Loading glove details...</div>
   </div>
+
+  <section class="mm-final-cta" aria-labelledby="sale-detail-cta-title">
+    <div class="mm-section-intro">
+      <p class="mm-eyebrow">Have a Glove to Service?</p>
+      <h2 id="sale-detail-cta-title" class="mm-section-title">Send the glove details when you are ready.</h2>
+      <p class="mm-section-copy">If you are looking for relacing, cleaning, conditioning, or targeted lace work, start with a service request.</p>
+    </div>
+
+    <div class="mm-final-actions">
+      <a class="btn btn-primary" href="{{ '/contact/?tab=service' | relative_url }}">Start a Service Request</a>
+      <a class="btn btn-secondary" href="{{ '/for-sale/' | relative_url }}">Back to Gloves</a>
+    </div>
+  </section>
 </main>
 
-<script>
-  async function loadGlove() {
-    const slug =
-      new URLSearchParams(location.search)
-        .get("slug");
-
-    const container =
-      document.getElementById("gloveDetail");
-
-    if (!slug) {
-      container.innerHTML = "<p>Glove not found.</p>";
-      return;
-    }
-
-    try {
-      const resp = await fetch("/api/gloves-for-sale");
-      const data = await resp.json();
-
-      const glove =
-        data.gloves.find(g => g.slug === slug);
-
-      if (!glove) {
-        container.innerHTML = "<p>Glove not found.</p>";
-        return;
-      }
-
-      container.innerHTML = `
-        <article class="sale-detail">
-      
-          <div class="sale-detail-gallery">
-            <div class="sale-slider" id="saleSlider">
-              <div class="sale-slider-track" id="saleSliderTrack">
-                ${(glove.photos?.length ? glove.photos : [{ url: glove.primaryPhoto }]).map(photo => `
-                  <div class="sale-slide">
-                    <img
-                      src="${photo.url || ""}"
-                      alt="${glove.title}"
-                    >
-                  </div>
-                `).join("")}
-              </div>
-            </div>
-          
-            <div class="sale-slider-dots" id="saleSliderDots">
-              ${(glove.photos?.length ? glove.photos : [{ url: glove.primaryPhoto }]).map((photo, index) => `
-                <button
-                  type="button"
-                  class="sale-slider-dot ${index === 0 ? "active" : ""}"
-                  data-slide="${index}"
-                  aria-label="Show photo ${index + 1}"
-                ></button>
-              `).join("")}
-            </div>
-          </div>
-      
-          <section class="sale-detail-info">
-            <h1>${glove.title}</h1>
-      
-            <p class="sale-detail-price">
-              $${Number(glove.price).toFixed(2)}
-            </p>
-      
-            <div class="glove-specs">
-              <div><strong>Brand:</strong> ${glove.brand}</div>
-              <div><strong>Model:</strong> ${glove.model}</div>
-              <div><strong>Size:</strong> ${glove.gloveSize ? `${glove.gloveSize}"` : ""}</div>
-              <div><strong>Position:</strong> ${glove.position}</div>
-              <div><strong>Web:</strong> ${glove.web}</div>
-              <div><strong>Throw Hand:</strong> ${glove.throwHand}</div>
-              <div><strong>Condition:</strong> ${glove.condition}</div>
-            </div>
-      
-            <div class="sale-detail-description">
-              ${
-                (glove.description || "")
-                  .replace(/\n\n/g, "<br><br>")
-                  .replace(/\n/g, "<br>")
-              }
-            </div>
-            
-            <div class="sale-detail-actions">
-              ${
-                glove.purchaseUrl
-                  ? `<a class="btn btn-primary" href="${glove.purchaseUrl}" target="_blank" rel="noopener">Buy This Glove</a>`
-                  : `<a class="btn btn-primary" href="/contact/?glove=${encodeURIComponent(glove.title)}">Ask About This Glove</a>`
-                }
-            
-              <a class="btn btn-secondary" href="/for-sale/">
-                Back to Gloves
-              </a>
-            </div>
-          </section>
-      
-        </article>
-      `;
-      initSaleSlider();
-    } catch (err) {
-      container.innerHTML = `<p>${err.message}</p>`;
-    }
-  }
-function initSaleSlider() {
-  const slider = document.getElementById("saleSlider");
-  const track = document.getElementById("saleSliderTrack");
-  const dots = Array.from(document.querySelectorAll(".sale-slider-dot"));
-
-  if (!slider || !track || !dots.length) return;
-
-  let current = 0;
-  let startX = 0;
-  let currentX = 0;
-  let dragging = false;
-
-  function goToSlide(index) {
-    current = Math.max(0, Math.min(dots.length - 1, index));
-    track.style.transform = `translateX(-${current * 100}%)`;
-
-    dots.forEach((dot, i) => {
-      dot.classList.toggle("active", i === current);
-    });
-  }
-
-  dots.forEach(dot => {
-    dot.addEventListener("click", () => {
-      goToSlide(Number(dot.dataset.slide || 0));
-    });
-  });
-
-  slider.addEventListener("click", e => {
-    const rect = slider.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-
-    if (x < rect.width / 2) {
-      goToSlide(current - 1);
-    } else {
-      goToSlide(current + 1);
-    }
-  });
-
-  slider.addEventListener("touchstart", e => {
-    startX = e.touches[0].clientX;
-    currentX = startX;
-    dragging = true;
-  }, { passive: true });
-
-  slider.addEventListener("touchmove", e => {
-    if (!dragging) return;
-    currentX = e.touches[0].clientX;
-  }, { passive: true });
-
-  slider.addEventListener("touchend", () => {
-    if (!dragging) return;
-    dragging = false;
-
-    const diff = currentX - startX;
-
-    if (Math.abs(diff) < 45) return;
-
-    if (diff < 0) {
-      goToSlide(current + 1);
-    } else {
-      goToSlide(current - 1);
-    }
-  });
-
-  goToSlide(0);
-}
-  loadGlove();
-</script>
+<script src="{{ '/for-sale/for-sale.js' | relative_url }}"></script>
