@@ -382,10 +382,10 @@ body.home.header-over-hero .site-nav a:hover{
 }
 
 .mm-final-cta{
-  display:grid;
-  grid-template-columns:minmax(0, 640px) minmax(220px, max-content);
-  gap: var(--space-6);
-  align-items:center;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap: var(--space-4);
   padding: var(--space-7) 0;
   border-top: 1px solid var(--mm-border);
 }
@@ -410,20 +410,14 @@ body.home.header-over-hero .site-nav a:hover{
 .mm-final-cta .mm-final-actions{
   display:flex;
   gap: var(--space-3);
-  flex-wrap:nowrap;
-  justify-content:flex-end;
+  flex-wrap:wrap;
+  justify-content:flex-start;
   margin:0;
 }
 
 @media (max-width: 900px){
   .mm-final-cta{
-    grid-template-columns:1fr;
     gap: var(--space-4);
-  }
-
-  .mm-final-cta .mm-final-actions{
-    justify-content:flex-start;
-    flex-wrap:wrap;
   }
 }
 
@@ -1081,11 +1075,6 @@ body.home .footer{margin-top:0;}
   align-items:start;
 }
 
-/* About page split ratios (desktop) */
-.about-split{
-  grid-template-columns: 1.45fr .55fr;
-}
-
 .card{
   background: rgba(218, 202, 177,.35);
   border: 1px solid rgba(9,47,77,.30);
@@ -1094,21 +1083,68 @@ body.home .footer{margin-top:0;}
 }
 
 /* =========================
-   ABOUT PHOTO (taller + controllable crop)
-   - Taller: adjust height below
-   - Crop position: tweak object-position %
+   ABOUT PHOTO
    ========================= */
 
-.about-photo { 
-  padding: 14px; 
-  height: 520px;              /* <-- taller photo on desktop */
+.about-page{
+  max-width: var(--max-content);
 }
-.about-photo img { 
-  width: 100%; 
-  height: 100%; 
-  display: block; 
-  object-fit: cover; 
-  object-position: 60% 15%;    /* <-- move what part shows (X% Y%). Example: 50% 10% */
+
+.about-hero{
+  margin-bottom: var(--space-5);
+}
+
+.about-layout{
+  display:grid;
+  grid-template-columns:minmax(260px, .72fr) minmax(0, 1fr);
+  gap: var(--space-7);
+  align-items:start;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--mm-border);
+}
+
+.about-story{
+  max-width: 760px;
+}
+
+.about-story p{
+  margin: 0;
+  color: var(--mm-ink-muted);
+  font-size: var(--text-md);
+  line-height: 1.68;
+}
+
+.about-story p + p{
+  margin-top: var(--space-4);
+}
+
+.about-story p:nth-of-type(4),
+.about-story p:nth-of-type(7){
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--mm-border);
+}
+
+.about-photo {
+  align-self:start;
+  margin: 0;
+  padding: var(--space-3);
+  height: auto;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  background: rgba(255, 250, 243, .54);
+  border: 1px solid var(--mm-border);
+  border-radius: var(--radius-md);
+}
+
+.about-photo img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 14px;
+  border: 1px solid rgba(2,11,18,.12);
+  object-fit: contain;
+  object-position: center top;
 }
 
 .price-grid{
@@ -3155,9 +3191,20 @@ body.menu-open{ overflow:hidden; }
   .price-grid{grid-template-columns:1fr}
   .gallery-grid{grid-template-columns: repeat(2, 1fr)}
 
-  /* About photo on mobile (keeps your existing behavior) */
-  .about-photo { height: 50vh; max-height: 320px; padding: 12px;}
-  .about-photo img { height: 100%; }
+  .about-layout{
+    grid-template-columns:1fr;
+    gap: var(--space-5);
+  }
+
+  .about-photo { height: auto; max-height: none; padding: 12px;}
+  .about-photo img { height: auto; }
+}
+
+@media (max-width: 700px){
+  .about-story p{
+    font-size: var(--text-base);
+  }
+
 }
 
 @media (max-width: 770px){
