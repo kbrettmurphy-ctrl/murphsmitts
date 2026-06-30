@@ -535,7 +535,7 @@ button.secondary{
   background:var(--panel);
   border-top:1px solid var(--line);
   border-bottom:1px solid var(--line);
-  padding:16px 14px 14px;
+  padding:14px;
 }
 
 .clickable-card{
@@ -557,7 +557,10 @@ button.secondary{
   font-size:1.02rem;
   font-weight:700;
   color:var(--cream);
-  margin:0 0 8px;
+  margin:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 
 .order-number{
@@ -580,10 +583,17 @@ button.secondary{
 
 .order-subrow{
   display:grid;
-  grid-template-columns:auto minmax(0, auto);
+  grid-template-columns:minmax(0, 1fr) auto;
   gap:10px;
   align-items:center;
   margin-top:8px;
+}
+
+.order-meta-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
 }
 
 .workflow-progress{
@@ -629,40 +639,6 @@ button.secondary{
 
 .workflow-connector.complete{
   background:rgba(255,255,255,.6);
-}
-
-.action-row{
-  display:flex;
-  justify-content:flex-end;
-  gap:16px;
-  margin-top:12px;
-}
-
-.action-btn{
-  background:transparent;
-  border:none;
-  color:var(--cream);
-  padding:0;
-  width:auto;
-  min-width:auto;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  opacity:.95;
-}
-
-.action-btn svg{
-  width:24px;
-  height:20px;
-  stroke:currentColor;
-  fill:none;
-  stroke-width:2;
-  stroke-linecap:round;
-  stroke-linejoin:round;
-}
-
-.action-btn:hover{
-  opacity:1;
 }
 
 .no-results{
@@ -815,7 +791,8 @@ button.secondary{
   display:flex;
   align-items:center;
   gap:8px;
-  margin-right:auto;
+  margin-right:0;
+  min-width:0;
 }
 
 .workflow-sheet-root{
@@ -931,6 +908,14 @@ button.secondary{
   line-height:1.15;
 }
 
+.workflow-action-btn[hidden]{
+  display:none !important;
+}
+
+.workflow-sheet-root.workflow-action-selected .workflow-action-btn:not(.active){
+  display:none !important;
+}
+
 .workflow-action-btn.active{
   background:rgba(0,122,255,.92);
   color:#fff;
@@ -956,9 +941,9 @@ button.secondary{
 
 @media (prefers-color-scheme: light){
   .workflow-sheet{
-    color:rgba(0,0,0,.86);
-    background:rgba(246,246,246,.76);
-    border-color:rgba(0,0,0,.12);
+    color:var(--light-ink);
+    background:rgba(255,250,243,.94);
+    border-color:rgba(9,47,77,.16);
     box-shadow:
       0 18px 46px rgba(0,0,0,.18),
       0 2px 8px rgba(0,0,0,.12);
@@ -966,32 +951,54 @@ button.secondary{
 
   .workflow-sheet-header,
   .workflow-sheet-form{
-    border-color:rgba(0,0,0,.10);
+    border-color:rgba(9,47,77,.13);
   }
 
   .workflow-customer-name,
   .workflow-action-btn{
-    color:rgba(0,0,0,.86);
+    color:var(--light-ink);
   }
 
   .workflow-order-number,
   .workflow-current-status,
   .workflow-action-form label,
   .workflow-action-form p{
-    color:rgba(0,0,0,.58);
+    color:rgba(9,47,77,.72);
   }
 
   .workflow-action-form input,
   .workflow-action-form textarea,
   .workflow-action-form select{
-    background:rgba(255,255,255,.56);
-    border-color:rgba(0,0,0,.14);
-    color:rgba(0,0,0,.86);
+    background:#fff;
+    border-color:rgba(9,47,77,.18);
+    color:var(--light-ink);
+  }
+
+  .workflow-action-form input::placeholder,
+  .workflow-action-form textarea::placeholder{
+    color:rgba(9,47,77,.45);
+  }
+
+  .workflow-action-btn.active,
+  .workflow-action-btn.active:hover{
+    background:#0a84ff;
+    color:#fff;
   }
 
   .workflow-form-actions .workflow-form-cancel{
-    background:rgba(0,0,0,.08);
-    color:rgba(0,0,0,.86);
+    background:rgba(9,47,77,.10);
+    color:var(--light-ink);
+  }
+
+  .workflow-form-actions .workflow-form-submit{
+    background:#0a84ff;
+    color:#fff;
+  }
+
+  .workflow-form-message{
+    color:var(--red);
+    background:rgba(146,26,36,.08);
+    border:1px solid rgba(146,26,36,.18);
   }
 }
 
@@ -1076,6 +1083,39 @@ button.secondary{
   color:#ffb3b3;
   font-size:.9rem;
   margin-bottom:10px;
+  border-radius:8px;
+  padding:8px 10px;
+}
+
+@media (prefers-color-scheme: light){
+  .workflow-action-form label,
+  .workflow-action-form p{
+    color:rgba(9,47,77,.72);
+  }
+
+  .workflow-action-form input,
+  .workflow-action-form textarea,
+  .workflow-action-form select{
+    background:#fff;
+    border-color:rgba(9,47,77,.18);
+    color:var(--light-ink);
+  }
+
+  .workflow-form-actions .workflow-form-cancel{
+    background:rgba(9,47,77,.10);
+    color:var(--light-ink);
+  }
+
+  .workflow-form-actions .workflow-form-submit{
+    background:#0a84ff;
+    color:#fff;
+  }
+
+  .workflow-form-message{
+    color:var(--red);
+    background:rgba(146,26,36,.08);
+    border:1px solid rgba(146,26,36,.18);
+  }
 }
 
 @media (pointer: coarse){
@@ -1129,7 +1169,7 @@ button.secondary{
 
 @media (pointer: coarse) and (prefers-color-scheme: light){
   .workflow-sheet{
-    background:rgba(246,246,246,.78);
+    background:rgba(255,250,243,.95);
     box-shadow:
       0 20px 54px rgba(0,0,0,.20),
       0 3px 12px rgba(0,0,0,.12);
@@ -1442,47 +1482,154 @@ button.secondary{
 .swipe-row{
   position: relative;
   overflow: hidden;
-  border-radius: 16px;
-  margin-bottom: 12px;
+  border-radius: 0;
+  margin-bottom: 0;
+  --deleteSwipeWidth: 70px;
+  --quickSwipeWidth: 0px;
 }
 
-.swipe-delete{
+.swipe-action-panel{
   position: absolute;
   inset: 0;
   display: flex;
-  justify-content: flex-end;
-  align-items: stretch;
+  align-items: center;
   background: transparent;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.swipe-actions-start{
+  justify-content: flex-start;
+  background: transparent;
+}
+
+.swipe-actions-end{
+  justify-content: flex-end;
+  background: transparent;
+}
+
+.swipe-row.revealing-right .swipe-actions-start,
+.swipe-row.swiped-right .swipe-actions-start{
+  background: transparent;
+  z-index: 1;
+}
+
+.swipe-row.revealing-left .swipe-actions-end,
+.swipe-row.swiped-left .swipe-actions-end{
+  background: transparent;
+  z-index: 1;
+}
+
+.swipe-row.swiped-right .swipe-actions-start,
+.swipe-row.swiped-left .swipe-actions-end{
+  pointer-events: auto;
+}
+
+.swipe-quick-actions{
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  min-width: var(--quickSwipeWidth);
+}
+
+.swipe-circle-action{
+  width: 50px;
+  height: 50px;
+  border: 0;
+  border-radius: 999px;
+  color: #fffaf3;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  opacity: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 50px;
+  box-shadow:
+    0 8px 16px rgba(0,0,0,.24),
+    inset 0 1px 0 rgba(255,255,255,.16);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.swipe-circle-text{
+  background: linear-gradient(180deg, rgba(45,98,140,.98), rgba(23,63,96,.98));
+}
+
+.swipe-circle-email{
+  background: linear-gradient(180deg, rgba(218,202,177,.28), rgba(218,202,177,.18));
+  border: 1px solid rgba(218,202,177,.26);
+}
+
+.swipe-circle-ship{
+  background: linear-gradient(180deg, rgba(151,105,54,.98), rgba(110,77,40,.98));
+}
+
+.swipe-action-svg{
+  width: 23px;
+  height: 23px;
+  display: block;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .swipe-delete-btn{
-  min-width: 92px;
+  width: 50px;
+  height: 50px;
+  align-self: center;
+  margin-right: 10px;
   border: 0;
-  background: transparent;
-  color: transparent;
+  border-radius: 999px;
+  background: #921a24;
+  color: #fffaf3;
   font: inherit;
-  font-weight: 700;
+  padding: 0;
   cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 50px;
+  transform: scale(.94);
+  box-shadow:
+    0 8px 16px rgba(0,0,0,.24),
+    inset 0 1px 0 rgba(255,255,255,.14);
+  -webkit-tap-highlight-color: transparent;
 }
 
-.swipe-row.swiped .swipe-delete,
-.swipe-row.swiped .swipe-delete-btn{
+.swipe-row.revealing-left .swipe-delete-btn,
+.swipe-row.swiped-left .swipe-delete-btn{
+  opacity: 1;
+  transform: scale(1);
+}
+
+.swipe-row.swiped-left .swipe-delete-btn{
   background: #921a24;
-  color: #fff;
 }
 
 .swipe-row .order-card{
   position: relative;
-  z-index: 1;
-  transition: transform .18s ease;
+  z-index: 2;
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
 }
 
-.swipe-row.swiped .order-card{
-  transform: translateX(-92px);
+.swipe-row.swiped-right .order-card{
+  transform: translateX(var(--quickSwipeWidth));
+}
+
+.swipe-row.swiped-left .order-card{
+  transform: translateX(calc(var(--deleteSwipeWidth) * -1));
 }
 
 /* =========================

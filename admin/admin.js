@@ -52,6 +52,7 @@ let workflowSheetEl = null;
 let workflowPressTimer = null;
 let workflowSuppressOpeningTouch = false;
 let workflowSuppressOpeningTouchTimer = null;
+let suppressOrderCardClickUntil = 0;
 let loginInProgress = false;
 let listScrollY = 0;
 let orderMap = null;
@@ -407,6 +408,47 @@ async function copyPirateShipInfo(order) {
 
   window.open("https://ship.pirateship.com/", "_blank");
 }
+
+function textOrderCustomer(order) {
+  const phone = String(order.phoneNumber || "").replace(/[^\d+]/g, "").trim();
+  if (phone) window.location.href = `sms:${phone}`;
+}
+
+function emailOrderCustomer(order) {
+  const email = String(order.emailAddress || "").trim();
+  if (email) window.location.href = `mailto:${email}`;
+}
+
+const SWIPE_ICONS = {
+  text: `
+    <svg class="swipe-action-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.2 9.1 9.1 0 0 1-3.5-.7L3 21l1.9-4.7A7.9 7.9 0 0 1 4 11.5a8.4 8.4 0 0 1 8.5-8.2 8.4 8.4 0 0 1 8.5 8.2Z" />
+    </svg>
+  `,
+  email: `
+    <svg class="swipe-action-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
+      <path d="m5 7 7 5.8L19 7" />
+    </svg>
+  `,
+  ship: `
+    <svg class="swipe-action-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4.5 8.5 12 4l7.5 4.5v7L12 20l-7.5-4.5v-7Z" />
+      <path d="M4.8 8.8 12 13l7.2-4.2" />
+      <path d="M12 13v6.6" />
+      <path d="m8.2 6.3 7.5 4.4" />
+    </svg>
+  `,
+  delete: `
+    <svg class="swipe-action-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4.5 7h15" />
+      <path d="M9.5 7V5.6c0-.9.7-1.6 1.6-1.6h1.8c.9 0 1.6.7 1.6 1.6V7" />
+      <path d="M17.5 7 16.6 19c-.1.8-.8 1.4-1.6 1.4H9c-.8 0-1.5-.6-1.6-1.4L6.5 7" />
+      <path d="M10 11v5.5" />
+      <path d="M14 11v5.5" />
+    </svg>
+  `
+};
 
 function hasMeaningfulValue(value) {
   return String(value || "").trim() !== "";
@@ -776,45 +818,142 @@ function installSwipeDeleteStyles() {
       overflow:hidden;
       border-radius:0;
       margin-bottom:0;
+      --deleteSwipeWidth:70px;
+      --quickSwipeWidth:0px;
     }
 
-    .swipe-delete-bg{
+    .swipe-action-panel{
       position:absolute;
       inset:0;
       display:flex;
-      justify-content:flex-end;
-      align-items:stretch;
+      align-items:center;
       background:transparent;
       border-radius:0;
       pointer-events:none;
+      z-index:0;
     }
 
-    .swipe-row.swiped .swipe-delete-bg{
-      background:#921a24;
+    .swipe-actions-start{
+      justify-content:flex-start;
+      background:transparent;
+    }
+
+    .swipe-actions-end{
+      justify-content:flex-end;
+      background:transparent;
+    }
+
+    .swipe-row.revealing-right .swipe-actions-start,
+    .swipe-row.swiped-right .swipe-actions-start{
+      background:transparent;
+      z-index:1;
+    }
+
+    .swipe-row.revealing-left .swipe-actions-end,
+    .swipe-row.swiped-left .swipe-actions-end{
+      background:transparent;
+      z-index:1;
+    }
+
+    .swipe-row.swiped-right .swipe-actions-start,
+    .swipe-row.swiped-left .swipe-actions-end{
       pointer-events:auto;
     }
 
-    .swipe-delete-btn{
-      min-width:94px;
-      border:0;
-      background:transparent;
-      color:transparent;
-      font:inherit;
-      font-weight:700;
-      padding:0 18px;
-      cursor:pointer;
+    .swipe-quick-actions{
+      display:flex;
+      align-items:center;
+      gap:9px;
+      padding:0 10px;
+      min-width:var(--quickSwipeWidth);
     }
 
-    .swipe-row.swiped .swipe-delete-btn{
+    .swipe-circle-action{
+      width:50px;
+      height:50px;
+      border:0;
+      border-radius:999px;
+      color:#fffaf3;
+      font:inherit;
+      padding:0;
+      cursor:pointer;
+      opacity:1;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 50px;
+      box-shadow:
+        0 8px 16px rgba(0,0,0,.24),
+        inset 0 1px 0 rgba(255,255,255,.16);
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    .swipe-circle-text{
+      background:linear-gradient(180deg, rgba(45,98,140,.98), rgba(23,63,96,.98));
+    }
+
+    .swipe-circle-email{
+      background:linear-gradient(180deg, rgba(218,202,177,.28), rgba(218,202,177,.18));
+      border:1px solid rgba(218,202,177,.26);
+    }
+
+    .swipe-circle-ship{
+      background:linear-gradient(180deg, rgba(151,105,54,.98), rgba(110,77,40,.98));
+    }
+
+    .swipe-action-svg{
+      width:23px;
+      height:23px;
+      display:block;
+      stroke:currentColor;
+      fill:none;
+      stroke-width:1.9;
+      stroke-linecap:round;
+      stroke-linejoin:round;
+    }
+
+    .swipe-delete-btn{
+      width:50px;
+      height:50px;
+      align-self:center;
+      margin-right:10px;
+      border:0;
+      border-radius:999px;
       background:#921a24;
-      color:#fff;
+      color:#fffaf3;
+      font:inherit;
+      padding:0;
+      cursor:pointer;
+      opacity:0;
+      transition:
+        opacity 120ms ease,
+        transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 50px;
+      transform:scale(.94);
+      box-shadow:
+        0 8px 16px rgba(0,0,0,.24),
+        inset 0 1px 0 rgba(255,255,255,.14);
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    .swipe-row.revealing-left .swipe-delete-btn,
+    .swipe-row.swiped-left .swipe-delete-btn{
+      opacity:1;
+      transform:scale(1);
+    }
+
+    .swipe-row.swiped-left .swipe-delete-btn{
+      background:#921a24;
     }
 
     .swipe-row .order-card{
       position:relative;
-      z-index:1;
+      z-index:2;
       margin-bottom:0;
-      transition:transform .18s ease;
+      transition:transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
       will-change:transform;
       touch-action:pan-y;
       -webkit-touch-callout:none;
@@ -822,12 +961,12 @@ function installSwipeDeleteStyles() {
       user-select:none;
     }
 
-    .swipe-row.swiped .order-card{
-      transform:translateX(-94px);
+    .swipe-row.swiped-right .order-card{
+      transform:translateX(var(--quickSwipeWidth));
     }
 
-    .action-delete svg{
-      stroke:#921a24;
+    .swipe-row.swiped-left .order-card{
+      transform:translateX(calc(var(--deleteSwipeWidth) * -1));
     }
 
     .photo-grid{
@@ -998,84 +1137,181 @@ function installSwipeDeleteStyles() {
   document.head.appendChild(style);
 }
 
-function enableSwipeDelete(row) {
+function suppressNextOrderCardClick(duration = 450) {
+  suppressOrderCardClickUntil = Math.max(
+    suppressOrderCardClickUntil,
+    performance.now() + duration
+  );
+}
+
+function suppressRowClick(row, duration = 450) {
+  row._suppressClickUntil = Math.max(
+    row._suppressClickUntil || 0,
+    performance.now() + duration
+  );
+}
+
+function shouldSuppressOrderCardClick(row) {
+  const now = performance.now();
+  return now < suppressOrderCardClickUntil || now < (row._suppressClickUntil || 0);
+}
+
+function enableOrderSwipeActions(row, order) {
   const card = row.querySelector(".order-card");
   if (!card) return;
 
-  const MAX_SWIPE = 94;
+  const ACTION_SIZE = 50;
+  const ACTION_GAP = 9;
+  const ACTION_PAD = 10;
+  const DELETE_WIDTH = ACTION_SIZE + (ACTION_PAD * 2);
+  const quickActions = row.querySelectorAll(".swipe-action-btn").length;
+  const QUICK_WIDTH = quickActions
+    ? (quickActions * ACTION_SIZE) + ((quickActions - 1) * ACTION_GAP) + (ACTION_PAD * 2)
+    : 0;
+  const HORIZONTAL_THRESHOLD = 12;
+  const VERTICAL_THRESHOLD = 10;
+  const DIRECTION_RATIO = 1.2;
+
+  row.style.setProperty("--deleteSwipeWidth", `${DELETE_WIDTH}px`);
+  row.style.setProperty("--quickSwipeWidth", `${QUICK_WIDTH}px`);
+
   let startX = 0;
-  let currentX = 0;
+  let startY = 0;
   let startOffset = 0;
+  let tracking = false;
   let dragging = false;
+  let lockedVertical = false;
   let currentOffset = 0;
 
   function setOffset(x, withTransition = false) {
-    currentOffset = Math.max(-MAX_SWIPE, Math.min(0, x));
-    card.style.transition = withTransition ? "transform .18s ease" : "none";
+    const min = -DELETE_WIDTH;
+    const max = QUICK_WIDTH;
+    let next = x;
+
+    if (next > max) {
+      next = max + (next - max) * 0.25;
+    }
+
+    if (next < min) {
+      next = min + (next - min) * 0.25;
+    }
+
+    currentOffset = Math.max(min, Math.min(max, next));
+    card.style.transition = withTransition
+      ? "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)"
+      : "none";
     card.style.transform = `translateX(${currentOffset}px)`;
-    row.classList.toggle("swiped", currentOffset <= -MAX_SWIPE + 2);
+    row.classList.toggle("revealing-right", currentOffset > 8);
+    row.classList.toggle("revealing-left", currentOffset < -8);
+    row.classList.toggle("swiped-right", currentOffset >= QUICK_WIDTH - 2 && QUICK_WIDTH > 0);
+    row.classList.toggle("swiped-left", currentOffset <= -DELETE_WIDTH + 2);
+    row.classList.toggle("is-swiping", Math.abs(currentOffset) > 1);
   }
 
   function closeSwipe(withTransition = true) {
     setOffset(0, withTransition);
   }
 
-  function openSwipe(withTransition = true) {
+  function openDelete(withTransition = true) {
     closeOtherSwipes(row);
-    setOffset(-MAX_SWIPE, withTransition);
+    setOffset(-DELETE_WIDTH, withTransition);
+  }
+
+  function openQuickActions(withTransition = true) {
+    if (!QUICK_WIDTH) {
+      closeSwipe(withTransition);
+      return;
+    }
+
+    closeOtherSwipes(row);
+    setOffset(QUICK_WIDTH, withTransition);
   }
 
   card.addEventListener("touchstart", (e) => {
-    if (window.innerWidth > 900) return;
+    if (!window.matchMedia("(pointer: coarse)").matches) return;
+    if (e.touches.length !== 1) return;
+    if (e.target.closest(".swipe-action-btn") || e.target.closest(".swipe-delete-btn")) return;
 
     startX = e.touches[0].clientX;
-    currentX = startX;
+    startY = e.touches[0].clientY;
     startOffset = currentOffset;
+    tracking = true;
     dragging = true;
-    closeOtherSwipes(row);
+    lockedVertical = false;
+    row._swipeDirection = "";
     card.style.transition = "none";
   }, { passive: true });
 
   card.addEventListener("touchmove", (e) => {
-    if (!dragging || window.innerWidth > 900) return;
+    if (!tracking || !dragging || !window.matchMedia("(pointer: coarse)").matches) return;
 
-    currentX = e.touches[0].clientX;
+    if (e.touches.length !== 1) {
+      tracking = false;
+      dragging = false;
+      lockedVertical = false;
+      closeSwipe(true);
+      return;
+    }
+
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
     const dx = currentX - startX;
+    const dy = currentY - startY;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
 
-    let next = startOffset + dx;
+    if (!lockedVertical && !row._swipeDirection) {
+      if (absY > VERTICAL_THRESHOLD && absY > absX * DIRECTION_RATIO) {
+        lockedVertical = true;
+        tracking = false;
+        dragging = false;
+        closeSwipe(true);
+        return;
+      }
 
-    if (next > 0) {
-      next = next * 0.35;
+      if (absX < HORIZONTAL_THRESHOLD || absX < absY * DIRECTION_RATIO) {
+        return;
+      }
+
+      row._swipeDirection = "horizontal";
+      closeOtherSwipes(row);
+      cancelWorkflowPress();
     }
 
-    if (next < -MAX_SWIPE) {
-      next = -MAX_SWIPE + (next + MAX_SWIPE) * 0.35;
+    if (row._swipeDirection === "horizontal") {
+      e.preventDefault();
+      cancelWorkflowPress();
+      setOffset(startOffset + dx, false);
+    }
+  }, { passive: false });
+
+  function finishSwipe() {
+    if (!tracking && !dragging && !row._swipeDirection) {
+      row._swipeDirection = "";
+      return;
     }
 
-    setOffset(next, false);
-  }, { passive: true });
-
-  card.addEventListener("touchend", () => {
-    if (!dragging || window.innerWidth > 900) return;
+    const movedHorizontally = row._swipeDirection === "horizontal";
+    tracking = false;
     dragging = false;
+    lockedVertical = false;
+    row._swipeDirection = "";
 
-    if (currentOffset <= -MAX_SWIPE / 2) {
-      openSwipe(true);
+    if (!movedHorizontally) return;
+
+    if (currentOffset <= -DELETE_WIDTH / 2) {
+      openDelete(true);
+    } else if (currentOffset >= QUICK_WIDTH / 2 && QUICK_WIDTH > 0) {
+      openQuickActions(true);
     } else {
       closeSwipe(true);
     }
-  });
 
-  card.addEventListener("touchcancel", () => {
-    if (!dragging || window.innerWidth > 900) return;
-    dragging = false;
+    suppressRowClick(row, 550);
+  }
 
-    if (currentOffset <= -MAX_SWIPE / 2) {
-      openSwipe(true);
-    } else {
-      closeSwipe(true);
-    }
-  });
+  card.addEventListener("touchend", finishSwipe);
+  card.addEventListener("touchcancel", finishSwipe);
 
   document.addEventListener("touchstart", (e) => {
     if (!row.contains(e.target)) {
@@ -1084,6 +1320,7 @@ function enableSwipeDelete(row) {
   }, { passive: true });
 
   row._closeSwipe = closeSwipe;
+  row._isSwipeOpen = () => Math.abs(currentOffset) > 1;
 }
 
 function closeOtherSwipes(activeRow) {
@@ -1243,8 +1480,26 @@ function renderOrders(list) {
     const paidClass = normalizeText(order.paid) === "paid" ? "paid" : "unpaid";
 
     row.innerHTML = `
-      <div class="swipe-delete-bg">
-        <button class="swipe-delete-btn" type="button">Delete</button>
+      <div class="swipe-action-panel swipe-rail-left swipe-actions-start">
+        <div class="swipe-quick-actions">
+          <button class="swipe-action-btn swipe-circle-action swipe-circle-text swipe-action-text" type="button" aria-label="Text customer">
+            ${SWIPE_ICONS.text}
+          </button>
+          <button class="swipe-action-btn swipe-circle-action swipe-circle-email swipe-action-email" type="button" aria-label="Email customer">
+            ${SWIPE_ICONS.email}
+          </button>
+          ${!looksLocalDropOff(order) ? `
+            <button class="swipe-action-btn swipe-circle-action swipe-circle-ship swipe-action-ship" type="button" aria-label="Open Pirate Ship">
+              ${SWIPE_ICONS.ship}
+            </button>
+          ` : ""}
+        </div>
+      </div>
+
+      <div class="swipe-action-panel swipe-rail-right swipe-actions-end">
+        <button class="swipe-delete-btn swipe-circle-action swipe-circle-delete" type="button" aria-label="Delete order">
+          ${SWIPE_ICONS.delete}
+        </button>
       </div>
 
       <div class="order-card clickable-card" tabindex="0">
@@ -1256,26 +1511,11 @@ function renderOrders(list) {
         </div>
 
         <div class="order-subrow">
-          <div class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</div>
+          <div class="order-meta-left">
+            <div class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</div>
+            ${renderLaceChips(order)}
+          </div>
           ${renderWorkflowProgress(order)}
-        </div>
-
-        <div class="action-row">
-          ${renderLaceChips(order)}
-          <button class="action-btn action-text" type="button" aria-label="Text">
-            💬
-          </button>
-          <button class="action-btn action-email" type="button" aria-label="Email">
-            ✉️
-          </button>
-            ${!looksLocalDropOff(order) ? `
-              <button class="action-btn action-ship" type="button" aria-label="Ship">
-                📦
-              </button>
-            ` : ""}
-          <button class="action-btn action-delete" type="button" aria-label="Delete">
-            🗑️
-          </button>
         </div>
       </div>
     `;
@@ -1286,7 +1526,22 @@ function renderOrders(list) {
       e.preventDefault();
     });
 
-    card.addEventListener("click", () => openOrder(order.orderNumber));
+    card.addEventListener("click", (e) => {
+      if (shouldSuppressOrderCardClick(row)) {
+        e.preventDefault();
+        return;
+      }
+
+      if (typeof row._isSwipeOpen === "function" && row._isSwipeOpen()) {
+        e.preventDefault();
+        row._closeSwipe?.(true);
+        suppressRowClick(row, 250);
+        return;
+      }
+
+      openOrder(order.orderNumber);
+    });
+
     card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
@@ -1295,13 +1550,13 @@ function renderOrders(list) {
     });
 
     card.addEventListener("contextmenu", (e) => {
-      if (e.target.closest(".action-btn") || e.target.closest(".swipe-delete-btn")) return;
+      if (e.target.closest(".swipe-action-btn") || e.target.closest(".swipe-delete-btn")) return;
       e.preventDefault();
       openWorkflowSheet(order, e);
     });
 
     card.addEventListener("touchstart", (e) => {
-      if (e.target.closest(".action-btn") || e.target.closest(".swipe-delete-btn")) return;
+      if (e.target.closest(".swipe-action-btn") || e.target.closest(".swipe-delete-btn")) return;
       startWorkflowPress(e, order);
     }, { passive: true });
 
@@ -1309,35 +1564,39 @@ function renderOrders(list) {
     card.addEventListener("touchend", cancelWorkflowPress);
     card.addEventListener("touchcancel", cancelWorkflowPress);
 
-    row.querySelector(".action-email").addEventListener("click", (e) => {
+    row.querySelector(".swipe-action-email").addEventListener("click", (e) => {
       e.stopPropagation();
-      const email = String(order.emailAddress || "").trim();
-      if (email) window.location.href = `mailto:${email}`;
+      e.preventDefault();
+      suppressRowClick(row);
+      row._closeSwipe?.(true);
+      emailOrderCustomer(order);
     });
 
-    row.querySelector(".action-text").addEventListener("click", (e) => {
+    row.querySelector(".swipe-action-text").addEventListener("click", (e) => {
       e.stopPropagation();
-      const phone = String(order.phoneNumber || "").replace(/[^\d+]/g, "").trim();
-      if (phone) window.location.href = `sms:${phone}`;
+      e.preventDefault();
+      suppressRowClick(row);
+      row._closeSwipe?.(true);
+      textOrderCustomer(order);
     });
     
-    row.querySelector(".action-ship")?.addEventListener("click", async (e) => {
+    row.querySelector(".swipe-action-ship")?.addEventListener("click", async (e) => {
       e.stopPropagation();
+      e.preventDefault();
+      suppressRowClick(row);
+      row._closeSwipe?.(true);
       await copyPirateShipInfo(order);
-    });
-
-    row.querySelector(".action-delete").addEventListener("click", async (e) => {
-      e.stopPropagation();
-      await confirmAndDeleteOrder(order.orderNumber);
     });
 
     row.querySelector(".swipe-delete-btn").addEventListener("click", async (e) => {
       e.stopPropagation();
+      e.preventDefault();
+      suppressRowClick(row);
       await confirmAndDeleteOrder(order.orderNumber);
     });
 
     ordersList.appendChild(row);
-    enableSwipeDelete(row);
+    enableOrderSwipeActions(row, order);
   });
 }
 
@@ -2064,6 +2323,7 @@ function openWorkflowSheet(order, source, suppressOpeningTouch = false) {
 
   form.innerHTML = "";
   workflowSheetEl.querySelector(".workflow-sheet-title").textContent = "Workflow actions";
+  workflowSheetEl.classList.remove("workflow-action-selected");
   workflowSheetEl.classList.add("open");
   document.body.classList.add("workflow-open");
   document.addEventListener("keydown", handleWorkflowMenuKeydown);
@@ -2079,6 +2339,7 @@ function closeWorkflowSheet() {
   document.removeEventListener("touchend", consumeWorkflowOpeningTouchEnd, true);
   document.removeEventListener("keydown", handleWorkflowMenuKeydown);
   workflowSheetEl.classList.remove("open");
+  workflowSheetEl.classList.remove("workflow-action-selected");
   workflowSheetEl.querySelector(".workflow-action-list").innerHTML = "";
   workflowSheetEl.querySelector(".workflow-sheet-form").innerHTML = "";
   document.body.classList.remove("workflow-open");
@@ -2263,6 +2524,7 @@ function getWorkflowActions(order) {
 function openWorkflowActionForm(order, actionKey) {
   const form = workflowSheetEl.querySelector(".workflow-sheet-form");
   workflowSheetEl.actionKey = actionKey;
+  workflowSheetEl.classList.add("workflow-action-selected");
   workflowSheetEl.querySelectorAll(".workflow-action-btn").forEach((button) => {
     const active = button.dataset.action === actionKey;
     button.hidden = !active;
@@ -2441,6 +2703,7 @@ function startWorkflowPress(e, order) {
   const anchor = getMenuAnchorPosition(e, e.currentTarget);
   workflowPressTimer = setTimeout(() => {
     clearTextSelection();
+    suppressNextOrderCardClick(800);
     openWorkflowSheet(order, anchor, true);
   }, 500);
 }
