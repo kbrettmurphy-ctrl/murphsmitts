@@ -4,17 +4,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <title>{% if page.title %}{{ page.title }} | {% endif %}Murph’s Mitt Maintenance</title>
-  <meta name="description" content="{% if page.description %}{{ page.description }}{% else %}Baseball & softball glove repair. Local drop-off and nationwide mail-in service.{% endif %}" />
-  <meta property="og:title" content="{% if page.title %}{{ page.title }} | {% endif %}Murph’s Mitt Maintenance" />
-  <meta property="og:description" content="{% if page.description %}{{ page.description }}{% else %}Professional baseball glove relacing and restoration. Local drop-off and nationwide mail-in service.{% endif %}" />
+  {% assign site_title = site.title | default: "Murph’s Mitt Maintenance" %}
+  {% assign meta_title = page.title | default: site_title %}
+  {% assign default_description = "Professional baseball and softball glove relacing, cleaning, conditioning, and care. Local drop-off in Surf City, NC and nationwide mail-in service." %}
+  {% assign meta_description = page.description | default: default_description %}
+  {% assign social_image = page.social_image | default: "/assets/img/hero-glove-wide.jpeg" %}
+  {% capture full_title %}{% if meta_title == site_title %}{{ site_title }}{% else %}{{ meta_title }} | {{ site_title }}{% endif %}{% endcapture %}
+
+  <title>{{ full_title | strip | escape }}</title>
+  <meta name="description" content="{{ meta_description | escape }}" />
+  <link rel="canonical" href="{{ page.url | absolute_url }}" />
+  <meta property="og:site_name" content="{{ site_title | escape }}" />
+  <meta property="og:title" content="{{ full_title | strip | escape }}" />
+  <meta property="og:description" content="{{ meta_description | escape }}" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="{{ page.url | absolute_url }}" />
-  <meta property="og:image" content="{{ '/assets/img/social-preview.jpg' | absolute_url }}" />
+  <meta property="og:image" content="{{ social_image | absolute_url }}" />
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="{% if page.title %}{{ page.title }} | {% endif %}Murph’s Mitt Maintenance">
-  <meta name="twitter:description" content="{% if page.description %}{{ page.description }}{% else %}Professional baseball glove relacing and restoration service.{% endif %}">
-  <meta name="twitter:image" content="{{ '/assets/img/social-preview.jpg' | absolute_url }}">
+  <meta name="twitter:title" content="{{ full_title | strip | escape }}">
+  <meta name="twitter:description" content="{{ meta_description | escape }}">
+  <meta name="twitter:image" content="{{ social_image | absolute_url }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
