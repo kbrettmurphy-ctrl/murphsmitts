@@ -713,9 +713,11 @@ function renderPhotoGallery(order) {
   if (!photos.length) return "";
 
   return `
-    ${renderSectionHeading("Photos")}
+    <section class="detail-section detail-photo-section">
+      <div class="detail-section-header">
+        <h2>Photos</h2>
+      </div>
 
-    <div class="detail-block full">
       <div class="photo-grid">
         ${photos.map((url, index) => `
           <img
@@ -727,7 +729,7 @@ function renderPhotoGallery(order) {
           >
         `).join("")}
       </div>
-    </div>
+    </section>
 
     <div id="photoLightbox" class="photo-lightbox">
       <img id="lightboxImage" src="">
@@ -2086,8 +2088,8 @@ function renderOrders(list) {
 function renderOrderDetail(order) {
   currentOrder = order;
   if (detailTitle) {
-  detailTitle.textContent = order.customerName || "Order Detail";
-}
+    detailTitle.textContent = "Order Detail";
+  }
   clearSaveStatus();
 
   const isLocal = looksLocalDropOff(order);
@@ -2097,139 +2099,159 @@ function renderOrderDetail(order) {
   const customColorRequest = order.customColorRequest || order.customLaceNotes || "";
 
   orderDetail.innerHTML = `
-    <div class="detail-delete-row">
-      <button id="detailDeleteBtn" class="detail-delete-btn" type="button">Delete Order</button>
-    </div>
+    <div class="detail-form-shell">
+      <section class="detail-section">
+        <div class="detail-section-header">
+          <h2>Customer</h2>
+        </div>
 
-    <div class="detail-grid">
-      ${renderSectionHeading("Order Summary")}
+        <div class="detail-section-grid">
+          ${renderFieldLike("Order #", order.orderNumber || "")}
+          ${renderFieldLike("Customer", order.customerName || "")}
+          ${renderPhoneInput("Phone", "editPhoneNumber", order.phoneNumber || "")}
+          ${renderFieldLike("Email", order.emailAddress || "")}
+          <div class="detail-block">
+            <div class="label">Social Tag</div>
+            <input id="editSocialTag" type="text" value="${escapeAttr(order.socialTag || "")}" />
+          </div>
+          ${renderReferralSourceEditor(order.referralSource || "")}
+        </div>
+      </section>
 
-      ${renderFieldLike("Order #", order.orderNumber || "")}
-      ${renderFieldLike("Customer", order.customerName || "")}
-      ${renderPhoneInput("Phone", "editPhoneNumber", order.phoneNumber || "")}
-      ${renderFieldLike("Email", order.emailAddress || "")}
-      <div class="detail-block">
-        <div class="label">Social Tag</div>
-        <input id="editSocialTag" type="text" value="${escapeAttr(order.socialTag || "")}" />
-      </div>
-      ${renderReferralSourceEditor(order.referralSource || "")}
+      <section class="detail-section">
+        <div class="detail-section-header">
+          <h2>Order Status</h2>
+        </div>
 
-      ${renderSectionHeading("Order Status")}
+        <div class="detail-section-grid">
+          <div class="detail-block">
+            <div class="label">Status</div>
+            <select id="editStatus">
+               <option value="Received">Received</option>
+               <option value="Estimate Sent">Estimate Sent</option>
+               <option value="Customer Approved">Customer Approved</option>
+               <option value="Pending Response">Pending Response</option>
+               <option value="In Transit to Me">In Transit to Me</option>
+               <option value="In Progress">In Progress</option>
+               <option value="Waiting on Lace/Parts">Waiting on Lace/Parts</option>
+               <option value="Ready to Go">Ready to Go</option>
+               <option value="On Hold">On Hold</option>
+               <option value="Completed">Completed</option>
+               <option value="Picked Up">Picked Up</option>
+             </select>
+          </div>
 
-      <div class="detail-block">
-        <div class="label">Status</div>
-        <select id="editStatus">
-           <option value="Received">Received</option>
-           <option value="Estimate Sent">Estimate Sent</option>
-           <option value="Customer Approved">Customer Approved</option>
-           <option value="Pending Response">Pending Response</option>
-           <option value="In Transit to Me">In Transit to Me</option>
-           <option value="In Progress">In Progress</option>
-           <option value="Waiting on Lace/Parts">Waiting on Lace/Parts</option>
-           <option value="Ready to Go">Ready to Go</option>
-           <option value="On Hold">On Hold</option>
-           <option value="Completed">Completed</option>
-           <option value="Picked Up">Picked Up</option>
-         </select>
-      </div>
+          <div class="detail-block">
+            <div class="label">Paid?</div>
+            <select id="editPaid">
+              <option value="Paid">Paid</option>
+              <option value="Unpaid">Unpaid</option>
+            </select>
+          </div>
 
-      <div class="detail-block">
-        <div class="label">Paid?</div>
-        <select id="editPaid">
-          <option value="Paid">Paid</option>
-          <option value="Unpaid">Unpaid</option>
-        </select>
-      </div>
+          <div class="detail-block">
+            <div class="label">Price Quoted</div>
+            <input id="editPriceQuoted" type="text" inputmode="decimal" placeholder="$0.00" />
+          </div>
 
-      <div class="detail-block">
-        <div class="label">Price Quoted</div>
-        <input id="editPriceQuoted" type="text" inputmode="decimal" placeholder="$0.00" />
-      </div>
+          <div id="editShippingCostWrap" class="detail-block ${isLocal ? "is-hidden" : ""}">
+            <div class="label">Shipping Cost</div>
+            <input id="editShippingCost" type="text" inputmode="decimal" placeholder="$0.00" />
+          </div>
 
-      <div id="editShippingCostWrap" class="detail-block ${isLocal ? "is-hidden" : ""}">
-        <div class="label">Shipping Cost</div>
-        <input id="editShippingCost" type="text" inputmode="decimal" placeholder="$0.00" />
-      </div>
-      
-      <div id="editTotalDueWrap" class="detail-block ${isLocal ? "is-hidden" : ""}">
-        <div class="label">Total Due</div>
-        <div id="editTotalDue" class="field-like readonly">$0.00</div>
-      </div>
+          <div id="editTotalDueWrap" class="detail-block ${isLocal ? "is-hidden" : ""}">
+            <div class="label">Total Due</div>
+            <div id="editTotalDue" class="field-like readonly">$0.00</div>
+          </div>
 
-      <div class="detail-block">
-        <div class="label">Date Received</div>
-        <input id="editDateReceived" type="date" />
-      </div>
+          <div class="detail-block">
+            <div class="label">Date Received</div>
+            <input id="editDateReceived" type="date" />
+          </div>
 
-      <div class="detail-block">
-        <div class="label">Estimated Completion</div>
-        <input id="editEstimatedCompletion" type="date" />
-      </div>
+          <div class="detail-block">
+            <div class="label">Estimated Completion</div>
+            <input id="editEstimatedCompletion" type="date" />
+          </div>
 
-      <div class="detail-block">
-        <div class="label">Date Completed</div>
-        <input id="editDateCompleted" type="date" />
-      </div>
+          <div class="detail-block">
+            <div class="label">Date Completed</div>
+            <input id="editDateCompleted" type="date" />
+          </div>
+        </div>
+      </section>
 
-      <div class="detail-block full">
-        <div class="label">Internal Notes</div>
-        <textarea id="editInternalNotes" rows="1"></textarea>
-      </div>
+      <section class="detail-section">
+        <div class="detail-section-header">
+          <h2>Glove Details</h2>
+        </div>
 
-      ${renderSectionHeading("Glove Details")}
+        <div class="detail-section-grid">
+          <div class="detail-block">
+            <div class="label">Brand / Model</div>
+            <input id="editBrandModel" type="text" />
+          </div>
 
-      <div class="detail-block">
-        <div class="label">Brand / Model</div>
-        <input id="editBrandModel" type="text" />
-      </div>
+          <div class="detail-block">
+            <div class="label">Glove Type</div>
+            <select id="editGloveType">${gloveTypeOptions(order.gloveType)}</select>
+          </div>
 
-      <div class="detail-block">
-        <div class="label">Glove Type</div>
-        <select id="editGloveType">${gloveTypeOptions(order.gloveType)}</select>
-      </div>
+          <div id="editWebTypeWrap" class="detail-block">
+            <div class="label">Web Type</div>
+            <select id="editWebType">${webTypeOptions(order.webType)}</select>
+          </div>
 
-      <div id="editWebTypeWrap" class="detail-block">
-        <div class="label">Web Type</div>
-        <select id="editWebType">${webTypeOptions(order.webType)}</select>
-      </div>
+          <div class="detail-block">
+            <div class="label">Drop-Off Method</div>
+            <select id="editDropOffMethod">${dropOffMethodOptions(order.dropOffMethod)}</select>
+          </div>
+        </div>
+      </section>
 
-      <div class="detail-block">
-        <div class="label">Drop-Off Method</div>
-        <select id="editDropOffMethod">${dropOffMethodOptions(order.dropOffMethod)}</select>
-      </div>
+      <section class="detail-section">
+        <div class="detail-section-header">
+          <h2>Services</h2>
+        </div>
 
-      ${renderServicesEditor(order.servicesRequested || "")}
+        <div class="detail-section-grid">
+          ${renderServicesEditor(order.servicesRequested || "")}
+        </div>
+      </section>
 
-      ${renderLaceInput("Primary Lace Color", "editPrimaryLaceColor", primaryLaceColor, "Choose")}
+      <section class="detail-section">
+        <div class="detail-section-header">
+          <h2>Lace</h2>
+        </div>
 
-      <div class="detail-block">
-        <div class="label">Primary Lace Used</div>
-        <input id="editPrimaryLaceUsed" type="number" step="0.25" min="0" placeholder="0" />
-      </div>
-      
-      ${renderLaceInput("Secondary / Accent Lace Color", "editSecondaryLaceColor", secondaryLaceColor, "Only if multi-colors wanted")}
+        <div class="detail-section-grid">
+          ${renderLaceInput("Primary Lace Color", "editPrimaryLaceColor", primaryLaceColor, "Choose")}
 
-      <div class="detail-block">
-        <div class="label">Secondary Lace Used</div>
-        <input id="editSecondaryLaceUsed" type="number" step="0.25" min="0" placeholder="0" />
-      </div>
+          <div class="detail-block">
+            <div class="label">Primary Lace Used</div>
+            <input id="editPrimaryLaceUsed" type="number" step="0.25" min="0" placeholder="0" />
+          </div>
 
-      <div class="detail-block full">
-        <div class="label">Custom Color Request</div>
-        <textarea id="editCustomColorRequest" rows="1" placeholder="Don’t see your color? Describe it here.">${escapeHtml(customColorRequest)}</textarea>
-      </div>
+          ${renderLaceInput("Secondary / Accent Lace Color", "editSecondaryLaceColor", secondaryLaceColor, "Only if multi-colors wanted")}
 
-      <div class="detail-block full">
-        <div class="label">Customer Notes</div>
-        <textarea id="editGloveNotes" rows="2"></textarea>
-      </div>
+          <div class="detail-block">
+            <div class="label">Secondary Lace Used</div>
+            <input id="editSecondaryLaceUsed" type="number" step="0.25" min="0" placeholder="0" />
+          </div>
 
-      ${renderPhotoGallery(order)}
+          <div class="detail-block full">
+            <div class="label">Custom Color Request</div>
+            <textarea id="editCustomColorRequest" rows="1" placeholder="Don’t see your color? Describe it here.">${escapeHtml(customColorRequest)}</textarea>
+          </div>
+        </div>
+      </section>
 
-      <div id="editShippingSection" class="full ${isLocal ? "is-hidden" : ""}">
-        ${renderSectionHeading("Shipping")}
+      <div id="editShippingSection" class="detail-section ${isLocal ? "is-hidden" : ""}">
+        <div class="detail-section-header">
+          <h2>Shipping</h2>
+        </div>
 
-        <div class="detail-grid">
+        <div class="detail-section-grid">
           <div class="detail-block">
             <div class="label">Allow Ship Without Payment</div>
             <select id="editAllowShipWithoutPayment">
@@ -2268,6 +2290,30 @@ function renderOrderDetail(order) {
             <input id="editZipCode" type="text" inputmode="numeric" />
           </div>
         </div>
+      </div>
+
+      <section class="detail-section">
+        <div class="detail-section-header">
+          <h2>Notes</h2>
+        </div>
+
+        <div class="detail-section-grid">
+          <div class="detail-block full">
+            <div class="label">Customer Notes</div>
+            <textarea id="editGloveNotes" rows="2"></textarea>
+          </div>
+
+          <div class="detail-block full">
+            <div class="label">Internal Notes</div>
+            <textarea id="editInternalNotes" rows="2"></textarea>
+          </div>
+        </div>
+      </section>
+
+      ${renderPhotoGallery(order)}
+
+      <div class="detail-delete-row">
+        <button id="detailDeleteBtn" class="detail-delete-btn" type="button">Delete Order</button>
       </div>
     </div>
   `;

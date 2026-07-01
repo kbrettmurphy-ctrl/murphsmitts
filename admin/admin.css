@@ -2336,24 +2336,24 @@ button.secondary{
    DETAIL VIEW
    ========================= */
 #detailView{
-  background:var(--light-bg);
+  background:var(--bg);
   min-height:100vh;
-  padding:0 12px 28px;
+  padding:0 0 calc(18px + env(safe-area-inset-bottom));
 }
 
-/* sticky top bar exactly where save button belongs */
 #detailView .detail-topbar{
   position:sticky;
   top:0;
   z-index:25;
   min-height:var(--topbarH);
-  background:var(--light-bg);
-  border-bottom:1px solid var(--light-line);
-  padding:12px 6px;
+  background:var(--navy);
+  color:var(--cream);
+  border-bottom:1px solid rgba(218,202,177,.18);
+  padding:14px 14px 12px;
 }
 
 #detailView .detail-topbar h1{
-  color:var(--light-ink);
+  color:var(--cream);
 }
 
 #detailView .detail-topbar .secondary{
@@ -2370,47 +2370,87 @@ button.secondary{
 }
 
 .detail-topbar-actions .status{
-  min-height:20px;
-  font-size:.92rem;
-  color:var(--red);
+  min-height:0;
+  max-width:150px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:.82rem;
+  color:rgba(218,202,177,.84);
   text-align:right;
+}
+
+#backBtn{
+  min-height:40px;
+  border-radius:14px;
+  padding:0 13px;
+  font-size:.9rem;
+  font-weight:850;
+  white-space:nowrap;
 }
 
 #saveOrderBtn{
   width:auto;
-  /*min-width:172px;*/
-  padding:14px 20px;
+  min-height:40px;
+  padding:0 14px;
   border:none;
-  background:var(--navy);
-  color:var(--cream);
-  border-radius:18px;
-  font-weight:700;
+  background:rgba(218,202,177,.92);
+  color:var(--navy);
+  border-radius:14px;
+  font-weight:850;
   white-space:nowrap;
   flex:0 0 auto;
 }
 
-/* content card under sticky bar */
 .detail-card{
-  background:var(--light-panel);
-  border:1px solid var(--light-line);
-  border-radius:22px;
-  box-shadow:var(--shadow);
-  padding:14px;
-  margin-top:14px;
+  width:100%;
+  max-width:940px;
+  margin:0 auto;
+  padding:12px;
+  background:transparent;
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+}
+
+.detail-form-shell{
+  display:grid;
+  gap:12px;
+}
+
+.detail-section{
+  display:grid;
+  gap:10px;
+  padding:13px;
+  border:1px solid rgba(218,202,177,.16);
+  border-radius:18px;
+  background:rgba(19,41,61,.96);
+}
+
+.detail-section-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.detail-section-header h2{
+  margin:0;
+  color:var(--cream);
+  font-size:1.05rem;
+  line-height:1.15;
+  letter-spacing:-.015em;
+}
+
+.detail-section-grid{
+  display:grid;
+  gap:10px;
 }
 
 .detail-grid{
   display:flex;
   flex-direction:column;
   gap:14px;
-}
-
-.detail-header-row{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:6px;
 }
 
 .detail-order-number{
@@ -2440,6 +2480,7 @@ button.secondary{
 
 .detail-block{
   width:100%;
+  min-width:0;
 }
 
 .detail-block.full{
@@ -2447,9 +2488,13 @@ button.secondary{
 }
 
 .label{
-  font-size:.84rem;
-  color:var(--light-muted);
-  margin-bottom:6px;
+  display:block;
+  margin:0 0 5px;
+  color:rgba(218,202,177,.72);
+  font-size:.72rem;
+  font-weight:850;
+  letter-spacing:.02em;
+  text-transform:uppercase;
 }
 
 .value{
@@ -2467,31 +2512,47 @@ button.secondary{
   width:100%;
   max-width:100%;
   box-sizing:border-box;
-  background:#fff;
-  color:var(--light-ink);
-  border:2px solid #d1ccc2;
-  border-radius:16px;
-  padding:9px 12px;
-  font-size:1rem;
+  background:#244866;
+  color:var(--cream);
+  border:1px solid rgba(218,202,177,.16);
+  border-radius:14px;
+  padding:8px 11px;
+  font-size:.92rem;
+  font-weight:650;
   line-height:1.2;
-  min-height:42px;
+  min-height:40px;
 }
 
 .detail-block select{
   appearance:none;
   -webkit-appearance:none;
   -moz-appearance:none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(218,202,177,.9) 50%),
+    linear-gradient(135deg, rgba(218,202,177,.9) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) 17px,
+    calc(100% - 10px) 17px;
+  background-size:6px 6px, 6px 6px;
+  background-repeat:no-repeat;
+  padding-right:34px;
 }
 
 .detail-block .field-like{
-  min-height:42px;
+  min-height:40px;
   display:flex;
   align-items:center;
 }
 
 .detail-block textarea{
   resize:vertical;
-  min-height:50px;
+  min-height:58px;
+  line-height:1.35;
+}
+
+.detail-block input::placeholder,
+.detail-block textarea::placeholder{
+  color:rgba(218,202,177,.45);
 }
 
 .detail-block input[type="date"]{
@@ -2504,7 +2565,28 @@ button.secondary{
 .detail-block input[readonly],
 .detail-block textarea[readonly],
 .detail-block .field-like.readonly{
-  background:#f7f3eb;
+  background:rgba(218,202,177,.08);
+  color:rgba(218,202,177,.88);
+}
+
+.detail-delete-row{
+  display:flex;
+  justify-content:flex-start;
+  padding:2px 2px 8px;
+}
+
+.detail-delete-btn{
+  min-height:36px;
+  border:1px solid rgba(255,107,120,.30);
+  border-radius:12px;
+  padding:0 13px;
+  background:rgba(146,26,36,.14);
+  color:#ffd5da;
+  font:inherit;
+  font-size:.84rem;
+  font-weight:850;
+  cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
 }
 
 .detail-divider{
@@ -2556,7 +2638,11 @@ button.secondary{
   .detail-card{
     width:100%;
     margin-top:14px;
-    padding:14px;
+    padding:12px;
+  }
+
+  .detail-section-grid{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
   }
 
   .store-editor-panel{
@@ -2581,6 +2667,7 @@ button.secondary{
   .detail-section-title.full,
   .detail-block.full,
   .detail-grid > .full,
+  .detail-section-grid > .full,
   .detail-divider{
     grid-column:1 / -1;
   }
@@ -2602,7 +2689,8 @@ button.secondary{
   grid-template-columns:auto 1fr;
   gap:12px;
   align-items:center;
-  color:var(--light-ink);
+  color:var(--cream);
+  font-size:.9rem;
 }
 
 .checkbox-inline-other{
@@ -2616,7 +2704,7 @@ button.secondary{
   grid-template-columns:auto 1fr;
   gap:12px;
   align-items:center;
-  color:var(--light-ink);
+  color:var(--cream);
 }
 
 .checkbox-inline-other input[type="text"]{
@@ -2636,6 +2724,23 @@ button.secondary{
   box-shadow:none;
   accent-color:var(--navy);
   justify-self:start;
+}
+
+.detail-card .photo-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(72px, 1fr));
+  gap:8px;
+}
+
+.detail-card .photo-thumb-img{
+  display:block;
+  width:100%;
+  aspect-ratio:1 / 1;
+  object-fit:cover;
+  border:1px solid rgba(218,202,177,.16);
+  border-radius:13px;
+  background:rgba(218,202,177,.07);
+  cursor:pointer;
 }
 
 .swipe-row{
@@ -2800,11 +2905,11 @@ button.secondary{
   }
 
   #detailView{
-    padding:0 10px 24px;
+    padding:0 0 calc(14px + env(safe-area-inset-bottom));
   }
 
   #detailView .detail-topbar{
-    padding:10px 2px 12px;
+    padding:14px 14px 12px;
   }
 
   /* keep both dashboard and detail topbars in one row on mobile */
@@ -2894,7 +2999,7 @@ button.secondary{
     flex-direction:row;
     align-items:center;
     justify-content:flex-end;
-    gap:10px;
+    gap:6px;
     width:auto;
     min-width:0;
     flex:0 0 auto;
@@ -2903,17 +3008,23 @@ button.secondary{
   .detail-topbar-actions .status{
     text-align:right;
     min-height:auto;
-    font-size:.85rem;
-    max-width:110px;
+    font-size:.78rem;
+    max-width:82px;
   }
 
-  /* keep Save button same kind of size/placement as desktop */
+  #backBtn{
+    min-height:40px;
+    padding:0 11px;
+    font-size:.84rem;
+  }
+
   #saveOrderBtn{
     width:auto;
-    /*min-width:148px;*/
-    padding:12px 16px;
+    min-height:40px;
+    padding:0 12px;
     flex:0 0 auto;
     white-space:nowrap;
+    font-size:.84rem;
   }
 
   .logout-action{
@@ -2933,6 +3044,6 @@ button.secondary{
   }
 
   .detail-card{
-    padding:12px;
+    padding:10px;
   }
 }
