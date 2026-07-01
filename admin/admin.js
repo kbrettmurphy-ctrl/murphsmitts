@@ -73,6 +73,8 @@ let workflowSuppressOpeningTouch = false;
 let workflowSuppressOpeningTouchTimer = null;
 let suppressOrderCardClickUntil = 0;
 let searchExpanded = false;
+let desktopOrderActionMenu = null;
+let desktopOrderActionState = null;
 let orderFiltersExpanded = false;
 let inventoryFiltersExpanded = false;
 let pullRefreshState = {
@@ -503,10 +505,10 @@ const ORDER_FILTER_LABELS = {
   approved: "Customer Approved",
   transit: "In Transit to Me",
   progress: "In Progress",
-  waiting: "Waiting on Lace/Parts",
+  waiting: "Waiting Parts",
   ready: "Ready to Go",
   hold: "On Hold",
-  completed: "Completed / Picked Up"
+  completed: "Completed"
 };
 
 function isOrderFilterView(viewName) {
@@ -515,6 +517,17 @@ function isOrderFilterView(viewName) {
 
 function getOrderFilterLabel(viewName) {
   return ORDER_FILTER_LABELS[viewName] || ORDER_FILTER_LABELS.current;
+}
+
+function getOrderStatusDisplay(status) {
+  const raw = String(status || "").trim();
+  const normalized = normalizeStatus(raw);
+
+  if (normalized === "waiting on lace/parts" || normalized === "waiting on parts") {
+    return "Waiting Parts";
+  }
+
+  return raw;
 }
 
 function getViewTitle(viewName) {
@@ -1310,7 +1323,7 @@ function installSwipeDeleteStyles() {
        padding:8px 10px;
        background:#092f4d;
        color:#dacab1;
-       font-weight:700;
+       font-weight:600;
     }
 
     #reorderDismissBtn{
@@ -1565,6 +1578,92 @@ function closeOtherSwipes(activeRow) {
   });
 }
 
+function closeDesktopOrderActionMenus(exceptMenu = null) {
+  if (!desktopOrderActionMenu || desktopOrderActionMenu === exceptMenu) return;
+
+  desktopOrderActionMenu.hidden = true;
+  desktopOrderActionState?.row?.classList.remove("actions-open");
+  desktopOrderActionState?.button?.setAttribute("aria-expanded", "false");
+  desktopOrderActionState = null;
+}
+
+function getDesktopOrderActionMenu() {
+  if (desktopOrderActionMenu) return desktopOrderActionMenu;
+
+  desktopOrderActionMenu = document.createElement("div");
+  desktopOrderActionMenu.className = "order-actions-menu";
+  desktopOrderActionMenu.setAttribute("role", "menu");
+  desktopOrderActionMenu.hidden = true;
+  desktopOrderActionMenu.innerHTML = `
+    <button class="order-menu-action order-menu-text" type="button" role="menuitem">Text</button>
+    <button class="order-menu-action order-menu-email" type="button" role="menuitem">Email</button>
+    <button class="order-menu-action order-menu-ship" type="button" role="menuitem">Ship</button>
+    <button class="order-menu-action order-menu-delete" type="button" role="menuitem">Delete</button>
+  `;
+
+  desktopOrderActionMenu.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const action = e.target.closest(".order-menu-action");
+    if (!action || !desktopOrderActionState?.order) return;
+
+    e.preventDefault();
+    const { row, order } = desktopOrderActionState;
+    suppressRowClick(row);
+    closeDesktopOrderActionMenus();
+
+    if (action.classList.contains("order-menu-text")) {
+      textOrderCustomer(order);
+    } else if (action.classList.contains("order-menu-email")) {
+      emailOrderCustomer(order);
+    } else if (action.classList.contains("order-menu-ship")) {
+      await copyPirateShipInfo(order);
+    } else if (action.classList.contains("order-menu-delete")) {
+      await confirmAndDeleteOrder(order.orderNumber);
+    }
+  });
+
+  document.body.appendChild(desktopOrderActionMenu);
+  return desktopOrderActionMenu;
+}
+
+function positionDesktopOrderActionMenu(button, menu) {
+  const rect = button.getBoundingClientRect();
+  const menuRect = menu.getBoundingClientRect();
+  const gap = 6;
+  const margin = 10;
+  const left = Math.min(
+    window.innerWidth - menuRect.width - margin,
+    Math.max(margin, rect.left + (rect.width / 2) - (menuRect.width / 2))
+  );
+  const top = Math.min(
+    window.innerHeight - menuRect.height - margin,
+    rect.bottom + gap
+  );
+
+  menu.style.left = `${left}px`;
+  menu.style.top = `${Math.max(margin, top)}px`;
+}
+
+function toggleDesktopOrderActionMenu(row, button, order) {
+  const isOpen = desktopOrderActionState?.button === button && !desktopOrderActionMenu?.hidden;
+
+  if (isOpen) {
+    closeDesktopOrderActionMenus();
+    return;
+  }
+
+  const menu = getDesktopOrderActionMenu();
+  closeDesktopOrderActionMenus();
+  closeOtherSwipes(row);
+
+  desktopOrderActionState = { row, button, order };
+  row.classList.add("actions-open");
+  button.setAttribute("aria-expanded", "true");
+  menu.querySelector(".order-menu-ship").hidden = looksLocalDropOff(order);
+  menu.hidden = false;
+  positionDesktopOrderActionMenu(button, menu);
+}
+
 function setActiveView(viewName) {
   if (!isAuthenticated()) {
     activeView = "current";
@@ -1678,7 +1777,7 @@ function applyFilters() {
   } else {
     viewTitle.textContent = getViewTitle(activeView);
     orderCount.textContent = isOrderFilterView(activeView)
-      ? `${getOrderFilterLabel(activeView)} · ${list.length} order${list.length === 1 ? "" : "s"}`
+      ? `${getOrderFilterLabel(activeView)} · ${list.length}`
       : `${list.length} order${list.length === 1 ? "" : "s"}`;
   }
 
@@ -1698,11 +1797,13 @@ function syncSearchUI() {
     searchExpanded = true;
   }
 
-  searchToolbar?.classList.toggle("is-collapsed", !showSearch || !searchExpanded);
+  const expanded = showSearch && searchExpanded;
+
+  searchToolbar?.classList.toggle("is-collapsed", !expanded);
 
   if (searchToggleBtn) {
     searchToggleBtn.hidden = !showSearch;
-    searchToggleBtn.setAttribute("aria-expanded", showSearch && searchExpanded ? "true" : "false");
+    searchToggleBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
   }
 
   if (searchClearBtn) {
@@ -1976,7 +2077,9 @@ async function confirmAndDeleteOrder(orderNumber) {
 }
 
 function renderOrders(list) {
-  orderCount.textContent = `${list.length} order${list.length === 1 ? "" : "s"}`;
+  orderCount.textContent = isOrderFilterView(activeView)
+    ? `${getOrderFilterLabel(activeView)} · ${list.length}`
+    : `${list.length}`;
   ordersList.innerHTML = "";
 
   if (!list.length) {
@@ -1989,6 +2092,7 @@ function renderOrders(list) {
     row.className = "swipe-row";
 
     const paidClass = normalizeText(order.paid) === "paid" ? "paid" : "unpaid";
+    const isLocal = looksLocalDropOff(order);
 
     row.innerHTML = `
       <div class="swipe-action-panel swipe-rail-left swipe-actions-start">
@@ -1999,7 +2103,7 @@ function renderOrders(list) {
           <button class="swipe-action-btn swipe-circle-action swipe-circle-email swipe-action-email" type="button" aria-label="Email customer">
             ${SWIPE_ICONS.email}
           </button>
-          ${!looksLocalDropOff(order) ? `
+          ${!isLocal ? `
             <button class="swipe-action-btn swipe-circle-action swipe-circle-ship swipe-action-ship" type="button" aria-label="Open Pirate Ship">
               ${SWIPE_ICONS.ship}
             </button>
@@ -2018,13 +2122,18 @@ function renderOrders(list) {
           <div class="order-main">
             <div class="order-name">${escapeHtml(order.customerName || "")}</div>
           </div>
-          <div class="order-status">${escapeHtml(order.status || "")}</div>
+          <div class="order-status">${escapeHtml(getOrderStatusDisplay(order.status))}</div>
         </div>
 
         <div class="order-subrow">
           <div class="order-meta-left">
             <div class="order-number ${paidClass}">${escapeHtml(order.orderNumber || "")}</div>
             ${renderLaceChips(order)}
+          </div>
+          <div class="order-actions-wrap">
+            <button class="order-actions-btn" type="button" aria-label="Order actions" aria-haspopup="menu" aria-expanded="false">
+              <span aria-hidden="true">•••</span>
+            </button>
           </div>
           ${renderWorkflowProgress(order)}
         </div>
@@ -2061,13 +2170,13 @@ function renderOrders(list) {
     });
 
     card.addEventListener("contextmenu", (e) => {
-      if (e.target.closest(".swipe-action-btn") || e.target.closest(".swipe-delete-btn")) return;
+      if (e.target.closest(".swipe-action-btn") || e.target.closest(".swipe-delete-btn") || e.target.closest(".order-actions-wrap")) return;
       e.preventDefault();
       openWorkflowSheet(order, e);
     });
 
     card.addEventListener("touchstart", (e) => {
-      if (e.target.closest(".swipe-action-btn") || e.target.closest(".swipe-delete-btn")) return;
+      if (e.target.closest(".swipe-action-btn") || e.target.closest(".swipe-delete-btn") || e.target.closest(".order-actions-wrap")) return;
       startWorkflowPress(e, order);
     }, { passive: true });
 
@@ -2104,6 +2213,13 @@ function renderOrders(list) {
       e.preventDefault();
       suppressRowClick(row);
       await confirmAndDeleteOrder(order.orderNumber);
+    });
+
+    row.querySelector(".order-actions-btn")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      suppressRowClick(row, 250);
+      toggleDesktopOrderActionMenu(row, e.currentTarget, order);
     });
 
     ordersList.appendChild(row);
@@ -2159,7 +2275,7 @@ function renderOrderDetail(order) {
                <option value="Pending Response">Pending Response</option>
                <option value="In Transit to Me">In Transit to Me</option>
                <option value="In Progress">In Progress</option>
-               <option value="Waiting on Lace/Parts">Waiting on Lace/Parts</option>
+               <option value="Waiting on Lace/Parts">Waiting Parts</option>
                <option value="Ready to Go">Ready to Go</option>
                <option value="On Hold">On Hold</option>
                <option value="Completed">Completed</option>
@@ -3108,11 +3224,11 @@ function getWorkflowActions(order) {
     add("onHold", "On Hold");
   } else if (status === "customer approved") {
     add("inTransitToMe", "In Transit to Me");
-    add("waitingOnLaceParts", "Waiting on Lace/Parts");
+    add("waitingOnLaceParts", "Waiting Parts");
     add("startWork", "Start Work");
     add("onHold", "On Hold");
   } else if (status === "in transit to me") {
-    add("waitingOnLaceParts", "Waiting on Lace/Parts");
+    add("waitingOnLaceParts", "Waiting Parts");
     add("startWork", "Start Work");
     add("onHold", "On Hold");
   } else if (status === "waiting on lace/parts") {
@@ -3125,7 +3241,7 @@ function getWorkflowActions(order) {
     add("sendEstimate", "Send Estimate");
     add("customerApproved", "Customer Approved");
     add("inTransitToMe", "In Transit to Me");
-    add("waitingOnLaceParts", "Waiting on Lace/Parts");
+    add("waitingOnLaceParts", "Waiting Parts");
     add("startWork", "Start Work");
   } else if (status === "ready to go") {
     add("completed", "Completed");
@@ -3773,7 +3889,6 @@ function renderOrderMapMarkers(items, token, options = {}) {
 
 function renderMapPopup(order, address) {
   const location = getMapPopupLocation(order, address);
-  const status = String(order.status || "").trim();
 
   return `
     <div class="map-popup">
@@ -3783,7 +3898,6 @@ function renderMapPopup(order, address) {
           <div class="map-popup-meta">Order #${escapeHtml(order.orderNumber || "")}</div>
         </div>
       </div>
-      ${status ? `<div class="map-popup-status" title="${escapeAttr(status)}">${escapeHtml(status)}</div>` : ""}
       ${location ? `<div class="map-popup-location">${escapeHtml(location)}</div>` : ""}
       <button class="map-popup-btn" type="button" data-map-order="${escapeAttr(order.orderNumber || "")}">View Order</button>
     </div>
@@ -4787,6 +4901,11 @@ searchInput.addEventListener("input", applyFilters);
 searchInput.addEventListener("keydown", handleSearchKeydown);
 
 searchToggleBtn?.addEventListener("click", () => {
+  if (searchExpanded && !isMobileViewport()) {
+    cancelSearch();
+    return;
+  }
+
   if (searchExpanded && !searchInput.value.trim() && isMobileViewport()) {
     collapseSearchIfEmpty();
     return;
@@ -4869,12 +4988,20 @@ document.addEventListener("click", (e) => {
     syncOrderFilterUI();
     syncInventoryFilterUI();
   }
+
+  if (!e.target.closest?.(".order-actions-wrap")) {
+    closeDesktopOrderActionMenus();
+  }
 });
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
 
   let changed = false;
+
+  if (searchExpanded) {
+    cancelSearch();
+  }
 
   if (orderFiltersExpanded) {
     orderFiltersExpanded = false;
@@ -4885,6 +5012,8 @@ document.addEventListener("keydown", (e) => {
     inventoryFiltersExpanded = false;
     changed = true;
   }
+
+  closeDesktopOrderActionMenus();
 
   if (changed) {
     syncOrderFilterUI();
@@ -4897,8 +5026,11 @@ window.addEventListener("resize", () => {
     searchExpanded = false;
   }
 
+  closeDesktopOrderActionMenus();
   syncSearchUI();
 });
+
+window.addEventListener("scroll", closeDesktopOrderActionMenus, { passive: true, capture: true });
 
 backBtn.addEventListener("click", () => {
   clearSaveStatus();
