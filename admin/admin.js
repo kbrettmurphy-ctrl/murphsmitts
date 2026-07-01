@@ -1,6 +1,11 @@
 const API_BASE_URL = window.MM_ADMIN_CONFIG.API_BASE_URL;
 const TOKEN_KEY = "mm_admin_token";
 
+// Admin v2 default: keep controls compact, icon-first, and as close to native iOS/macOS behavior as practical.
+if ("scrollRestoration" in history) {
+  history.scrollRestoration = "manual";
+}
+
 const loginView = document.getElementById("loginView");
 const dashboardView = document.getElementById("dashboardView");
 const detailView = document.getElementById("detailView");
@@ -9,9 +14,16 @@ const mapView = document.getElementById("mapView");
 const detailTitle = document.getElementById("detailTitle");
 const pinInput = document.getElementById("pinInput");
 const loginStatus = document.getElementById("loginStatus");
+const mainPanel = document.querySelector(".main-panel");
 
 const logoutBtn = document.getElementById("logoutBtn");
 const searchInput = document.getElementById("searchInput");
+const searchToolbar = document.getElementById("searchToolbar");
+const searchToggleBtn = document.getElementById("searchToggleBtn");
+const searchClearBtn = document.getElementById("searchClearBtn");
+const searchCloseBtn = document.getElementById("searchCloseBtn");
+const pullRefreshIndicator = document.getElementById("pullRefreshIndicator");
+const pullRefreshText = document.getElementById("pullRefreshText");
 const ordersList = document.getElementById("ordersList");
 const orderCount = document.getElementById("orderCount");
 const viewTitle = document.getElementById("viewTitle");
@@ -53,6 +65,15 @@ let workflowPressTimer = null;
 let workflowSuppressOpeningTouch = false;
 let workflowSuppressOpeningTouchTimer = null;
 let suppressOrderCardClickUntil = 0;
+let searchExpanded = false;
+let pullRefreshState = {
+  tracking: false,
+  pulling: false,
+  refreshing: false,
+  startX: 0,
+  startY: 0,
+  distance: 0
+};
 let loginInProgress = false;
 let listScrollY = 0;
 let orderMap = null;
@@ -74,6 +95,113 @@ function showView(view) {
   }
 
   syncAuthUI();
+}
+
+function resetAdminScroll(activeContainer = null) {
+  const anchor =
+    activeContainer?.querySelector?.(".topbar") ||
+    activeContainer?.firstElementChild ||
+    activeContainer;
+
+  const containers = new Set([
+    document.scrollingElement,
+    document.documentElement,
+    document.body,
+    mainPanel,
+    loginView,
+    dashboardView,
+    detailView,
+    uploadView,
+    mapView,
+    saleGlovesView,
+    ordersList,
+    orderDetail,
+    activeContainer
+  ].filter(Boolean));
+
+  containers.forEach(container => {
+    container.scrollTop = 0;
+    container.scrollLeft = 0;
+  });
+
+  window.scrollTo(0, 0);
+
+  if (anchor && typeof anchor.scrollIntoView === "function") {
+    anchor.scrollIntoView({ block: "start", inline: "nearest" });
+  }
+}
+
+function getAdminScrollTop() {
+  return Math.max(
+    window.scrollY || 0,
+    document.documentElement.scrollTop || 0,
+    document.body.scrollTop || 0,
+    mainPanel?.scrollTop || 0
+  );
+}
+
+function setAdminScrollTop(value) {
+  const top = Math.max(0, Number(value) || 0);
+
+  window.scrollTo(0, top);
+  document.documentElement.scrollTop = top;
+  document.body.scrollTop = top;
+
+  if (mainPanel) {
+    mainPanel.scrollTop = top;
+    mainPanel.scrollLeft = 0;
+  }
+}
+
+function resetViewScroll(viewEl, { invalidateMap = false, blurActive = false } = {}) {
+  if (blurActive && document.activeElement && typeof document.activeElement.blur === "function") {
+    document.activeElement.blur();
+  }
+
+  const invalidate = () => {
+    if (invalidateMap && orderMap) {
+      orderMap.invalidateSize();
+    }
+  };
+
+  resetAdminScroll(viewEl);
+  invalidate();
+
+  queueMicrotask(() => {
+    resetAdminScroll(viewEl);
+    invalidate();
+  });
+
+  setTimeout(() => {
+    resetAdminScroll(viewEl);
+    invalidate();
+  }, 0);
+
+  setTimeout(() => {
+    resetAdminScroll(viewEl);
+    invalidate();
+  }, 90);
+
+  setTimeout(() => {
+    resetAdminScroll(viewEl);
+    invalidate();
+  }, 260);
+
+  requestAnimationFrame(() => {
+    resetAdminScroll(viewEl);
+    invalidate();
+
+    requestAnimationFrame(() => {
+      resetAdminScroll(viewEl);
+      invalidate();
+    });
+  });
+}
+
+function beginAdminViewSwitch() {
+  closeOtherSwipes(null);
+  cancelWorkflowPress();
+  resetAdminScroll();
 }
 
 function getToken() {
@@ -259,6 +387,82 @@ function normalizeStatus(value) {
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function normalizeForSearch(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function digitsOnly(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function getSearchTokens(value) {
+  return normalizeForSearch(value)
+    .split(/\s+/)
+    .map(token => token.trim())
+    .filter(Boolean);
+}
+
+function getOrderSearchText(order) {
+  const paidState = normalizeText(order.paid) === "paid" ? "paid" : "unpaid needs payment";
+  const fulfillmentState = looksLocalDropOff(order)
+    ? "local pickup drop off drop-off"
+    : "shipping shipped mail mail-in";
+
+  return [
+    order.orderNumber,
+    order.customerName,
+    String(order.customerName || "").split(/\s+/).filter(Boolean).join(" "),
+    order.emailAddress,
+    order.phoneNumber,
+    order.status,
+    paidState,
+    order.brandModel,
+    order.gloveType,
+    order.webType,
+    order.servicesRequested,
+    order.primaryLaceColor,
+    order.lacePrimary,
+    order.secondaryLaceColor,
+    order.laceAccent,
+    order.customColorRequest,
+    order.customLaceNotes,
+    order.dropOffMethod,
+    order.shippingMethod,
+    fulfillmentState,
+    order.city,
+    order.state,
+    order.zipCode,
+    order.zip,
+    order.internalNotes,
+    order.customerNotes,
+    order.gloveNotes
+  ].join(" ");
+}
+
+function orderMatchesSearch(order, query) {
+  const tokens = getSearchTokens(query);
+  if (!tokens.length) return true;
+
+  const text = normalizeForSearch(getOrderSearchText(order));
+  const compactText = text.replace(/\s+/g, "");
+  const digitText = [
+    order.phoneNumber,
+    order.orderNumber,
+    order.zipCode,
+    order.zip
+  ].map(digitsOnly).join(" ");
+
+  return tokens.every(token => {
+    if (text.includes(token) || compactText.includes(token)) return true;
+
+    const tokenDigits = digitsOnly(token);
+    return tokenDigits.length > 0 && digitText.includes(tokenDigits);
+  });
 }
 
 function val(id) {
@@ -1340,6 +1544,7 @@ function setActiveView(viewName) {
     return;
   }
 
+  beginAdminViewSwitch();
   activeView = viewName;
   navLinks.forEach(link => {
     link.classList.toggle("active", link.dataset.view === viewName);
@@ -1350,34 +1555,45 @@ function setActiveView(viewName) {
   if (viewName === "upload") {
     showView(uploadView);
     closeMenu();
+    resetViewScroll(uploadView, { blurActive: true });
     return;
   }
 
   if (viewName === "gloves-sale") {
-     loadSaleGloves();
-     showView(saleGlovesView);
-     closeMenu();
-     return;
+    const loadPromise = loadSaleGloves();
+    showView(saleGlovesView);
+    closeMenu();
+    resetViewScroll(saleGlovesView, { blurActive: true });
+    loadPromise.finally(() => resetViewScroll(saleGlovesView));
+    return;
   }
 
   if (viewName === "map") {
-     showView(mapView);
-     closeMenu();
-     renderMapView();
-     return;
+    showView(mapView);
+    closeMenu();
+    resetViewScroll(mapView, { invalidateMap: true, blurActive: true });
+    renderMapView().finally(() => resetViewScroll(mapView, { invalidateMap: true }));
+    return;
   }
 
+  let renderPromise = null;
   if (viewName === "inventory") {
-     searchInput.value = "";
-     loadInventory().catch(err => {
-       ordersList.innerHTML = `<div class="no-results">${escapeHtml(err.message || "Failed to load inventory.")}</div>`;
-     });
-   } else {
-     applyFilters();
-   }
+    searchInput.value = "";
+    syncSearchUI();
+    renderPromise = loadInventory().catch(err => {
+      ordersList.innerHTML = `<div class="no-results">${escapeHtml(err.message || "Failed to load inventory.")}</div>`;
+    });
+  } else {
+    applyFilters();
+  }
 
-   showView(dashboardView);
-   closeMenu();
+  showView(dashboardView);
+  closeMenu();
+  resetViewScroll(dashboardView, { blurActive: true });
+
+  if (renderPromise) {
+    renderPromise.finally(() => resetViewScroll(dashboardView));
+  }
 }
 
 function sortOrders(list) {
@@ -1410,28 +1626,230 @@ function sortOrders(list) {
 }
 
 function applyFilters() {
-  const q = searchInput.value.trim().toLowerCase();
+  const q = searchInput.value.trim();
+  const isSearching = !!q;
+  let list = (isSearching ? allOrders : getViewOrders()).slice();
 
-  let list;
-
-  if (q) {
-    // Search ALL orders when typing
-    list = allOrders.filter(order => {
-      return [
-        order.orderNumber,
-        order.customerName,
-        order.emailAddress,
-        order.phoneNumber,
-        order.status
-      ].some(v => String(v || "").toLowerCase().includes(q));
-    });
-  } else {
-    // No search = normal filtered view
-    list = getViewOrders();
+  if (isSearching) {
+    list = list.filter(order => orderMatchesSearch(order, q));
   }
 
   sortOrders(list);
   renderOrders(list);
+
+  if (isSearching) {
+    viewTitle.textContent = "Search";
+    orderCount.textContent = `${list.length} result${list.length === 1 ? "" : "s"}`;
+  } else {
+    viewTitle.textContent = getViewTitle(activeView);
+    orderCount.textContent = `${list.length} order${list.length === 1 ? "" : "s"}`;
+  }
+
+  syncSearchUI();
+}
+
+function isMobileViewport() {
+  return window.matchMedia("(max-width: 899px)").matches;
+}
+
+function syncSearchUI() {
+  const hasQuery = !!searchInput?.value.trim();
+
+  if (hasQuery && !searchExpanded) {
+    searchExpanded = true;
+  }
+
+  searchToolbar?.classList.toggle("is-collapsed", !searchExpanded);
+  searchToggleBtn?.setAttribute("aria-expanded", searchExpanded ? "true" : "false");
+
+  if (searchClearBtn) {
+    searchClearBtn.hidden = !hasQuery;
+  }
+}
+
+function expandSearch({ focus = false } = {}) {
+  searchExpanded = true;
+  syncSearchUI();
+
+  if (focus) {
+    requestAnimationFrame(() => {
+      searchInput?.focus({ preventScroll: true });
+    });
+  }
+}
+
+function collapseSearchIfEmpty() {
+  if (searchInput?.value.trim()) {
+    searchInput.focus({ preventScroll: true });
+    return;
+  }
+
+  searchExpanded = !isMobileViewport();
+  syncSearchUI();
+}
+
+function clearSearch() {
+  if (!searchInput) return;
+
+  searchInput.value = "";
+  applyFilters();
+  expandSearch({ focus: true });
+}
+
+function cancelSearch() {
+  if (!searchInput) return;
+
+  searchInput.value = "";
+  applyFilters();
+  searchExpanded = !isMobileViewport();
+  syncSearchUI();
+  searchInput.blur();
+  resetAdminScroll(dashboardView);
+}
+
+function handleSearchKeydown(e) {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    cancelSearch();
+    return;
+  }
+
+  if (e.key === "Enter") {
+    searchInput.blur();
+  }
+}
+
+function canStartPullRefresh(e) {
+  if (!window.matchMedia("(pointer: coarse)").matches) return false;
+  if (!isAuthenticated()) return false;
+  if (pullRefreshState.refreshing) return false;
+  if (!dashboardView?.classList.contains("active")) return false;
+  if (activeView === "inventory") return false;
+  if (document.body.classList.contains("workflow-open")) return false;
+  if (sideMenu?.classList.contains("open")) return false;
+  if (document.activeElement === searchInput) return false;
+  if (getAdminScrollTop() > 1) return false;
+  if (!e.touches || e.touches.length !== 1) return false;
+  if (e.target.closest("button, input, textarea, select, .swipe-action-panel, .side-menu")) return false;
+
+  return true;
+}
+
+function setPullRefreshIndicator(distance, state = "pull") {
+  if (!pullRefreshIndicator || !pullRefreshText) return;
+
+  const threshold = 74;
+  const clamped = Math.max(0, Math.min(82, distance));
+  const visible = clamped > 1 || state === "refreshing";
+
+  pullRefreshIndicator.classList.toggle("visible", visible);
+  pullRefreshIndicator.classList.toggle("ready", state === "ready");
+  pullRefreshIndicator.classList.toggle("refreshing", state === "refreshing");
+  pullRefreshIndicator.style.transform = `translate(-50%, ${visible ? clamped : 0}px)`;
+  pullRefreshText.textContent =
+    state === "refreshing"
+      ? "Refreshing..."
+      : distance >= threshold
+        ? "Release to refresh"
+        : "Pull to refresh";
+}
+
+function resetPullRefreshIndicator() {
+  pullRefreshState.tracking = false;
+  pullRefreshState.pulling = false;
+  pullRefreshState.distance = 0;
+  setPullRefreshIndicator(0, "pull");
+}
+
+async function refreshOrdersFromPull() {
+  if (pullRefreshState.refreshing) return;
+
+  pullRefreshState.refreshing = true;
+  setPullRefreshIndicator(74, "refreshing");
+
+  try {
+    await loadOrders();
+  } catch {
+    // loadOrders already falls back to cache; keep pull-to-refresh quiet.
+  } finally {
+    setTimeout(() => {
+      pullRefreshState.refreshing = false;
+      resetPullRefreshIndicator();
+    }, 240);
+  }
+}
+
+function initPullToRefresh() {
+  const threshold = 74;
+  const directionThreshold = 10;
+
+  document.addEventListener("touchstart", (e) => {
+    if (!canStartPullRefresh(e)) return;
+
+    const touch = e.touches[0];
+    pullRefreshState.tracking = true;
+    pullRefreshState.pulling = false;
+    pullRefreshState.startX = touch.clientX;
+    pullRefreshState.startY = touch.clientY;
+    pullRefreshState.distance = 0;
+  }, { passive: true });
+
+  document.addEventListener("touchmove", (e) => {
+    if (!pullRefreshState.tracking || pullRefreshState.refreshing) return;
+    if (!e.touches || e.touches.length !== 1) {
+      resetPullRefreshIndicator();
+      return;
+    }
+
+    const touch = e.touches[0];
+    const dx = touch.clientX - pullRefreshState.startX;
+    const dy = touch.clientY - pullRefreshState.startY;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+
+    if (!pullRefreshState.pulling) {
+      if (dy < 0 || (absX > directionThreshold && absX > absY)) {
+        resetPullRefreshIndicator();
+        return;
+      }
+
+      if (dy < directionThreshold || absY < absX * 1.2) {
+        return;
+      }
+
+      pullRefreshState.pulling = true;
+      closeOtherSwipes(null);
+      cancelWorkflowPress();
+    }
+
+    if (!pullRefreshState.pulling) return;
+
+    e.preventDefault();
+    cancelWorkflowPress();
+
+    const distance = Math.min(92, (dy - directionThreshold) * 0.55);
+    pullRefreshState.distance = Math.max(0, distance);
+    setPullRefreshIndicator(
+      pullRefreshState.distance,
+      pullRefreshState.distance >= threshold ? "ready" : "pull"
+    );
+  }, { passive: false });
+
+  document.addEventListener("touchend", () => {
+    if (!pullRefreshState.tracking) return;
+
+    const shouldRefresh = pullRefreshState.pulling && pullRefreshState.distance >= threshold;
+    pullRefreshState.tracking = false;
+    pullRefreshState.pulling = false;
+
+    if (shouldRefresh) {
+      refreshOrdersFromPull();
+    } else {
+      resetPullRefreshIndicator();
+    }
+  });
+
+  document.addEventListener("touchcancel", resetPullRefreshIndicator);
 }
 
 async function deleteOrder(orderNumber) {
@@ -2111,9 +2529,7 @@ async function saveCurrentOrderFromForm() {
   currentOrder = updated;
   renderOrderDetail(updated);
   saveStatusEl.textContent = "Saved.";
-  orderDetail.scrollTop = 0;
-  detailView.scrollTop = 0;
-  window.scrollTo(0, 0);
+  resetAdminScroll(detailView);
 }
 
 async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false) {
@@ -4038,7 +4454,7 @@ function fileToDataUrl(file) {
 }
 
 function openOrder(orderNumber) {
-  listScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  listScrollY = getAdminScrollTop();
   const order = allOrders.find(o => String(o.orderNumber) === String(orderNumber));
   if (!order) {
     alert("Order not found.");
@@ -4048,9 +4464,7 @@ function openOrder(orderNumber) {
   renderOrderDetail(order);
   clearSaveStatus();
   showView(detailView);
-  orderDetail.scrollTop = 0;
-  detailView.scrollTop = 0;
-  window.scrollTo(0, 0);
+  resetViewScroll(detailView);
 
   requestAnimationFrame(() => {
     const topbar = detailView.querySelector(".detail-topbar");
@@ -4080,13 +4494,36 @@ logoutBtn.addEventListener("click", () => {
 });
 
 searchInput.addEventListener("input", applyFilters);
+searchInput.addEventListener("keydown", handleSearchKeydown);
+
+searchToggleBtn?.addEventListener("click", () => {
+  if (searchExpanded && !searchInput.value.trim() && isMobileViewport()) {
+    collapseSearchIfEmpty();
+    return;
+  }
+
+  expandSearch({ focus: true });
+});
+
+searchClearBtn?.addEventListener("click", clearSearch);
+searchCloseBtn?.addEventListener("click", cancelSearch);
+
+window.addEventListener("resize", () => {
+  if (!isMobileViewport()) {
+    searchExpanded = true;
+  } else if (!searchInput.value.trim()) {
+    searchExpanded = false;
+  }
+
+  syncSearchUI();
+});
 
 backBtn.addEventListener("click", () => {
   clearSaveStatus();
   showView(dashboardView);
 
   requestAnimationFrame(() => {
-    window.scrollTo(0, listScrollY);
+    setAdminScrollTop(listScrollY);
   });
 });
 
@@ -4201,7 +4638,11 @@ document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
 (async function init() {
   installSwipeDeleteStyles();
   initUploadView();
+  initPullToRefresh();
+  searchExpanded = !isMobileViewport();
+  syncSearchUI();
   syncAuthUI();
+  resetAdminScroll();
 
   if (!getToken()) {
     showView(loginView);

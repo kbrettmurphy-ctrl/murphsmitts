@@ -72,14 +72,42 @@
               <p id="orderCount" class="muted"></p>
             </div>
           </div>
-          <div style="display:flex; gap:8px;">
-            <button id="refreshBtn" class="secondary">🔄</button>
-            <button id="logoutBtn" class="secondary">Log Out</button>
+          <div class="topbar-actions">
+            <button id="searchToggleBtn" class="secondary topbar-icon-action" type="button" aria-label="Search orders" aria-expanded="false" aria-controls="searchToolbar">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="11" cy="11" r="6"></circle>
+                <path d="m16 16 4 4"></path>
+              </svg>
+            </button>
+            <button id="refreshBtn" class="secondary topbar-icon-action" type="button" aria-label="Refresh orders">↻</button>
+            <button id="logoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
+              <span class="logout-action-text">Log Out</span>
+              <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M10 6H6.8A2.8 2.8 0 0 0 4 8.8v6.4A2.8 2.8 0 0 0 6.8 18H10"></path>
+                <path d="M14 8l4 4-4 4"></path>
+                <path d="M8.8 12H18"></path>
+              </svg>
+            </button>
           </div>
         </header>
 
-        <div class="toolbar">
-          <input id="searchInput" type="search" placeholder="Search by order #, name, email..." />
+        <div id="searchToolbar" class="toolbar search-toolbar is-collapsed">
+          <div class="search-control">
+            <div class="search-field-shell">
+              <svg class="search-field-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="11" cy="11" r="6"></circle>
+                <path d="m16 16 4 4"></path>
+              </svg>
+              <input id="searchInput" type="search" placeholder="Search orders" autocomplete="off" enterkeyhint="search" />
+              <button id="searchClearBtn" class="search-clear-btn" type="button" aria-label="Clear search" hidden>×</button>
+            </div>
+            <button id="searchCloseBtn" class="search-close-btn" type="button">Cancel</button>
+          </div>
+        </div>
+
+        <div id="pullRefreshIndicator" class="pull-refresh-indicator" aria-hidden="true">
+          <span class="pull-refresh-spinner" aria-hidden="true"></span>
+          <span id="pullRefreshText">Pull to refresh</span>
         </div>
 
         <div id="ordersList" class="orders-list"></div>
@@ -97,7 +125,14 @@
 
           <div style="display:flex; gap:8px;">
             <button id="mapRefreshBtn" class="secondary">🔄</button>
-            <button id="mapLogoutBtn" class="secondary">Log Out</button>
+            <button id="mapLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
+              <span class="logout-action-text">Log Out</span>
+              <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M10 6H6.8A2.8 2.8 0 0 0 4 8.8v6.4A2.8 2.8 0 0 0 6.8 18H10"></path>
+                <path d="M14 8l4 4-4 4"></path>
+                <path d="M8.8 12H18"></path>
+              </svg>
+            </button>
           </div>
         </header>
 
@@ -127,7 +162,14 @@
 
           <div style="display:flex; gap:8px;">
             <button id="uploadRefreshBtn" class="secondary">🔄</button>
-            <button id="uploadLogoutBtn" class="secondary">Log Out</button>
+            <button id="uploadLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
+              <span class="logout-action-text">Log Out</span>
+              <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M10 6H6.8A2.8 2.8 0 0 0 4 8.8v6.4A2.8 2.8 0 0 0 6.8 18H10"></path>
+                <path d="M14 8l4 4-4 4"></path>
+                <path d="M8.8 12H18"></path>
+              </svg>
+            </button>
           </div>
         </header>
 
@@ -188,7 +230,14 @@
           <div style="display:flex; gap:8px;">
             <button id="addSaleGloveBtn" class="secondary">+ Add</button>
             <button id="saleGlovesRefreshBtn" class="secondary">🔄</button>
-            <button id="saleGlovesLogoutBtn" class="secondary">Log Out</button>
+            <button id="saleGlovesLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
+              <span class="logout-action-text">Log Out</span>
+              <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M10 6H6.8A2.8 2.8 0 0 0 4 8.8v6.4A2.8 2.8 0 0 0 6.8 18H10"></path>
+                <path d="M14 8l4 4-4 4"></path>
+                <path d="M8.8 12H18"></path>
+              </svg>
+            </button>
           </div>
         </header>
 
