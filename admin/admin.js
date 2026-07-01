@@ -25,6 +25,7 @@ const searchCloseBtn = document.getElementById("searchCloseBtn");
 const orderFilterToggleBtn = document.getElementById("orderFilterToggleBtn");
 const orderFilterPopover = document.getElementById("orderFilterPopover");
 const orderFilterButtons = Array.from(document.querySelectorAll("[data-order-filter]"));
+const orderNewBtn = document.getElementById("orderNewBtn");
 const inventoryFilterToggleBtn = document.getElementById("inventoryFilterToggleBtn");
 const inventoryAddBtn = document.getElementById("inventoryAddBtn");
 const inventoryFilterPopover = document.getElementById("inventoryFilterPopover");
@@ -69,6 +70,8 @@ let reorderBannerDismissed = false;
 let allOrders = [];
 let activeView = "current";
 let currentOrder = null;
+let detailMode = "edit";
+let customerSuggestionState = null;
 let workflowSheetEl = null;
 let inventorySheetEl = null;
 let adminMenuLayer = null;
@@ -1824,6 +1827,10 @@ function syncSearchUI() {
     searchToggleBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
   }
 
+  if (orderNewBtn) {
+    orderNewBtn.hidden = !showSearch;
+  }
+
   if (searchClearBtn) {
     searchClearBtn.hidden = !hasQuery;
   }
@@ -2249,9 +2256,13 @@ function renderOrders(list) {
 }
 
 function renderOrderDetail(order) {
+  detailMode = "edit";
   currentOrder = order;
   if (detailTitle) {
     detailTitle.textContent = "Order Detail";
+  }
+  if (saveOrderBtn) {
+    saveOrderBtn.textContent = "Save";
   }
   clearSaveStatus();
 
@@ -2532,6 +2543,494 @@ function renderOrderDetail(order) {
   wireOrderPhotoLightbox(order);
 
   wireDetailForm();
+}
+
+function getBlankAdminOrder() {
+  return {
+    orderNumber: "",
+    customerName: "",
+    phoneNumber: "",
+    emailAddress: "",
+    socialTag: "",
+    referralSource: "",
+    status: "Received",
+    paid: "Unpaid",
+    priceQuoted: null,
+    shippingCost: null,
+    dateReceived: "",
+    estimatedCompletion: "",
+    dateCompleted: "",
+    brandModel: "",
+    gloveType: "",
+    webType: "",
+    servicesRequested: "",
+    dropOffMethod: "Local Drop-Off",
+    primaryLaceColor: "",
+    secondaryLaceColor: "",
+    customColorRequest: "",
+    streetAddress: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    gloveNotes: "",
+    internalNotes: "",
+    smsOptIn: false
+  };
+}
+
+function renderNewOrderForm() {
+  detailMode = "new";
+  currentOrder = null;
+  const order = getBlankAdminOrder();
+  if (detailTitle) {
+    detailTitle.textContent = "New Order";
+  }
+  if (saveOrderBtn) {
+    saveOrderBtn.textContent = "Create";
+  }
+  clearSaveStatus();
+
+  orderDetail.innerHTML = `
+    <div class="detail-form-shell">
+      <section class="detail-section">
+        <div class="detail-section-header">
+          <h2>Customer</h2>
+        </div>
+
+        <div class="detail-section-grid">
+          <div class="detail-block">
+            <div class="label">Customer Name</div>
+            <input id="editCustomerName" type="text" autocomplete="name" required />
+            <div id="customerLookupPopover" class="admin-customer-autocomplete" role="listbox" hidden></div>
+          </div>
+          ${renderPhoneInput("Phone", "editPhoneNumber", "")}
+          <div class="detail-block">
+            <div class="label">Email</div>
+            <input id="editEmailAddress" type="email" autocomplete="email" />
+          </div>
+          <div class="detail-block">
+            <div class="label">SMS Opt-In</div>
+            <select id="editSmsOptIn">
+              <option value="false">No</option>
+              <option value="true">Yes</option>
+            </select>
+          </div>
+          <div class="detail-block">
+            <div class="label">Social Tag</div>
+            <input id="editSocialTag" type="text" value="${escapeAttr(order.socialTag)}" />
+          </div>
+          ${renderReferralSourceEditor(order.referralSource)}
+        </div>
+      </section>
+
+      <section class="detail-section">
+        <div class="detail-section-header">
+          <h2>Order Status</h2>
+        </div>
+
+        <div class="detail-section-grid">
+          <div class="detail-block">
+            <div class="label">Status</div>
+            <select id="editStatus">
+               <option value="Received">Received</option>
+               <option value="Estimate Sent">Estimate Sent</option>
+               <option value="Customer Approved">Customer Approved</option>
+               <option value="Pending Response">Pending Response</option>
+               <option value="In Transit to Me">In Transit to Me</option>
+               <option value="In Progress">In Progress</option>
+               <option value="Waiting on Lace/Parts">Waiting Parts</option>
+               <option value="Ready to Go">Ready to Go</option>
+               <option value="On Hold">On Hold</option>
+               <option value="Completed">Completed</option>
+               <option value="Picked Up">Picked Up</option>
+             </select>
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Paid?</div>
+            <select id="editPaid">
+              <option value="Paid">Paid</option>
+              <option value="Unpaid" selected>Unpaid</option>
+            </select>
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Price Quoted</div>
+            <input id="editPriceQuoted" type="text" inputmode="decimal" placeholder="$0.00" />
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Date Received</div>
+            <input id="editDateReceived" type="date" />
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Estimated Completion</div>
+            <input id="editEstimatedCompletion" type="date" />
+          </div>
+        </div>
+      </section>
+
+      <section class="detail-section">
+        <div class="detail-section-header">
+          <h2>Glove Details</h2>
+        </div>
+
+        <div class="detail-section-grid">
+          <div class="detail-block">
+            <div class="label">Brand / Model</div>
+            <input id="editBrandModel" type="text" />
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Glove Type</div>
+            <select id="editGloveType">${gloveTypeOptions(order.gloveType)}</select>
+          </div>
+
+          <div id="editWebTypeWrap" class="detail-block">
+            <div class="label">Web Type</div>
+            <select id="editWebType">${webTypeOptions(order.webType)}</select>
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Drop-Off Method</div>
+            <select id="editDropOffMethod">${dropOffMethodOptions(order.dropOffMethod)}</select>
+          </div>
+        </div>
+      </section>
+
+      <section class="detail-section">
+        <div class="detail-section-header">
+          <h2>Services</h2>
+        </div>
+
+        <div class="detail-section-grid">
+          ${renderServicesEditor(order.servicesRequested)}
+        </div>
+      </section>
+
+      <section class="detail-section">
+        <div class="detail-section-header">
+          <h2>Lace</h2>
+        </div>
+
+        <div class="detail-section-grid">
+          ${renderLaceInput("Primary Lace Color", "editPrimaryLaceColor", "", "Choose")}
+          ${renderLaceInput("Secondary / Accent Lace Color", "editSecondaryLaceColor", "", "Only if multi-colors wanted")}
+
+          <div class="detail-block full">
+            <div class="label">Custom Color Request</div>
+            <textarea id="editCustomColorRequest" rows="1" placeholder="Don’t see your color? Describe it here."></textarea>
+          </div>
+        </div>
+      </section>
+
+      <div id="editShippingSection" class="detail-section is-hidden">
+        <div class="detail-section-header">
+          <h2>Shipping</h2>
+        </div>
+
+        <div class="detail-section-grid">
+          <div class="detail-block full">
+            <div class="label">Street Address</div>
+            <input id="editStreetAddress" type="text" autocomplete="street-address" />
+          </div>
+
+          <div class="detail-block">
+            <div class="label">City</div>
+            <input id="editCity" type="text" autocomplete="address-level2" />
+          </div>
+
+          <div class="detail-block">
+            <div class="label">State</div>
+            <select id="editState">${stateOptions(order.state)}</select>
+          </div>
+
+          <div class="detail-block">
+            <div class="label">Zip Code</div>
+            <input id="editZipCode" type="text" inputmode="numeric" autocomplete="postal-code" />
+          </div>
+        </div>
+      </div>
+
+      <section class="detail-section">
+        <div class="detail-section-header">
+          <h2>Notes</h2>
+        </div>
+
+        <div class="detail-section-grid">
+          <div class="detail-block full">
+            <div class="label">Customer Notes</div>
+            <textarea id="editGloveNotes" rows="2"></textarea>
+          </div>
+
+          <div class="detail-block full">
+            <div class="label">Internal Notes</div>
+            <textarea id="editInternalNotes" rows="2"></textarea>
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+
+  document.getElementById("editStatus").value = order.status;
+  document.getElementById("editDropOffMethod").value = order.dropOffMethod;
+  wireDetailForm();
+  wireNewOrderCustomerLookup();
+}
+
+function getOrderRecencyTime(order) {
+  const candidates = [
+    order.createdAt,
+    order.updatedAt,
+    order.dateReceived,
+    order.timestampSubmitted
+  ];
+
+  for (const candidate of candidates) {
+    const time = Date.parse(String(candidate || "").trim());
+    if (!Number.isNaN(time)) return time;
+  }
+
+  return Number(String(order.orderNumber || "").replace(/[^\d]/g, "")) || 0;
+}
+
+function buildCustomerSuggestions() {
+  const suggestions = [];
+  const seenEmails = new Set();
+  const seenPhones = new Set();
+  const seenNames = new Set();
+
+  allOrders
+    .slice()
+    .sort((a, b) => getOrderRecencyTime(b) - getOrderRecencyTime(a))
+    .forEach(order => {
+      const email = normalizeText(order.emailAddress).toLowerCase();
+      const phone = digitsOnly(order.phoneNumber);
+      const name = normalizeText(order.customerName).toLowerCase();
+      if (!email && !phone && !name) return;
+
+      if (
+        (email && seenEmails.has(email)) ||
+        (phone && seenPhones.has(phone)) ||
+        (!email && !phone && name && seenNames.has(name))
+      ) {
+        return;
+      }
+
+      if (email) seenEmails.add(email);
+      if (phone) seenPhones.add(phone);
+      if (name) seenNames.add(name);
+      suggestions.push(order);
+    });
+
+  return suggestions;
+}
+
+function customerMatchesQuery(order, query) {
+  const q = normalizeText(query).toLowerCase();
+  const qDigits = digitsOnly(query);
+  if (!q && !qDigits) return false;
+
+  const haystack = [
+    order.customerName,
+    order.emailAddress,
+    order.city,
+    order.state,
+    order.orderNumber
+  ].map(value => normalizeText(value).toLowerCase());
+
+  const textMatch = q && haystack.some(value => value.includes(q));
+  const phoneMatch = qDigits && digitsOnly(order.phoneNumber).includes(qDigits);
+  return textMatch || phoneMatch;
+}
+
+function renderCustomerSuggestionRow(order, index, activeIndex) {
+  const location = [order.city, order.state].map(normalizeText).filter(Boolean).join(", ");
+  const contactBits = [
+    formatPhoneForInput(order.phoneNumber || ""),
+    order.emailAddress || "",
+    location
+  ].filter(Boolean);
+  const meta = [
+    order.orderNumber ? `#${order.orderNumber}` : "",
+    order.dateReceived || order.createdAt || ""
+  ].filter(Boolean).join(" · ");
+
+  return `
+    <button
+      class="admin-customer-suggestion${index === activeIndex ? " is-active" : ""}"
+      type="button"
+      role="option"
+      aria-selected="${index === activeIndex ? "true" : "false"}"
+      data-customer-index="${index}"
+    >
+      <span class="admin-customer-suggestion-main">
+        <span class="admin-customer-suggestion-name">${escapeHtml(order.customerName || "Unnamed customer")}</span>
+        ${meta ? `<span class="admin-customer-suggestion-meta">${escapeHtml(meta)}</span>` : ""}
+      </span>
+      ${contactBits.length ? `<span class="admin-customer-suggestion-sub">${escapeHtml(contactBits.join(" · "))}</span>` : ""}
+    </button>
+  `;
+}
+
+function renderCustomerSuggestions() {
+  const state = customerSuggestionState;
+  if (!state?.popover) return;
+
+  if (!state.matches.length) {
+    state.popover.hidden = true;
+    state.activeIndex = -1;
+    return;
+  }
+
+  state.popover.innerHTML = state.matches
+    .map((order, index) => renderCustomerSuggestionRow(order, index, state.activeIndex))
+    .join("");
+  state.popover.hidden = false;
+}
+
+function updateCustomerSuggestions(query) {
+  if (!customerSuggestionState) return;
+
+  const normalized = normalizeText(query);
+  const qDigits = digitsOnly(query);
+  if (normalized.length < 2 && qDigits.length < 3) {
+    customerSuggestionState.matches = [];
+    renderCustomerSuggestions();
+    return;
+  }
+
+  customerSuggestionState.matches = buildCustomerSuggestions()
+    .filter(order => customerMatchesQuery(order, query))
+    .slice(0, 6);
+  customerSuggestionState.activeIndex = customerSuggestionState.matches.length ? 0 : -1;
+  renderCustomerSuggestions();
+}
+
+function setFieldValue(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const nextValue = value || "";
+  if (el.tagName === "SELECT" && nextValue && !Array.from(el.options).some(option => option.value === nextValue)) {
+    el.add(new Option(nextValue, nextValue));
+  }
+  el.value = nextValue;
+}
+
+function selectCustomerSuggestion(order) {
+  if (!order) return;
+
+  setFieldValue("editCustomerName", order.customerName || "");
+  setFieldValue("editPhoneNumber", formatPhoneForInput(order.phoneNumber || ""));
+  setFieldValue("editEmailAddress", order.emailAddress || "");
+  setFieldValue("editSmsOptIn", order.smsOptIn ? "true" : "false");
+  setFieldValue("editSocialTag", order.socialTag || "");
+  setFieldValue("editReferralSource", order.referralSource || "");
+
+  const dropOffMethod = order.dropOffMethod || order.dropoffMethod || "Local Drop-Off";
+  setFieldValue("editDropOffMethod", dropOffMethod);
+  document.getElementById("editDropOffMethod")?.dispatchEvent(new Event("change"));
+
+  if (!looksLocalDropOff({ dropOffMethod })) {
+    setFieldValue("editStreetAddress", order.streetAddress || order.address || "");
+    setFieldValue("editCity", order.city || "");
+    setFieldValue("editState", order.state || "");
+    setFieldValue("editZipCode", order.zipCode || order.zip || "");
+  }
+
+  if (customerSuggestionState?.popover) {
+    customerSuggestionState.popover.hidden = true;
+  }
+  if (saveStatusEl) {
+    saveStatusEl.textContent = "Customer info filled.";
+  }
+}
+
+function clearNewOrderCustomerInfo() {
+  [
+    "editCustomerName",
+    "editPhoneNumber",
+    "editEmailAddress",
+    "editSocialTag",
+    "editStreetAddress",
+    "editCity",
+    "editState",
+    "editZipCode"
+  ].forEach(id => setFieldValue(id, ""));
+  setFieldValue("editSmsOptIn", "false");
+  setFieldValue("editReferralSource", "");
+  setFieldValue("editDropOffMethod", "Local Drop-Off");
+  document.getElementById("editDropOffMethod")?.dispatchEvent(new Event("change"));
+  if (saveStatusEl) {
+    saveStatusEl.textContent = "Customer info cleared.";
+  }
+}
+
+function wireNewOrderCustomerLookup() {
+  const nameInput = document.getElementById("editCustomerName");
+  const phoneInput = document.getElementById("editPhoneNumber");
+  const emailInput = document.getElementById("editEmailAddress");
+  const popover = document.getElementById("customerLookupPopover");
+  if (!nameInput || !phoneInput || !emailInput || !popover) return;
+
+  customerSuggestionState = {
+    popover,
+    matches: [],
+    activeIndex: -1
+  };
+
+  const searchableInputs = [nameInput, phoneInput, emailInput];
+  searchableInputs.forEach(input => {
+    input.setAttribute("autocomplete", "off");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-controls", "customerLookupPopover");
+    input.addEventListener("input", () => updateCustomerSuggestions(input.value));
+    input.addEventListener("focus", () => updateCustomerSuggestions(input.value));
+    input.addEventListener("keydown", (e) => {
+      const state = customerSuggestionState;
+      if (!state || state.popover.hidden) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        state.activeIndex = Math.min(state.matches.length - 1, state.activeIndex + 1);
+        renderCustomerSuggestions();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        state.activeIndex = Math.max(0, state.activeIndex - 1);
+        renderCustomerSuggestions();
+      } else if (e.key === "Enter" && state.activeIndex >= 0) {
+        e.preventDefault();
+        selectCustomerSuggestion(state.matches[state.activeIndex]);
+      } else if (e.key === "Escape") {
+        state.popover.hidden = true;
+      }
+    });
+  });
+
+  popover.addEventListener("pointerdown", e => {
+    e.preventDefault();
+  });
+
+  popover.addEventListener("click", e => {
+    const btn = e.target.closest("[data-customer-index]");
+    if (!btn || !customerSuggestionState) return;
+    selectCustomerSuggestion(customerSuggestionState.matches[Number(btn.dataset.customerIndex)]);
+  });
+
+  const clearBtn = document.createElement("button");
+  clearBtn.className = "admin-customer-clear";
+  clearBtn.type = "button";
+  clearBtn.textContent = "Clear customer info";
+  clearBtn.addEventListener("click", clearNewOrderCustomerInfo);
+  popover.insertAdjacentElement("afterend", clearBtn);
+
+  document.addEventListener("click", (e) => {
+    if (detailMode !== "new" || !customerSuggestionState?.popover) return;
+    if (customerSuggestionState.popover !== popover) return;
+    if (popover.contains(e.target) || searchableInputs.some(input => input.contains(e.target))) return;
+    customerSuggestionState.popover.hidden = true;
+  });
 }
 
 function wireOrderPhotoControls(order) {
@@ -3037,6 +3536,100 @@ async function saveCurrentOrderFromForm() {
   renderOrderDetail(updated);
   saveStatusEl.textContent = "Saved.";
   resetAdminScroll(detailView);
+}
+
+function getAdminOrderFormPayload() {
+  const dropOffMethod = val("editDropOffMethod");
+  const isLocal = looksLocalDropOff({ dropOffMethod });
+  const gloveType = val("editGloveType");
+  const webType = gloveType === "Fielders Glove" ? val("editWebType") : "";
+  const parsedPrice = parseMoneyInput(val("editPriceQuoted"));
+
+  const payload = {
+    customerName: val("editCustomerName"),
+    phoneNumber: formatPhoneForInput(val("editPhoneNumber")),
+    emailAddress: val("editEmailAddress"),
+    smsOptIn: val("editSmsOptIn") === "true",
+    status: val("editStatus") || "Received",
+    paid: val("editPaid") || "Unpaid",
+    priceQuoted: parsedPrice === "" ? null : parsedPrice,
+    dateReceived: emptyToNull(val("editDateReceived")),
+    estimatedCompletion: emptyToNull(val("editEstimatedCompletion")),
+    brandModel: val("editBrandModel"),
+    gloveType,
+    webType,
+    servicesRequested: getSelectedServices(),
+    dropOffMethod,
+    referralSource: getReferralSourceValue(),
+    socialTag: emptyToNull(val("editSocialTag")),
+    gloveNotes: val("editGloveNotes"),
+    customerNotes: val("editGloveNotes"),
+    primaryLaceColor: val("editPrimaryLaceColor"),
+    lacePrimary: val("editPrimaryLaceColor"),
+    secondaryLaceColor: val("editSecondaryLaceColor"),
+    laceAccent: val("editSecondaryLaceColor"),
+    customColorRequest: val("editCustomColorRequest"),
+    customLaceNotes: val("editCustomColorRequest"),
+    streetAddress: isLocal ? null : emptyToNull(val("editStreetAddress")),
+    city: isLocal ? null : emptyToNull(val("editCity")),
+    state: isLocal ? null : emptyToNull(val("editState")),
+    zipCode: isLocal ? null : emptyToNull(val("editZipCode"))
+  };
+
+  return payload;
+}
+
+function validateNewOrderPayload(payload) {
+  if (!payload.customerName) {
+    return "Customer name is required.";
+  }
+
+  if (!payload.phoneNumber && !payload.emailAddress) {
+    return "Add a phone number or email.";
+  }
+
+  if (payload.smsOptIn && !payload.phoneNumber) {
+    return "Phone is required when SMS opt-in is enabled.";
+  }
+
+  if (!looksLocalDropOff({ dropOffMethod: payload.dropOffMethod })) {
+    if (!payload.streetAddress || !payload.city || !payload.state || !payload.zipCode) {
+      return "Shipping orders need street, city, state, and zip.";
+    }
+  }
+
+  return "";
+}
+
+async function createNewOrderFromForm() {
+  if (!saveStatusEl) return;
+
+  const payload = getAdminOrderFormPayload();
+  const validationMessage = validateNewOrderPayload(payload);
+  if (validationMessage) {
+    saveStatusEl.textContent = validationMessage;
+    return;
+  }
+
+  saveStatusEl.textContent = "Creating...";
+
+  const data = await postJson({
+    action: "createOrder",
+    order: payload
+  }, true);
+
+  if (!data.order) {
+    throw new Error("Order created, but no order was returned.");
+  }
+
+  const created = data.order;
+  mergeUpdatedOrder(created);
+  localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
+  applyFilters();
+  openOrder(created.orderNumber);
+  if (saveStatusEl) {
+    saveStatusEl.textContent = "Created.";
+  }
 }
 
 async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false) {
@@ -5715,6 +6308,17 @@ orderFilterButtons.forEach(btn => {
   });
 });
 
+orderNewBtn?.addEventListener("click", () => {
+  listScrollY = getAdminScrollTop();
+  orderFiltersExpanded = false;
+  inventoryFiltersExpanded = false;
+  syncOrderFilterUI();
+  syncInventoryFilterUI();
+  renderNewOrderForm();
+  showView(detailView);
+  resetViewScroll(detailView, { blurActive: true });
+});
+
 inventoryFilterToggleBtn?.addEventListener("click", (e) => {
   e.stopPropagation();
   if (activeView !== "inventory") return;
@@ -5832,6 +6436,10 @@ window.addEventListener("scroll", closeAdminFilterPopovers, { passive: true, cap
 
 backBtn.addEventListener("click", () => {
   clearSaveStatus();
+  detailMode = "edit";
+  if (saveOrderBtn) {
+    saveOrderBtn.textContent = "Save";
+  }
   showView(dashboardView);
 
   requestAnimationFrame(() => {
@@ -5883,7 +6491,11 @@ mapLogoutBtn?.addEventListener("click", () => {
 if (saveOrderBtn) {
   saveOrderBtn.addEventListener("click", async () => {
     try {
-      await saveCurrentOrderFromForm();
+      if (detailMode === "new") {
+        await createNewOrderFromForm();
+      } else {
+        await saveCurrentOrderFromForm();
+      }
     } catch (err) {
       if (saveStatusEl) saveStatusEl.textContent = err.message;
     }

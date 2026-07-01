@@ -283,6 +283,16 @@ export async function onRequest(context) {
       return json(result, 200, jsonHeaders);
     }
 
+    if (action === "createOrder") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await createOrderAction(env, body);
+      return json(result, 200, jsonHeaders);
+    }
+
     if (action === "updateOrder") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -1414,6 +1424,122 @@ async function fetchOrderByNumber(env, orderNumber) {
   };
 }
 
+async function createOrderAction(env, body) {
+  const input = body.order || {};
+  const customerName = cleanText(input.customerName);
+  const phoneNumber = cleanText(input.phoneNumber);
+  const emailAddress = cleanText(input.emailAddress);
+  const dropOffMethod = cleanText(input.dropOffMethod) || "Local Drop-Off";
+  const smsOptIn = toBoolean(input.smsOptIn);
+
+  if (!customerName) {
+    return { ok: false, error: "Customer name is required." };
+  }
+
+  if (!phoneNumber && !emailAddress) {
+    return { ok: false, error: "Add a phone number or email." };
+  }
+
+  if (smsOptIn && !phoneNumber) {
+    return { ok: false, error: "Phone is required when SMS opt-in is enabled." };
+  }
+
+  if (looksLikeShipMethod(dropOffMethod)) {
+    if (!cleanText(input.streetAddress) || !cleanText(input.city) || !cleanText(input.state) || !cleanText(input.zipCode)) {
+      return { ok: false, error: "Shipping orders need street, city, state, and zip." };
+    }
+  }
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const nextOrderNumber = await getNextAdminOrderNumber(env);
+    const dbOrder = {
+      ...mapUpdatesToDb({
+        ...input,
+        customerName,
+        phoneNumber,
+        emailAddress,
+        dropOffMethod,
+        status: cleanText(input.status) || "Received",
+        paid: cleanText(input.paid) || "Unpaid",
+        smsOptIn
+      }),
+      timestamp_submitted: new Date().toISOString(),
+      order_number: nextOrderNumber,
+      glove_photos: [],
+      shipping_cost: null,
+      tracking_number: null,
+      carrier: null,
+      date_completed: null,
+      allow_ship_without_payment: false,
+      last_status_emailed: null,
+      last_status_texted: null
+    };
+
+    if (!looksLikeShipMethod(dropOffMethod)) {
+      dbOrder.street_address = null;
+      dbOrder.city = null;
+      dbOrder.state = null;
+      dbOrder.zip_code = null;
+    }
+
+    const insert = await supabaseFetch(
+      env,
+      `/rest/v1/orders`,
+      {
+        method: "POST",
+        headers: {
+          Prefer: "return=representation"
+        },
+        body: JSON.stringify(dbOrder)
+      }
+    );
+
+    if (insert.ok && Array.isArray(insert.data) && insert.data[0]) {
+      return {
+        ok: true,
+        order: mapOrderFromDb(insert.data[0])
+      };
+    }
+
+    const details = JSON.stringify(insert.error || {});
+    if (!/duplicate|unique|23505/i.test(details)) {
+      return {
+        ok: false,
+        error: "Failed to create order in Supabase.",
+        details: insert.error
+      };
+    }
+  }
+
+  return {
+    ok: false,
+    error: "Could not reserve the next order number. Please try again."
+  };
+}
+
+async function getNextAdminOrderNumber(env) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/orders?select=order_number`
+  );
+
+  if (!resp.ok) {
+    throw new Error("Failed to determine next order number.");
+  }
+
+  let maxNum = 79;
+  if (Array.isArray(resp.data)) {
+    for (const row of resp.data) {
+      const n = parseInt(String(row.order_number || "").trim(), 10);
+      if (!Number.isNaN(n) && n > maxNum) {
+        maxNum = n;
+      }
+    }
+  }
+
+  return String(maxNum + 1).padStart(4, "0");
+}
+
 async function uploadOrderPhotoAction(env, body) {
   const orderNumber = cleanText(body.orderNumber);
   const filename = cleanText(body.filename);
@@ -1979,6 +2105,7 @@ function mapUpdatesToDb(updates) {
   if ("shippingCost" in updates) out.shipping_cost = cleanNumeric(updates.shippingCost);
   if ("paid" in updates) out.paid = cleanText(updates.paid);
 
+  if ("smsOptIn" in updates) out.sms_opt_in = toBoolean(updates.smsOptIn);
   if ("allowShipWithoutPayment" in updates) out.allow_ship_without_payment = toBoolean(updates.allowShipWithoutPayment);
 
   if ("trackingNumber" in updates) out.tracking_number = cleanText(updates.trackingNumber);
