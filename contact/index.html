@@ -129,7 +129,7 @@ body_class: inner
           </div>
 
           <div class="service-section">
-            <h3 class="service-section-title">Glove Details</h3>
+            <h3 class="service-section-title">Glove 1 Details</h3>
             <div class="service-section-body">
               <p class="service-help">A model number helps, but it is fine if you are not sure. The glove type determines whether web type is needed.</p>
 
@@ -223,6 +223,12 @@ body_class: inner
                 <label for="sr-custom-color">Custom Color Request</label>
                 <textarea id="sr-custom-color" class="compact-textarea" name="customColorRequest" rows="1" placeholder="Don’t see your color? Describe it here. Special order lace may extend turnaround."></textarea>
               </div>
+
+              <div id="additionalGloves" class="additional-gloves" aria-live="polite"></div>
+
+              <div class="mm-actions glove-add-actions">
+                <button id="addGloveBtn" class="btn btn-secondary" type="button">Add another glove</button>
+              </div>
             </div>
           </div>
 
@@ -278,7 +284,7 @@ body_class: inner
               <p class="service-help">Add anything that helps me understand the glove, how it plays, or what you want changed.</p>
 
               <div class="mm-field">
-                <label for="sr-notes">Anything I should know about this glove?</label>
+                <label for="sr-notes">Anything I should know about Glove 1?</label>
                 <textarea id="sr-notes" class="compact-textarea" name="gloveNotes" rows="1" placeholder="Anything I should know about this glove?"></textarea>
               </div>
 
@@ -351,6 +357,8 @@ body_class: inner
   const successCard = document.getElementById("serviceSuccessCard");
   const successOrder = document.getElementById("serviceSuccessOrder");
   const submitBtn = document.getElementById("serviceSubmitBtn");
+  const addGloveBtn = document.getElementById("addGloveBtn");
+  const additionalGloves = document.getElementById("additionalGloves");
   const shippingAddressWrap = document.getElementById("shippingAddressWrap");
 
   const streetEl = document.getElementById("sr-street");
@@ -362,9 +370,10 @@ body_class: inner
   const servicesGroup = document.getElementById("servicesGroup");
   const dropOffGroup = document.getElementById("dropOffGroup");
   const turnaroundGroup = document.getElementById("turnaroundGroup");
+  let gloveCount = 1;
 
-  function selectedValue(name) {
-    return form.querySelector(`input[name="${name}"]:checked`)?.value || "";
+  function selectedValue(name, root = form) {
+    return root.querySelector(`input[name="${name}"]:checked`)?.value || "";
   }
 
   function toggleConditionalFields() {
@@ -387,14 +396,16 @@ body_class: inner
     }
   }
 
-  function collectServicesRequested() {
-    const checked = Array.from(form.querySelectorAll('input[name="servicesRequested"]:checked'))
+  function collectServicesRequested(root = form) {
+    const checked = Array.from(root.querySelectorAll('input[name="servicesRequested"]:checked'))
       .map(el => el.value);
 
-    const other = serviceOtherText.value.trim();
-    if (serviceOtherCheck.checked && other) {
+    const otherCheck = root.querySelector('[data-service-other-check]') || serviceOtherCheck;
+    const otherText = root.querySelector('[data-service-other-text]') || serviceOtherText;
+    const other = otherText.value.trim();
+    if (otherCheck.checked && other) {
       checked.push(`Other: ${other}`);
-    } else if (serviceOtherCheck.checked) {
+    } else if (otherCheck.checked) {
       checked.push("Other");
     }
 
@@ -419,9 +430,14 @@ body_class: inner
     statusEl.textContent = "";
   }
 
-  function showSuccess(orderNumber) {
+  function showSuccess(orderNumbers) {
     clearStatus();
-    successOrder.textContent = orderNumber ? `Order number: ${orderNumber}` : "";
+    const numbers = Array.isArray(orderNumbers) ? orderNumbers.filter(Boolean) : [orderNumbers].filter(Boolean);
+    if (numbers.length > 1) {
+      successOrder.textContent = `Orders: ${numbers.map(n => `#${n}`).join(", ")}. Each glove has its own order number.`;
+    } else {
+      successOrder.textContent = numbers[0] ? `Order number: ${numbers[0]}` : "";
+    }
     successCard.classList.add("show");
   }
 
@@ -433,7 +449,7 @@ body_class: inner
 
   function clearInvalidStates() {
     form.querySelectorAll(".field-invalid").forEach(el => el.classList.remove("field-invalid"));
-    [gloveTypeGroup, servicesGroup, dropOffGroup, turnaroundGroup].forEach(el => el.classList.remove("group-invalid"));
+    form.querySelectorAll(".group-invalid").forEach(el => el.classList.remove("group-invalid"));
   }
 
   function scrollToElement(el) {
@@ -457,6 +473,180 @@ body_class: inner
     return false;
   }
 
+  function cloneLaceOptions(kind) {
+    const source = kind === "secondary" ? form.secondaryLaceColor : form.primaryLaceColor;
+    return Array.from(source?.options || [])
+      .map(option => `<option value="${option.value.replace(/"/g, "&quot;")}">${option.textContent}</option>`)
+      .join("");
+  }
+
+  function gloveSectionTemplate(index) {
+    return `
+      <section class="service-section glove-request-card" data-glove-section data-glove-index="${index}">
+        <div class="glove-section-heading">
+          <h3 class="service-section-title">Glove ${index}</h3>
+          <button class="glove-remove-btn" type="button" data-remove-glove aria-label="Remove Glove ${index}">Remove</button>
+        </div>
+        <div class="service-section-body">
+          <p class="service-help">Add the details for this glove only. Contact and drop-off info stays shared.</p>
+
+          <div class="mm-field">
+            <label>Brand / Model (if known)</label>
+            <input name="brandModel" type="text" placeholder="Example: Nokona AMG1200, Rawlings HoH PRO7175SB-2WSS">
+          </div>
+
+          <div class="mm-field" data-glove-type-group>
+            <div class="group-label">Glove Type <span class="req-badge">Required</span></div>
+            <div class="mm-choice-list">
+              <label class="mm-choice"><input type="radio" name="gloveType-${index}" value="Fielders Glove"> <span>Fielders Glove</span></label>
+              <label class="mm-choice"><input type="radio" name="gloveType-${index}" value="Catchers Mitt"> <span>Catchers Mitt</span></label>
+              <label class="mm-choice"><input type="radio" name="gloveType-${index}" value="First Base Mitt"> <span>First Base Mitt</span></label>
+            </div>
+          </div>
+
+          <div class="mm-field is-hidden" data-web-type-wrap>
+            <label>Web Type (Fielders Gloves Only) <span class="req-badge">Required</span></label>
+            <div class="note">Trapeze and Modified Trapeze webs require additional lace and labor and may be priced higher.</div>
+            <select name="webType">
+              <option value="">Choose</option>
+              <option value="Basket (Fully Closed) Web">Basket (Fully Closed) Web</option>
+              <option value="I-Web">I-Web</option>
+              <option value="H-Web">H-Web</option>
+              <option value="Modified Trapeze Web">Modified Trapeze Web</option>
+              <option value="Trapeze Web">Trapeze Web</option>
+              <option value="Single Post Web">Single Post Web</option>
+              <option value="Other / Not Sure">Other / Not Sure</option>
+            </select>
+          </div>
+
+          <div class="mm-field" data-services-group>
+            <div class="group-label">Services Requested <span class="req-badge">Required</span></div>
+            <div class="mm-choice-list">
+              <label class="mm-choice"><input type="checkbox" name="servicesRequested" value="Relacing"> <span>Relacing</span></label>
+              <label class="mm-choice"><input type="checkbox" name="servicesRequested" value="Cleaning + Conditioning"> <span>Cleaning + Conditioning</span></label>
+              <label class="mm-choice"><input type="checkbox" name="servicesRequested" value="Cleaning + Conditioning + Relacing"> <span>Cleaning + Conditioning + Relacing</span></label>
+              <label class="mm-choice"><input type="checkbox" name="servicesRequested" value="ShockTec Air2Gel Palm Pad"> <span>ShockTec Air2Gel Palm Pad</span></label>
+              <label class="mm-inline-other">
+                <span class="mm-choice"><input type="checkbox" value="Other" data-service-other-check> <span>Other:</span></span>
+                <input type="text" placeholder="Describe other requested work" data-service-other-text>
+              </label>
+            </div>
+          </div>
+
+          <div class="mm-grid-2 lace-select-grid">
+            <div class="mm-field">
+              <label>Primary Lace Color <span class="req-badge">Required</span></label>
+              <div class="note">Choose the main color for the full relace.</div>
+              <select name="primaryLaceColor" data-lace-select="primary">${cloneLaceOptions("primary")}</select>
+            </div>
+
+            <div class="mm-field">
+              <label>Secondary / Accent Lace Color</label>
+              <div class="note">Leave blank for a single-color relace.</div>
+              <select name="secondaryLaceColor" data-lace-select="secondary">${cloneLaceOptions("secondary")}</select>
+            </div>
+          </div>
+
+          <div class="mm-field custom-color-field">
+            <label>Custom Color Request</label>
+            <textarea class="compact-textarea" name="customColorRequest" rows="1" placeholder="Don’t see your color? Describe it here. Special order lace may extend turnaround."></textarea>
+          </div>
+
+          <div class="mm-field">
+            <label>Anything I should know about this glove?</label>
+            <textarea class="compact-textarea" name="gloveNotes" rows="1" placeholder="Anything I should know about this glove?"></textarea>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function renumberGloveSections() {
+    Array.from(additionalGloves.querySelectorAll("[data-glove-section]")).forEach((section, i) => {
+      const index = i + 2;
+      section.dataset.gloveIndex = String(index);
+      section.querySelector(".service-section-title").textContent = `Glove ${index}`;
+      section.querySelector("[data-remove-glove]")?.setAttribute("aria-label", `Remove Glove ${index}`);
+      section.querySelectorAll('input[type="radio"][name^="gloveType-"]').forEach(input => {
+        input.name = `gloveType-${index}`;
+      });
+    });
+  }
+
+  function toggleAdditionalGlove(section) {
+    const index = section.dataset.gloveIndex;
+    const gloveType = selectedValue(`gloveType-${index}`, section);
+    const webWrap = section.querySelector("[data-web-type-wrap]");
+    const webSelect = section.querySelector('select[name="webType"]');
+    const showWeb = gloveType === "Fielders Glove";
+
+    webWrap?.classList.toggle("is-hidden", !showWeb);
+    if (!showWeb && webSelect) {
+      webSelect.value = "";
+      webSelect.classList.remove("field-invalid");
+    }
+  }
+
+  function collectFirstGlove() {
+    return {
+      brandModel: form.brandModel.value.trim(),
+      gloveType: selectedValue("gloveType"),
+      webType: webTypeSelect.value.trim(),
+      servicesRequested: collectServicesRequested(form),
+      primaryLaceColor: form.primaryLaceColor.value.trim(),
+      secondaryLaceColor: form.secondaryLaceColor.value.trim(),
+      customColorRequest: form.customColorRequest.value.trim(),
+      gloveNotes: form.gloveNotes.value.trim()
+    };
+  }
+
+  function collectAdditionalGlove(section) {
+    const index = section.dataset.gloveIndex;
+    return {
+      brandModel: section.querySelector('input[name="brandModel"]')?.value.trim() || "",
+      gloveType: selectedValue(`gloveType-${index}`, section),
+      webType: section.querySelector('select[name="webType"]')?.value.trim() || "",
+      servicesRequested: collectServicesRequested(section),
+      primaryLaceColor: section.querySelector('select[name="primaryLaceColor"]')?.value.trim() || "",
+      secondaryLaceColor: section.querySelector('select[name="secondaryLaceColor"]')?.value.trim() || "",
+      customColorRequest: section.querySelector('textarea[name="customColorRequest"]')?.value.trim() || "",
+      gloveNotes: section.querySelector('textarea[name="gloveNotes"]')?.value.trim() || ""
+    };
+  }
+
+  function collectGloves() {
+    return [
+      collectFirstGlove(),
+      ...Array.from(additionalGloves.querySelectorAll("[data-glove-section]")).map(collectAdditionalGlove)
+    ];
+  }
+
+  function validateGlove(glove, index, section) {
+    const label = `Glove ${index}`;
+    const typeGroup = section?.querySelector("[data-glove-type-group]") || gloveTypeGroup;
+    const servicesEl = section?.querySelector("[data-services-group]") || servicesGroup;
+    const webSelect = section?.querySelector('select[name="webType"]') || webTypeSelect;
+    const primarySelect = section?.querySelector('select[name="primaryLaceColor"]') || form.primaryLaceColor;
+
+    if (!glove.gloveType) {
+      return fail(`${label}: please select a glove type.`, null, typeGroup);
+    }
+
+    if (glove.gloveType === "Fielders Glove" && !glove.webType) {
+      return fail(`${label}: please select a web type for a fielders glove.`, webSelect);
+    }
+
+    if (!glove.servicesRequested) {
+      return fail(`${label}: select at least one service requested.`, null, servicesEl);
+    }
+
+    if (!glove.primaryLaceColor) {
+      return fail(`${label}: please select a primary lace color.`, primarySelect);
+    }
+
+    return true;
+  }
+
   function validateForm() {
     clearInvalidStates();
 
@@ -472,20 +662,12 @@ body_class: inner
       return fail("Please enter your phone number.", form.phoneNumber);
     }
 
-    if (!selectedValue("gloveType")) {
-      return fail("Please select a glove type.", null, gloveTypeGroup);
-    }
-
-    if (selectedValue("gloveType") === "Fielders Glove" && !webTypeSelect.value.trim()) {
-      return fail("Please select a web type for a fielders glove.", webTypeSelect);
-    }
-
-    if (!collectServicesRequested()) {
-      return fail("Select at least one service requested.", null, servicesGroup);
-    }
-
-    if (!form.primaryLaceColor.value.trim()) {
-      return fail("Please select a primary lace color.", form.primaryLaceColor);
+    const gloves = collectGloves();
+    for (let i = 0; i < gloves.length; i += 1) {
+      const section = i === 0 ? null : additionalGloves.querySelectorAll("[data-glove-section]")[i - 1];
+      if (!validateGlove(gloves[i], i + 1, section)) {
+        return false;
+      }
     }
 
     if (!selectedValue("dropOffMethod")) {
@@ -511,10 +693,32 @@ body_class: inner
       toggleConditionalFields();
     }
 
+    const gloveSection = e.target.closest("[data-glove-section]");
+    if (gloveSection && e.target.name?.startsWith("gloveType-")) {
+      toggleAdditionalGlove(gloveSection);
+    }
+
     if (e.target.classList.contains("field-invalid")) {
       e.target.classList.remove("field-invalid");
     }
 
+    clearStatus();
+  });
+
+  addGloveBtn?.addEventListener("click", () => {
+    gloveCount += 1;
+    additionalGloves.insertAdjacentHTML("beforeend", gloveSectionTemplate(gloveCount));
+    const section = additionalGloves.lastElementChild;
+    renumberGloveSections();
+    setTimeout(() => scrollToElement(section), 20);
+  });
+
+  additionalGloves?.addEventListener("click", (e) => {
+    const removeBtn = e.target.closest("[data-remove-glove]");
+    if (!removeBtn) return;
+    removeBtn.closest("[data-glove-section]")?.remove();
+    gloveCount = 1 + additionalGloves.querySelectorAll("[data-glove-section]").length;
+    renumberGloveSections();
     clearStatus();
   });
 
@@ -541,23 +745,20 @@ body_class: inner
       emailAddress: form.emailAddress.value.trim(),
       phoneNumber: form.phoneNumber.value.trim(),
       smsOptIn: !!smsOptInBox?.checked,
-      brandModel: form.brandModel.value.trim(),
-      gloveType: selectedValue("gloveType"),
-      webType: webTypeSelect.value.trim(),
-      servicesRequested: collectServicesRequested(),
-      primaryLaceColor: form.primaryLaceColor.value.trim(),
-      secondaryLaceColor: form.secondaryLaceColor.value.trim(),
-      customColorRequest: form.customColorRequest.value.trim(),
       dropOffMethod: selectedValue("dropOffMethod"),
       streetAddress: streetEl.value.trim(),
       city: cityEl.value.trim(),
       state: stateEl.value.trim(),
       zipCode: zipEl.value.trim(),
-      gloveNotes: form.gloveNotes.value.trim(),
       socialTag: form.socialTag.value.trim(),
       turnaroundAcknowledged: "I understand",
-      referralSource: collectReferralSource()
+      referralSource: collectReferralSource(),
+      gloves: collectGloves()
     };
+
+    if (payload.gloves.length === 1) {
+      Object.assign(payload, payload.gloves[0]);
+    }
 
     try {
       const res = await fetch("/api/intake", {
@@ -575,9 +776,14 @@ body_class: inner
       }
 
       form.reset();
+      additionalGloves.innerHTML = "";
+      gloveCount = 1;
       clearInvalidStates();
       toggleConditionalFields();
-      showSuccess(data.order?.orderNumber || data.order?.order_number || "");
+      const orderNumbers = Array.isArray(data.orders)
+        ? data.orders.map(order => order.orderNumber || order.order_number)
+        : [data.order?.orderNumber || data.order?.order_number || ""];
+      showSuccess(orderNumbers);
 
       setTimeout(() => {
         scrollToElement(successCard);

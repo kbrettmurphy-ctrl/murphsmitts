@@ -2861,6 +2861,50 @@ footer{
   margin-bottom:var(--space-4);
 }
 
+.additional-gloves{
+  display:grid;
+  gap:var(--space-4);
+  margin-top:var(--space-4);
+}
+
+.glove-request-card{
+  margin:0;
+  background:rgba(255, 250, 243, .92);
+}
+
+.glove-section-heading{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:var(--space-3);
+  background:var(--mm-navy);
+}
+
+.glove-section-heading .service-section-title{
+  flex:1 1 auto;
+}
+
+.glove-remove-btn{
+  margin-right:14px;
+  border:1px solid rgba(246, 239, 229, .34);
+  border-radius:999px;
+  background:transparent;
+  color:var(--mm-bg-soft);
+  padding:7px 11px;
+  font-size:var(--text-xs);
+  font-weight:800;
+  line-height:1;
+}
+
+.glove-remove-btn:hover,
+.glove-remove-btn:focus-visible{
+  background:rgba(246, 239, 229, .12);
+}
+
+.glove-add-actions{
+  margin-top:var(--space-4);
+}
+
 .dropoff-guidance{
   display:grid;
   grid-template-columns:repeat(2, minmax(0, 1fr));
@@ -2989,6 +3033,15 @@ footer{
 
   .service-form-wrap .mm-inline-other input[type="text"]{
     margin-top:-2px;
+  }
+
+  .glove-section-heading{
+    align-items:stretch;
+  }
+
+  .glove-remove-btn{
+    align-self:center;
+    margin-right:10px;
   }
 
   .lace-decision-support{
