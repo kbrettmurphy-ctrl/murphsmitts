@@ -418,7 +418,8 @@ button.secondary{
 }
 
 #galleryUploadInput,
-#saleGlovePhotoInput{
+#saleGlovePhotoInput,
+#orderPhotoInput{
   position:absolute;
   width:1px;
   height:1px;
@@ -2932,6 +2933,24 @@ button.secondary{
   display:grid;
   grid-template-columns:repeat(auto-fill, minmax(72px, 1fr));
   gap:8px;
+}
+
+.detail-photo-add-btn{
+  width:36px;
+  min-width:36px;
+  height:36px;
+  min-height:36px;
+  border-radius:12px;
+  font-size:1.2rem;
+}
+
+.order-photo-status{
+  min-height:18px;
+  margin:0;
+}
+
+.order-photo-empty{
+  margin:0;
 }
 
 .detail-card .photo-thumb-img{

@@ -72,6 +72,10 @@ let currentOrder = null;
 let workflowSheetEl = null;
 let inventorySheetEl = null;
 let adminMenuLayer = null;
+let orderPhotoActionMenuEl = null;
+let orderPhotoPressTimer = null;
+let orderPhotoPressStart = null;
+let suppressPhotoLightboxUntil = 0;
 let inventoryPressTimer = null;
 let inventoryPressStart = null;
 let workflowPressTimer = null;
@@ -729,25 +733,31 @@ function renderFieldLike(label, value) {
 function renderPhotoGallery(order) {
   const photos = Array.isArray(order.glovePhotos) ? order.glovePhotos : [];
 
-  if (!photos.length) return "";
-
   return `
-    <section class="detail-section detail-photo-section">
+    <section id="detailPhotoSection" class="detail-section detail-photo-section">
       <div class="detail-section-header">
         <h2>Photos</h2>
+        <button id="orderPhotoAddBtn" class="secondary topbar-icon-action detail-photo-add-btn" type="button" aria-label="Add order photos">+</button>
       </div>
 
-      <div class="photo-grid">
-        ${photos.map((url, index) => `
-          <img
-            class="photo-thumb-img"
-            src="${escapeAttr(url)}"
-            data-index="${index}"
-            alt="Glove photo ${index + 1}"
-            loading="lazy"
-          >
-        `).join("")}
-      </div>
+      <input id="orderPhotoInput" class="order-photo-input" type="file" accept="image/*" multiple>
+      <p id="orderPhotoStatus" class="upload-status order-photo-status" aria-live="polite"></p>
+
+      ${photos.length ? `
+        <div class="photo-grid">
+          ${photos.map((url, index) => `
+            <img
+              class="photo-thumb-img"
+              src="${escapeAttr(url)}"
+              data-index="${index}"
+              alt="Glove photo ${index + 1}"
+              loading="lazy"
+            >
+          `).join("")}
+        </div>
+      ` : `
+        <p class="muted order-photo-empty">No order photos yet.</p>
+      `}
     </section>
 
     <div id="photoLightbox" class="photo-lightbox">
@@ -1681,6 +1691,7 @@ function setActiveView(viewName) {
 
   beginAdminViewSwitch();
   closeInventorySheet();
+  closeOrderPhotoActionMenu();
   orderFiltersExpanded = false;
   inventoryFiltersExpanded = false;
   activeView = viewName;
@@ -2516,15 +2527,74 @@ function renderOrderDetail(order) {
   document.getElementById("detailDeleteBtn")?.addEventListener("click", async () => {
     await confirmAndDeleteOrder(order.orderNumber);
   });
-   
+
+  wireOrderPhotoControls(order);
+  wireOrderPhotoLightbox(order);
+
+  wireDetailForm();
+}
+
+function wireOrderPhotoControls(order) {
+  const addBtn = document.getElementById("orderPhotoAddBtn");
+  const input = document.getElementById("orderPhotoInput");
+
+  addBtn?.addEventListener("click", () => {
+    input?.click();
+  });
+
+  input?.addEventListener("change", async () => {
+    const files = Array.from(input.files || []).filter(file => file.type.startsWith("image/"));
+    input.value = "";
+    if (!files.length) return;
+
+    await uploadOrderPhotos(order, files);
+  });
+
+  document.querySelectorAll(".photo-thumb-img").forEach(img => {
+    const index = Number(img.dataset.index);
+    const url = order.glovePhotos?.[index];
+    if (!url) return;
+
+    img.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      openOrderPhotoActionMenu(order, url, e);
+    });
+
+    img.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      orderPhotoPressStart = {
+        x: touch.clientX,
+        y: touch.clientY
+      };
+      orderPhotoPressTimer = window.setTimeout(() => {
+        orderPhotoPressTimer = null;
+        suppressPhotoLightboxUntil = Date.now() + 700;
+        openOrderPhotoActionMenu(order, url, e);
+      }, 520);
+    }, { passive: true });
+
+    img.addEventListener("touchmove", (e) => {
+      if (!orderPhotoPressStart || !e.touches.length) return;
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - orderPhotoPressStart.x);
+      const dy = Math.abs(touch.clientY - orderPhotoPressStart.y);
+      if (dx > 10 || dy > 10) cancelOrderPhotoLongPress();
+    }, { passive: true });
+
+    img.addEventListener("touchend", cancelOrderPhotoLongPress, { passive: true });
+    img.addEventListener("touchcancel", cancelOrderPhotoLongPress, { passive: true });
+  });
+}
+
+function wireOrderPhotoLightbox(order) {
   const photos = Array.isArray(order.glovePhotos) ? order.glovePhotos : [];
+  const lightbox = document.getElementById("photoLightbox");
+  const lightboxImg = document.getElementById("lightboxImage");
 
-const lightbox = document.getElementById("photoLightbox");
-const lightboxImg = document.getElementById("lightboxImage");
+  if (!photos.length || !lightbox || !lightboxImg) return;
 
-if (photos.length && lightbox && lightboxImg) {
   let currentPhoto = 0;
-
   let touchStartX = 0;
   let touchStartY = 0;
   let touchStartCount = 0;
@@ -2554,7 +2624,12 @@ if (photos.length && lightbox && lightboxImg) {
   }
 
   document.querySelectorAll(".photo-thumb-img").forEach(img => {
-    img.addEventListener("click", () => {
+    img.addEventListener("click", (e) => {
+      if (Date.now() < suppressPhotoLightboxUntil) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       showPhoto(Number(img.dataset.index));
       lightbox.classList.add("show");
     });
@@ -2594,7 +2669,6 @@ if (photos.length && lightbox && lightboxImg) {
     const diffX = touch.clientX - touchStartX;
     const diffY = touch.clientY - touchStartY;
 
-    // Swipes only. Pinch/zoom/tap release should do nothing here.
     if (Math.abs(diffX) > 60 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
       ignoreNextClick = true;
 
@@ -2638,7 +2712,177 @@ if (photos.length && lightbox && lightboxImg) {
   });
 }
 
-  wireDetailForm();
+async function uploadOrderPhotos(order, files) {
+  const addBtn = document.getElementById("orderPhotoAddBtn");
+  const total = files.length;
+  let uploaded = 0;
+  let failed = 0;
+  let latestPhotos = Array.isArray(order.glovePhotos) ? order.glovePhotos : [];
+
+  if (addBtn) addBtn.disabled = true;
+  setOrderPhotoStatus(`Uploading ${total} photo${total === 1 ? "" : "s"}...`);
+
+  for (const file of files) {
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      const result = await postJson({
+        action: "uploadOrderPhoto",
+        orderNumber: order.orderNumber,
+        filename: file.name,
+        contentType: file.type || "image/jpeg",
+        dataUrl
+      }, true);
+
+      uploaded += 1;
+      latestPhotos = result.photos || result.order?.glovePhotos || latestPhotos;
+      if (result.order) {
+        mergeUpdatedOrder(result.order);
+      }
+      setOrderPhotoStatus(`Uploading... ${uploaded}/${total}`);
+    } catch {
+      failed += 1;
+    }
+  }
+
+  const nextOrder = {
+    ...(currentOrder || order),
+    glovePhotos: latestPhotos
+  };
+  mergeUpdatedOrder(nextOrder);
+  refreshOrderPhotoSection(nextOrder);
+
+  if (uploaded && failed) {
+    setOrderPhotoStatus(`${uploaded} added, ${failed} failed.`);
+  } else if (uploaded) {
+    setOrderPhotoStatus(`${uploaded} photo${uploaded === 1 ? "" : "s"} added.`);
+  } else {
+    setOrderPhotoStatus("Upload failed.");
+  }
+
+  if (addBtn) addBtn.disabled = false;
+}
+
+function mergeUpdatedOrder(order) {
+  if (!order) return;
+
+  currentOrder = {
+    ...(currentOrder || {}),
+    ...order
+  };
+
+  const idx = allOrders.findIndex(item => String(item.orderNumber) === String(order.orderNumber));
+  if (idx !== -1) {
+    allOrders[idx] = {
+      ...allOrders[idx],
+      ...order
+    };
+  }
+}
+
+function refreshOrderPhotoSection(order) {
+  const existingSection = document.getElementById("detailPhotoSection");
+  if (!existingSection) return;
+
+  const existingLightbox = document.getElementById("photoLightbox");
+  const holder = document.createElement("div");
+  holder.innerHTML = renderPhotoGallery(order);
+
+  const nextSection = holder.querySelector("#detailPhotoSection");
+  const nextLightbox = holder.querySelector("#photoLightbox");
+
+  if (nextSection) existingSection.replaceWith(nextSection);
+  if (existingLightbox && nextLightbox) {
+    existingLightbox.replaceWith(nextLightbox);
+  } else if (nextLightbox) {
+    nextSection?.insertAdjacentElement("afterend", nextLightbox);
+  }
+
+  wireOrderPhotoControls(order);
+  wireOrderPhotoLightbox(order);
+}
+
+function setOrderPhotoStatus(message) {
+  const status = document.getElementById("orderPhotoStatus");
+  if (status) status.textContent = message || "";
+}
+
+function cancelOrderPhotoLongPress() {
+  if (orderPhotoPressTimer) {
+    window.clearTimeout(orderPhotoPressTimer);
+    orderPhotoPressTimer = null;
+  }
+  orderPhotoPressStart = null;
+}
+
+function ensureOrderPhotoActionMenu() {
+  if (orderPhotoActionMenuEl) return orderPhotoActionMenuEl;
+
+  orderPhotoActionMenuEl = document.createElement("div");
+  orderPhotoActionMenuEl.className = "admin-action-menu-root workflow-sheet-root order-photo-menu-root";
+  orderPhotoActionMenuEl.innerHTML = `
+    <div class="admin-action-backdrop workflow-backdrop"></div>
+    <div class="admin-action-menu workflow-sheet" role="menu" aria-label="Photo actions">
+      <div class="admin-action-section workflow-section">
+        <div class="workflow-action-list">
+          <button class="workflow-action-btn danger" type="button" data-photo-action="remove">Remove Photo</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  getAdminMenuLayer().appendChild(orderPhotoActionMenuEl);
+  orderPhotoActionMenuEl.querySelector(".workflow-backdrop")?.addEventListener("click", closeOrderPhotoActionMenu);
+  orderPhotoActionMenuEl.querySelector("[data-photo-action='remove']")?.addEventListener("click", async () => {
+    const order = orderPhotoActionMenuEl.order;
+    const url = orderPhotoActionMenuEl.url;
+    closeOrderPhotoActionMenu();
+    await removeOrderPhoto(order, url);
+  });
+  return orderPhotoActionMenuEl;
+}
+
+function openOrderPhotoActionMenu(order, url, source) {
+  const root = ensureOrderPhotoActionMenu();
+  root.order = order;
+  root.url = url;
+  root.anchor = getAdminAnchorPosition(source, source?.currentTarget || source?.target);
+  root.classList.add("open");
+  requestAnimationFrame(() => {
+    positionWorkflowMenu(root.querySelector(".workflow-sheet"), root.anchor);
+  });
+}
+
+function closeOrderPhotoActionMenu() {
+  if (!orderPhotoActionMenuEl) return;
+  orderPhotoActionMenuEl.classList.remove("open");
+  orderPhotoActionMenuEl.order = null;
+  orderPhotoActionMenuEl.url = "";
+}
+
+async function removeOrderPhoto(order, url) {
+  if (!order || !url) return;
+  const ok = window.confirm("Remove this photo from the order?");
+  if (!ok) return;
+
+  try {
+    setOrderPhotoStatus("Removing photo...");
+    const result = await postJson({
+      action: "removeOrderPhoto",
+      orderNumber: order.orderNumber,
+      url
+    }, true);
+
+    const nextOrder = {
+      ...(currentOrder || order),
+      ...(result.order || {}),
+      glovePhotos: result.photos || result.order?.glovePhotos || []
+    };
+    mergeUpdatedOrder(nextOrder);
+    refreshOrderPhotoSection(nextOrder);
+    setOrderPhotoStatus("Photo removed.");
+  } catch (err) {
+    setOrderPhotoStatus(err.message || "Remove failed.");
+  }
 }
 
 function wireDetailForm() {
@@ -3405,6 +3649,7 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
   const isLocal = looksLocalDropOff(order);
   const existingNote = order.internalNotes || "";
   const priceQuoted = order.priceQuoted ?? "";
+  const dateReceived = order.dateReceived || todayForInput();
   const estimatedCompletion = order.estimatedCompletion || todayForInput();
   const dateCompleted = order.dateCompleted || todayForInput();
   const shippingCost = order.shippingCost ?? "";
@@ -3436,6 +3681,8 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
   } else if (actionKey === "startWork") {
     inner = `
       <div class="workflow-action-form">
+        <label>Date Received</label>
+        <input id="workflowDateReceived" type="date" required value="${escapeAttr(dateReceived)}" />
         <label>Estimated completion</label>
         <input id="workflowEstimatedCompletion" type="date" value="${escapeAttr(estimatedCompletion)}" />
       </div>
@@ -3525,6 +3772,7 @@ async function submitWorkflowAction(order, actionKey) {
     if (note) updates.internalNotes = appendInternalNote(order.internalNotes, note);
   } else if (actionKey === "startWork") {
     updates.status = "In Progress";
+    updates.dateReceived = document.getElementById("workflowDateReceived")?.value || todayForInput();
     updates.estimatedCompletion = document.getElementById("workflowEstimatedCompletion")?.value || null;
   } else if (actionKey === "onHold") {
     updates.status = "On Hold";
@@ -5556,6 +5804,7 @@ document.addEventListener("keydown", (e) => {
 
   closeDesktopOrderActionMenus();
   closeInventorySheet();
+  closeOrderPhotoActionMenu();
 
   if (changed) {
     syncOrderFilterUI();
@@ -5570,6 +5819,7 @@ window.addEventListener("resize", () => {
 
   closeDesktopOrderActionMenus();
   closeInventorySheet();
+  closeOrderPhotoActionMenu();
   syncOrderFilterUI();
   syncInventoryFilterUI();
   syncSearchUI();
@@ -5577,6 +5827,7 @@ window.addEventListener("resize", () => {
 
 window.addEventListener("scroll", closeDesktopOrderActionMenus, { passive: true, capture: true });
 window.addEventListener("scroll", closeInventorySheet, { passive: true, capture: true });
+window.addEventListener("scroll", closeOrderPhotoActionMenu, { passive: true, capture: true });
 window.addEventListener("scroll", closeAdminFilterPopovers, { passive: true, capture: true });
 
 backBtn.addEventListener("click", () => {

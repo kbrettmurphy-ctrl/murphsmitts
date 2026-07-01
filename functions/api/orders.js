@@ -263,6 +263,26 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "uploadOrderPhoto") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await uploadOrderPhotoAction(env, body);
+      return json(result, 200, jsonHeaders);
+    }
+
+    if (action === "removeOrderPhoto") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await removeOrderPhotoAction(env, body);
+      return json(result, 200, jsonHeaders);
+    }
+
     if (action === "updateOrder") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -1394,6 +1414,157 @@ async function fetchOrderByNumber(env, orderNumber) {
   };
 }
 
+async function uploadOrderPhotoAction(env, body) {
+  const orderNumber = cleanText(body.orderNumber);
+  const filename = cleanText(body.filename);
+  const contentType = cleanText(body.contentType) || "image/jpeg";
+  const dataUrl = cleanText(body.dataUrl);
+
+  if (!orderNumber || !filename || !dataUrl) {
+    return { ok: false, error: "Missing order number, filename or image data." };
+  }
+
+  if (!contentType.startsWith("image/")) {
+    return { ok: false, error: "Only image uploads are allowed." };
+  }
+
+  const existing = await fetchOrderByNumber(env, orderNumber);
+  if (!existing.ok) {
+    return { ok: false, error: "Failed to load order.", details: existing.error };
+  }
+  if (!existing.data) {
+    return { ok: false, error: "Order not found." };
+  }
+
+  const uploaded = await uploadOrderPhoto(env, {
+    orderNumber,
+    filename,
+    contentType,
+    dataUrl
+  });
+
+  if (!uploaded.ok) {
+    return {
+      ok: false,
+      error: "Order photo upload failed.",
+      details: uploaded.error
+    };
+  }
+
+  const photos = uniquePhotoUrls([
+    ...parseDbPhotoList(existing.data.glove_photos),
+    uploaded.url
+  ]);
+  const updated = await updateOrderPhotos(env, orderNumber, photos);
+
+  if (!updated.ok) {
+    return {
+      ok: false,
+      error: "Photo uploaded but order update failed.",
+      details: updated.error
+    };
+  }
+
+  return {
+    ok: true,
+    url: uploaded.url,
+    path: uploaded.path,
+    photos,
+    order: mapOrderFromDb(updated.data)
+  };
+}
+
+async function removeOrderPhotoAction(env, body) {
+  const orderNumber = cleanText(body.orderNumber);
+  const url = cleanText(body.url);
+
+  if (!orderNumber || !url) {
+    return { ok: false, error: "Missing order number or photo URL." };
+  }
+
+  const existing = await fetchOrderByNumber(env, orderNumber);
+  if (!existing.ok) {
+    return { ok: false, error: "Failed to load order.", details: existing.error };
+  }
+  if (!existing.data) {
+    return { ok: false, error: "Order not found." };
+  }
+
+  const existingPhotos = parseDbPhotoList(existing.data.glove_photos);
+  const photos = existingPhotos.filter(photo => String(photo) !== String(url));
+
+  if (photos.length === existingPhotos.length) {
+    return { ok: false, error: "Photo was not found on this order." };
+  }
+
+  const updated = await updateOrderPhotos(env, orderNumber, photos);
+
+  if (!updated.ok) {
+    return {
+      ok: false,
+      error: "Failed to remove photo from order.",
+      details: updated.error
+    };
+  }
+
+  return {
+    ok: true,
+    removed: true,
+    photos,
+    order: mapOrderFromDb(updated.data)
+  };
+}
+
+async function updateOrderPhotos(env, orderNumber, photos) {
+  const result = await supabaseFetch(
+    env,
+    `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify({
+        glove_photos: photos
+      })
+    }
+  );
+
+  if (!result.ok) return result;
+
+  return {
+    ok: true,
+    data: Array.isArray(result.data) ? (result.data[0] || null) : null
+  };
+}
+
+function parseDbPhotoList(value) {
+  if (Array.isArray(value)) return uniquePhotoUrls(value);
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? uniquePhotoUrls(parsed) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function uniquePhotoUrls(photos) {
+  const seen = new Set();
+  const out = [];
+
+  (Array.isArray(photos) ? photos : []).forEach(photo => {
+    const url = cleanText(photo);
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    out.push(url);
+  });
+
+  return out;
+}
+
 async function fetchInventoryRows(env) {
   const resp = await supabaseFetch(env, "/rest/v1/lace_inventory?select=*&order=color.asc");
   if (!resp.ok) return resp;
@@ -2000,6 +2171,75 @@ async function uploadSaleGlovePhoto(env, { slug, filename, contentType, dataUrl 
       ok: true,
       path,
       url: `${env.SUPABASE_URL}/storage/v1/object/public/gloves-for-sale/${path}`
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err?.message || String(err)
+    };
+  }
+}
+
+async function uploadOrderPhoto(env, { orderNumber, filename, contentType, dataUrl }) {
+  try {
+    const base64 = String(dataUrl || "").split(",").pop();
+
+    if (!base64) {
+      return {
+        ok: false,
+        error: "Invalid image data."
+      };
+    }
+
+    const bytes = base64ToUint8Array(base64);
+    const maxBytes = 8 * 1024 * 1024;
+    if (bytes.byteLength > maxBytes) {
+      return {
+        ok: false,
+        error: "Image is too large. Please use a photo under 8 MB."
+      };
+    }
+
+    const ext = extensionFromContentType(contentType, filename);
+    const cleanName = safeStorageName(filename)
+      .replace(/\.[a-z0-9]+$/i, "");
+    const safeOrder = safeStorageName(orderNumber)
+      .replace(/\.[a-z0-9]+$/i, "") || "order";
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const path = `${safeOrder}/${stamp}-${cleanName}.${ext}`;
+
+    const uploadResp = await fetch(
+      `${env.SUPABASE_URL}/storage/v1/object/order-photos/${path}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": contentType,
+          "x-upsert": "true"
+        },
+        body: bytes
+      }
+    );
+
+    const uploadText = await uploadResp.text();
+
+    if (!uploadResp.ok) {
+      let error = uploadText;
+      try {
+        error = JSON.parse(uploadText);
+      } catch {}
+
+      return {
+        ok: false,
+        error
+      };
+    }
+
+    return {
+      ok: true,
+      path,
+      url: `${env.SUPABASE_URL}/storage/v1/object/public/order-photos/${path}`
     };
   } catch (err) {
     return {
