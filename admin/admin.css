@@ -1267,6 +1267,389 @@ button.secondary{
 }
 
 /* =========================
+   STORE / GLOVES FOR SALE
+   ========================= */
+.sale-add-btn{
+  width:44px;
+  min-width:44px;
+  height:44px;
+  min-height:44px;
+  border-radius:14px;
+  padding:0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 44px;
+  font-size:1.25rem;
+  line-height:1;
+  font-weight:850;
+  white-space:nowrap;
+}
+
+.sale-gloves-list{
+  display:grid;
+  border-top:1px solid var(--line);
+}
+
+.sale-glove-row{
+  width:100%;
+  border:0;
+  border-bottom:1px solid var(--line);
+  background:rgba(19,41,61,.98);
+  color:var(--cream);
+  padding:12px 14px;
+  display:grid;
+  gap:8px;
+  text-align:left;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.sale-glove-row:active{
+  background:rgba(36,72,102,.70);
+}
+
+.sale-glove-row-main,
+.sale-glove-row-meta{
+  display:grid;
+  grid-template-columns:minmax(0, 1fr) auto;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+
+.sale-glove-title{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:1rem;
+  font-weight:850;
+  line-height:1.1;
+  letter-spacing:-.015em;
+}
+
+.sale-glove-price{
+  color:rgba(218,202,177,.88);
+  font-size:.94rem;
+  font-weight:850;
+  line-height:1;
+}
+
+.sale-glove-meta{
+  min-width:0;
+  max-width:45vw;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:rgba(218,202,177,.62);
+  font-size:.82rem;
+  font-weight:650;
+  line-height:1;
+  text-align:right;
+}
+
+.sale-status-pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:24px;
+  padding:0 9px;
+  border-radius:999px;
+  font-size:.72rem;
+  font-weight:900;
+  line-height:1;
+  white-space:nowrap;
+}
+
+.sale-status-available{
+  background:rgba(62,155,99,.16);
+  color:#65c184;
+  border:1px solid rgba(101,193,132,.18);
+}
+
+.sale-status-sold{
+  background:rgba(146,26,36,.20);
+  color:#ff6b78;
+  border:1px solid rgba(255,107,120,.22);
+}
+
+.sale-status-draft{
+  background:rgba(218,202,177,.10);
+  color:rgba(218,202,177,.72);
+  border:1px solid rgba(218,202,177,.16);
+}
+
+.store-empty-state{
+  display:grid;
+  gap:6px;
+  align-content:start;
+  margin:12px;
+  padding:14px;
+  border:1px solid rgba(218,202,177,.14);
+  border-radius:18px;
+  background:rgba(19,41,61,.88);
+  color:var(--muted);
+  font-size:.9rem;
+  line-height:1.35;
+}
+
+.store-empty-state strong{
+  color:var(--cream);
+  font-size:1rem;
+}
+
+.store-empty-add{
+  justify-self:start;
+  min-height:36px;
+  margin-top:4px;
+  border-radius:12px;
+  padding:0 12px;
+  font-weight:850;
+}
+
+.store-editor-panel{
+  padding:12px;
+}
+
+.store-editor-card{
+  display:grid;
+  gap:14px;
+  padding:13px;
+  border:1px solid rgba(218,202,177,.16);
+  border-radius:18px;
+  background:rgba(19,41,61,.96);
+}
+
+.store-editor-header,
+.store-photo-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.store-editor-header h2,
+.store-photo-header h3{
+  margin:0 0 4px;
+  color:var(--cream);
+  font-size:1.05rem;
+  line-height:1.15;
+  letter-spacing:-.015em;
+}
+
+.store-editor-header .muted,
+.store-photo-header .muted{
+  margin:0;
+  font-size:.82rem;
+  line-height:1.35;
+}
+
+.store-editor-card .detail-grid{
+  gap:10px;
+}
+
+.store-editor-card .label{
+  display:block;
+  margin:0 0 5px;
+  color:rgba(218,202,177,.72);
+  font-size:.72rem;
+  font-weight:850;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+}
+
+.store-editor-card .detail-block input,
+.store-editor-card .detail-block select,
+.store-editor-card .detail-block textarea{
+  min-height:40px;
+  border:1px solid rgba(218,202,177,.16);
+  border-radius:14px;
+  background:#244866;
+  color:var(--cream);
+  padding:8px 11px;
+  font-size:.92rem;
+  font-weight:650;
+}
+
+.store-editor-card .detail-block textarea{
+  min-height:72px;
+  line-height:1.35;
+}
+
+.store-editor-card .detail-block input::placeholder,
+.store-editor-card .detail-block textarea::placeholder{
+  color:rgba(218,202,177,.45);
+}
+
+.store-editor-card .detail-block select,
+.sale-photo-action-select{
+  appearance:none;
+  -webkit-appearance:none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(218,202,177,.9) 50%),
+    linear-gradient(135deg, rgba(218,202,177,.9) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) 17px,
+    calc(100% - 10px) 17px;
+  background-size:6px 6px, 6px 6px;
+  background-repeat:no-repeat;
+  padding-right:34px;
+}
+
+.store-photo-section{
+  display:grid;
+  gap:10px;
+  padding-top:12px;
+  border-top:1px solid rgba(218,202,177,.14);
+}
+
+.store-editor-card .upload-drop{
+  grid-template-columns:auto minmax(0, 1fr);
+  gap:2px 10px;
+  align-items:center;
+  margin-top:0;
+  padding:12px;
+  border:1px solid rgba(218,202,177,.16);
+  border-radius:16px;
+  background:rgba(218,202,177,.08);
+  text-align:left;
+}
+
+.store-editor-card .upload-drop-title{
+  font-size:.96rem;
+  line-height:1.1;
+}
+
+.store-editor-card .upload-drop-note{
+  font-size:.78rem;
+  line-height:1.25;
+}
+
+.store-editor-card .upload-preview-grid,
+.store-photo-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(68px, 1fr));
+  gap:8px;
+  margin-top:0;
+}
+
+.store-editor-card .upload-preview-item{
+  border-color:rgba(218,202,177,.16);
+  border-radius:13px;
+  background:rgba(218,202,177,.07);
+}
+
+.store-editor-card .upload-preview-name:not(.sale-photo-badges){
+  display:none;
+}
+
+.store-editor-card .upload-actions{
+  gap:8px;
+  margin-top:0;
+}
+
+.store-editor-card .upload-actions button{
+  min-height:38px;
+  border-radius:13px;
+  padding:0 14px;
+  font-weight:850;
+}
+
+.store-editor-card .upload-primary:not(:disabled){
+  background:rgba(218,202,177,.92);
+  color:var(--navy);
+}
+
+.store-editor-card .upload-clear:not(:disabled){
+  background:rgba(146,26,36,.18);
+  color:#ffb8bf;
+}
+
+.store-editor-card .upload-status{
+  min-height:18px;
+  margin:0;
+  font-size:.82rem;
+  line-height:1.35;
+}
+
+#saleGlovePhotosList{
+  display:grid;
+  gap:8px;
+}
+
+.sale-photo-item{
+  display:grid;
+  grid-template-rows:auto minmax(20px, auto) auto;
+}
+
+.sale-photo-badges{
+  min-height:24px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  padding:5px 5px 0;
+}
+
+.sale-photo-badges span{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:18px;
+  padding:0 6px;
+  border-radius:999px;
+  background:rgba(218,202,177,.14);
+  color:rgba(218,202,177,.90);
+  font-size:.58rem;
+  font-weight:900;
+  line-height:1;
+}
+
+.sale-photo-actions{
+  padding:6px;
+}
+
+.sale-photo-action-select{
+  width:100%;
+  max-width:none;
+  height:30px;
+  min-height:30px;
+  border:1px solid rgba(218,202,177,.16);
+  border-radius:10px;
+  background-color:#244866;
+  color:var(--cream);
+  padding:0 22px 0 8px;
+  font-size:.68rem;
+  font-weight:850;
+  line-height:1;
+}
+
+.store-editor-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  padding-top:2px;
+}
+
+.store-editor-actions button{
+  min-height:38px;
+  border-radius:13px;
+  padding:0 14px;
+  font-weight:850;
+}
+
+.store-save-btn{
+  background:rgba(218,202,177,.92) !important;
+  color:var(--navy) !important;
+}
+
+.store-delete-btn{
+  background:rgba(146,26,36,.20) !important;
+  color:#ffb8bf !important;
+}
+
+/* =========================
    MAP VIEW
    ========================= */
 .map-panel{
@@ -2042,6 +2425,15 @@ button.secondary{
     padding:14px;
   }
 
+  .store-editor-panel{
+    max-width:940px;
+    margin:0 auto;
+  }
+
+  .store-editor-card .detail-grid{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
+
   .detail-grid{
     display:grid;
     grid-template-columns:repeat(2, minmax(0, 1fr));
@@ -2294,6 +2686,14 @@ button.secondary{
   .topbar-icon-action{
     min-width:40px;
     height:40px;
+  }
+
+  .sale-add-btn{
+    width:40px;
+    min-width:40px;
+    height:40px;
+    min-height:40px;
+    flex-basis:40px;
   }
 
   .topbar-left{

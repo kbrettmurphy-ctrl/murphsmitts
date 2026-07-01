@@ -3800,7 +3800,7 @@ async function loadOrders() {
 
 async function loadSaleGloves() {
   saleGlovesList.innerHTML =
-    `<div class="no-results">Loading gloves...</div>`;
+    `<div class="store-empty-state">Loading gloves...</div>`;
 
   try {
     const data = await postJson({
@@ -3810,71 +3810,119 @@ async function loadSaleGloves() {
     const gloves = data.gloves || [];
 
     saleGlovesCount.textContent =
-      `${gloves.length} glove${gloves.length === 1 ? "" : "s"}`;
+      `${gloves.length} listing${gloves.length === 1 ? "" : "s"}`;
 
     if (!gloves.length) {
-      saleGlovesList.innerHTML =
-        `<div class="no-results">No gloves listed.</div>`;
+      saleGlovesList.innerHTML = `
+        <div class="store-empty-state">
+          <strong>No gloves listed.</strong>
+          <span>Add a glove when one is ready for the site.</span>
+          <button class="secondary store-empty-add" type="button">+ Add</button>
+        </div>
+      `;
+
+      saleGlovesList.querySelector(".store-empty-add")?.addEventListener("click", () => {
+        renderSaleGloveEditor(null);
+      });
+      resetStoreScrollSoon();
       return;
     }
 
-    saleGlovesList.innerHTML = gloves.map(glove => `
-      <div class="order-card sale-glove-card"
-           data-id="${glove.id}">
-        <div class="order-top">
-          <div>
-            <div class="order-name">${escapeHtml(glove.title || "")}</div>
-            <div class="order-number">
-              $${Number(glove.price || 0).toFixed(2)}
-            </div>
-          </div>
+    saleGlovesList.innerHTML = `
+      <div class="sale-gloves-list">
+        ${gloves.map(glove => {
+          const status = getSaleGloveStatus(glove.status);
+          const meta = getSaleGloveMeta(glove);
 
-          <div class="order-status">
-            ${escapeHtml(glove.status || "")}
-          </div>
-        </div>
+          return `
+            <button class="sale-glove-row"
+                 type="button"
+                 data-id="${escapeAttr(glove.id)}">
+              <span class="sale-glove-row-main">
+                <span class="sale-glove-title">${escapeHtml(glove.title || "Untitled glove")}</span>
+                <span class="sale-status-pill sale-status-${escapeAttr(status.key)}">${escapeHtml(status.label)}</span>
+              </span>
+
+              <span class="sale-glove-row-meta">
+                <span class="sale-glove-price">$${Number(glove.price || 0).toFixed(2)}</span>
+                <span class="sale-glove-meta">${escapeHtml(meta || "Listing")}</span>
+              </span>
+            </button>
+          `;
+        }).join("")}
       </div>
-    `).join("");
+    `;
 
     saleGlovesList
-      .querySelectorAll(".sale-glove-card")
-      .forEach(card => {
+      .querySelectorAll(".sale-glove-row")
+      .forEach(row => {
+        row.addEventListener("click", async () => {
+          const gloveId = row.dataset.id;
 
-       card.addEventListener("click", async () => {
+          try {
+            const data = await postJson({
+              action: "getSaleGlove",
+              id: gloveId
+            }, true);
 
-         const gloveId = card.dataset.id;
+            renderSaleGloveEditor(data.glove);
+          } catch (err) {
+            alert(err.message);
+          }
+        });
+      });
 
-         try {
-
-           const data = await postJson({
-             action: "getSaleGlove",
-             id: gloveId
-           }, true);
-
-           renderSaleGloveEditor(data.glove);
-
-         } catch (err) {
-           alert(err.message);
-         }
-
-       });
-
-    });
+    resetStoreScrollSoon();
 
   } catch (err) {
     saleGlovesList.innerHTML =
-      `<div class="no-results">${escapeHtml(err.message)}</div>`;
+      `<div class="store-empty-state">${escapeHtml(err.message)}</div>`;
+    resetStoreScrollSoon();
   }
+}
+
+function getSaleGloveStatus(statusValue) {
+  const status = String(statusValue || "available").trim().toLowerCase();
+
+  if (status === "sold") {
+    return { key: "sold", label: "Sold" };
+  }
+
+  if (status === "hidden" || status === "draft") {
+    return { key: "draft", label: "Draft" };
+  }
+
+  return { key: "available", label: "Available" };
+}
+
+function getSaleGloveMeta(glove) {
+  return [
+    glove.gloveSize,
+    glove.position,
+    glove.throwHand
+  ]
+    .map(value => String(value || "").trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" · ");
+}
+
+function resetStoreScrollSoon() {
+  resetViewScroll(saleGlovesView, { blurActive: false });
 }
 
 function renderSaleGloveEditor(glove) {
   const isNew = !glove;
 
   saleGlovesList.innerHTML = `
-    <div class="upload-panel">
-      <div class="upload-card">
-        <h2>${isNew ? "Add Glove" : "Edit Glove"}</h2>
-        <p class="muted">Create or update a glove listing.</p>
+    <div class="store-editor-panel">
+      <div class="store-editor-card">
+        <div class="store-editor-header">
+          <div>
+            <h2>${isNew ? "Add Glove" : "Edit Glove"}</h2>
+            <p class="muted">Create or update a glove listing.</p>
+          </div>
+        </div>
 
         <div class="detail-grid">
           <div class="detail-block full">
@@ -3970,11 +4018,23 @@ function renderSaleGloveEditor(glove) {
         </div>
 
         ${isNew ? "" : `
-           <div class="detail-block full">
-             <div class="detail-section-title full">Photos</div>
+           <div class="store-photo-section">
+             <div class="store-photo-header">
+               <div>
+                 <h3>Photos</h3>
+                 <p class="muted">Upload photos and choose the primary and hover images.</p>
+               </div>
+             </div>
 
              <label class="upload-drop" for="saleGlovePhotoInput">
-               <span class="upload-drop-title">Choose glove photos</span>
+               <span class="upload-drop-icon" aria-hidden="true">
+                 <svg viewBox="0 0 24 24" focusable="false">
+                   <rect x="4" y="5" width="16" height="14" rx="3"></rect>
+                   <circle cx="9" cy="10" r="1.6"></circle>
+                   <path d="m7 17 4.2-4.2a1.8 1.8 0 0 1 2.5 0L17 16"></path>
+                 </svg>
+               </span>
+               <span class="upload-drop-title">Choose Photos</span>
                <span class="upload-drop-note">Select photos, review them, then upload.</span>
              </label>
 
@@ -3983,11 +4043,11 @@ function renderSaleGloveEditor(glove) {
              <div id="saleGlovePhotoPreview" class="upload-preview-grid"></div>
 
              <div class="upload-actions">
-               <button id="saleGloveUploadBtn" class="secondary" type="button" disabled>
+               <button id="saleGloveUploadBtn" class="secondary upload-primary" type="button" disabled>
                  Upload
                </button>
 
-               <button id="saleGloveClearBtn" class="secondary" type="button" disabled>
+               <button id="saleGloveClearBtn" class="secondary upload-clear" type="button" disabled>
                  Clear
                </button>
              </div>
@@ -3999,15 +4059,15 @@ function renderSaleGloveEditor(glove) {
            </div>
         `}
 
-        <div style="display:flex; gap:10px; margin-top:18px; flex-wrap:wrap;">
-           <button id="saveSaleGloveBtn" class="secondary" type="button">
+        <div class="store-editor-actions">
+           <button id="saveSaleGloveBtn" class="secondary store-save-btn" type="button">
              ${isNew ? "Create Glove" : "Save Changes"}
            </button>
 
-           <button id="cancelSaleGloveBtn" class="secondary" type="button">Cancel</button>
+           <button id="cancelSaleGloveBtn" class="secondary store-cancel-btn" type="button">Cancel</button>
 
            ${isNew ? "" : `
-             <button id="deleteSaleGloveBtn" class="secondary" type="button">
+             <button id="deleteSaleGloveBtn" class="secondary store-delete-btn" type="button">
                Delete
              </button>
            `}
@@ -4017,6 +4077,8 @@ function renderSaleGloveEditor(glove) {
       </div>
     </div>
   `;
+
+  resetStoreScrollSoon();
 
   document.getElementById("cancelSaleGloveBtn")?.addEventListener("click", loadSaleGloves);
 
@@ -4243,7 +4305,7 @@ async function loadSaleGlovePhotos(gloveId) {
     }
 
     wrap.innerHTML = `
-      <div class="upload-preview-grid">
+      <div class="store-photo-grid">
         ${photos.map(photo => `
           <div class="upload-preview-item sale-photo-item">
             <img
@@ -4253,8 +4315,8 @@ async function loadSaleGlovePhotos(gloveId) {
             >
 
             <div class="upload-preview-name sale-photo-badges">
-              ${photo.is_primary ? "★Primary★" : ""}
-              ${photo.is_hover ? "↔Hover↔" : ""}
+              ${photo.is_primary ? "<span>Primary</span>" : ""}
+              ${photo.is_hover ? "<span>Hover</span>" : ""}
             </div>
 
             <div class="sale-photo-actions">
@@ -4263,14 +4325,14 @@ async function loadSaleGlovePhotos(gloveId) {
                 data-glove-id="${escapeAttr(gloveId)}"
                 data-photo-id="${escapeAttr(photo.id)}"
               >
-                <option value="">...</option>
+                <option value="">Actions</option>
                 <option value="primary" ${photo.is_primary ? "disabled" : ""}>
-                  ${photo.is_primary ? "Already Primary" : "A"}
+                  Primary
                 </option>
                 <option value="hover" ${photo.is_hover ? "disabled" : ""}>
-                  ${photo.is_hover ? "Already Hover" : "B"}
+                  Hover
                 </option>
-                <option value="delete">🗑</option>
+                <option value="delete">Delete</option>
               </select>
             </div>
           </div>
@@ -4753,6 +4815,12 @@ saleGlovesLogoutBtn?.addEventListener("click", () => {
 addSaleGloveBtn?.addEventListener("click", () => {
   renderSaleGloveEditor(null);
 });
+
+if (addSaleGloveBtn) {
+  addSaleGloveBtn.textContent = "+";
+  addSaleGloveBtn.setAttribute("aria-label", "Add glove");
+  addSaleGloveBtn.setAttribute("title", "Add glove");
+}
 
 mapMenuBtn?.addEventListener("click", openMenu);
 
