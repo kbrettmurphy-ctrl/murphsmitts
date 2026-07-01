@@ -1059,8 +1059,13 @@ function installSwipeDeleteStyles() {
       align-items:center;
       background:transparent;
       border-radius:0;
+      opacity:0;
+      visibility:hidden;
       pointer-events:none;
       z-index:0;
+      transition:
+        opacity 120ms ease,
+        visibility 0s linear 120ms;
     }
 
     .swipe-actions-start{
@@ -1073,16 +1078,24 @@ function installSwipeDeleteStyles() {
       background:transparent;
     }
 
-    .swipe-row.revealing-right .swipe-actions-start,
     .swipe-row.swiped-right .swipe-actions-start{
       background:transparent;
+      opacity:1;
+      visibility:visible;
       z-index:1;
+      transition:
+        opacity 120ms ease,
+        visibility 0s;
     }
 
-    .swipe-row.revealing-left .swipe-actions-end,
     .swipe-row.swiped-left .swipe-actions-end{
       background:transparent;
+      opacity:1;
+      visibility:visible;
       z-index:1;
+      transition:
+        opacity 120ms ease,
+        visibility 0s;
     }
 
     .swipe-row.swiped-right .swipe-actions-start,
@@ -1107,15 +1120,32 @@ function installSwipeDeleteStyles() {
       font:inherit;
       padding:0;
       cursor:pointer;
-      opacity:1;
+      opacity:0;
+      visibility:hidden;
       display:inline-flex;
       align-items:center;
       justify-content:center;
       flex:0 0 50px;
+      transform:scale(.94);
+      transition:
+        opacity 120ms ease,
+        transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+        visibility 0s linear 120ms;
       box-shadow:
         0 8px 16px rgba(0,0,0,.24),
         inset 0 1px 0 rgba(255,255,255,.16);
       -webkit-tap-highlight-color:transparent;
+    }
+
+    .swipe-row.swiped-right .swipe-actions-start .swipe-circle-action,
+    .swipe-row.swiped-left .swipe-actions-end .swipe-circle-action{
+      opacity:1;
+      visibility:visible;
+      transform:scale(1);
+      transition:
+        opacity 120ms ease,
+        transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+        visibility 0s;
     }
 
     .swipe-circle-text{
@@ -1155,21 +1185,16 @@ function installSwipeDeleteStyles() {
       padding:0;
       cursor:pointer;
       opacity:0;
-      transition:
-        opacity 120ms ease,
-        transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
       display:inline-flex;
       align-items:center;
       justify-content:center;
       flex:0 0 50px;
-      transform:scale(.94);
       box-shadow:
         0 8px 16px rgba(0,0,0,.24),
         inset 0 1px 0 rgba(255,255,255,.14);
       -webkit-tap-highlight-color:transparent;
     }
 
-    .swipe-row.revealing-left .swipe-delete-btn,
     .swipe-row.swiped-left .swipe-delete-btn{
       opacity:1;
       transform:scale(1);
@@ -1182,6 +1207,7 @@ function installSwipeDeleteStyles() {
     .swipe-row .order-card{
       position:relative;
       z-index:2;
+      background:#fffaf3;
       margin-bottom:0;
       transition:transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
       will-change:transform;

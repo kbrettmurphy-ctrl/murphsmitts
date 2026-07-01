@@ -4,12 +4,12 @@
   --red:#921a24;
   --dark:#020b12;
 
-  --bg:#092f4d;
-  --panel:#13293d;
-  --panel-2:#173550;
-  --line:rgba(218,202,177,.18);
-  --ink:#dacab1;
-  --muted:rgba(218,202,177,.76);
+  --bg:#f4eee4;
+  --panel:#fffaf3;
+  --panel-2:#f8efdf;
+  --line:rgba(9,47,77,.14);
+  --ink:#092f4d;
+  --muted:rgba(9,47,77,.66);
   --green:#3e9b63;
 
   --light-bg:#f4eee4;
@@ -19,12 +19,13 @@
   --light-ink:#092f4d;
   --light-muted:#6f7a85;
 
-  --shadow:0 10px 28px rgba(0,0,0,.18);
+  --shadow:0 10px 28px rgba(9,47,77,.10);
 
   /* narrowed desktop menu so labels fit without wrapping */
   --menuW:236px;
   --radius:18px;
   --topbarH:78px;
+  color-scheme:light;
 }
 
 /* Admin v2 visual rule: compact, icon-first controls should feel close to native iOS/macOS. */
@@ -2758,8 +2759,13 @@ button.secondary{
   display: flex;
   align-items: center;
   background: transparent;
+  opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   z-index: 0;
+  transition:
+    opacity 120ms ease,
+    visibility 0s linear 120ms;
 }
 
 .swipe-actions-start{
@@ -2772,16 +2778,24 @@ button.secondary{
   background: transparent;
 }
 
-.swipe-row.revealing-right .swipe-actions-start,
 .swipe-row.swiped-right .swipe-actions-start{
   background: transparent;
+  opacity: 1;
+  visibility: visible;
   z-index: 1;
+  transition:
+    opacity 120ms ease,
+    visibility 0s;
 }
 
-.swipe-row.revealing-left .swipe-actions-end,
 .swipe-row.swiped-left .swipe-actions-end{
   background: transparent;
+  opacity: 1;
+  visibility: visible;
   z-index: 1;
+  transition:
+    opacity 120ms ease,
+    visibility 0s;
 }
 
 .swipe-row.swiped-right .swipe-actions-start,
@@ -2806,15 +2820,32 @@ button.secondary{
   font: inherit;
   padding: 0;
   cursor: pointer;
-  opacity: 1;
+  opacity: 0;
+  visibility: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 50px;
+  transform: scale(.94);
+  transition:
+    opacity 120ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 120ms;
   box-shadow:
     0 8px 16px rgba(0,0,0,.24),
     inset 0 1px 0 rgba(255,255,255,.16);
   -webkit-tap-highlight-color: transparent;
+}
+
+.swipe-row.swiped-right .swipe-actions-start .swipe-circle-action,
+.swipe-row.swiped-left .swipe-actions-end .swipe-circle-action{
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
+  transition:
+    opacity 120ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s;
 }
 
 .swipe-circle-text{
@@ -2854,21 +2885,16 @@ button.secondary{
   padding: 0;
   cursor: pointer;
   opacity: 0;
-  transition:
-    opacity 120ms ease,
-    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 50px;
-  transform: scale(.94);
   box-shadow:
     0 8px 16px rgba(0,0,0,.24),
     inset 0 1px 0 rgba(255,255,255,.14);
   -webkit-tap-highlight-color: transparent;
 }
 
-.swipe-row.revealing-left .swipe-delete-btn,
 .swipe-row.swiped-left .swipe-delete-btn{
   opacity: 1;
   transform: scale(1);
@@ -3046,4 +3072,492 @@ button.secondary{
   .detail-card{
     padding:10px;
   }
+}
+
+/* =========================
+   ADMIN V2 CREAM THEME
+   ========================= */
+html,
+body,
+.app-shell,
+.main-panel,
+#dashboardView,
+#detailView{
+  background:var(--bg);
+  color:var(--ink);
+}
+
+.topbar,
+#detailView .detail-topbar,
+.search-toolbar{
+  background:rgba(244,238,228,.94);
+  color:var(--navy);
+  border-bottom:1px solid rgba(9,47,77,.12);
+  box-shadow:0 8px 24px rgba(9,47,77,.06);
+}
+
+.topbar,
+#detailView .detail-topbar,
+.inventory-filter-popover,
+.order-filter-popover,
+.workflow-sheet{
+  -webkit-backdrop-filter:blur(18px) saturate(1.2);
+  backdrop-filter:blur(18px) saturate(1.2);
+}
+
+.topbar h1,
+#viewTitle,
+#detailView .detail-topbar h1{
+  color:var(--navy);
+}
+
+#orderCount,
+#uploadCount,
+#saleGlovesCount,
+#mapCount,
+.detail-topbar-actions .status{
+  color:rgba(9,47,77,.66);
+}
+
+.icon-btn,
+button.secondary,
+.topbar-icon-action,
+#detailView .detail-topbar .secondary,
+#backBtn,
+.logout-action,
+.sale-add-btn,
+.store-empty-add{
+  background:rgba(9,47,77,.10);
+  color:var(--navy);
+  border:1px solid rgba(9,47,77,.10);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.50);
+}
+
+.icon-btn:active,
+button.secondary:active,
+.topbar-icon-action:active,
+#backBtn:active,
+.logout-action:active,
+.sale-add-btn:active{
+  background:rgba(9,47,77,.16);
+}
+
+#saveOrderBtn,
+.gallery-upload-card .upload-primary:not(:disabled),
+.store-editor-card .upload-primary:not(:disabled),
+.store-save-btn,
+.map-unmapped-btn,
+.workflow-form-actions .workflow-form-submit{
+  background:var(--navy) !important;
+  color:#fffaf3 !important;
+}
+
+.side-menu{
+  background:rgba(255,250,243,.96);
+  color:var(--navy);
+  border-right:1px solid rgba(9,47,77,.14);
+  box-shadow:18px 0 38px rgba(9,47,77,.18);
+}
+
+.brand-title,
+.nav-link,
+.nav-parent{
+  color:var(--navy);
+}
+
+.brand-subtitle,
+.nav-children .nav-link{
+  color:rgba(9,47,77,.66);
+}
+
+.nav-link.active,
+.nav-parent,
+.nav-main{
+  background:rgba(9,47,77,.10);
+}
+
+.nav-link:active,
+.nav-parent:active{
+  background:rgba(9,47,77,.14);
+}
+
+.toolbar{
+  background:var(--bg);
+  border-bottom:1px solid rgba(9,47,77,.12);
+}
+
+.inventory-filter-toggle.is-active,
+.order-filter-toggle.is-active,
+.inventory-filter-segment button.active,
+.order-filter-list button.active{
+  background:var(--navy);
+  color:#fffaf3;
+}
+
+.inventory-filter-toggle.has-active-filter::after,
+.order-filter-toggle.has-active-filter::after{
+  box-shadow:0 0 0 2px #fffaf3;
+}
+
+.inventory-filter-popover,
+.order-filter-popover{
+  background:rgba(255,250,243,.96);
+  border:1px solid rgba(9,47,77,.14);
+  box-shadow:0 18px 42px rgba(9,47,77,.16);
+}
+
+.inventory-filter-segment{
+  background:rgba(9,47,77,.08);
+}
+
+.inventory-filter-segment button,
+.order-filter-list button{
+  color:rgba(9,47,77,.78);
+}
+
+.search-field-shell{
+  background:rgba(255,250,243,.92);
+  border:1px solid rgba(9,47,77,.12);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.72);
+}
+
+.search-field-shell:focus-within{
+  background:#fffaf3;
+  border-color:rgba(9,47,77,.22);
+  box-shadow:0 0 0 3px rgba(9,47,77,.08);
+}
+
+.search-field-icon{
+  stroke:rgba(9,47,77,.58);
+}
+
+.search-field-shell input{
+  color:var(--navy);
+}
+
+.search-field-shell input::placeholder{
+  color:rgba(9,47,77,.45);
+}
+
+.search-clear-btn{
+  background:rgba(9,47,77,.14);
+  color:var(--navy);
+}
+
+.search-close-btn{
+  color:var(--navy);
+}
+
+.pull-refresh-indicator,
+.pull-refresh-indicator.ready{
+  background:rgba(255,250,243,.96);
+  color:var(--navy);
+  border:1px solid rgba(9,47,77,.14);
+  box-shadow:0 12px 28px rgba(9,47,77,.16);
+}
+
+.pull-refresh-spinner{
+  border-color:rgba(9,47,77,.18);
+  border-top-color:var(--navy);
+}
+
+.upload-card,
+.gallery-upload-card,
+.inventory-card,
+.order-card,
+.sale-glove-row,
+.store-empty-state,
+.store-editor-card,
+.map-card,
+.detail-section{
+  background:rgba(255,250,243,.96);
+  color:var(--navy);
+  border-color:rgba(9,47,77,.12);
+  box-shadow:0 8px 22px rgba(9,47,77,.06);
+}
+
+.order-card{
+  background:#fffaf3;
+}
+
+.inventory-card,
+.order-card,
+.sale-glove-row{
+  box-shadow:none;
+}
+
+.inventory-card,
+.sale-glove-row{
+  border-bottom:1px solid rgba(9,47,77,.12);
+}
+
+.sale-glove-row:active{
+  background:rgba(9,47,77,.07);
+}
+
+.upload-card h2,
+.gallery-upload-card h2,
+.store-editor-header h2,
+.store-photo-header h3,
+.map-header-row h2,
+.detail-section-header h2,
+.store-empty-state strong,
+.inventory-color-name,
+.inventory-qty strong,
+.order-name,
+.order-status,
+.sale-glove-title{
+  color:var(--navy);
+}
+
+.muted,
+.upload-drop-note,
+.gallery-upload-card .upload-drop-note,
+.store-editor-card .upload-drop-note,
+.upload-status,
+.gallery-upload-card .upload-status,
+.store-editor-card .upload-status,
+.inventory-card-row-meta,
+.inventory-reorder,
+.sale-glove-meta,
+.store-empty-state,
+.map-header-row .muted,
+.map-unmapped-main,
+.order-subrow,
+.no-results{
+  color:rgba(9,47,77,.64);
+}
+
+.label,
+.gallery-upload-card .label,
+.store-editor-card .label{
+  color:rgba(9,47,77,.62);
+}
+
+.value,
+.detail-order-number,
+.detail-section-title{
+  color:var(--navy);
+}
+
+.detail-order-status{
+  color:rgba(9,47,77,.64);
+}
+
+.gallery-upload-card select,
+.store-editor-card .detail-block input,
+.store-editor-card .detail-block select,
+.store-editor-card .detail-block textarea,
+.sale-photo-action-select,
+.detail-block input,
+.detail-block select,
+.detail-block textarea,
+.detail-block .field-like,
+.workflow-action-form input,
+.workflow-action-form textarea,
+.workflow-action-form select,
+.login-card input{
+  background:#fffaf3;
+  color:var(--navy);
+  border:1px solid rgba(9,47,77,.16);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.75);
+}
+
+.gallery-upload-card select,
+.store-editor-card .detail-block select,
+.sale-photo-action-select,
+.detail-block select{
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(9,47,77,.72) 50%),
+    linear-gradient(135deg, rgba(9,47,77,.72) 50%, transparent 50%);
+}
+
+.detail-block input::placeholder,
+.detail-block textarea::placeholder,
+.store-editor-card .detail-block input::placeholder,
+.store-editor-card .detail-block textarea::placeholder,
+.workflow-action-form input::placeholder,
+.workflow-action-form textarea::placeholder{
+  color:rgba(9,47,77,.42);
+}
+
+.detail-block input[readonly],
+.detail-block textarea[readonly],
+.detail-block .field-like.readonly{
+  background:rgba(9,47,77,.06);
+  color:rgba(9,47,77,.76);
+}
+
+.checkbox-item,
+.checkbox-other-choice{
+  color:var(--navy);
+}
+
+.upload-drop,
+.gallery-upload-card .upload-drop,
+.store-editor-card .upload-drop{
+  background:rgba(9,47,77,.05);
+  border-color:rgba(9,47,77,.14);
+  color:var(--navy);
+}
+
+.gallery-upload-card .upload-drop:hover{
+  background:rgba(9,47,77,.07);
+  border-color:rgba(9,47,77,.20);
+}
+
+.upload-drop-icon{
+  background:rgba(9,47,77,.10);
+  color:var(--navy);
+}
+
+.upload-preview-item,
+.gallery-upload-card .upload-preview-item,
+.store-editor-card .upload-preview-item,
+.sale-photo-badges span,
+.detail-card .photo-thumb-img{
+  background:rgba(9,47,77,.05);
+  border-color:rgba(9,47,77,.12);
+}
+
+.upload-preview-name,
+.sale-photo-badges span{
+  color:rgba(9,47,77,.62);
+}
+
+.inventory-status-ignore .inventory-status-pill,
+.sale-status-draft{
+  background:rgba(9,47,77,.08);
+  color:rgba(9,47,77,.66);
+  border-color:rgba(9,47,77,.12);
+}
+
+.workflow-step{
+  background:rgba(9,47,77,.20);
+}
+
+.workflow-step.complete{
+  background:rgba(9,47,77,.58);
+}
+
+.workflow-step.active{
+  background:var(--navy);
+}
+
+.workflow-connector{
+  background:rgba(9,47,77,.16);
+}
+
+.workflow-connector.complete{
+  background:rgba(9,47,77,.46);
+}
+
+.lace-dot{
+  border-color:rgba(9,47,77,.22);
+  box-shadow:0 1px 3px rgba(9,47,77,.20);
+}
+
+.workflow-sheet{
+  color:var(--navy);
+  background:rgba(255,250,243,.96);
+  border:1px solid rgba(9,47,77,.14);
+  box-shadow:
+    0 18px 46px rgba(9,47,77,.18),
+    0 2px 8px rgba(9,47,77,.10);
+}
+
+.workflow-sheet-header,
+.workflow-sheet-form{
+  border-color:rgba(9,47,77,.12);
+}
+
+.workflow-customer-name,
+.workflow-action-btn,
+.workflow-action-form label,
+.workflow-action-form p{
+  color:var(--navy);
+}
+
+.workflow-order-number,
+.workflow-current-status{
+  color:rgba(9,47,77,.60);
+}
+
+.workflow-action-btn.active,
+.workflow-action-btn.active:hover,
+.workflow-action-btn:hover{
+  background:#0a84ff;
+  color:#fff;
+}
+
+.workflow-form-actions .workflow-form-cancel{
+  background:rgba(9,47,77,.10);
+  color:var(--navy);
+}
+
+.workflow-form-message{
+  color:var(--red);
+  background:rgba(146,26,36,.08);
+  border:1px solid rgba(146,26,36,.18);
+}
+
+.order-map{
+  background:#e9e3d8;
+  border-color:rgba(9,47,77,.14);
+}
+
+.map-unmapped-title,
+.map-unmapped-main strong{
+  color:var(--navy);
+}
+
+.map-unmapped-item{
+  background:rgba(255,250,243,.72);
+  border-color:rgba(9,47,77,.12);
+}
+
+.swipe-circle-action{
+  box-shadow:
+    0 8px 18px rgba(9,47,77,.18),
+    inset 0 1px 0 rgba(255,255,255,.18);
+}
+
+.swipe-circle-text{
+  background:linear-gradient(180deg, #1b5f95, #0d426b);
+}
+
+.swipe-circle-email{
+  background:linear-gradient(180deg, #6f7d8b, #4d5d6c);
+  border:0;
+}
+
+.swipe-circle-ship{
+  background:linear-gradient(180deg, #9a6935, #745029);
+}
+
+.swipe-delete-btn{
+  box-shadow:
+    0 8px 18px rgba(146,26,36,.20),
+    inset 0 1px 0 rgba(255,255,255,.16);
+}
+
+.detail-delete-btn,
+.gallery-upload-card .upload-clear:not(:disabled),
+.store-editor-card .upload-clear:not(:disabled),
+.store-delete-btn{
+  background:rgba(146,26,36,.10) !important;
+  color:var(--red) !important;
+  border-color:rgba(146,26,36,.22);
+}
+
+#loginView{
+  background:
+    radial-gradient(circle at top left, rgba(218,202,177,.45), transparent 36%),
+    linear-gradient(180deg, #f4eee4 0%, #eadfcf 100%);
+}
+
+.login-card{
+  background:rgba(255,250,243,.96);
+  border:1px solid rgba(9,47,77,.14);
+  box-shadow:0 16px 34px rgba(9,47,77,.12);
 }
