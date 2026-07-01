@@ -2869,6 +2869,9 @@ footer{
 
 .glove-request-card{
   margin:0;
+  overflow:hidden;
+  border:1px solid var(--mm-border);
+  border-radius:var(--radius-md);
   background:rgba(255, 250, 243, .92);
 }
 
@@ -2880,8 +2883,20 @@ footer{
   background:var(--mm-navy);
 }
 
-.glove-section-heading .service-section-title{
+.glove-card-title{
+  margin:0;
+  padding:13px 16px;
+  color:var(--mm-bg-soft);
+  font-size:var(--text-md);
+  font-weight:var(--weight-semibold);
+}
+
+.glove-section-heading .glove-card-title{
   flex:1 1 auto;
+}
+
+.glove-card-body{
+  padding:16px;
 }
 
 .glove-remove-btn{
