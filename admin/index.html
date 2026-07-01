@@ -73,6 +73,14 @@
             </div>
           </div>
           <div class="topbar-actions">
+            <button id="inventoryFilterToggleBtn" class="secondary topbar-icon-action inventory-filter-toggle" type="button" aria-label="Inventory filters" aria-expanded="false" aria-controls="inventoryFilterPopover" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 7h16"></path>
+                <circle cx="9" cy="7" r="2"></circle>
+                <path d="M4 17h16"></path>
+                <circle cx="15" cy="17" r="2"></circle>
+              </svg>
+            </button>
             <button id="searchToggleBtn" class="secondary topbar-icon-action" type="button" aria-label="Search orders" aria-expanded="false" aria-controls="searchToolbar">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <circle cx="11" cy="11" r="6"></circle>
@@ -88,6 +96,12 @@
                 <path d="M8.8 12H18"></path>
               </svg>
             </button>
+            <div id="inventoryFilterPopover" class="inventory-filter-popover" hidden>
+              <div class="inventory-filter-segment" role="group" aria-label="Inventory filter">
+                <button id="inventoryAllBtn" type="button">All</button>
+                <button id="inventoryNeedsOrderBtn" type="button">Needs Order</button>
+              </div>
+            </div>
           </div>
         </header>
 

@@ -511,6 +511,7 @@ button.secondary{
   align-items:center;
   gap:8px;
   flex:0 0 auto;
+  position:relative;
 }
 
 .topbar-icon-action{
@@ -531,6 +532,77 @@ button.secondary{
   stroke-width:2;
   stroke-linecap:round;
   stroke-linejoin:round;
+}
+
+.topbar-icon-action[hidden]{
+  display:none;
+}
+
+.inventory-filter-toggle{
+  position:relative;
+}
+
+.inventory-filter-toggle.is-active{
+  background:rgba(218,202,177,.92);
+  color:var(--navy);
+}
+
+.inventory-filter-toggle.has-active-filter::after{
+  content:"";
+  position:absolute;
+  top:8px;
+  right:8px;
+  width:7px;
+  height:7px;
+  border-radius:999px;
+  background:#0a84ff;
+  box-shadow:0 0 0 2px var(--navy);
+}
+
+.inventory-filter-popover{
+  position:absolute;
+  top:calc(100% + 8px);
+  right:0;
+  z-index:35;
+  min-width:196px;
+  padding:7px;
+  border-radius:18px;
+  background:rgba(19,41,61,.96);
+  border:1px solid rgba(218,202,177,.16);
+  box-shadow:0 18px 42px rgba(0,0,0,.26);
+  -webkit-backdrop-filter:blur(18px);
+  backdrop-filter:blur(18px);
+}
+
+.inventory-filter-popover[hidden]{
+  display:none;
+}
+
+.inventory-filter-segment{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:4px;
+  padding:3px;
+  border-radius:14px;
+  background:rgba(218,202,177,.08);
+}
+
+.inventory-filter-segment button{
+  border:0;
+  border-radius:11px;
+  min-height:34px;
+  padding:0 10px;
+  background:transparent;
+  color:rgba(218,202,177,.78);
+  font-size:.82rem;
+  font-weight:850;
+  white-space:nowrap;
+}
+
+.inventory-filter-segment button.active{
+  background:rgba(218,202,177,.92);
+  color:var(--navy);
+  box-shadow:0 1px 4px rgba(0,0,0,.18);
 }
 
 .logout-action{
@@ -739,6 +811,125 @@ button.secondary{
 .orders-list{
   display:block;
   overflow-anchor:none;
+}
+
+.inventory-card{
+  display:grid;
+  gap:8px;
+  padding:12px 14px;
+  background:var(--panel);
+  border-bottom:1px solid rgba(218,202,177,.14);
+  color:var(--cream);
+}
+
+.inventory-card-row{
+  display:grid;
+  grid-template-columns:minmax(0, 1fr) auto;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+
+.inventory-card-row-meta{
+  color:rgba(218,202,177,.72);
+  font-size:.92rem;
+  line-height:1.1;
+}
+
+.inventory-color{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-width:0;
+}
+
+.inventory-swatch{
+  width:16px;
+  height:16px;
+  flex:0 0 16px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.28);
+  box-shadow:0 0 0 1px rgba(0,0,0,.18);
+  background:var(--cream);
+}
+
+.inventory-swatch-custom{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(135deg, #dacab1, #78aeda 48%, #b01f2e);
+  color:var(--navy);
+  font-size:.6rem;
+  font-weight:900;
+}
+
+.inventory-color-name{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--cream);
+  font-size:1rem;
+  font-weight:800;
+  letter-spacing:-.015em;
+}
+
+.inventory-status-pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:26px;
+  padding:0 10px;
+  border-radius:999px;
+  font-size:.78rem;
+  font-weight:900;
+  line-height:1;
+  background:rgba(62,155,99,.16);
+  color:#65c184;
+  border:1px solid rgba(101,193,132,.18);
+}
+
+.inventory-status-low .inventory-status-pill{
+  background:rgba(214,178,31,.16);
+  color:#e8c848;
+  border-color:rgba(232,200,72,.20);
+}
+
+.inventory-status-out .inventory-status-pill{
+  background:rgba(146,26,36,.20);
+  color:#ff6b78;
+  border-color:rgba(255,107,120,.22);
+}
+
+.inventory-status-ignore .inventory-status-pill{
+  background:rgba(218,202,177,.10);
+  color:rgba(218,202,177,.72);
+  border-color:rgba(218,202,177,.16);
+}
+
+.inventory-qty{
+  display:flex;
+  align-items:baseline;
+  gap:5px;
+  min-width:0;
+}
+
+.inventory-qty strong{
+  color:rgba(218,202,177,.92);
+  font-size:1rem;
+  line-height:1;
+}
+
+.inventory-qty span,
+.inventory-reorder{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.inventory-reorder{
+  text-align:right;
+  color:rgba(218,202,177,.58);
 }
 
 .order-card{

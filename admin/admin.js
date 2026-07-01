@@ -22,6 +22,10 @@ const searchToolbar = document.getElementById("searchToolbar");
 const searchToggleBtn = document.getElementById("searchToggleBtn");
 const searchClearBtn = document.getElementById("searchClearBtn");
 const searchCloseBtn = document.getElementById("searchCloseBtn");
+const inventoryFilterToggleBtn = document.getElementById("inventoryFilterToggleBtn");
+const inventoryFilterPopover = document.getElementById("inventoryFilterPopover");
+const inventoryAllBtn = document.getElementById("inventoryAllBtn");
+const inventoryNeedsOrderBtn = document.getElementById("inventoryNeedsOrderBtn");
 const pullRefreshIndicator = document.getElementById("pullRefreshIndicator");
 const pullRefreshText = document.getElementById("pullRefreshText");
 const ordersList = document.getElementById("ordersList");
@@ -66,6 +70,7 @@ let workflowSuppressOpeningTouch = false;
 let workflowSuppressOpeningTouchTimer = null;
 let suppressOrderCardClickUntil = 0;
 let searchExpanded = false;
+let inventoryFiltersExpanded = false;
 let pullRefreshState = {
   tracking: false,
   pulling: false,
@@ -1315,28 +1320,6 @@ function installSwipeDeleteStyles() {
        }
     }
 
- /* Inventory filter */
-    .inventory-filter-bar{
-      display:flex;
-      gap:10px;
-      padding:14px 16px;
-      border-bottom:1px solid var(--line);
-    }
-
-    .inventory-filter-bar button{
-      border:1px solid rgba(218,202,177,.28);
-      border-radius:999px;
-      padding:9px 14px;
-      background:rgba(255,255,255,.08);
-      color:var(--muted);
-      font-weight:700;
-    }
-
-    .inventory-filter-bar button.active{
-      background:#dacab1;
-      color:#092f4d;
-      border-color:#dacab1;
-    }
   `;
   document.head.appendChild(style);
 }
@@ -1545,12 +1528,14 @@ function setActiveView(viewName) {
   }
 
   beginAdminViewSwitch();
+  inventoryFiltersExpanded = false;
   activeView = viewName;
   navLinks.forEach(link => {
     link.classList.toggle("active", link.dataset.view === viewName);
   });
 
   viewTitle.textContent = getViewTitle(viewName);
+  syncInventoryFilterUI();
 
   if (viewName === "upload") {
     showView(uploadView);
@@ -2569,6 +2554,7 @@ const LACE_COLOR_MAP = {
   "indian tan": "#b8793a",
   "brown – chestnut": "#7a3f1d",
   "brown - chestnut": "#7a3f1d",
+  "vintage chestnut": "#6f3a1f",
   "brown – chocolate": "#4a2616",
   "brown - chocolate": "#4a2616",
   "chocolate": "#4a2616",
@@ -2601,6 +2587,68 @@ function normalizeLaceName(value) {
 function getLaceColor(value) {
   const key = normalizeLaceName(value);
   return LACE_COLOR_MAP[key] || "#dacab1";
+}
+
+function getInventoryQuantity(item) {
+  return Number(item.quantity_on_hand ?? 0);
+}
+
+function getInventoryReorderAt(item) {
+  return Number(item.reorder_at ?? item.reorder_threshold ?? 0);
+}
+
+function getInventoryStatus(item) {
+  const qty = getInventoryQuantity(item);
+  const reorderAt = getInventoryReorderAt(item);
+
+  if (reorderAt === -1) {
+    return {
+      key: "ignore",
+      label: "Ignore",
+      note: "No alert"
+    };
+  }
+
+  if (qty === 0) {
+    return {
+      key: "out",
+      label: "Out",
+      note: "Reorder"
+    };
+  }
+
+  if (qty <= reorderAt) {
+    return {
+      key: "low",
+      label: "Low",
+      note: "Reorder"
+    };
+  }
+
+  return {
+    key: "ok",
+    label: "OK",
+    note: "Stocked"
+  };
+}
+
+function inventoryNeedsOrder(item) {
+  const status = getInventoryStatus(item);
+  return status.key === "low" || status.key === "out";
+}
+
+function renderInventorySwatch(colorName) {
+  const swatchColor = getLaceColor(colorName);
+  const isCustom = swatchColor === "linear";
+  const style = isCustom ? "" : `style="background:${escapeAttr(swatchColor)}"`;
+
+  return `
+    <span
+      class="inventory-swatch ${isCustom ? "inventory-swatch-custom" : ""}"
+      ${style}
+      aria-hidden="true"
+    >${isCustom ? "?" : ""}</span>
+  `;
 }
 
 function renderLaceChips(order) {
@@ -4210,43 +4258,12 @@ async function loadInventory() {
 
 function renderInventory(rows) {
   const filteredRows = window.inventoryNeedsOrderOnly
-    ? rows.filter(item => Number(item.quantity_on_hand || 0) <= Number(item.reorder_at || 0))
+    ? rows.filter(inventoryNeedsOrder)
     : rows;
 
-  orderCount.textContent = `${filteredRows.length} color${filteredRows.length === 1 ? "" : "s"}`;
+  orderCount.textContent = `${filteredRows.length} color${filteredRows.length === 1 ? "" : "s"}${window.inventoryNeedsOrderOnly ? " · Needs Order" : ""}`;
   ordersList.innerHTML = "";
-
-  const filterBar = document.createElement("div");
-  filterBar.className = "inventory-filter-bar";
-  filterBar.innerHTML = `
-    <button
-      id="inventoryAllBtn"
-      type="button"
-      class="${window.inventoryNeedsOrderOnly ? "" : "active"}"
-    >
-      All
-    </button>
-
-    <button
-      id="inventoryNeedsOrderBtn"
-      type="button"
-      class="${window.inventoryNeedsOrderOnly ? "active" : ""}"
-    >
-      Needs Order
-    </button>
-  `;
-
-  ordersList.appendChild(filterBar);
-
-  document.getElementById("inventoryAllBtn")?.addEventListener("click", () => {
-    window.inventoryNeedsOrderOnly = false;
-    renderInventory(laceInventory);
-  });
-
-  document.getElementById("inventoryNeedsOrderBtn")?.addEventListener("click", () => {
-    window.inventoryNeedsOrderOnly = true;
-    renderInventory(laceInventory);
-  });
+  syncInventoryFilterUI();
 
   if (!filteredRows.length) {
     ordersList.insertAdjacentHTML("beforeend", `<div class="no-results">No matching lace inventory.</div>`);
@@ -4254,30 +4271,31 @@ function renderInventory(rows) {
   }
 
   filteredRows.forEach(item => {
-    const qty = Number(item.quantity_on_hand || 0);
-    const reorderAt = Number(item.reorder_at || 0);
-    const out = qty === 0;
-    const low = qty > 0 && qty <= reorderAt;
-
-    const statusText = out ? "OUT" : low ? "LOW" : "OK";
-    const statusColor = out || low ? "var(--red)" : "var(--green)";
+    const colorName = String(item.color || "").trim();
+    const qty = getInventoryQuantity(item);
+    const reorderAt = getInventoryReorderAt(item);
+    const status = getInventoryStatus(item);
 
     const row = document.createElement("div");
-    row.className = "order-card";
+    row.className = `inventory-card inventory-status-${status.key}`;
 
     row.innerHTML = `
-      <div class="order-top">
-        <div class="order-main">
-          <div class="order-name">${escapeHtml(item.color || "")}</div>
-          <div class="muted">${qty} piece${qty === 1 ? "" : "s"} on hand</div>
+      <div class="inventory-card-row inventory-card-row-main">
+        <div class="inventory-color">
+          ${renderInventorySwatch(colorName)}
+          <span class="inventory-color-name">${escapeHtml(colorName || "Unknown")}</span>
         </div>
-        <div class="order-status" style="color:${statusColor};">
-          ${statusText}
-        </div>
+        <span class="inventory-status-pill">${escapeHtml(status.label)}</span>
       </div>
 
-      <div class="muted" style="margin-top:8px;">
-        Reorder at: ${reorderAt}
+      <div class="inventory-card-row inventory-card-row-meta">
+        <div class="inventory-qty">
+          <strong>${qty}</strong>
+          <span>piece${qty === 1 ? "" : "s"} on hand</span>
+        </div>
+        <div class="inventory-reorder">
+          ${reorderAt === -1 ? "No reorder alert" : `Reorder at ${reorderAt}`}
+        </div>
       </div>
     `;
 
@@ -4286,9 +4304,32 @@ function renderInventory(rows) {
 }
 
 function getLowInventoryItems(rows) {
-  return rows.filter(item =>
-    Number(item.quantity_on_hand || 0) <= Number(item.reorder_at || 0)
-  );
+  return rows.filter(inventoryNeedsOrder);
+}
+
+function syncInventoryFilterUI() {
+  const showInventoryFilter = activeView === "inventory";
+  const showPopover = showInventoryFilter && inventoryFiltersExpanded;
+
+  if (inventoryFilterToggleBtn) {
+    inventoryFilterToggleBtn.hidden = !showInventoryFilter;
+    inventoryFilterToggleBtn.setAttribute("aria-expanded", showPopover ? "true" : "false");
+    inventoryFilterToggleBtn.classList.toggle("is-active", showPopover);
+    inventoryFilterToggleBtn.classList.toggle("has-active-filter", !!window.inventoryNeedsOrderOnly);
+  }
+
+  if (inventoryFilterPopover) {
+    inventoryFilterPopover.hidden = !showPopover;
+  }
+
+  inventoryAllBtn?.classList.toggle("active", !window.inventoryNeedsOrderOnly);
+  inventoryNeedsOrderBtn?.classList.toggle("active", !!window.inventoryNeedsOrderOnly);
+}
+
+function setInventoryFilter(needsOrder) {
+  window.inventoryNeedsOrderOnly = needsOrder;
+  inventoryFiltersExpanded = false;
+  renderInventory(laceInventory);
 }
 
 function renderReorderBanner(rows) {
@@ -4507,6 +4548,45 @@ searchToggleBtn?.addEventListener("click", () => {
 
 searchClearBtn?.addEventListener("click", clearSearch);
 searchCloseBtn?.addEventListener("click", cancelSearch);
+
+inventoryFilterToggleBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (activeView !== "inventory") return;
+
+  inventoryFiltersExpanded = !inventoryFiltersExpanded;
+  syncInventoryFilterUI();
+});
+
+inventoryFilterPopover?.addEventListener("click", (e) => {
+  e.stopPropagation();
+});
+
+inventoryAllBtn?.addEventListener("click", () => {
+  setInventoryFilter(false);
+});
+
+inventoryNeedsOrderBtn?.addEventListener("click", () => {
+  setInventoryFilter(true);
+});
+
+document.addEventListener("click", (e) => {
+  if (!inventoryFiltersExpanded) return;
+  if (
+    inventoryFilterPopover?.contains(e.target) ||
+    inventoryFilterToggleBtn?.contains(e.target)
+  ) {
+    return;
+  }
+
+  inventoryFiltersExpanded = false;
+  syncInventoryFilterUI();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !inventoryFiltersExpanded) return;
+  inventoryFiltersExpanded = false;
+  syncInventoryFilterUI();
+});
 
 window.addEventListener("resize", () => {
   if (!isMobileViewport()) {
