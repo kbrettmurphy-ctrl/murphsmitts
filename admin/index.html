@@ -69,6 +69,7 @@
                 <circle cx="15" cy="17" r="2"></circle>
               </svg>
             </button>
+            <button id="inventoryAddBtn" class="secondary topbar-icon-action inventory-add-btn" type="button" aria-label="Add lace color" hidden>+</button>
             <button id="searchToggleBtn" class="secondary topbar-icon-action" type="button" aria-label="Search orders" aria-expanded="false" aria-controls="searchToolbar">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <circle cx="11" cy="11" r="6"></circle>
@@ -83,14 +84,15 @@
                 <path d="M8.8 12H18"></path>
               </svg>
             </button>
-            <div id="inventoryFilterPopover" class="inventory-filter-popover" hidden>
-              <div class="inventory-filter-segment" role="group" aria-label="Inventory filter">
-                <button id="inventoryAllBtn" type="button">All</button>
+            <div id="inventoryFilterPopover" class="admin-filter-popover inventory-filter-popover" hidden>
+              <div class="admin-filter-list inventory-filter-list" role="group" aria-label="Inventory filter">
+                <button id="inventoryAllBtn" type="button">Active</button>
                 <button id="inventoryNeedsOrderBtn" type="button">Needs Order</button>
+                <button id="inventoryHiddenBtn" type="button">Hidden</button>
               </div>
             </div>
-            <div id="orderFilterPopover" class="order-filter-popover" hidden>
-              <div class="order-filter-list" role="menu" aria-label="Order filters">
+            <div id="orderFilterPopover" class="admin-filter-popover order-filter-popover" hidden>
+              <div class="admin-filter-list order-filter-list" role="menu" aria-label="Order filters">
                 <button type="button" role="menuitemradio" data-order-filter="current">Current</button>
                 <button type="button" role="menuitemradio" data-order-filter="all">All</button>
                 <button type="button" role="menuitemradio" data-order-filter="estimate">Estimate Sent</button>
