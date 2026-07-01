@@ -151,6 +151,26 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "createInventoryItem") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await createInventoryItem(env, body);
+      return json(result, 200, jsonHeaders);
+    }
+
+    if (action === "updateInventoryItem") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await updateInventoryItem(env, body);
+      return json(result, 200, jsonHeaders);
+    }
+
     if (action === "getOrder") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -1372,6 +1392,178 @@ async function fetchOrderByNumber(env, orderNumber) {
     ok: true,
     data: Array.isArray(resp.data) ? (resp.data[0] || null) : null
   };
+}
+
+async function fetchInventoryRows(env) {
+  const resp = await supabaseFetch(env, "/rest/v1/lace_inventory?select=*&order=color.asc");
+  if (!resp.ok) return resp;
+  return {
+    ok: true,
+    data: Array.isArray(resp.data) ? resp.data : []
+  };
+}
+
+async function createInventoryItem(env, body) {
+  const color = cleanText(body.color);
+  if (!color) return { ok: false, error: "Missing lace color." };
+
+  const existing = await fetchInventoryRows(env);
+  if (!existing.ok) {
+    return { ok: false, error: "Failed to check lace inventory.", details: existing.error };
+  }
+
+  if (inventoryColorExists(existing.data, color)) {
+    return { ok: false, error: "That lace color already exists." };
+  }
+
+  const columnHints = getInventoryColumnHints(existing.data);
+  let payload;
+  try {
+    payload = buildInventoryPayload({
+      color,
+      quantityOnHand: body.quantityOnHand,
+      reorderAt: body.reorderAt,
+      reorderAlertEnabled: body.reorderAlertEnabled,
+      active: body.active
+    }, columnHints, { creating: true });
+  } catch (err) {
+    return { ok: false, error: err.message || "Invalid lace inventory values." };
+  }
+
+  const result = await supabaseFetch(
+    env,
+    "/rest/v1/lace_inventory",
+    {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(payload)
+    }
+  );
+
+  if (!result.ok) {
+    return { ok: false, error: "Failed to create lace color.", details: result.error };
+  }
+
+  return { ok: true, item: result.data?.[0] || null };
+}
+
+async function updateInventoryItem(env, body) {
+  const color = cleanText(body.color);
+  if (!color) return { ok: false, error: "Missing lace color." };
+
+  const existing = await fetchInventoryRows(env);
+  if (!existing.ok) {
+    return { ok: false, error: "Failed to load lace inventory.", details: existing.error };
+  }
+
+  const row = existing.data.find(item => normalizeInventoryName(item.color) === normalizeInventoryName(color));
+  if (!row) return { ok: false, error: "Lace color not found." };
+
+  const updates = body.updates || {};
+  const nextColor = cleanText(updates.color);
+  if (nextColor && inventoryColorExists(existing.data, nextColor, row.color)) {
+    return { ok: false, error: "That lace color already exists." };
+  }
+
+  let payload;
+  try {
+    payload = buildInventoryPayload(updates, getInventoryColumnHints(existing.data, row), { creating: false });
+  } catch (err) {
+    return { ok: false, error: err.message || "Invalid lace inventory values." };
+  }
+  if (!Object.keys(payload).length) return { ok: true, item: row };
+
+  const result = await supabaseFetch(
+    env,
+    `/rest/v1/lace_inventory?color=eq.${encodeURIComponent(row.color)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(payload)
+    }
+  );
+
+  if (!result.ok) {
+    return { ok: false, error: "Failed to update lace inventory.", details: result.error };
+  }
+
+  return { ok: true, item: result.data?.[0] || null };
+}
+
+function buildInventoryPayload(input, columns, options = {}) {
+  const payload = {};
+  const creating = options.creating === true;
+
+  if (creating || "color" in input) {
+    payload.color = cleanText(input.color);
+  }
+
+  if (creating || "quantityOnHand" in input || "quantity_on_hand" in input) {
+    const parsed = parseInventoryInteger(input.quantityOnHand ?? input.quantity_on_hand, "quantity");
+    if (!parsed.ok) throw new Error(parsed.error);
+    payload.quantity_on_hand = parsed.value;
+  }
+
+  if (creating || "reorderAt" in input || "reorder_at" in input || "reorderThreshold" in input) {
+    const parsed = parseInventoryInteger(input.reorderAt ?? input.reorder_at ?? input.reorderThreshold, "reorder at");
+    if (!parsed.ok) throw new Error(parsed.error);
+    if (columns.has("reorder_at")) payload.reorder_at = parsed.value;
+    if (columns.has("reorder_threshold")) payload.reorder_threshold = parsed.value;
+  }
+
+  if (creating || "reorderAlertEnabled" in input || "reorder_alert_enabled" in input) {
+    if (columns.has("reorder_alert_enabled")) {
+      payload.reorder_alert_enabled = (input.reorderAlertEnabled ?? input.reorder_alert_enabled) !== false;
+    }
+  }
+
+  if (creating || "active" in input) {
+    if (columns.has("active")) payload.active = input.active !== false;
+  }
+
+  return payload;
+}
+
+function getInventoryColumnHints(rows, preferredRow = null) {
+  const row = preferredRow || rows.find(item => item && typeof item === "object") || {};
+  const keys = new Set(Object.keys(row));
+  if (!keys.size) {
+    ["color", "quantity_on_hand", "reorder_at", "reorder_alert_enabled", "active"].forEach(key => keys.add(key));
+  }
+  keys.add("reorder_alert_enabled");
+  if (!keys.has("reorder_at") && !keys.has("reorder_threshold")) keys.add("reorder_at");
+  return keys;
+}
+
+function parseInventoryInteger(value, label, options = {}) {
+  if ((value === null || value === undefined || value === "") && options.allowNull) {
+    return { ok: true, value: null };
+  }
+
+  if (value === null || value === undefined || value === "") {
+    return { ok: false, error: `Invalid ${label}.` };
+  }
+
+  const number = Number(value);
+  const min = Number.isFinite(options.min) ? options.min : 0;
+  if (!Number.isInteger(number) || number < min) {
+    return { ok: false, error: `Invalid ${label}.` };
+  }
+
+  return { ok: true, value: number };
+}
+
+function inventoryColorExists(rows, color, currentColor = "") {
+  const next = normalizeInventoryName(color);
+  const current = normalizeInventoryName(currentColor);
+  return rows.some(row => {
+    const rowColor = normalizeInventoryName(row.color);
+    return rowColor && rowColor === next && rowColor !== current;
+  });
+}
+
+function normalizeInventoryName(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 /* =========================

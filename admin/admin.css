@@ -25,6 +25,9 @@
   --menuW:236px;
   --radius:18px;
   --topbarH:78px;
+  --admin-z-popover:1200;
+  --admin-z-menu:1400;
+  --admin-z-submenu:1410;
   color-scheme:light;
 }
 
@@ -677,7 +680,7 @@ button.secondary{
 .topbar-left{
   display:flex;
   align-items:center;
-  gap:12px;
+  gap:14px;
   min-width:0;
   flex:1 1 auto;
 }
@@ -738,12 +741,12 @@ button.secondary{
   box-shadow:none;
 }
 
-.inventory-filter-popover,
-.order-filter-popover{
-  position:absolute;
-  top:calc(100% + 8px);
-  right:0;
-  z-index:35;
+.admin-filter-popover{
+  position:fixed;
+  left:0;
+  top:0;
+  right:auto;
+  z-index:var(--admin-z-popover);
   min-width:196px;
   padding:7px;
   border-radius:18px;
@@ -754,8 +757,7 @@ button.secondary{
   backdrop-filter:blur(18px);
 }
 
-.inventory-filter-popover[hidden],
-.order-filter-popover[hidden]{
+.admin-filter-popover[hidden]{
   display:none;
 }
 
@@ -766,46 +768,19 @@ button.secondary{
   -webkit-overflow-scrolling:touch;
 }
 
-.inventory-filter-segment{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:4px;
-  padding:3px;
-  border-radius:14px;
-  background:rgba(218,202,177,.08);
-}
-
-.inventory-filter-segment button{
-  border:0;
-  border-radius:11px;
-  min-height:34px;
-  padding:0 10px;
-  background:transparent;
-  color:rgba(218,202,177,.78);
-  font-size:.82rem;
-  font-weight:600;
-  white-space:nowrap;
-}
-
-.inventory-filter-segment button.active{
-  background:rgba(218,202,177,.92);
-  color:var(--navy);
-  box-shadow:0 1px 4px rgba(0,0,0,.18);
-}
-
-.order-filter-list{
+.admin-filter-list{
   display:grid;
   gap:4px;
 }
 
-.order-filter-list button{
+.admin-filter-list button{
   width:100%;
-  min-height:34px;
   border:0;
   border-radius:12px;
+  min-height:34px;
   padding:8px 10px;
   background:transparent;
-  color:rgba(218,202,177,.82);
+  color:rgba(218,202,177,.78);
   font-size:.82rem;
   font-weight:600;
   line-height:1.15;
@@ -813,10 +788,10 @@ button.secondary{
   white-space:nowrap;
 }
 
-.order-filter-list button.active{
+.admin-filter-list button.active{
   background:rgba(218,202,177,.92);
   color:var(--navy);
-  box-shadow:0 1px 4px rgba(0,0,0,.18);
+  box-shadow:none;
 }
 
 .logout-action{
@@ -1041,6 +1016,14 @@ button.secondary{
   background:var(--panel);
   border-bottom:1px solid rgba(218,202,177,.14);
   color:var(--cream);
+  cursor:pointer;
+  touch-action:pan-y;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.inventory-card:focus-visible{
+  outline:2px solid rgba(122,174,218,.75);
+  outline-offset:-2px;
 }
 
 .inventory-card-row{
@@ -1290,6 +1273,22 @@ button.secondary{
   line-height:1;
   font-weight:600;
   white-space:nowrap;
+}
+
+.inventory-add-btn{
+  width:44px;
+  min-width:44px;
+  height:44px;
+  min-height:44px;
+  border-radius:14px;
+  padding:0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 44px;
+  font-size:1.35rem;
+  line-height:1;
+  font-weight:600;
 }
 
 .sale-gloves-list{
@@ -1918,10 +1917,17 @@ button.secondary{
   min-width:0;
 }
 
+.admin-menu-layer{
+  position:fixed;
+  inset:0;
+  z-index:var(--admin-z-menu);
+  pointer-events:none;
+}
+
 .workflow-sheet-root{
   position:fixed;
   inset:0;
-  z-index:9999;
+  z-index:0;
   display:none;
   pointer-events:none;
 }
@@ -1958,6 +1964,12 @@ button.secondary{
   overflow-y:auto;
   pointer-events:auto;
   transform-origin:top left;
+}
+
+@media (hover:hover) and (pointer:fine){
+  .workflow-sheet{
+    overflow:visible;
+  }
 }
 
 .workflow-sheet-header{
@@ -2035,8 +2047,10 @@ button.secondary{
   display:none !important;
 }
 
-.workflow-sheet-root.workflow-action-selected .workflow-action-btn:not(.active){
-  display:none !important;
+@media (hover:none), (pointer:coarse){
+  .workflow-sheet-root.workflow-action-selected .workflow-action-btn:not(.active){
+    display:none !important;
+  }
 }
 
 .workflow-action-btn.active{
@@ -2075,6 +2089,15 @@ button.secondary{
   .workflow-sheet-header,
   .workflow-sheet-form{
     border-color:rgba(9,47,77,.13);
+  }
+
+  .workflow-sheet-form.is-submenu{
+    color:var(--light-ink);
+    background:rgba(255,250,243,.94);
+    border-color:rgba(9,47,77,.16);
+    box-shadow:
+      0 18px 46px rgba(0,0,0,.18),
+      0 2px 8px rgba(0,0,0,.12);
   }
 
   .workflow-customer-name,
@@ -2129,8 +2152,37 @@ button.secondary{
   display:grid;
   gap:8px;
   margin-top:5px;
-  padding-top:5px;
+  padding:0;
   border-top:1px solid rgba(255,255,255,.13);
+}
+
+.workflow-sheet-form:not(:empty){
+  padding:8px;
+}
+
+.workflow-sheet-form.is-submenu{
+  position:absolute;
+  z-index:var(--admin-z-submenu);
+  min-width:292px;
+  max-width:min(340px, calc(100vw - 24px));
+  max-height:calc(100vh - 24px);
+  margin:0;
+  padding:8px;
+  color:rgba(255,255,255,.92);
+  background:rgba(38,38,40,.72);
+  border:1px solid rgba(255,255,255,.16);
+  border-radius:13px;
+  box-shadow:
+    0 18px 46px rgba(0,0,0,.34),
+    0 2px 8px rgba(0,0,0,.20);
+  backdrop-filter:blur(24px) saturate(1.8);
+  -webkit-backdrop-filter:blur(24px) saturate(1.8);
+  overflow-y:auto;
+  pointer-events:auto;
+}
+
+.workflow-sheet-form.is-submenu .workflow-action-form p{
+  white-space:normal;
 }
 
 .workflow-form-content{
@@ -2170,6 +2222,36 @@ button.secondary{
   line-height:1.2;
   -webkit-appearance:none;
   appearance:none;
+}
+
+.inventory-form-title{
+  color:rgba(255,255,255,.92) !important;
+  font-weight:600;
+}
+
+.inventory-check-row{
+  display:flex !important;
+  align-items:center;
+  gap:8px;
+  margin:2px 0 0 !important;
+  color:rgba(255,255,255,.82) !important;
+  white-space:normal !important;
+}
+
+.inventory-check-row input{
+  width:18px;
+  min-width:18px;
+  height:18px;
+  min-height:18px;
+  margin:0;
+  padding:0;
+  border-radius:5px;
+  appearance:auto;
+  -webkit-appearance:checkbox;
+}
+
+.workflow-action-btn.danger{
+  color:#ffb3b3;
 }
 
 .workflow-form-actions{
@@ -2222,6 +2304,15 @@ button.secondary{
     background:#fff;
     border-color:rgba(9,47,77,.18);
     color:var(--light-ink);
+  }
+
+  .inventory-form-title,
+  .inventory-check-row{
+    color:var(--light-ink) !important;
+  }
+
+  .workflow-action-btn.danger{
+    color:var(--red);
   }
 
   .workflow-form-actions .workflow-form-cancel{
@@ -2336,6 +2427,10 @@ button.secondary{
   color:var(--cream);
   border-bottom:1px solid rgba(218,202,177,.18);
   padding:14px 14px 12px;
+}
+
+#detailView .detail-topbar .topbar-left{
+  gap:12px;
 }
 
 #detailView .detail-topbar h1{
@@ -3204,8 +3299,7 @@ body,
 
 .topbar,
 #detailView .detail-topbar,
-.inventory-filter-popover,
-.order-filter-popover,
+.admin-filter-popover,
 .workflow-sheet{
   -webkit-backdrop-filter:blur(18px) saturate(1.2);
   backdrop-filter:blur(18px) saturate(1.2);
@@ -3232,6 +3326,7 @@ button.secondary,
 #backBtn,
 .logout-action,
 .sale-add-btn,
+.inventory-add-btn,
 .store-empty-add{
   background:rgba(9,47,77,.10);
   color:var(--navy);
@@ -3244,7 +3339,8 @@ button.secondary:active,
 .topbar-icon-action:active,
 #backBtn:active,
 .logout-action:active,
-.sale-add-btn:active{
+.sale-add-btn:active,
+.inventory-add-btn:active{
   background:rgba(9,47,77,.16);
 }
 
@@ -3294,8 +3390,7 @@ button.secondary:active,
 
 .inventory-filter-toggle.is-active,
 .order-filter-toggle.is-active,
-.inventory-filter-segment button.active,
-.order-filter-list button.active{
+.admin-filter-list button.active{
   background:var(--navy);
   color:#fffaf3;
 }
@@ -3305,19 +3400,13 @@ button.secondary:active,
   box-shadow:none;
 }
 
-.inventory-filter-popover,
-.order-filter-popover{
+.admin-filter-popover{
   background:rgba(255,250,243,.96);
   border:1px solid rgba(9,47,77,.14);
   box-shadow:0 18px 42px rgba(9,47,77,.16);
 }
 
-.inventory-filter-segment{
-  background:rgba(9,47,77,.08);
-}
-
-.inventory-filter-segment button,
-.order-filter-list button{
+.admin-filter-list button{
   color:rgba(9,47,77,.78);
 }
 
@@ -3593,6 +3682,15 @@ button.secondary:active,
   border-color:rgba(9,47,77,.12);
 }
 
+.workflow-sheet-form.is-submenu{
+  color:var(--navy);
+  background:rgba(255,250,243,.96);
+  border-color:rgba(9,47,77,.14);
+  box-shadow:
+    0 18px 46px rgba(9,47,77,.18),
+    0 2px 8px rgba(9,47,77,.10);
+}
+
 .workflow-customer-name,
 .workflow-action-btn,
 .workflow-action-form label,
@@ -3719,9 +3817,9 @@ button.secondary,
 .topbar-icon-action,
 .logout-action,
 .sale-add-btn,
+.inventory-add-btn,
 .store-empty-add,
-.order-filter-list button,
-.inventory-filter-segment button,
+.admin-filter-list button,
 .workflow-action-btn,
 .workflow-form-actions button,
 .map-unmapped-btn,

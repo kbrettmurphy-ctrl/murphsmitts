@@ -26,9 +26,11 @@ const orderFilterToggleBtn = document.getElementById("orderFilterToggleBtn");
 const orderFilterPopover = document.getElementById("orderFilterPopover");
 const orderFilterButtons = Array.from(document.querySelectorAll("[data-order-filter]"));
 const inventoryFilterToggleBtn = document.getElementById("inventoryFilterToggleBtn");
+const inventoryAddBtn = document.getElementById("inventoryAddBtn");
 const inventoryFilterPopover = document.getElementById("inventoryFilterPopover");
 const inventoryAllBtn = document.getElementById("inventoryAllBtn");
 const inventoryNeedsOrderBtn = document.getElementById("inventoryNeedsOrderBtn");
+const inventoryHiddenBtn = document.getElementById("inventoryHiddenBtn");
 const pullRefreshIndicator = document.getElementById("pullRefreshIndicator");
 const pullRefreshText = document.getElementById("pullRefreshText");
 const ordersList = document.getElementById("ordersList");
@@ -68,6 +70,10 @@ let allOrders = [];
 let activeView = "current";
 let currentOrder = null;
 let workflowSheetEl = null;
+let inventorySheetEl = null;
+let adminMenuLayer = null;
+let inventoryPressTimer = null;
+let inventoryPressStart = null;
 let workflowPressTimer = null;
 let workflowSuppressOpeningTouch = false;
 let workflowSuppressOpeningTouchTimer = null;
@@ -91,7 +97,7 @@ let orderMap = null;
 let orderMapMarkers = null;
 let mapRenderToken = 0;
 
-window.inventoryNeedsOrderOnly = false;
+window.inventoryViewMode = "active";
 
 /* =========================
    VIEW / MENU
@@ -1674,6 +1680,7 @@ function setActiveView(viewName) {
   }
 
   beginAdminViewSwitch();
+  closeInventorySheet();
   orderFiltersExpanded = false;
   inventoryFiltersExpanded = false;
   activeView = viewName;
@@ -1824,6 +1831,9 @@ function syncOrderFilterUI() {
 
   if (orderFilterPopover) {
     orderFilterPopover.hidden = !showPopover;
+    if (showPopover) {
+      requestAnimationFrame(() => positionAdminFilterPopover(orderFilterPopover, orderFilterToggleBtn));
+    }
   }
 
   orderFilterButtons.forEach(btn => {
@@ -1907,7 +1917,7 @@ function canStartPullRefresh(e) {
   if (!e.touches || e.touches.length !== 1) return false;
   if (
     e.target.closest(
-      "button, input, textarea, select, .swipe-action-panel, .side-menu, .order-filter-popover, .inventory-filter-popover, .leaflet-container, .leaflet-popup, .order-map, .upload-drop"
+      "button, input, textarea, select, .swipe-action-panel, .side-menu, .admin-filter-popover, .leaflet-container, .leaflet-popup, .order-map, .upload-drop"
     )
   ) {
     return false;
@@ -2865,11 +2875,16 @@ function getInventoryReorderAt(item) {
   return Number(item.reorder_at ?? item.reorder_threshold ?? 0);
 }
 
+function inventoryAlertEnabled(item) {
+  if (item.reorder_alert_enabled === false) return false;
+  return getInventoryReorderAt(item) !== -1;
+}
+
 function getInventoryStatus(item) {
   const qty = getInventoryQuantity(item);
   const reorderAt = getInventoryReorderAt(item);
 
-  if (reorderAt === -1) {
+  if (!inventoryAlertEnabled(item)) {
     return {
       key: "ignore",
       label: "Ignore",
@@ -3020,7 +3035,7 @@ function openWorkflowSheet(order, source, suppressOpeningTouch = false) {
   }
 
   workflowSheetEl.order = order;
-  workflowSheetEl.anchor = getMenuAnchorPosition(source, source?.currentTarget);
+  workflowSheetEl.anchor = getAdminAnchorPosition(source, source?.currentTarget);
   workflowSuppressOpeningTouch = suppressOpeningTouch;
   clearWorkflowOpeningTouchTimer();
   document.removeEventListener("touchend", consumeWorkflowOpeningTouchEnd, true);
@@ -3054,6 +3069,7 @@ function openWorkflowSheet(order, source, suppressOpeningTouch = false) {
     .join("");
 
   form.innerHTML = "";
+  form.classList.remove("is-submenu");
   workflowSheetEl.querySelector(".workflow-sheet-title").textContent = "Workflow actions";
   workflowSheetEl.classList.remove("workflow-action-selected");
   workflowSheetEl.classList.add("open");
@@ -3061,6 +3077,13 @@ function openWorkflowSheet(order, source, suppressOpeningTouch = false) {
   document.addEventListener("keydown", handleWorkflowMenuKeydown);
   requestAnimationFrame(() => {
     positionWorkflowMenu(workflowSheetEl.querySelector(".workflow-sheet"), workflowSheetEl.anchor);
+  });
+
+  actions.querySelectorAll(".workflow-action-btn").forEach(btn => {
+    btn.addEventListener("mouseenter", () => {
+      if (!isDesktopHoverMenu()) return;
+      openWorkflowActionForm(order, btn.dataset.action, { button: btn });
+    });
   });
 }
 
@@ -3074,6 +3097,7 @@ function closeWorkflowSheet() {
   workflowSheetEl.classList.remove("workflow-action-selected");
   workflowSheetEl.querySelector(".workflow-action-list").innerHTML = "";
   workflowSheetEl.querySelector(".workflow-sheet-form").innerHTML = "";
+  workflowSheetEl.querySelector(".workflow-sheet-form").classList.remove("is-submenu");
   document.body.classList.remove("workflow-open");
 }
 
@@ -3081,13 +3105,22 @@ function closeWorkflowMenu() {
   closeWorkflowSheet();
 }
 
+function getAdminMenuLayer() {
+  if (adminMenuLayer) return adminMenuLayer;
+
+  adminMenuLayer = document.createElement("div");
+  adminMenuLayer.className = "admin-menu-layer";
+  document.body.appendChild(adminMenuLayer);
+  return adminMenuLayer;
+}
+
 function createWorkflowSheet() {
   workflowSheetEl = document.createElement("div");
-  workflowSheetEl.className = "workflow-sheet-root";
+  workflowSheetEl.className = "admin-action-menu-root workflow-sheet-root";
   workflowSheetEl.innerHTML = `
-    <div class="workflow-backdrop"></div>
-    <div class="workflow-sheet" role="menu" aria-label="Workflow actions">
-      <div class="workflow-sheet-header">
+    <div class="admin-action-backdrop workflow-backdrop"></div>
+    <div class="admin-action-menu workflow-sheet" role="menu" aria-label="Workflow actions">
+      <div class="admin-action-header workflow-sheet-header">
         <div>
           <div class="workflow-customer-name"></div>
           <div class="workflow-order-number"></div>
@@ -3095,11 +3128,11 @@ function createWorkflowSheet() {
         </div>
         <button class="workflow-close-btn" type="button" aria-label="Close">✕</button>
       </div>
-      <div class="workflow-section">
+      <div class="admin-action-section workflow-section">
         <div class="workflow-sheet-title">Workflow actions</div>
-        <div class="workflow-action-list"></div>
+        <div class="admin-action-list workflow-action-list"></div>
       </div>
-      <div class="workflow-sheet-form"></div>
+      <div class="admin-action-form-panel workflow-sheet-form"></div>
     </div>
   `;
 
@@ -3109,7 +3142,7 @@ function createWorkflowSheet() {
   workflowSheetEl.addEventListener("click", (e) => {
     const actionBtn = e.target.closest(".workflow-action-btn");
     if (actionBtn) {
-      openWorkflowActionForm(workflowSheetEl.order, actionBtn.dataset.action);
+      openWorkflowActionForm(workflowSheetEl.order, actionBtn.dataset.action, { button: actionBtn });
       return;
     }
 
@@ -3126,7 +3159,7 @@ function createWorkflowSheet() {
     }
   });
 
-  document.body.appendChild(workflowSheetEl);
+  getAdminMenuLayer().appendChild(workflowSheetEl);
 }
 
 function handleWorkflowMenuKeydown(e) {
@@ -3134,7 +3167,7 @@ function handleWorkflowMenuKeydown(e) {
   closeWorkflowMenu();
 }
 
-function getMenuAnchorPosition(event, element) {
+function getAdminAnchorPosition(event, element) {
   const source = event || window.event;
 
   if (Number.isFinite(source?.x) && Number.isFinite(source?.y)) {
@@ -3164,28 +3197,141 @@ function getMenuAnchorPosition(event, element) {
   };
 }
 
-function positionWorkflowMenu(menu, anchor) {
-  if (!menu || !anchor) return;
+function getMenuAnchorPosition(event, element) {
+  return getAdminAnchorPosition(event, element);
+}
 
-  menu.style.left = "0px";
-  menu.style.top = "0px";
-  menu.style.right = "auto";
-  menu.style.bottom = "auto";
+function clampAdminFloatingPanel(panel, anchor, options = {}) {
+  if (!panel || !anchor) return;
 
-  const margin = 12;
-  const rect = menu.getBoundingClientRect();
+  panel.style.left = "0px";
+  panel.style.top = "0px";
+  panel.style.right = "auto";
+  panel.style.bottom = "auto";
+
+  const margin = options.margin ?? 12;
+  const rect = panel.getBoundingClientRect();
   const width = rect.width;
   const height = rect.height;
   const maxLeft = Math.max(margin, window.innerWidth - width - margin);
   const maxTop = Math.max(margin, window.innerHeight - height - margin);
   const preferTouchMenu = window.matchMedia("(pointer: coarse)").matches;
-  const offsetY = preferTouchMenu ? 10 : 2;
+  const offsetX = options.offsetX ?? 0;
+  const offsetY = options.offsetY ?? (preferTouchMenu ? 10 : 2);
 
-  const left = Math.min(Math.max(margin, anchor.x), maxLeft);
+  const left = Math.min(Math.max(margin, anchor.x + offsetX), maxLeft);
   const top = Math.min(Math.max(margin, anchor.y + offsetY), maxTop);
 
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+}
+
+function positionWorkflowMenu(menu, anchor) {
+  clampAdminFloatingPanel(menu, anchor);
+}
+
+function positionAdminFilterPopover(popover, toggle) {
+  if (!popover || !toggle || popover.hidden) return;
+
+  const rect = toggle.getBoundingClientRect();
+  const anchor = {
+    x: rect.right,
+    y: rect.bottom + 8
+  };
+
+  popover.style.left = "0px";
+  popover.style.top = "0px";
+  popover.style.right = "auto";
+  popover.style.bottom = "auto";
+
+  const margin = 12;
+  const popoverRect = popover.getBoundingClientRect();
+  const left = Math.min(
+    Math.max(margin, anchor.x - popoverRect.width),
+    Math.max(margin, window.innerWidth - popoverRect.width - margin)
+  );
+  const top = Math.min(
+    Math.max(margin, anchor.y),
+    Math.max(margin, window.innerHeight - popoverRect.height - margin)
+  );
+
+  popover.style.left = `${left}px`;
+  popover.style.top = `${top}px`;
+}
+
+function isDesktopHoverMenu() {
+  return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+}
+
+function getActionButtonKey(button) {
+  return button?.dataset?.action || button?.dataset?.inventoryAction || "";
+}
+
+function openAdminActionSubmenu(root, button, html, options = {}) {
+  const form = root?.querySelector(".workflow-sheet-form");
+  if (!root || !form || !button) return;
+
+  const actionKey = getActionButtonKey(button);
+  const desktopMenu = isDesktopHoverMenu();
+
+  if (options.assignActionKey) {
+    root.actionKey = actionKey;
+  }
+
+  root.classList.add("workflow-action-selected");
+  root.querySelectorAll(".workflow-action-btn").forEach((actionBtn) => {
+    const active = getActionButtonKey(actionBtn) === actionKey;
+    actionBtn.hidden = !desktopMenu && !active;
+    actionBtn.classList.toggle("active", active);
+  });
+
+  form.innerHTML = html;
+
+  requestAnimationFrame(() => {
+    if (desktopMenu) {
+      positionActionSubmenu(root, button);
+    } else {
+      positionWorkflowMenu(root.querySelector(".workflow-sheet"), root.anchor);
+    }
+  });
+}
+
+function positionActionSubmenu(root, activeButton) {
+  const form = root?.querySelector(".workflow-sheet-form");
+  if (!form) return;
+
+  form.classList.remove("is-submenu");
+  form.style.left = "";
+  form.style.top = "";
+  form.style.right = "";
+  form.style.bottom = "";
+
+  if (!isDesktopHoverMenu() || !activeButton || !form.innerHTML.trim()) return;
+
+  form.classList.add("is-submenu");
+  const buttonRect = activeButton.getBoundingClientRect();
+  const menuRect = root.querySelector(".workflow-sheet")?.getBoundingClientRect();
+  if (!menuRect) return;
+
+  const margin = 12;
+  const gap = 8;
+  const formRect = form.getBoundingClientRect();
+  const width = formRect.width || 292;
+  const height = formRect.height || 140;
+  const canOpenRight = buttonRect.right + gap + width <= window.innerWidth - margin;
+  const viewportLeft = canOpenRight
+    ? buttonRect.right + gap
+    : Math.max(margin, buttonRect.left - width - gap);
+  const viewportTop = Math.min(
+    Math.max(margin, buttonRect.top),
+    Math.max(margin, window.innerHeight - height - margin)
+  );
+
+  const left = viewportLeft - menuRect.left;
+  const top = viewportTop - menuRect.top;
+
+  form.style.left = `${left}px`;
+  form.style.top = `${top}px`;
 }
 
 function consumeWorkflowOpeningTouchEnd(e) {
@@ -3253,15 +3399,9 @@ function getWorkflowActions(order) {
   return actions;
 }
 
-function openWorkflowActionForm(order, actionKey) {
-  const form = workflowSheetEl.querySelector(".workflow-sheet-form");
-  workflowSheetEl.actionKey = actionKey;
-  workflowSheetEl.classList.add("workflow-action-selected");
-  workflowSheetEl.querySelectorAll(".workflow-action-btn").forEach((button) => {
-    const active = button.dataset.action === actionKey;
-    button.hidden = !active;
-    button.classList.toggle("active", active);
-  });
+function openWorkflowActionForm(order, actionKey, options = {}) {
+  const activeButton = options.button || Array.from(workflowSheetEl.querySelectorAll(".workflow-action-btn"))
+    .find(button => button.dataset.action === actionKey);
   const isLocal = looksLocalDropOff(order);
   const existingNote = order.internalNotes || "";
   const priceQuoted = order.priceQuoted ?? "";
@@ -3353,7 +3493,7 @@ function openWorkflowActionForm(order, actionKey) {
     `;
   }
 
-  form.innerHTML = `
+  openAdminActionSubmenu(workflowSheetEl, activeButton, `
     <div class="workflow-form-content">
       ${inner}
       <div class="workflow-form-actions">
@@ -3361,10 +3501,7 @@ function openWorkflowActionForm(order, actionKey) {
         <button class="primary workflow-form-submit" type="button">Save</button>
       </div>
     </div>
-  `;
-  requestAnimationFrame(() => {
-    positionWorkflowMenu(workflowSheetEl.querySelector(".workflow-sheet"), workflowSheetEl.anchor);
-  });
+  `, { assignActionKey: true });
 }
 
 async function submitWorkflowAction(order, actionKey) {
@@ -4619,11 +4756,17 @@ async function loadInventory() {
 }
 
 function renderInventory(rows) {
-  const filteredRows = window.inventoryNeedsOrderOnly
-    ? rows.filter(inventoryNeedsOrder)
-    : rows;
+  const viewMode = window.inventoryViewMode || "active";
+  const activeRows = rows.filter(item => item.active !== false);
+  const hiddenRows = rows.filter(item => item.active === false);
+  const filteredRows = viewMode === "hidden"
+    ? hiddenRows
+    : viewMode === "needs"
+      ? activeRows.filter(inventoryNeedsOrder)
+      : activeRows;
 
-  orderCount.textContent = `${filteredRows.length} color${filteredRows.length === 1 ? "" : "s"}${window.inventoryNeedsOrderOnly ? " · Needs Order" : ""}`;
+  const modeLabel = viewMode === "hidden" ? " · Hidden" : viewMode === "needs" ? " · Needs Order" : "";
+  orderCount.textContent = `${filteredRows.length} color${filteredRows.length === 1 ? "" : "s"}${modeLabel}`;
   ordersList.innerHTML = "";
   syncInventoryFilterUI();
 
@@ -4637,9 +4780,11 @@ function renderInventory(rows) {
     const qty = getInventoryQuantity(item);
     const reorderAt = getInventoryReorderAt(item);
     const status = getInventoryStatus(item);
+    const alertEnabled = inventoryAlertEnabled(item);
 
     const row = document.createElement("div");
     row.className = `inventory-card inventory-status-${status.key}`;
+    row.tabIndex = 0;
 
     row.innerHTML = `
       <div class="inventory-card-row inventory-card-row-main">
@@ -4656,17 +4801,18 @@ function renderInventory(rows) {
           <span>piece${qty === 1 ? "" : "s"} on hand</span>
         </div>
         <div class="inventory-reorder">
-          ${reorderAt === -1 ? "No reorder alert" : `Reorder at ${reorderAt}`}
+          ${alertEnabled ? `Reorder at ${reorderAt}` : "No Alert"}
         </div>
       </div>
     `;
 
+    attachInventoryRowActions(row, item);
     ordersList.appendChild(row);
   });
 }
 
 function getLowInventoryItems(rows) {
-  return rows.filter(inventoryNeedsOrder);
+  return rows.filter(item => item.active !== false).filter(inventoryNeedsOrder);
 }
 
 function syncInventoryFilterUI() {
@@ -4677,22 +4823,402 @@ function syncInventoryFilterUI() {
     inventoryFilterToggleBtn.hidden = !showInventoryFilter;
     inventoryFilterToggleBtn.setAttribute("aria-expanded", showPopover ? "true" : "false");
     inventoryFilterToggleBtn.classList.toggle("is-active", showPopover);
-    inventoryFilterToggleBtn.classList.toggle("has-active-filter", !!window.inventoryNeedsOrderOnly);
+    inventoryFilterToggleBtn.classList.toggle("has-active-filter", (window.inventoryViewMode || "active") !== "active");
+  }
+
+  if (inventoryAddBtn) {
+    inventoryAddBtn.hidden = !showInventoryFilter;
   }
 
   if (inventoryFilterPopover) {
     inventoryFilterPopover.hidden = !showPopover;
+    if (showPopover) {
+      requestAnimationFrame(() => positionAdminFilterPopover(inventoryFilterPopover, inventoryFilterToggleBtn));
+    }
   }
 
-  inventoryAllBtn?.classList.toggle("active", !window.inventoryNeedsOrderOnly);
-  inventoryNeedsOrderBtn?.classList.toggle("active", !!window.inventoryNeedsOrderOnly);
+  const mode = window.inventoryViewMode || "active";
+  inventoryAllBtn?.classList.toggle("active", mode === "active");
+  inventoryNeedsOrderBtn?.classList.toggle("active", mode === "needs");
+  inventoryHiddenBtn?.classList.toggle("active", mode === "hidden");
 }
 
-function setInventoryFilter(needsOrder) {
-  window.inventoryNeedsOrderOnly = needsOrder;
+function setInventoryFilter(mode) {
+  window.inventoryViewMode = mode || "active";
   inventoryFiltersExpanded = false;
   renderInventory(laceInventory);
   syncInventoryFilterUI();
+}
+
+function closeAdminFilterPopovers() {
+  let changed = false;
+
+  if (orderFiltersExpanded) {
+    orderFiltersExpanded = false;
+    changed = true;
+  }
+
+  if (inventoryFiltersExpanded) {
+    inventoryFiltersExpanded = false;
+    changed = true;
+  }
+
+  if (changed) {
+    syncOrderFilterUI();
+    syncInventoryFilterUI();
+  }
+}
+
+function attachInventoryRowActions(row, item) {
+  row.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    openInventoryActions(item, e);
+  });
+
+  row.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    openInventoryActions(item, row);
+  });
+
+  row.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    inventoryPressStart = {
+      x: touch.clientX,
+      y: touch.clientY
+    };
+    inventoryPressTimer = window.setTimeout(() => {
+      inventoryPressTimer = null;
+      openInventoryActions(item, row);
+    }, 520);
+  }, { passive: true });
+
+  row.addEventListener("touchmove", (e) => {
+    if (!inventoryPressStart || !e.touches.length) return;
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - inventoryPressStart.x);
+    const dy = Math.abs(touch.clientY - inventoryPressStart.y);
+    if (dx > 10 || dy > 10) cancelInventoryLongPress();
+  }, { passive: true });
+
+  row.addEventListener("touchend", cancelInventoryLongPress, { passive: true });
+  row.addEventListener("touchcancel", cancelInventoryLongPress, { passive: true });
+}
+
+function cancelInventoryLongPress() {
+  if (inventoryPressTimer) {
+    window.clearTimeout(inventoryPressTimer);
+    inventoryPressTimer = null;
+  }
+  inventoryPressStart = null;
+}
+
+function ensureInventorySheet() {
+  if (inventorySheetEl) return inventorySheetEl;
+
+  inventorySheetEl = document.createElement("div");
+  inventorySheetEl.className = "admin-action-menu-root workflow-sheet-root inventory-sheet-root";
+  inventorySheetEl.innerHTML = `
+    <div class="admin-action-backdrop workflow-backdrop"></div>
+    <div class="admin-action-menu workflow-sheet inventory-sheet" role="menu" aria-label="Lace inventory actions">
+      <div class="admin-action-header workflow-sheet-header">
+        <button class="workflow-close-btn" type="button" aria-label="Close">×</button>
+        <div class="workflow-sheet-title">Lace inventory actions</div>
+        <div class="workflow-customer-name"></div>
+        <div class="workflow-current-status"></div>
+      </div>
+      <div class="admin-action-section workflow-section">
+        <div class="admin-action-list workflow-action-list"></div>
+      </div>
+      <div class="admin-action-form-panel workflow-sheet-form"></div>
+    </div>
+  `;
+
+  getAdminMenuLayer().appendChild(inventorySheetEl);
+  inventorySheetEl.querySelector(".workflow-backdrop")?.addEventListener("click", closeInventorySheet);
+  inventorySheetEl.querySelector(".workflow-close-btn")?.addEventListener("click", closeInventorySheet);
+  return inventorySheetEl;
+}
+
+function closeInventorySheet() {
+  if (!inventorySheetEl) return;
+  inventorySheetEl.classList.remove("open", "workflow-action-selected");
+  inventorySheetEl.querySelector(".workflow-sheet-form")?.classList.remove("is-submenu");
+  inventorySheetEl.anchor = null;
+}
+
+function openInventoryActions(item, source) {
+  const sheetRoot = ensureInventorySheet();
+  const sheet = sheetRoot.querySelector(".workflow-sheet");
+  const list = sheetRoot.querySelector(".workflow-action-list");
+  const form = sheetRoot.querySelector(".workflow-sheet-form");
+  const colorName = String(item.color || "").trim();
+  const qty = getInventoryQuantity(item);
+  const status = getInventoryStatus(item);
+  const alertEnabled = inventoryAlertEnabled(item);
+
+  sheetRoot.anchor = getAdminAnchorPosition(source, source?.currentTarget || source);
+  sheetRoot.className = "admin-action-menu-root workflow-sheet-root inventory-sheet-root open";
+  sheetRoot.querySelector(".workflow-customer-name").textContent = colorName || "Lace color";
+  sheetRoot.querySelector(".workflow-current-status").textContent = `${qty} on hand · ${status.label}`;
+  form.innerHTML = "";
+  list.innerHTML = item.active === false
+    ? `
+      <button class="workflow-action-btn" type="button" data-inventory-action="restore">Restore Color</button>
+      <button class="workflow-action-btn" type="button" data-inventory-action="set">Set Quantity <span class="workflow-menu-chevron">›</span></button>
+      <button class="workflow-action-btn" type="button" data-inventory-action="alertSettings">Alert Settings <span class="workflow-menu-chevron">›</span></button>
+      <button class="workflow-action-btn" type="button" data-inventory-action="rename">Edit Lace Color <span class="workflow-menu-chevron">›</span></button>
+    `
+    : `
+      <button class="workflow-action-btn" type="button" data-inventory-action="set">Set Quantity <span class="workflow-menu-chevron">›</span></button>
+      <button class="workflow-action-btn" type="button" data-inventory-action="alertSettings">Alert Settings <span class="workflow-menu-chevron">›</span></button>
+      <button class="workflow-action-btn" type="button" data-inventory-action="rename">Edit Lace Color <span class="workflow-menu-chevron">›</span></button>
+      <button class="workflow-action-btn danger" type="button" data-inventory-action="deactivate">Deactivate / Hide Color</button>
+    `;
+
+  list.querySelectorAll("[data-inventory-action]").forEach(btn => {
+    btn.addEventListener("click", () => handleInventoryAction(item, btn.dataset.inventoryAction, btn));
+    btn.addEventListener("mouseenter", () => {
+      if (!isDesktopHoverMenu()) return;
+      if (!inventoryActionHasForm(btn.dataset.inventoryAction)) {
+        form.innerHTML = "";
+        form.classList.remove("is-submenu");
+        sheetRoot.querySelectorAll(".workflow-action-btn").forEach(actionBtn => {
+          actionBtn.classList.remove("active");
+          actionBtn.hidden = false;
+        });
+        return;
+      }
+      renderInventoryActionForm(item, btn.dataset.inventoryAction, btn);
+    });
+  });
+
+  requestAnimationFrame(() => positionWorkflowMenu(sheet, sheetRoot.anchor));
+}
+
+function handleInventoryAction(item, action, button) {
+  if (action === "deactivate") {
+    deactivateInventoryItem(item, button);
+    return;
+  }
+
+  if (action === "restore") {
+    restoreInventoryItem(item, button);
+    return;
+  }
+
+  renderInventoryActionForm(item, action, button);
+}
+
+function inventoryActionHasForm(action) {
+  return action === "set" || action === "alertSettings" || action === "rename";
+}
+
+function renderInventoryActionForm(item, action, button) {
+  const sheetRoot = ensureInventorySheet();
+  const form = sheetRoot.querySelector(".workflow-sheet-form");
+  const colorName = String(item?.color || "").trim();
+  const isAdd = action === "add";
+  const titles = {
+    add: "Add lace color",
+    set: "Set quantity",
+    alertSettings: "Alert settings",
+    rename: "Edit lace color"
+  };
+
+  const currentQty = getInventoryQuantity(item || {});
+  const currentReorderAt = getInventoryReorderAt(item || {});
+  const safeReorderAt = currentReorderAt === -1 ? 4 : currentReorderAt;
+  const alertEnabled = item ? inventoryAlertEnabled(item) : true;
+
+  let fields = "";
+  if (isAdd) {
+    fields = `
+      <label for="inventoryColorInput">Color</label>
+      <input id="inventoryColorInput" type="text" autocomplete="off" />
+      <label for="inventoryQtyInput">Quantity on hand</label>
+      <input id="inventoryQtyInput" type="number" min="0" step="1" inputmode="numeric" value="0" />
+      <label for="inventoryReorderAtInput">Reorder at</label>
+      <input id="inventoryReorderAtInput" type="number" min="0" step="1" inputmode="numeric" value="4" />
+      <label class="inventory-check-row"><input id="inventoryAlertEnabledInput" type="checkbox" checked /> <span>Alert enabled</span></label>
+      <label class="inventory-check-row"><input id="inventoryActiveInput" type="checkbox" checked /> <span>Active</span></label>
+    `;
+  } else if (action === "set") {
+    fields = `
+      <label for="inventoryQtyInput">Quantity on hand</label>
+      <input id="inventoryQtyInput" type="number" min="0" step="1" inputmode="numeric" value="${escapeAttr(currentQty)}" />
+    `;
+  } else if (action === "alertSettings") {
+    fields = `
+      <label for="inventoryReorderAtInput">Reorder at</label>
+      <input id="inventoryReorderAtInput" type="number" min="0" step="1" inputmode="numeric" value="${escapeAttr(safeReorderAt)}" />
+      <label class="inventory-check-row"><input id="inventoryAlertEnabledInput" type="checkbox" ${alertEnabled ? "checked" : ""} /> <span>Alert enabled</span></label>
+    `;
+  } else if (action === "rename") {
+    fields = `
+      <label for="inventoryColorInput">Lace color</label>
+      <input id="inventoryColorInput" type="text" autocomplete="off" value="${escapeAttr(colorName)}" />
+      <p>Renaming a lace color can affect future matching for orders that already reference the old color.</p>
+    `;
+  }
+
+  const html = `
+    <form class="workflow-action-form inventory-action-form" data-inventory-form="${escapeAttr(action)}">
+      <div class="workflow-form-content">
+        <p class="inventory-form-title">${escapeHtml(titles[action] || "Inventory action")}</p>
+        <div class="workflow-form-message" hidden></div>
+        ${fields}
+        <div class="workflow-form-actions">
+          <button class="workflow-form-cancel" type="button">Cancel</button>
+          <button class="workflow-form-submit" type="submit">Save</button>
+        </div>
+      </div>
+    </form>
+  `;
+
+  if (button) {
+    openAdminActionSubmenu(sheetRoot, button, html);
+  } else {
+    sheetRoot.classList.add("workflow-action-selected");
+    form.innerHTML = html;
+  }
+
+  form.querySelector(".workflow-form-cancel")?.addEventListener("click", () => {
+    if (isAdd) closeInventorySheet();
+    else openInventoryActions(item, sheetRoot.anchor);
+  });
+
+  form.querySelector("form")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    saveInventoryAction(item, action, e.currentTarget);
+  });
+
+  if (!isDesktopHoverMenu() || !button) {
+    form.querySelector("input")?.focus();
+  }
+}
+
+function openAddInventoryForm(source) {
+  const sheetRoot = ensureInventorySheet();
+  const sheet = sheetRoot.querySelector(".workflow-sheet");
+  sheetRoot.anchor = getAdminAnchorPosition(null, source);
+  sheetRoot.className = "admin-action-menu-root workflow-sheet-root inventory-sheet-root open workflow-action-selected";
+  sheetRoot.querySelector(".workflow-customer-name").textContent = "New lace color";
+  sheetRoot.querySelector(".workflow-current-status").textContent = "Inventory";
+  sheetRoot.querySelector(".workflow-action-list").innerHTML = "";
+  renderInventoryActionForm(null, "add", null);
+  requestAnimationFrame(() => positionWorkflowMenu(sheet, sheetRoot.anchor));
+}
+
+function readInventoryInteger(id, { allowBlank = false, min = 0 } = {}) {
+  const el = document.getElementById(id);
+  const raw = String(el?.value || "").trim();
+  if (!raw && allowBlank) return null;
+  if (!raw) throw new Error("Enter a valid whole number.");
+  const number = Number(raw);
+  if (!Number.isInteger(number) || number < min) {
+    throw new Error("Enter a valid whole number.");
+  }
+  return number;
+}
+
+function inventoryColorExists(color, currentColor = "") {
+  const next = normalizeLaceName(color);
+  const current = normalizeLaceName(currentColor);
+  return laceInventory.some(item => {
+    const itemColor = normalizeLaceName(item.color);
+    return itemColor && itemColor === next && itemColor !== current;
+  });
+}
+
+async function saveInventoryAction(item, action, formEl) {
+  const messageEl = formEl.querySelector(".workflow-form-message");
+  const submitBtn = formEl.querySelector(".workflow-form-submit");
+
+  try {
+    messageEl.hidden = true;
+    submitBtn.disabled = true;
+
+    if (action === "add") {
+      const color = String(document.getElementById("inventoryColorInput")?.value || "").trim();
+      if (!color) throw new Error("Enter a lace color.");
+      if (inventoryColorExists(color)) throw new Error("That lace color already exists.");
+
+      await postJson({
+        action: "createInventoryItem",
+        color,
+        quantityOnHand: readInventoryInteger("inventoryQtyInput"),
+        reorderAt: readInventoryInteger("inventoryReorderAtInput"),
+        reorderAlertEnabled: document.getElementById("inventoryAlertEnabledInput")?.checked === true,
+        active: document.getElementById("inventoryActiveInput")?.checked === true
+      }, true);
+    } else if (action === "set") {
+      await updateInventoryItem(item, {
+        quantityOnHand: readInventoryInteger("inventoryQtyInput")
+      });
+    } else if (action === "alertSettings") {
+      await updateInventoryItem(item, {
+        reorderAt: readInventoryInteger("inventoryReorderAtInput"),
+        reorderAlertEnabled: document.getElementById("inventoryAlertEnabledInput")?.checked === true
+      });
+    } else if (action === "rename") {
+      const color = String(document.getElementById("inventoryColorInput")?.value || "").trim();
+      if (!color) throw new Error("Enter a lace color.");
+      if (inventoryColorExists(color, item.color)) throw new Error("That lace color already exists.");
+      if (normalizeLaceName(color) !== normalizeLaceName(item.color)) {
+        const ok = window.confirm("Rename this lace color? Existing orders may still reference the old color name.");
+        if (!ok) return;
+      }
+      await updateInventoryItem(item, { color });
+    }
+
+    closeInventorySheet();
+    await loadInventory();
+  } catch (err) {
+    messageEl.textContent = err.message || "Inventory update failed.";
+    messageEl.hidden = false;
+  } finally {
+    submitBtn.disabled = false;
+  }
+}
+
+async function updateInventoryItem(item, updates) {
+  await postJson({
+    action: "updateInventoryItem",
+    color: item.color,
+    updates
+  }, true);
+}
+
+async function deactivateInventoryItem(item, button) {
+  const ok = window.confirm(`Hide ${item.color || "this lace color"} from the inventory list?`);
+  if (!ok) return;
+
+  button.disabled = true;
+  try {
+    await updateInventoryItem(item, { active: false });
+    closeInventorySheet();
+    await loadInventory();
+  } catch (err) {
+    alert(err.message || "Inventory update failed.");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function restoreInventoryItem(item, button) {
+  button.disabled = true;
+  try {
+    await updateInventoryItem(item, { active: true });
+    window.inventoryViewMode = "active";
+    closeInventorySheet();
+    await loadInventory();
+  } catch (err) {
+    alert(err.message || "Inventory update failed.");
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function renderReorderBanner(rows) {
@@ -4951,16 +5477,31 @@ inventoryFilterToggleBtn?.addEventListener("click", (e) => {
   syncInventoryFilterUI();
 });
 
+inventoryAddBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (activeView !== "inventory") return;
+
+  orderFiltersExpanded = false;
+  inventoryFiltersExpanded = false;
+  syncOrderFilterUI();
+  syncInventoryFilterUI();
+  openAddInventoryForm(e.currentTarget);
+});
+
 inventoryFilterPopover?.addEventListener("click", (e) => {
   e.stopPropagation();
 });
 
 inventoryAllBtn?.addEventListener("click", () => {
-  setInventoryFilter(false);
+  setInventoryFilter("active");
 });
 
 inventoryNeedsOrderBtn?.addEventListener("click", () => {
-  setInventoryFilter(true);
+  setInventoryFilter("needs");
+});
+
+inventoryHiddenBtn?.addEventListener("click", () => {
+  setInventoryFilter("hidden");
 });
 
 document.addEventListener("click", (e) => {
@@ -5014,6 +5555,7 @@ document.addEventListener("keydown", (e) => {
   }
 
   closeDesktopOrderActionMenus();
+  closeInventorySheet();
 
   if (changed) {
     syncOrderFilterUI();
@@ -5027,10 +5569,15 @@ window.addEventListener("resize", () => {
   }
 
   closeDesktopOrderActionMenus();
+  closeInventorySheet();
+  syncOrderFilterUI();
+  syncInventoryFilterUI();
   syncSearchUI();
 });
 
 window.addEventListener("scroll", closeDesktopOrderActionMenus, { passive: true, capture: true });
+window.addEventListener("scroll", closeInventorySheet, { passive: true, capture: true });
+window.addEventListener("scroll", closeAdminFilterPopovers, { passive: true, capture: true });
 
 backBtn.addEventListener("click", () => {
   clearSaveStatus();
