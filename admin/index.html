@@ -23,27 +23,7 @@
       </div>
 
       <nav class="side-nav">
-        <div class="nav-group">
-          <button class="nav-parent" type="button" data-tree-toggle="orders" aria-expanded="true">
-            <span>Orders</span>
-            <span class="nav-caret" aria-hidden="true">▾</span>
-          </button>
-
-          <div class="nav-children" data-tree="orders">
-            <button class="nav-link active" data-view="current">Current Orders</button>
-            <button class="nav-link" data-view="progress">In Progress</button>
-            <button class="nav-link" data-view="estimate">Estimate Sent</button>
-            <button class="nav-link" data-view="approved">Customer Approved</button>
-            <button class="nav-link" data-view="customer-response">Pending Response</button>
-            <button class="nav-link" data-view="transit">In Transit to Me</button>
-            <button class="nav-link" data-view="waiting">Waiting on Lace/Parts</button>
-            <button class="nav-link" data-view="ready">Ready to Go</button>
-            <button class="nav-link" data-view="hold">On Hold</button>
-            <button class="nav-link" data-view="completed">Completed</button>
-            <button class="nav-link" data-view="all">All Orders</button>
-          </div>
-        </div>
-
+        <button class="nav-link nav-main active" data-view="current">Orders</button>
         <button class="nav-link nav-main" data-view="map">Map</button>
         <button class="nav-link nav-main" data-view="inventory">Lace Inventory</button>
         <button class="nav-link nav-main" data-view="upload">Upload</button>
@@ -68,11 +48,19 @@
           <div class="topbar-left">
             <button id="menuBtn" class="icon-btn" aria-label="Open menu">☰</button>
             <div>
-              <h1 id="viewTitle">Current Orders</h1>
+              <h1 id="viewTitle">Orders</h1>
               <p id="orderCount" class="muted"></p>
             </div>
           </div>
           <div class="topbar-actions">
+            <button id="orderFilterToggleBtn" class="secondary topbar-icon-action order-filter-toggle" type="button" aria-label="Order filters" aria-expanded="false" aria-controls="orderFilterPopover">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 7h16"></path>
+                <circle cx="9" cy="7" r="2"></circle>
+                <path d="M4 17h16"></path>
+                <circle cx="15" cy="17" r="2"></circle>
+              </svg>
+            </button>
             <button id="inventoryFilterToggleBtn" class="secondary topbar-icon-action inventory-filter-toggle" type="button" aria-label="Inventory filters" aria-expanded="false" aria-controls="inventoryFilterPopover" hidden>
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M4 7h16"></path>
@@ -87,7 +75,6 @@
                 <path d="m16 16 4 4"></path>
               </svg>
             </button>
-            <button id="refreshBtn" class="secondary topbar-icon-action" type="button" aria-label="Refresh orders">↻</button>
             <button id="logoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
               <span class="logout-action-text">Log Out</span>
               <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -100,6 +87,21 @@
               <div class="inventory-filter-segment" role="group" aria-label="Inventory filter">
                 <button id="inventoryAllBtn" type="button">All</button>
                 <button id="inventoryNeedsOrderBtn" type="button">Needs Order</button>
+              </div>
+            </div>
+            <div id="orderFilterPopover" class="order-filter-popover" hidden>
+              <div class="order-filter-list" role="menu" aria-label="Order filters">
+                <button type="button" role="menuitemradio" data-order-filter="current">Current</button>
+                <button type="button" role="menuitemradio" data-order-filter="all">All</button>
+                <button type="button" role="menuitemradio" data-order-filter="estimate">Estimate Sent</button>
+                <button type="button" role="menuitemradio" data-order-filter="customer-response">Pending Response</button>
+                <button type="button" role="menuitemradio" data-order-filter="approved">Customer Approved</button>
+                <button type="button" role="menuitemradio" data-order-filter="transit">In Transit to Me</button>
+                <button type="button" role="menuitemradio" data-order-filter="progress">In Progress</button>
+                <button type="button" role="menuitemradio" data-order-filter="waiting">Waiting on Lace/Parts</button>
+                <button type="button" role="menuitemradio" data-order-filter="ready">Ready to Go</button>
+                <button type="button" role="menuitemradio" data-order-filter="hold">On Hold</button>
+                <button type="button" role="menuitemradio" data-order-filter="completed">Completed / Picked Up</button>
               </div>
             </div>
           </div>
@@ -119,11 +121,6 @@
           </div>
         </div>
 
-        <div id="pullRefreshIndicator" class="pull-refresh-indicator" aria-hidden="true">
-          <span class="pull-refresh-spinner" aria-hidden="true"></span>
-          <span id="pullRefreshText">Pull to refresh</span>
-        </div>
-
         <div id="ordersList" class="orders-list"></div>
       </section>
 
@@ -137,8 +134,7 @@
             </div>
           </div>
 
-          <div style="display:flex; gap:8px;">
-            <button id="mapRefreshBtn" class="secondary">🔄</button>
+          <div class="topbar-actions">
             <button id="mapLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
               <span class="logout-action-text">Log Out</span>
               <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -174,8 +170,7 @@
             </div>
           </div>
 
-          <div style="display:flex; gap:8px;">
-            <button id="uploadRefreshBtn" class="secondary">🔄</button>
+          <div class="topbar-actions">
             <button id="uploadLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
               <span class="logout-action-text">Log Out</span>
               <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -188,14 +183,18 @@
         </header>
 
         <div class="upload-panel">
-          <div class="upload-card">
-            <h2>Website Gallery</h2>
-            <p class="muted">
-              Choose a section, then upload glove photos.
-            </p>
+          <div class="upload-card gallery-upload-card">
+            <div class="upload-card-heading">
+              <div>
+                <h2>Website Gallery</h2>
+                <p class="muted">
+                  Choose a section, then upload glove photos.
+                </p>
+              </div>
+            </div>
 
-            <div class="detail-block">
-              <div class="label">Gallery Section</div>
+            <div class="detail-block upload-section-block">
+              <label class="label" for="gallerySectionSelect">Gallery Section</label>
               <select id="gallerySectionSelect">
                 <option value="fielding-gloves">Fielding Gloves</option>
                 <option value="catchers-mitts">Catcher's Mitts</option>
@@ -206,8 +205,15 @@
             </div>
 
             <label class="upload-drop" for="galleryUploadInput">
-              <span class="upload-drop-title">Choose gallery photos</span>
-              <span class="upload-drop-note">Select one or multiple photos, then review before uploading.</span>
+              <span class="upload-drop-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <rect x="4" y="5" width="16" height="14" rx="3"></rect>
+                  <circle cx="9" cy="10" r="1.6"></circle>
+                  <path d="m7 17 4.2-4.2a1.8 1.8 0 0 1 2.5 0L17 16"></path>
+                </svg>
+              </span>
+              <span class="upload-drop-title">Choose Photos</span>
+              <span class="upload-drop-note">Select one or multiple photos to review before uploading.</span>
             </label>
 
             <input id="galleryUploadInput" type="file" accept="image/*" multiple>
@@ -215,16 +221,16 @@
             <div id="galleryUploadPreview" class="upload-preview-grid"></div>
 
             <div class="upload-actions">
-              <button id="galleryUploadBtn" class="secondary" type="button" disabled>
+              <button id="galleryUploadBtn" class="secondary upload-primary" type="button" disabled>
                 Upload
               </button>
 
-              <button id="galleryClearBtn" class="secondary" type="button" disabled>
+              <button id="galleryClearBtn" class="secondary upload-clear" type="button" disabled>
                 Clear
               </button>
             </div>
 
-            <p id="galleryUploadStatus" class="upload-status">
+            <p id="galleryUploadStatus" class="upload-status" aria-live="polite">
               No photos selected.
             </p>
           </div>
@@ -241,9 +247,8 @@
             </div>
           </div>
 
-          <div style="display:flex; gap:8px;">
+          <div class="topbar-actions">
             <button id="addSaleGloveBtn" class="secondary">+ Add</button>
-            <button id="saleGlovesRefreshBtn" class="secondary">🔄</button>
             <button id="saleGlovesLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
               <span class="logout-action-text">Log Out</span>
               <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -275,6 +280,10 @@
 
         <div id="orderDetail" class="detail-card"></div>
       </section>
+      <div id="pullRefreshIndicator" class="pull-refresh-indicator" aria-hidden="true">
+        <span class="pull-refresh-spinner" aria-hidden="true"></span>
+        <span id="pullRefreshText">Pull to refresh</span>
+      </div>
     </main>
   </div>
 

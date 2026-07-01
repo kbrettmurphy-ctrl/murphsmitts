@@ -22,6 +22,9 @@ const searchToolbar = document.getElementById("searchToolbar");
 const searchToggleBtn = document.getElementById("searchToggleBtn");
 const searchClearBtn = document.getElementById("searchClearBtn");
 const searchCloseBtn = document.getElementById("searchCloseBtn");
+const orderFilterToggleBtn = document.getElementById("orderFilterToggleBtn");
+const orderFilterPopover = document.getElementById("orderFilterPopover");
+const orderFilterButtons = Array.from(document.querySelectorAll("[data-order-filter]"));
 const inventoryFilterToggleBtn = document.getElementById("inventoryFilterToggleBtn");
 const inventoryFilterPopover = document.getElementById("inventoryFilterPopover");
 const inventoryAllBtn = document.getElementById("inventoryAllBtn");
@@ -70,6 +73,7 @@ let workflowSuppressOpeningTouch = false;
 let workflowSuppressOpeningTouchTimer = null;
 let suppressOrderCardClickUntil = 0;
 let searchExpanded = false;
+let orderFiltersExpanded = false;
 let inventoryFiltersExpanded = false;
 let pullRefreshState = {
   tracking: false,
@@ -491,23 +495,35 @@ function isInTransitToMe(order) {
   return normalizeStatus(order.status) === "in transit to me";
 }
 
+const ORDER_FILTER_LABELS = {
+  current: "Current",
+  all: "All",
+  estimate: "Estimate Sent",
+  "customer-response": "Pending Response",
+  approved: "Customer Approved",
+  transit: "In Transit to Me",
+  progress: "In Progress",
+  waiting: "Waiting on Lace/Parts",
+  ready: "Ready to Go",
+  hold: "On Hold",
+  completed: "Completed / Picked Up"
+};
+
+function isOrderFilterView(viewName) {
+  return Object.prototype.hasOwnProperty.call(ORDER_FILTER_LABELS, viewName);
+}
+
+function getOrderFilterLabel(viewName) {
+  return ORDER_FILTER_LABELS[viewName] || ORDER_FILTER_LABELS.current;
+}
+
 function getViewTitle(viewName) {
   switch (viewName) {
     case "map": return "Map";
     case "upload": return "Upload";
     case "inventory": return "Lace Inventory";
-    case "waiting": return "Waiting on Lace/Parts";
-    case "estimate": return "Estimate Sent";
-    case "approved": return "Customer Approved";
-    case "customer-response": return "Pending Response";
-    case "transit": return "In Transit to Me";
-    case "progress": return "In Progress";
-    case "ready": return "Ready to Go";
-    case "hold": return "On Hold";
-    case "completed": return "Completed";
-    case "all": return "All Orders";
     case "gloves-sale": return "Gloves For Sale";
-    default: return "Current Orders";
+    default: return "Orders";
   }
 }
 
@@ -520,7 +536,10 @@ function getViewOrders() {
       return allOrders.filter(isCompletedOrder);
 
     case "waiting":
-      return allOrders.filter(order => normalizeStatus(order.status) === "waiting on lace/parts");
+      return allOrders.filter(order => {
+        const status = normalizeStatus(order.status);
+        return status === "waiting on lace/parts" || status === "waiting on parts";
+      });
 
     case "estimate":
       return allOrders.filter(order => normalizeStatus(order.status) === "estimate sent");
@@ -1528,13 +1547,16 @@ function setActiveView(viewName) {
   }
 
   beginAdminViewSwitch();
+  orderFiltersExpanded = false;
   inventoryFiltersExpanded = false;
   activeView = viewName;
   navLinks.forEach(link => {
-    link.classList.toggle("active", link.dataset.view === viewName);
+    const isOrdersLink = link.dataset.view === "current" && isOrderFilterView(viewName);
+    link.classList.toggle("active", link.dataset.view === viewName || isOrdersLink);
   });
 
   viewTitle.textContent = getViewTitle(viewName);
+  syncOrderFilterUI();
   syncInventoryFilterUI();
 
   if (viewName === "upload") {
@@ -1627,9 +1649,12 @@ function applyFilters() {
     orderCount.textContent = `${list.length} result${list.length === 1 ? "" : "s"}`;
   } else {
     viewTitle.textContent = getViewTitle(activeView);
-    orderCount.textContent = `${list.length} order${list.length === 1 ? "" : "s"}`;
+    orderCount.textContent = isOrderFilterView(activeView)
+      ? `${getOrderFilterLabel(activeView)} · ${list.length} order${list.length === 1 ? "" : "s"}`
+      : `${list.length} order${list.length === 1 ? "" : "s"}`;
   }
 
+  syncOrderFilterUI();
   syncSearchUI();
 }
 
@@ -1639,17 +1664,44 @@ function isMobileViewport() {
 
 function syncSearchUI() {
   const hasQuery = !!searchInput?.value.trim();
+  const showSearch = isOrderFilterView(activeView);
 
   if (hasQuery && !searchExpanded) {
     searchExpanded = true;
   }
 
-  searchToolbar?.classList.toggle("is-collapsed", !searchExpanded);
-  searchToggleBtn?.setAttribute("aria-expanded", searchExpanded ? "true" : "false");
+  searchToolbar?.classList.toggle("is-collapsed", !showSearch || !searchExpanded);
+
+  if (searchToggleBtn) {
+    searchToggleBtn.hidden = !showSearch;
+    searchToggleBtn.setAttribute("aria-expanded", showSearch && searchExpanded ? "true" : "false");
+  }
 
   if (searchClearBtn) {
     searchClearBtn.hidden = !hasQuery;
   }
+}
+
+function syncOrderFilterUI() {
+  const showOrderFilter = isOrderFilterView(activeView);
+  const showPopover = showOrderFilter && orderFiltersExpanded;
+
+  if (orderFilterToggleBtn) {
+    orderFilterToggleBtn.hidden = !showOrderFilter;
+    orderFilterToggleBtn.setAttribute("aria-expanded", showPopover ? "true" : "false");
+    orderFilterToggleBtn.classList.toggle("is-active", showPopover);
+    orderFilterToggleBtn.classList.toggle("has-active-filter", showOrderFilter && activeView !== "current");
+  }
+
+  if (orderFilterPopover) {
+    orderFilterPopover.hidden = !showPopover;
+  }
+
+  orderFilterButtons.forEach(btn => {
+    const active = btn.dataset.orderFilter === activeView;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-checked", active ? "true" : "false");
+  });
 }
 
 function expandSearch({ focus = false } = {}) {
@@ -1669,7 +1721,7 @@ function collapseSearchIfEmpty() {
     return;
   }
 
-  searchExpanded = !isMobileViewport();
+  searchExpanded = false;
   syncSearchUI();
 }
 
@@ -1686,7 +1738,7 @@ function cancelSearch() {
 
   searchInput.value = "";
   applyFilters();
-  searchExpanded = !isMobileViewport();
+  searchExpanded = false;
   syncSearchUI();
   searchInput.blur();
   resetAdminScroll(dashboardView);
@@ -1708,14 +1760,29 @@ function canStartPullRefresh(e) {
   if (!window.matchMedia("(pointer: coarse)").matches) return false;
   if (!isAuthenticated()) return false;
   if (pullRefreshState.refreshing) return false;
-  if (!dashboardView?.classList.contains("active")) return false;
-  if (activeView === "inventory") return false;
+  if (loginView?.classList.contains("active") || detailView?.classList.contains("active")) return false;
   if (document.body.classList.contains("workflow-open")) return false;
   if (sideMenu?.classList.contains("open")) return false;
-  if (document.activeElement === searchInput) return false;
+  if (orderFiltersExpanded || inventoryFiltersExpanded) return false;
+
+  const activeEl = document.activeElement;
+  if (
+    activeEl &&
+    activeEl !== document.body &&
+    activeEl.matches?.("input, textarea, select, [contenteditable='true']")
+  ) {
+    return false;
+  }
+
   if (getAdminScrollTop() > 1) return false;
   if (!e.touches || e.touches.length !== 1) return false;
-  if (e.target.closest("button, input, textarea, select, .swipe-action-panel, .side-menu")) return false;
+  if (
+    e.target.closest(
+      "button, input, textarea, select, .swipe-action-panel, .side-menu, .order-filter-popover, .inventory-filter-popover, .leaflet-container, .order-map, .upload-drop"
+    )
+  ) {
+    return false;
+  }
 
   return true;
 }
@@ -1746,16 +1813,29 @@ function resetPullRefreshIndicator() {
   setPullRefreshIndicator(0, "pull");
 }
 
-async function refreshOrdersFromPull() {
+async function refreshActiveViewFromPull() {
   if (pullRefreshState.refreshing) return;
 
   pullRefreshState.refreshing = true;
   setPullRefreshIndicator(74, "refreshing");
 
   try {
-    await loadOrders();
+    if (isOrderFilterView(activeView)) {
+      await loadOrders();
+    } else if (activeView === "map") {
+      if (mapStatus) mapStatus.textContent = "Refreshing orders...";
+      await loadOrders();
+      await renderMapView();
+      orderMap?.invalidateSize();
+    } else if (activeView === "inventory") {
+      await loadInventory();
+    } else if (activeView === "gloves-sale") {
+      if (document.getElementById("saveSaleGloveBtn")) return;
+      await loadSaleGloves();
+    }
+    // Upload has no safe data-only refresh; staged photos are intentionally preserved.
   } catch {
-    // loadOrders already falls back to cache; keep pull-to-refresh quiet.
+    // Existing loaders surface their own recoverable states; keep pull-to-refresh quiet.
   } finally {
     setTimeout(() => {
       pullRefreshState.refreshing = false;
@@ -1828,7 +1908,7 @@ function initPullToRefresh() {
     pullRefreshState.pulling = false;
 
     if (shouldRefresh) {
-      refreshOrdersFromPull();
+      refreshActiveViewFromPull();
     } else {
       resetPullRefreshIndicator();
     }
@@ -4330,6 +4410,7 @@ function setInventoryFilter(needsOrder) {
   window.inventoryNeedsOrderOnly = needsOrder;
   inventoryFiltersExpanded = false;
   renderInventory(laceInventory);
+  syncInventoryFilterUI();
 }
 
 function renderReorderBanner(rows) {
@@ -4549,11 +4630,37 @@ searchToggleBtn?.addEventListener("click", () => {
 searchClearBtn?.addEventListener("click", clearSearch);
 searchCloseBtn?.addEventListener("click", cancelSearch);
 
+orderFilterToggleBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (!isOrderFilterView(activeView)) return;
+
+  inventoryFiltersExpanded = false;
+  orderFiltersExpanded = !orderFiltersExpanded;
+  syncOrderFilterUI();
+  syncInventoryFilterUI();
+});
+
+orderFilterPopover?.addEventListener("click", (e) => {
+  e.stopPropagation();
+});
+
+orderFilterButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    const nextFilter = btn.dataset.orderFilter;
+    if (!isOrderFilterView(nextFilter)) return;
+
+    orderFiltersExpanded = false;
+    setActiveView(nextFilter);
+  });
+});
+
 inventoryFilterToggleBtn?.addEventListener("click", (e) => {
   e.stopPropagation();
   if (activeView !== "inventory") return;
 
+  orderFiltersExpanded = false;
   inventoryFiltersExpanded = !inventoryFiltersExpanded;
+  syncOrderFilterUI();
   syncInventoryFilterUI();
 });
 
@@ -4570,28 +4677,55 @@ inventoryNeedsOrderBtn?.addEventListener("click", () => {
 });
 
 document.addEventListener("click", (e) => {
-  if (!inventoryFiltersExpanded) return;
+  let changed = false;
+
   if (
-    inventoryFilterPopover?.contains(e.target) ||
-    inventoryFilterToggleBtn?.contains(e.target)
+    orderFiltersExpanded &&
+    !orderFilterPopover?.contains(e.target) &&
+    !orderFilterToggleBtn?.contains(e.target)
   ) {
-    return;
+    orderFiltersExpanded = false;
+    changed = true;
   }
 
-  inventoryFiltersExpanded = false;
-  syncInventoryFilterUI();
+  if (
+    inventoryFiltersExpanded &&
+    !inventoryFilterPopover?.contains(e.target) &&
+    !inventoryFilterToggleBtn?.contains(e.target)
+  ) {
+    inventoryFiltersExpanded = false;
+    changed = true;
+  }
+
+  if (changed) {
+    syncOrderFilterUI();
+    syncInventoryFilterUI();
+  }
 });
 
 document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape" || !inventoryFiltersExpanded) return;
-  inventoryFiltersExpanded = false;
-  syncInventoryFilterUI();
+  if (e.key !== "Escape") return;
+
+  let changed = false;
+
+  if (orderFiltersExpanded) {
+    orderFiltersExpanded = false;
+    changed = true;
+  }
+
+  if (inventoryFiltersExpanded) {
+    inventoryFiltersExpanded = false;
+    changed = true;
+  }
+
+  if (changed) {
+    syncOrderFilterUI();
+    syncInventoryFilterUI();
+  }
 });
 
 window.addEventListener("resize", () => {
-  if (!isMobileViewport()) {
-    searchExpanded = true;
-  } else if (!searchInput.value.trim()) {
+  if (!searchInput.value.trim()) {
     searchExpanded = false;
   }
 
@@ -4719,7 +4853,7 @@ document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
   installSwipeDeleteStyles();
   initUploadView();
   initPullToRefresh();
-  searchExpanded = !isMobileViewport();
+  searchExpanded = false;
   syncSearchUI();
   syncAuthUI();
   resetAdminScroll();
