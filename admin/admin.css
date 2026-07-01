@@ -847,7 +847,8 @@ button.secondary{
 
 #orderCount,
 #uploadCount,
-#saleGlovesCount{
+#saleGlovesCount,
+#mapCount{
   margin:4px 0 0;
   color:rgba(218,202,177,.76);
   font-size:.95rem;
@@ -1653,14 +1654,19 @@ button.secondary{
    MAP VIEW
    ========================= */
 .map-panel{
-  padding:14px 16px 24px;
+  padding:12px 12px calc(18px + env(safe-area-inset-bottom));
 }
 
 .map-card{
-  background:var(--panel);
-  border-top:1px solid var(--line);
-  border-bottom:1px solid var(--line);
-  padding:16px;
+  width:100%;
+  max-width:1040px;
+  margin:0 auto;
+  display:grid;
+  gap:10px;
+  background:rgba(19,41,61,.96);
+  border:1px solid rgba(218,202,177,.15);
+  border-radius:18px;
+  padding:12px;
 }
 
 .map-header-row{
@@ -1668,13 +1674,40 @@ button.secondary{
   align-items:flex-start;
   justify-content:space-between;
   gap:16px;
-  margin-bottom:14px;
+  margin-bottom:0;
 }
 
 .map-header-row h2{
-  margin:0 0 6px;
+  margin:0;
   color:var(--cream);
-  font-size:1.1rem;
+  font-size:1.05rem;
+  line-height:1.15;
+  letter-spacing:-.015em;
+}
+
+.map-header-row .muted{
+  margin:4px 0 0;
+  font-size:.84rem;
+  line-height:1.35;
+}
+
+.map-header-row .muted[hidden]{
+  display:none;
+}
+
+.map-status-warning{
+  display:inline-flex;
+  align-items:center;
+  width:auto;
+  max-width:100%;
+  min-height:26px;
+  padding:4px 9px;
+  border-radius:999px;
+  background:rgba(214,178,31,.13);
+  color:#e8c848;
+  border:1px solid rgba(232,200,72,.18);
+  font-size:.78rem;
+  font-weight:800;
 }
 
 .order-map{
@@ -1682,9 +1715,9 @@ button.secondary{
   isolation:isolate;
   z-index:0;
   width:100%;
-  height:calc(100vh - 210px);
-  min-height:420px;
-  border-radius:14px;
+  height:calc(100dvh - var(--topbarH) - 124px);
+  min-height:430px;
+  border-radius:16px;
   overflow:hidden;
   background:#10263a;
   border:1px solid rgba(218,202,177,.18);
@@ -1740,42 +1773,143 @@ button.secondary{
 .map-unmapped-btn{
   flex:0 0 auto;
   border:none;
-  border-radius:10px;
-  background:#2a5475;
-  color:var(--cream);
-  padding:10px 14px;
+  border-radius:12px;
+  background:rgba(218,202,177,.92);
+  color:var(--navy);
+  min-height:36px;
+  padding:0 13px;
   font:inherit;
-  font-weight:800;
+  font-size:.82rem;
+  font-weight:850;
   cursor:pointer;
+}
+
+.order-map .leaflet-control-zoom{
+  border:0;
+  border-radius:14px;
+  overflow:hidden;
+  background:rgba(255,250,243,.92);
+  box-shadow:0 8px 20px rgba(0,0,0,.18);
+}
+
+.order-map .leaflet-control-zoom a{
+  width:36px;
+  height:36px;
+  border:0;
+  border-bottom:1px solid rgba(9,47,77,.12);
+  background:transparent;
+  color:var(--navy);
+  font:700 1.25rem/36px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.order-map .leaflet-control-zoom a:last-child{
+  border-bottom:0;
+}
+
+.order-map .leaflet-control-zoom a:hover,
+.order-map .leaflet-control-zoom a:focus{
+  background:rgba(9,47,77,.08);
+  color:var(--navy);
+}
+
+.order-map .leaflet-control-attribution{
+  margin:0 6px 6px 0;
+  padding:3px 7px;
+  border-radius:999px;
+  background:rgba(255,250,243,.82);
+  color:rgba(9,47,77,.70);
+  font-size:.62rem;
+  line-height:1.2;
+  box-shadow:0 4px 12px rgba(0,0,0,.10);
+}
+
+.order-map .leaflet-control-attribution a{
+  color:rgba(9,47,77,.82);
+}
+
+.order-map .leaflet-popup-content-wrapper{
+  border-radius:16px;
+  background:rgba(255,250,243,.96);
+  color:var(--navy);
+  box-shadow:0 14px 34px rgba(0,0,0,.22);
+}
+
+.order-map .leaflet-popup-tip{
+  background:rgba(255,250,243,.96);
+}
+
+.order-map .leaflet-popup-close-button{
+  width:28px;
+  height:28px;
+  border-radius:999px;
+  margin:6px 6px 0 0;
+  color:rgba(9,47,77,.58);
+  font-size:18px;
+  line-height:27px;
+}
+
+.order-map .leaflet-popup-close-button:hover,
+.order-map .leaflet-popup-close-button:focus{
+  background:rgba(9,47,77,.08);
+  color:var(--navy);
 }
 
 .map-popup{
   display:grid;
-  gap:6px;
-  min-width:190px;
-  color:#092f4d;
+  gap:8px;
+  width:min(230px, 70vw);
+  color:var(--navy);
   font-family:'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
+.map-popup-head{
+  min-width:0;
+}
+
 .map-popup-name{
-  font-weight:800;
-  font-size:.95rem;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-weight:850;
+  font-size:.92rem;
+  line-height:1.15;
 }
 
 .map-popup-meta,
-.map-popup-address{
-  font-size:.82rem;
+.map-popup-location{
+  font-size:.76rem;
   line-height:1.35;
+  color:rgba(9,47,77,.68);
+}
+
+.map-popup-status{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:22px;
+  padding:0 8px;
+  border-radius:999px;
+  background:rgba(9,47,77,.08);
+  color:var(--navy);
+  font-size:.64rem;
+  font-weight:900;
+  line-height:1;
+  justify-self:start;
 }
 
 .map-popup-btn{
   border:none;
   background:transparent;
-  color:#092f4d;
-  padding:2px 0;
+  color:#0a66c2;
+  padding:2px 0 0;
   font:inherit;
-  font-size:.82rem;
-  font-weight:700;
+  font-size:.78rem;
+  font-weight:850;
   cursor:pointer;
   text-align:left;
   justify-self:start;
@@ -1787,7 +1921,7 @@ button.secondary{
 }
 
 .leaflet-popup-content{
-  margin:12px;
+  margin:16px 36px 12px 14px;
 }
 
 .lace-dot-row{
@@ -2434,6 +2568,10 @@ button.secondary{
     grid-template-columns:repeat(2, minmax(0, 1fr));
   }
 
+  .order-map{
+    height:min(680px, calc(100vh - var(--topbarH) - 128px));
+  }
+
   .detail-grid{
     display:grid;
     grid-template-columns:repeat(2, minmax(0, 1fr));
@@ -2717,6 +2855,30 @@ button.secondary{
   #saleGlovesCount,
   #mapCount{
     font-size:.8rem;
+  }
+
+  .map-panel{
+    padding:10px 10px calc(14px + env(safe-area-inset-bottom));
+  }
+
+  .map-card{
+    border-radius:16px;
+    padding:10px;
+    gap:9px;
+  }
+
+  .map-header-row h2{
+    font-size:.98rem;
+  }
+
+  .map-header-row .muted{
+    font-size:.78rem;
+  }
+
+  .order-map{
+    min-height:420px;
+    height:calc(100dvh - var(--topbarH) - 118px);
+    border-radius:15px;
   }
 
   .map-unmapped-item{

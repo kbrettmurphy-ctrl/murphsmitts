@@ -1778,7 +1778,7 @@ function canStartPullRefresh(e) {
   if (!e.touches || e.touches.length !== 1) return false;
   if (
     e.target.closest(
-      "button, input, textarea, select, .swipe-action-panel, .side-menu, .order-filter-popover, .inventory-filter-popover, .leaflet-container, .order-map, .upload-drop"
+      "button, input, textarea, select, .swipe-action-panel, .side-menu, .order-filter-popover, .inventory-filter-popover, .leaflet-container, .leaflet-popup, .order-map, .upload-drop"
     )
   ) {
     return false;
@@ -3271,12 +3271,12 @@ async function renderMapView() {
 
   if (!mapView || !orderMapEl) return;
 
-  if (mapStatus) mapStatus.textContent = "Preparing map...";
+  setMapStatus("");
   if (mapCount) mapCount.textContent = "Customer reach";
   renderUnmappedAddresses([]);
 
   if (!window.L) {
-    if (mapStatus) mapStatus.textContent = "Map library failed to load.";
+    setMapStatus("Map could not load.", "warning");
     return;
   }
 
@@ -3285,7 +3285,7 @@ async function renderMapView() {
   if (!orders.length) {
     initOrderMap();
     orderMapMarkers.clearLayers();
-    if (mapStatus) mapStatus.textContent = "No shipped addresses found.";
+    setMapStatus("No shipped addresses found.", "warning");
     if (mapCount) mapCount.textContent = "0 addresses";
     return;
   }
@@ -3300,7 +3300,6 @@ async function renderMapView() {
   if (mapCount) mapCount.textContent = `${orders.length} address${orders.length === 1 ? "" : "es"}`;
 
   if (storedItems.length) {
-    if (mapStatus) mapStatus.textContent = `Using ${storedItems.length} saved location${storedItems.length === 1 ? "" : "s"}.`;
     renderOrderMapMarkers(storedItems, token, {
       includeFailures: false,
       updateStatus: false,
@@ -3316,7 +3315,6 @@ async function renderMapView() {
 
   let geocodeResults = new Map();
   if (needsGeocode.length) {
-    if (mapStatus) mapStatus.textContent = `Resolving ${needsGeocode.length} new/changed address${needsGeocode.length === 1 ? "" : "es"}...`;
     geocodeResults = await geocodeMissingMapAddresses(needsGeocode, token);
     if (token !== mapRenderToken) return;
   }
@@ -3325,13 +3323,25 @@ async function renderMapView() {
     .map(applyStoredMapLocation)
     .map(item => applyTransientMapGeocodeResult(item, geocodeResults))
     .map(applyLocalMapCacheFallback);
+  const mapWarningBeforeFinal = mapStatus && !mapStatus.hidden
+    ? mapStatus.textContent
+    : "";
   const finalRender = renderOrderMapMarkers(finalItems, token, {
     total: finalItems.length
   });
 
-  if (!needsGeocode.length && storedItems.length && finalRender && mapStatus) {
-    mapStatus.textContent = `Using ${storedItems.length} saved location${storedItems.length === 1 ? "" : "s"}. ${getMapStatusText(finalRender.mapped, finalItems.length, finalRender.failures.length)}`;
+  if (mapWarningBeforeFinal && finalRender && !finalRender.failures.length) {
+    setMapStatus(mapWarningBeforeFinal, "warning");
   }
+}
+
+function setMapStatus(message, tone = "") {
+  if (!mapStatus) return;
+
+  const text = String(message || "").trim();
+  mapStatus.textContent = text;
+  mapStatus.hidden = !text;
+  mapStatus.classList.toggle("map-status-warning", !!text && tone === "warning");
 }
 
 function initOrderMap() {
@@ -3541,8 +3551,8 @@ async function geocodeMissingMapAddresses(items, token) {
     mergeMapGeocodeResults(data.results || {});
     return new Map(Object.entries(data.results || {}));
   } catch (err) {
-    if (mapStatus && token === mapRenderToken) {
-      mapStatus.textContent = `Server geocoding failed. ${err.message || "Using saved locations."}`;
+    if (token === mapRenderToken) {
+      setMapStatus(`Geocoding failed. ${err.message || "Using saved locations."}`, "warning");
     }
     return new Map();
   }
@@ -3679,8 +3689,8 @@ function renderOrderMapMarkers(items, token, options = {}) {
     });
   }
 
-  if (mapStatus && updateStatus) {
-    mapStatus.textContent = getMapStatusText(mapped, total, failures.length);
+  if (updateStatus) {
+    setMapStatus(getMapStatusText(mapped, total, failures.length), failures.length ? "warning" : "");
   }
   if (mapCount) {
     mapCount.textContent = `${mapped} mapped`;
@@ -3690,21 +3700,45 @@ function renderOrderMapMarkers(items, token, options = {}) {
 }
 
 function renderMapPopup(order, address) {
+  const location = getMapPopupLocation(order, address);
+  const status = String(order.status || "").trim();
+
   return `
     <div class="map-popup">
-      <div class="map-popup-name">${escapeHtml(order.customerName || "Customer")}</div>
-      <div class="map-popup-meta">Order #${escapeHtml(order.orderNumber || "")}</div>
-      <div class="map-popup-meta">${escapeHtml(order.status || "")}</div>
-      <div class="map-popup-address">${escapeHtml(address)}</div>
+      <div class="map-popup-head">
+        <div>
+          <div class="map-popup-name">${escapeHtml(order.customerName || "Customer")}</div>
+          <div class="map-popup-meta">Order #${escapeHtml(order.orderNumber || "")}</div>
+        </div>
+      </div>
+      ${status ? `<div class="map-popup-status" title="${escapeAttr(status)}">${escapeHtml(status)}</div>` : ""}
+      ${location ? `<div class="map-popup-location">${escapeHtml(location)}</div>` : ""}
       <button class="map-popup-btn" type="button" data-map-order="${escapeAttr(order.orderNumber || "")}">View Order</button>
     </div>
   `;
 }
 
+function getMapPopupLocation(order, fallbackAddress) {
+  const city = String(order.city || "").trim();
+  const state = String(order.state || "").trim();
+
+  if (city && state) return `${city}, ${state}`;
+  if (city) return city;
+  if (state) return state;
+
+  return String(fallbackAddress || "").trim();
+}
+
 function getMapStatusText(mapped, total, unmapped) {
-  const addressLabel = `address${total === 1 ? "" : "es"}`;
-  const unmappedText = unmapped ? ` ${unmapped} unmapped.` : "";
-  return `Mapped ${mapped} of ${total} ${addressLabel}.${unmappedText}`;
+  if (unmapped) {
+    return `${unmapped} address${unmapped === 1 ? "" : "es"} could not be mapped.`;
+  }
+
+  if (!total) {
+    return "No shipped addresses found.";
+  }
+
+  return "";
 }
 
 function renderUnmappedAddresses(failures) {
