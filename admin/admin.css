@@ -3781,6 +3781,10 @@ button.secondary{
     padding:0 0 calc(14px + env(safe-area-inset-bottom));
   }
 
+  #detailView .detail-section-summary{
+    display:none;
+  }
+
   #detailView .detail-topbar{
     padding:14px 14px 12px;
   }
