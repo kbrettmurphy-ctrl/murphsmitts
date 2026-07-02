@@ -2899,6 +2899,35 @@ footer{
   padding:16px;
 }
 
+.glove-subgroup{
+  padding:0 0 var(--space-4);
+}
+
+.glove-subgroup + .glove-subgroup{
+  padding-top:var(--space-4);
+  border-top:1px solid var(--mm-border);
+}
+
+.glove-subgroup:last-child{
+  padding-bottom:0;
+}
+
+.glove-subgroup-title{
+  margin:0 0 var(--space-3);
+  color:var(--mm-navy);
+  font-size:var(--text-sm);
+  font-weight:800;
+  letter-spacing:.02em;
+}
+
+.glove-subgroup .service-help{
+  margin-bottom:var(--space-3);
+}
+
+.glove-subgroup .lace-decision-support{
+  margin-bottom:var(--space-3);
+}
+
 .glove-remove-btn{
   margin-right:14px;
   border:1px solid rgba(246, 239, 229, .34);
