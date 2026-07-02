@@ -2666,32 +2666,43 @@ footer{
 }
 
 .service-form-wrap{
-  margin-top:var(--space-2);
+  max-width:760px;
+  margin:var(--space-2) auto 0;
 }
 
 .service-form-wrap .mm-form{
   gap:0;
 }
 
-.service-section{
-  margin:20px 0 0;
-  border:1px solid var(--mm-border);
-  border-radius:var(--radius-lg);
-  overflow:hidden;
-  background:rgba(255, 250, 243, .88);
+.service-form-wrap .service-section{
+  margin:var(--space-5) 0 0;
+  border:0;
+  border-radius:0;
+  overflow:visible;
+  background:transparent;
 }
 
-.service-section-title{
+.service-form-wrap .service-section:first-of-type{
+  margin-top:var(--space-4);
+}
+
+.service-form-wrap .service-section + .service-section{
+  padding-top:var(--space-4);
+  border-top:1px solid var(--mm-border);
+}
+
+.service-form-wrap .service-section-title{
   margin:0;
-  padding:15px 20px;
+  padding:12px 16px;
   background:var(--mm-navy);
   color:var(--mm-bg-soft);
   font-size:var(--text-md);
   font-weight:var(--weight-semibold);
+  border-radius:var(--radius-sm);
 }
 
-.service-section-body{
-  padding:20px;
+.service-form-wrap .service-section-body{
+  padding:var(--space-4) 0 0;
 }
 
 .service-help{
@@ -2867,12 +2878,19 @@ footer{
   margin-top:var(--space-4);
 }
 
-.glove-request-card{
+.service-form-wrap .glove-request-card{
   margin:0;
-  overflow:hidden;
-  border:1px solid var(--mm-border);
-  border-radius:var(--radius-md);
-  background:rgba(255, 250, 243, .92);
+  overflow:visible;
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
+
+.service-form-wrap .glove-request-card + .glove-request-card,
+.service-form-wrap .additional-gloves .glove-request-card{
+  margin-top:var(--space-4);
+  padding-top:var(--space-4);
+  border-top:1px solid var(--mm-border);
 }
 
 .glove-section-heading{
@@ -2895,17 +2913,39 @@ footer{
   flex:1 1 auto;
 }
 
-.glove-card-body{
-  padding:16px;
+.service-form-wrap .glove-card-body{
+  padding:var(--space-3) 0 0;
 }
 
-.glove-subgroup{
-  padding:0 0 var(--space-4);
+.service-form-wrap .glove-subgroup{
+  margin:var(--space-4) 0 0;
+  padding:0;
 }
 
-.glove-subgroup + .glove-subgroup{
+.service-form-wrap .glove-card-body > .glove-subgroup:first-child{
+  margin-top:0;
+}
+
+.service-form-wrap .glove-subgroup + .glove-subgroup{
   padding-top:var(--space-4);
-  border-top:1px solid var(--mm-border);
+  margin-top:var(--space-4);
+  border-top:0;
+}
+
+.service-form-wrap .glove-subgroup[data-simple-title]::before{
+  content:attr(data-simple-title);
+  display:block;
+  margin:0 0 var(--space-3);
+  padding:12px 16px;
+  background:var(--mm-navy);
+  color:var(--mm-bg-soft);
+  font-size:var(--text-md);
+  font-weight:var(--weight-semibold);
+  border-radius:var(--radius-sm);
+}
+
+.service-form-wrap .glove-subgroup[data-simple-title] > .glove-subgroup-title{
+  display:none;
 }
 
 .glove-subgroup:last-child{
@@ -2960,29 +3000,8 @@ footer{
   padding:0;
 }
 
-.glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup{
-  margin:20px 0 0;
-  padding:0 20px 20px;
-  border:1px solid var(--mm-border);
-  border-radius:var(--radius-lg);
-  overflow:hidden;
-  background:rgba(255, 250, 243, .88);
-}
-
-.glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup + .glove-subgroup{
-  padding-top:0;
-  border-top:1px solid var(--mm-border);
-}
-
-.glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup::before{
-  content:attr(data-simple-title);
-  display:block;
-  margin:0 -20px 20px;
-  padding:15px 20px;
-  background:var(--mm-navy);
-  color:var(--mm-bg-soft);
-  font-size:var(--text-md);
-  font-weight:var(--weight-semibold);
+.glove-information-section.is-multi-glove > .service-section-body{
+  padding-top:var(--space-4);
 }
 
 .glove-remove-btn{
@@ -3128,31 +3147,14 @@ footer{
     border-radius:var(--radius-md);
   }
 
-  .service-form-wrap .service-section{
-    margin-top:var(--space-5);
-    border:0;
-    border-radius:0;
-    overflow:visible;
-    background:transparent;
-  }
-
-  .service-form-wrap .service-section + .service-section{
-    padding-top:var(--space-4);
-    border-top:1px solid var(--mm-border);
-  }
-
-  .service-form-wrap .service-section-title{
-    padding:0 0 10px;
-    background:transparent;
-    color:var(--mm-navy);
+  .service-form-wrap .service-section-title,
+  .service-form-wrap .glove-subgroup[data-simple-title]::before{
+    padding:11px 14px;
     font-size:var(--text-sm);
-    font-weight:800;
-    letter-spacing:.02em;
-    border-bottom:1px solid rgba(9, 47, 77, .12);
   }
 
   .service-form-wrap .service-section-body{
-    padding:var(--space-3) 0 0;
+    padding-top:var(--space-3);
   }
 
   .service-form-wrap .mm-field input:not([type]),
@@ -3176,68 +3178,6 @@ footer{
 
   .glove-information-section:not(.is-multi-glove) > .service-section-body{
     padding:0;
-  }
-
-  .glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup{
-    margin:var(--space-4) 0 0;
-    padding:0;
-    border:0;
-    border-radius:0;
-    overflow:visible;
-    background:transparent;
-  }
-
-  .glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup:first-child{
-    margin-top:0;
-  }
-
-  .glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup::before{
-    margin:0 0 var(--space-3);
-    padding:0 0 8px;
-    background:transparent;
-    color:var(--mm-navy);
-    font-size:var(--text-sm);
-    font-weight:800;
-    border-bottom:1px solid rgba(9, 47, 77, .12);
-  }
-
-  .glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup + .glove-subgroup{
-    padding-top:var(--space-4);
-    border-top:1px solid var(--mm-border);
-  }
-
-  .glove-information-section.is-multi-glove{
-    border:0;
-    border-radius:0;
-    overflow:visible;
-    background:transparent;
-  }
-
-  .glove-information-section.is-multi-glove > .service-section-body{
-    padding:var(--space-3) 0 0;
-  }
-
-  .glove-information-section.is-multi-glove .glove-request-card{
-    border:0;
-    border-radius:0;
-    overflow:visible;
-    background:transparent;
-  }
-
-  .glove-information-section.is-multi-glove .glove-request-card + .glove-request-card,
-  .glove-information-section.is-multi-glove .additional-gloves .glove-request-card{
-    margin-top:var(--space-4);
-    padding-top:var(--space-4);
-    border-top:1px solid var(--mm-border);
-  }
-
-  .glove-information-section.is-multi-glove .glove-card-body{
-    padding:var(--space-3) 0 0;
-  }
-
-  .glove-information-section.is-multi-glove .glove-subgroup{
-    padding-left:0;
-    padding-right:0;
   }
 
   .glove-section-heading{
