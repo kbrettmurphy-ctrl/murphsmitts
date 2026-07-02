@@ -551,7 +551,7 @@ function getOrderStatusDisplay(status) {
 function getViewTitle(viewName) {
   switch (viewName) {
     case "map": return "Map";
-    case "upload": return "Upload";
+    case "upload": return "Gallery";
     case "inventory": return "Lace Inventory";
     case "gloves-sale": return "Gloves For Sale";
     default: return "Orders";
