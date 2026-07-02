@@ -151,6 +151,26 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "createInventoryItem") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await createInventoryItem(env, body);
+      return json(result, 200, jsonHeaders);
+    }
+
+    if (action === "updateInventoryItem") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await updateInventoryItem(env, body);
+      return json(result, 200, jsonHeaders);
+    }
+
     if (action === "getOrder") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -189,6 +209,33 @@ export async function onRequest(context) {
         200,
         jsonHeaders
       );
+    }
+
+    if (action === "listOrderActivity") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const orderNumber = cleanText(body.orderNumber);
+      if (!orderNumber) {
+        return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+      }
+
+      const result = await listOrderActivity(env, orderNumber);
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Activity could not be loaded.",
+            details: result.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json({ ok: true, activity: result.activity }, 200, jsonHeaders);
     }
 
     if (action === "deleteOrder") {
@@ -241,6 +288,56 @@ export async function onRequest(context) {
         200,
         jsonHeaders
       );
+    }
+
+    if (action === "uploadOrderPhoto") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await uploadOrderPhotoAction(env, body);
+      return json(result, 200, jsonHeaders);
+    }
+
+    if (action === "removeOrderPhoto") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await removeOrderPhotoAction(env, body);
+      return json(result, 200, jsonHeaders);
+    }
+
+    if (action === "createOrder") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await createOrderAction(env, body);
+      return json(result, 200, jsonHeaders);
+    }
+
+    if (action === "resendStatusEmail") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await resendStatusEmailAction(env, body);
+      return json(result, 200, jsonHeaders);
+    }
+
+    if (action === "resendStatusText") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await resendStatusTextAction(env, body);
+      return json(result, 200, jsonHeaders);
     }
 
     if (action === "updateOrder") {
@@ -381,6 +478,8 @@ export async function onRequest(context) {
         newPrimaryUsed: Number(updated.primary_lace_used || 0),
         newSecondaryUsed: Number(updated.secondary_lace_used || 0)
       });
+
+      await logOrderActivities(env, getOrderUpdateActivityEvents(oldRow, updated));
       
       if (shouldEmailForStatus) {
         const emailResult = await sendStatusEmail(
@@ -418,6 +517,13 @@ export async function onRequest(context) {
         if (stamp.ok && Array.isArray(stamp.data) && stamp.data[0]) {
           updated = stamp.data[0];
         }
+
+        await logOrderActivity(env, {
+          orderNumber,
+          eventType: "status_email_sent",
+          eventLabel: "Status email sent",
+          eventDetail: normalizeDisplayStatus(updated.status)
+        });
       }
 
       if (shouldTextForStatus) {
@@ -479,6 +585,13 @@ export async function onRequest(context) {
         if (textStamp.ok && Array.isArray(textStamp.data) && textStamp.data[0]) {
           updated = textStamp.data[0];
         }
+
+        await logOrderActivity(env, {
+          orderNumber,
+          eventType: "status_text_sent",
+          eventLabel: "Status text sent",
+          eventDetail: normalizeDisplayStatus(updated.status)
+        });
       }
 
       return json(
@@ -586,6 +699,40 @@ export async function onRequest(context) {
           ok: true,
           url: uploaded.url,
           path: uploaded.path
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
+    if (action === "hideGalleryPhoto" || action === "restoreGalleryPhoto" || action === "deleteGalleryPhoto") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const photoPath = cleanText(body.path);
+      const result = action === "hideGalleryPhoto"
+        ? await hideGalleryPhoto(env, photoPath)
+        : action === "restoreGalleryPhoto"
+          ? await restoreGalleryPhoto(env, photoPath)
+          : await deleteGalleryPhoto(env, photoPath);
+
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: result.error || "Gallery photo action failed."
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json(
+        {
+          ok: true,
+          photo: result.photo || null
         },
         200,
         jsonHeaders
@@ -1247,6 +1394,15 @@ export async function onRequest(context) {
     }
 
     if (action === "listGalleryPhotos") {
+      const includeHidden = body.includeHidden === true;
+
+      if (includeHidden) {
+        const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+        if (!auth.ok) {
+          return json(auth, 200, jsonHeaders);
+        }
+      }
+
       const sections = [
         "fielding-gloves",
         "catchers-mitts",
@@ -1256,6 +1412,7 @@ export async function onRequest(context) {
       ];
 
       const gallery = {};
+      const hiddenGallery = {};
 
       for (const section of sections) {
         const listed = await listGallerySection(env, section);
@@ -1273,12 +1430,31 @@ export async function onRequest(context) {
         }
 
         gallery[section] = listed.photos;
+
+        if (includeHidden) {
+          const hidden = await listGallerySection(env, section, { hidden: true });
+
+          if (!hidden.ok) {
+            return json(
+              {
+                ok: false,
+                error: `Failed to load hidden gallery section: ${section}`,
+                details: hidden.error
+              },
+              200,
+              jsonHeaders
+            );
+          }
+
+          hiddenGallery[section] = hidden.photos;
+        }
       }
 
       return json(
         {
           ok: true,
-          gallery
+          gallery,
+          hiddenGallery
         },
         200,
         jsonHeaders
@@ -1372,6 +1548,797 @@ async function fetchOrderByNumber(env, orderNumber) {
     ok: true,
     data: Array.isArray(resp.data) ? (resp.data[0] || null) : null
   };
+}
+
+async function listOrderActivity(env, orderNumber) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/order_activity?select=*&order_number=eq.${encodeURIComponent(orderNumber)}&order=created_at.desc&limit=50`
+  );
+
+  if (!resp.ok) return resp;
+
+  return {
+    ok: true,
+    activity: Array.isArray(resp.data) ? resp.data.map(mapOrderActivityFromDb) : []
+  };
+}
+
+async function logOrderActivities(env, events) {
+  for (const event of events) {
+    await logOrderActivity(env, event);
+  }
+}
+
+async function logOrderActivity(env, event) {
+  const orderNumber = cleanText(event?.orderNumber);
+  const eventType = cleanText(event?.eventType);
+  const eventLabel = cleanText(event?.eventLabel);
+
+  if (!orderNumber || !eventType || !eventLabel) {
+    return { ok: false, error: "Missing activity fields." };
+  }
+
+  try {
+    const resp = await supabaseFetch(
+      env,
+      `/rest/v1/order_activity`,
+      {
+        method: "POST",
+        headers: {
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify({
+          order_number: orderNumber,
+          event_type: eventType,
+          event_label: eventLabel,
+          event_detail: cleanText(event?.eventDetail) || null,
+          actor: cleanText(event?.actor) || "admin",
+          metadata: event?.metadata || null
+        })
+      }
+    );
+
+    if (!resp.ok) {
+      console.warn("Order activity insert failed", resp.error);
+      return { ok: false, error: resp.error };
+    }
+
+    return { ok: true };
+  } catch (err) {
+    console.warn("Order activity insert failed", err);
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
+
+function mapOrderActivityFromDb(row) {
+  return {
+    id: row.id,
+    orderNumber: row.order_number,
+    eventType: row.event_type,
+    eventLabel: row.event_label,
+    eventDetail: row.event_detail,
+    actor: row.actor,
+    metadata: row.metadata,
+    createdAt: row.created_at
+  };
+}
+
+function getOrderUpdateActivityEvents(oldRow, newRow) {
+  const orderNumber = cleanText(newRow.order_number || oldRow.order_number);
+  const events = [];
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "status_changed",
+    eventLabel: "Status changed",
+    oldValue: normalizeDisplayStatus(oldRow.status),
+    newValue: normalizeDisplayStatus(newRow.status)
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "price_changed",
+    eventLabel: "Price changed",
+    oldValue: formatActivityMoney(oldRow.price_quoted),
+    newValue: formatActivityMoney(newRow.price_quoted)
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "paid_changed",
+    eventLabel: "Paid changed",
+    oldValue: oldRow.paid,
+    newValue: newRow.paid
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "date_received_changed",
+    eventLabel: "Date received changed",
+    oldValue: oldRow.date_received,
+    newValue: newRow.date_received
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "estimated_completion_changed",
+    eventLabel: "Estimated completion changed",
+    oldValue: oldRow.estimated_completion,
+    newValue: newRow.estimated_completion
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "date_completed_changed",
+    eventLabel: "Date completed changed",
+    oldValue: oldRow.date_completed,
+    newValue: newRow.date_completed
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "tracking_changed",
+    eventLabel: "Tracking changed",
+    oldValue: formatActivityTracking(oldRow),
+    newValue: formatActivityTracking(newRow)
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "shipping_override_changed",
+    eventLabel: "Shipping override changed",
+    oldValue: formatActivityBoolean(oldRow.allow_ship_without_payment),
+    newValue: formatActivityBoolean(newRow.allow_ship_without_payment)
+  });
+
+  if (cleanText(oldRow.internal_notes) !== cleanText(newRow.internal_notes)) {
+    events.push({
+      orderNumber,
+      eventType: "internal_notes_updated",
+      eventLabel: "Internal notes updated",
+      eventDetail: "Notes changed"
+    });
+  }
+
+  return events;
+}
+
+function addActivityChange(events, change) {
+  const oldValue = cleanText(change.oldValue);
+  const newValue = cleanText(change.newValue);
+  if (oldValue === newValue) return;
+  if (!oldValue && !newValue) return;
+
+  events.push({
+    orderNumber: change.orderNumber,
+    eventType: change.eventType,
+    eventLabel: change.eventLabel,
+    eventDetail: `${oldValue || "blank"} -> ${newValue || "blank"}`
+  });
+}
+
+function formatActivityMoney(value) {
+  if (value === null || value === undefined || value === "") return "";
+  const number = Number(value);
+  if (!Number.isFinite(number)) return cleanText(value);
+  return `$${number.toFixed(2)}`;
+}
+
+function formatActivityTracking(row) {
+  return [cleanText(row.carrier), cleanText(row.tracking_number)].filter(Boolean).join(" ");
+}
+
+function formatActivityBoolean(value) {
+  return toBoolean(value) ? "Yes" : "No";
+}
+
+async function createOrderAction(env, body) {
+  const input = body.order || {};
+  const customerName = cleanText(input.customerName);
+  const phoneNumber = cleanText(input.phoneNumber);
+  const emailAddress = cleanText(input.emailAddress);
+  const dropOffMethod = cleanText(input.dropOffMethod) || "Local Drop-Off";
+  const smsOptIn = toBoolean(input.smsOptIn);
+
+  if (!customerName) {
+    return { ok: false, error: "Customer name is required." };
+  }
+
+  if (!phoneNumber && !emailAddress) {
+    return { ok: false, error: "Add a phone number or email." };
+  }
+
+  if (smsOptIn && !phoneNumber) {
+    return { ok: false, error: "Phone is required when SMS opt-in is enabled." };
+  }
+
+  if (looksLikeShipMethod(dropOffMethod)) {
+    if (!cleanText(input.streetAddress) || !cleanText(input.city) || !cleanText(input.state) || !cleanText(input.zipCode)) {
+      return { ok: false, error: "Shipping orders need street, city, state, and zip." };
+    }
+  }
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const nextOrderNumber = await getNextAdminOrderNumber(env);
+    const dbOrder = {
+      ...mapUpdatesToDb({
+        ...input,
+        customerName,
+        phoneNumber,
+        emailAddress,
+        dropOffMethod,
+        status: cleanText(input.status) || "Received",
+        paid: cleanText(input.paid) || "Unpaid",
+        smsOptIn
+      }),
+      timestamp_submitted: new Date().toISOString(),
+      order_number: nextOrderNumber,
+      glove_photos: [],
+      shipping_cost: null,
+      tracking_number: null,
+      carrier: null,
+      date_completed: null,
+      allow_ship_without_payment: false,
+      last_status_emailed: null,
+      last_status_texted: null
+    };
+
+    if (!looksLikeShipMethod(dropOffMethod)) {
+      dbOrder.street_address = null;
+      dbOrder.city = null;
+      dbOrder.state = null;
+      dbOrder.zip_code = null;
+    }
+
+    const insert = await supabaseFetch(
+      env,
+      `/rest/v1/orders`,
+      {
+        method: "POST",
+        headers: {
+          Prefer: "return=representation"
+        },
+        body: JSON.stringify(dbOrder)
+      }
+    );
+
+    if (insert.ok && Array.isArray(insert.data) && insert.data[0]) {
+      await logOrderActivity(env, {
+        orderNumber: insert.data[0].order_number,
+        eventType: "order_created_manual",
+        eventLabel: "Order created manually",
+        eventDetail: customerName,
+        metadata: {
+          source: "admin"
+        }
+      });
+
+      return {
+        ok: true,
+        order: mapOrderFromDb(insert.data[0])
+      };
+    }
+
+    const details = JSON.stringify(insert.error || {});
+    if (!/duplicate|unique|23505/i.test(details)) {
+      return {
+        ok: false,
+        error: "Failed to create order in Supabase.",
+        details: insert.error
+      };
+    }
+  }
+
+  return {
+    ok: false,
+    error: "Could not reserve the next order number. Please try again."
+  };
+}
+
+async function getNextAdminOrderNumber(env) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/orders?select=order_number`
+  );
+
+  if (!resp.ok) {
+    throw new Error("Failed to determine next order number.");
+  }
+
+  let maxNum = 79;
+  if (Array.isArray(resp.data)) {
+    for (const row of resp.data) {
+      const n = parseInt(String(row.order_number || "").trim(), 10);
+      if (!Number.isNaN(n) && n > maxNum) {
+        maxNum = n;
+      }
+    }
+  }
+
+  return String(maxNum + 1).padStart(4, "0");
+}
+
+async function resendStatusEmailAction(env, body) {
+  const orderNumber = cleanText(body.orderNumber);
+  if (!orderNumber) {
+    return { ok: false, error: "Missing orderNumber." };
+  }
+
+  const existing = await fetchOrderByNumber(env, orderNumber);
+  if (!existing.ok || !existing.data) {
+    return { ok: false, error: `Order not found: ${orderNumber}` };
+  }
+
+  const statusDisplay = normalizeDisplayStatus(existing.data.status);
+  const status = normalizeStatus(statusDisplay);
+  if (!status) {
+    return { ok: false, error: "This order does not have a status to send." };
+  }
+
+  if (isInternalOnlyStatus(status)) {
+    return { ok: false, error: `${statusDisplay} is internal-only and is not emailed.` };
+  }
+
+  if (!cleanText(existing.data.email_address)) {
+    return { ok: false, error: "This order does not have a customer email address." };
+  }
+
+  if (!env.RESEND_API_KEY) {
+    return { ok: false, error: "Missing RESEND_API_KEY environment variable." };
+  }
+
+  const emailResult = await sendStatusEmail(env, existing.data, statusDisplay);
+  if (emailResult.skipped) {
+    return { ok: false, error: emailResult.reason || "Status email was skipped." };
+  }
+  if (!emailResult.ok) {
+    return { ok: false, error: "Status email failed to send.", details: emailResult.error };
+  }
+
+  const stamp = await supabaseFetch(
+    env,
+    `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify({
+        last_status_emailed: statusDisplay
+      })
+    }
+  );
+
+  if (!stamp.ok || !Array.isArray(stamp.data) || !stamp.data[0]) {
+    return { ok: false, error: "Status email sent, but delivery status could not be updated.", details: stamp.error };
+  }
+
+  await logOrderActivity(env, {
+    orderNumber,
+    eventType: "status_email_resent",
+    eventLabel: "Status email resent",
+    eventDetail: statusDisplay
+  });
+
+  return {
+    ok: true,
+    order: mapOrderFromDb(stamp.data[0])
+  };
+}
+
+async function resendStatusTextAction(env, body) {
+  const orderNumber = cleanText(body.orderNumber);
+  if (!orderNumber) {
+    return { ok: false, error: "Missing orderNumber." };
+  }
+
+  const existing = await fetchOrderByNumber(env, orderNumber);
+  if (!existing.ok || !existing.data) {
+    return { ok: false, error: `Order not found: ${orderNumber}` };
+  }
+
+  const statusDisplay = normalizeDisplayStatus(existing.data.status);
+  const status = normalizeStatus(statusDisplay);
+  if (!status) {
+    return { ok: false, error: "This order does not have a status to text." };
+  }
+
+  if (!shouldSendTextForStatus(status)) {
+    return { ok: false, error: `${statusDisplay} is not configured for status text messages.` };
+  }
+
+  if (!toBoolean(existing.data.sms_opt_in)) {
+    return { ok: false, error: "This customer has not opted in to SMS updates." };
+  }
+
+  if (!cleanText(existing.data.phone_number)) {
+    return { ok: false, error: "This order does not have a customer phone number." };
+  }
+
+  if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
+    return { ok: false, error: "Missing Twilio environment variables." };
+  }
+
+  const textResult = await sendStatusText(env, existing.data, statusDisplay);
+  if (textResult.skipped) {
+    return { ok: false, error: textResult.reason || "Status text was skipped." };
+  }
+  if (!textResult.ok) {
+    return { ok: false, error: "Status text failed to send.", details: textResult.error };
+  }
+
+  const stamp = await supabaseFetch(
+    env,
+    `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify({
+        last_status_texted: statusDisplay
+      })
+    }
+  );
+
+  if (!stamp.ok || !Array.isArray(stamp.data) || !stamp.data[0]) {
+    return { ok: false, error: "Status text sent, but delivery status could not be updated.", details: stamp.error };
+  }
+
+  await logOrderActivity(env, {
+    orderNumber,
+    eventType: "status_text_resent",
+    eventLabel: "Status text resent",
+    eventDetail: statusDisplay
+  });
+
+  return {
+    ok: true,
+    order: mapOrderFromDb(stamp.data[0])
+  };
+}
+
+async function uploadOrderPhotoAction(env, body) {
+  const orderNumber = cleanText(body.orderNumber);
+  const filename = cleanText(body.filename);
+  const contentType = cleanText(body.contentType) || "image/jpeg";
+  const dataUrl = cleanText(body.dataUrl);
+
+  if (!orderNumber || !filename || !dataUrl) {
+    return { ok: false, error: "Missing order number, filename or image data." };
+  }
+
+  if (!contentType.startsWith("image/")) {
+    return { ok: false, error: "Only image uploads are allowed." };
+  }
+
+  const existing = await fetchOrderByNumber(env, orderNumber);
+  if (!existing.ok) {
+    return { ok: false, error: "Failed to load order.", details: existing.error };
+  }
+  if (!existing.data) {
+    return { ok: false, error: "Order not found." };
+  }
+
+  const uploaded = await uploadOrderPhoto(env, {
+    orderNumber,
+    filename,
+    contentType,
+    dataUrl
+  });
+
+  if (!uploaded.ok) {
+    return {
+      ok: false,
+      error: "Order photo upload failed.",
+      details: uploaded.error
+    };
+  }
+
+  const photos = uniquePhotoUrls([
+    ...parseDbPhotoList(existing.data.glove_photos),
+    uploaded.url
+  ]);
+  const updated = await updateOrderPhotos(env, orderNumber, photos);
+
+  if (!updated.ok) {
+    return {
+      ok: false,
+      error: "Photo uploaded but order update failed.",
+      details: updated.error
+    };
+  }
+
+  await logOrderActivity(env, {
+    orderNumber,
+    eventType: "order_photo_added",
+    eventLabel: "Order photo added",
+    eventDetail: "1 photo added",
+    metadata: {
+      path: uploaded.path
+    }
+  });
+
+  return {
+    ok: true,
+    url: uploaded.url,
+    path: uploaded.path,
+    photos,
+    order: mapOrderFromDb(updated.data)
+  };
+}
+
+async function removeOrderPhotoAction(env, body) {
+  const orderNumber = cleanText(body.orderNumber);
+  const url = cleanText(body.url || body.photoUrl);
+
+  if (!orderNumber || !url) {
+    return { ok: false, error: "Missing order number or photo URL." };
+  }
+
+  const existing = await fetchOrderByNumber(env, orderNumber);
+  if (!existing.ok) {
+    return { ok: false, error: "Failed to load order.", details: existing.error };
+  }
+  if (!existing.data) {
+    return { ok: false, error: "Order not found." };
+  }
+
+  const existingPhotos = parseDbPhotoList(existing.data.glove_photos);
+  const photos = existingPhotos.filter(photo => String(photo) !== String(url));
+
+  if (photos.length === existingPhotos.length) {
+    return { ok: false, error: "Photo was not found on this order." };
+  }
+
+  const updated = await updateOrderPhotos(env, orderNumber, photos);
+
+  if (!updated.ok) {
+    return {
+      ok: false,
+      error: "Failed to remove photo from order.",
+      details: updated.error
+    };
+  }
+
+  await logOrderActivity(env, {
+    orderNumber,
+    eventType: "order_photo_removed",
+    eventLabel: "Order photo removed",
+    eventDetail: "Photo removed"
+  });
+
+  return {
+    ok: true,
+    removed: true,
+    photos,
+    order: mapOrderFromDb(updated.data)
+  };
+}
+
+async function updateOrderPhotos(env, orderNumber, photos) {
+  const result = await supabaseFetch(
+    env,
+    `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify({
+        glove_photos: photos
+      })
+    }
+  );
+
+  if (!result.ok) return result;
+
+  return {
+    ok: true,
+    data: Array.isArray(result.data) ? (result.data[0] || null) : null
+  };
+}
+
+function parseDbPhotoList(value) {
+  if (Array.isArray(value)) return uniquePhotoUrls(value);
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      return Array.isArray(parsed) ? uniquePhotoUrls(parsed) : [];
+    } catch {
+      return /^https?:\/\//i.test(trimmed) ? uniquePhotoUrls([trimmed]) : [];
+    }
+  }
+  return [];
+}
+
+function uniquePhotoUrls(photos) {
+  const seen = new Set();
+  const out = [];
+
+  (Array.isArray(photos) ? photos : []).forEach(photo => {
+    const url = cleanText(photo);
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    out.push(url);
+  });
+
+  return out;
+}
+
+async function fetchInventoryRows(env) {
+  const resp = await supabaseFetch(env, "/rest/v1/lace_inventory?select=*&order=color.asc");
+  if (!resp.ok) return resp;
+  return {
+    ok: true,
+    data: Array.isArray(resp.data) ? resp.data : []
+  };
+}
+
+async function createInventoryItem(env, body) {
+  const color = cleanText(body.color);
+  if (!color) return { ok: false, error: "Missing lace color." };
+
+  const existing = await fetchInventoryRows(env);
+  if (!existing.ok) {
+    return { ok: false, error: "Failed to check lace inventory.", details: existing.error };
+  }
+
+  if (inventoryColorExists(existing.data, color)) {
+    return { ok: false, error: "That lace color already exists." };
+  }
+
+  const columnHints = getInventoryColumnHints(existing.data);
+  let payload;
+  try {
+    payload = buildInventoryPayload({
+      color,
+      quantityOnHand: body.quantityOnHand,
+      reorderAt: body.reorderAt,
+      reorderAlertEnabled: body.reorderAlertEnabled,
+      active: body.active
+    }, columnHints, { creating: true });
+  } catch (err) {
+    return { ok: false, error: err.message || "Invalid lace inventory values." };
+  }
+
+  const result = await supabaseFetch(
+    env,
+    "/rest/v1/lace_inventory",
+    {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(payload)
+    }
+  );
+
+  if (!result.ok) {
+    return { ok: false, error: "Failed to create lace color.", details: result.error };
+  }
+
+  return { ok: true, item: result.data?.[0] || null };
+}
+
+async function updateInventoryItem(env, body) {
+  const color = cleanText(body.color);
+  if (!color) return { ok: false, error: "Missing lace color." };
+
+  const existing = await fetchInventoryRows(env);
+  if (!existing.ok) {
+    return { ok: false, error: "Failed to load lace inventory.", details: existing.error };
+  }
+
+  const row = existing.data.find(item => normalizeInventoryName(item.color) === normalizeInventoryName(color));
+  if (!row) return { ok: false, error: "Lace color not found." };
+
+  const updates = body.updates || {};
+  const nextColor = cleanText(updates.color);
+  if (nextColor && inventoryColorExists(existing.data, nextColor, row.color)) {
+    return { ok: false, error: "That lace color already exists." };
+  }
+
+  let payload;
+  try {
+    payload = buildInventoryPayload(updates, getInventoryColumnHints(existing.data, row), { creating: false });
+  } catch (err) {
+    return { ok: false, error: err.message || "Invalid lace inventory values." };
+  }
+  if (!Object.keys(payload).length) return { ok: true, item: row };
+
+  const result = await supabaseFetch(
+    env,
+    `/rest/v1/lace_inventory?color=eq.${encodeURIComponent(row.color)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(payload)
+    }
+  );
+
+  if (!result.ok) {
+    return { ok: false, error: "Failed to update lace inventory.", details: result.error };
+  }
+
+  return { ok: true, item: result.data?.[0] || null };
+}
+
+function buildInventoryPayload(input, columns, options = {}) {
+  const payload = {};
+  const creating = options.creating === true;
+
+  if (creating || "color" in input) {
+    payload.color = cleanText(input.color);
+  }
+
+  if (creating || "quantityOnHand" in input || "quantity_on_hand" in input) {
+    const parsed = parseInventoryInteger(input.quantityOnHand ?? input.quantity_on_hand, "quantity");
+    if (!parsed.ok) throw new Error(parsed.error);
+    payload.quantity_on_hand = parsed.value;
+  }
+
+  if (creating || "reorderAt" in input || "reorder_at" in input || "reorderThreshold" in input) {
+    const parsed = parseInventoryInteger(input.reorderAt ?? input.reorder_at ?? input.reorderThreshold, "reorder at");
+    if (!parsed.ok) throw new Error(parsed.error);
+    if (columns.has("reorder_at")) payload.reorder_at = parsed.value;
+    if (columns.has("reorder_threshold")) payload.reorder_threshold = parsed.value;
+  }
+
+  if (creating || "reorderAlertEnabled" in input || "reorder_alert_enabled" in input) {
+    if (columns.has("reorder_alert_enabled")) {
+      payload.reorder_alert_enabled = (input.reorderAlertEnabled ?? input.reorder_alert_enabled) !== false;
+    }
+  }
+
+  if (creating || "active" in input) {
+    if (columns.has("active")) payload.active = input.active !== false;
+  }
+
+  return payload;
+}
+
+function getInventoryColumnHints(rows, preferredRow = null) {
+  const row = preferredRow || rows.find(item => item && typeof item === "object") || {};
+  const keys = new Set(Object.keys(row));
+  if (!keys.size) {
+    ["color", "quantity_on_hand", "reorder_at", "reorder_alert_enabled", "active"].forEach(key => keys.add(key));
+  }
+  keys.add("reorder_alert_enabled");
+  if (!keys.has("reorder_at") && !keys.has("reorder_threshold")) keys.add("reorder_at");
+  return keys;
+}
+
+function parseInventoryInteger(value, label, options = {}) {
+  if ((value === null || value === undefined || value === "") && options.allowNull) {
+    return { ok: true, value: null };
+  }
+
+  if (value === null || value === undefined || value === "") {
+    return { ok: false, error: `Invalid ${label}.` };
+  }
+
+  const number = Number(value);
+  const min = Number.isFinite(options.min) ? options.min : 0;
+  if (!Number.isInteger(number) || number < min) {
+    return { ok: false, error: `Invalid ${label}.` };
+  }
+
+  return { ok: true, value: number };
+}
+
+function inventoryColorExists(rows, color, currentColor = "") {
+  const next = normalizeInventoryName(color);
+  const current = normalizeInventoryName(currentColor);
+  return rows.some(row => {
+    const rowColor = normalizeInventoryName(row.color);
+    return rowColor && rowColor === next && rowColor !== current;
+  });
+}
+
+function normalizeInventoryName(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 /* =========================
@@ -1509,11 +2476,7 @@ function mapOrderFromDb(row) {
     socialTag: row.social_tag,
     turnaroundAcknowledged: row.turnaround_acknowledged,
     referralSource: row.referral_source,
-    glovePhotos: Array.isArray(row.glove_photos)
-      ? row.glove_photos
-      : row.glove_photos
-        ? JSON.parse(row.glove_photos)
-        : [],
+    glovePhotos: parseDbPhotoList(row.glove_photos),
 
     orderNumber: row.order_number,
     status: row.status,
@@ -1531,6 +2494,7 @@ function mapOrderFromDb(row) {
     lastStatusEmailed: row.last_status_emailed,
     smsOptIn: row.sms_opt_in === true,
     lastStatusTexted: row.last_status_texted,
+    lastStatusTextedAt: row.last_status_texted_at,
     mapLat: row.map_lat,
     mapLng: row.map_lng,
     mapGeocodedAddress: row.map_geocoded_address,
@@ -1616,6 +2580,7 @@ function mapUpdatesToDb(updates) {
   if ("shippingCost" in updates) out.shipping_cost = cleanNumeric(updates.shippingCost);
   if ("paid" in updates) out.paid = cleanText(updates.paid);
 
+  if ("smsOptIn" in updates) out.sms_opt_in = toBoolean(updates.smsOptIn);
   if ("allowShipWithoutPayment" in updates) out.allow_ship_without_payment = toBoolean(updates.allowShipWithoutPayment);
 
   if ("trackingNumber" in updates) out.tracking_number = cleanText(updates.trackingNumber);
@@ -1745,6 +2710,133 @@ async function uploadGalleryPhoto(env, { section, filename, contentType, dataUrl
   }
 }
 
+async function hideGalleryPhoto(env, photoPath) {
+  const parsed = parseGalleryPhotoPath(photoPath);
+  if (!parsed.ok || parsed.hidden) {
+    return { ok: false, error: "Invalid visible gallery photo path." };
+  }
+
+  const destinationPath = `_hidden/${parsed.section}/${parsed.name}`;
+  const moved = await moveGalleryStorageObject(env, parsed.path, destinationPath);
+  if (!moved.ok) return moved;
+
+  return {
+    ok: true,
+    photo: galleryPhotoFromPath(env, destinationPath, true)
+  };
+}
+
+async function restoreGalleryPhoto(env, photoPath) {
+  const parsed = parseGalleryPhotoPath(photoPath);
+  if (!parsed.ok || !parsed.hidden) {
+    return { ok: false, error: "Invalid hidden gallery photo path." };
+  }
+
+  const destinationPath = `${parsed.section}/${parsed.name}`;
+  const moved = await moveGalleryStorageObject(env, parsed.path, destinationPath);
+  if (!moved.ok) return moved;
+
+  return {
+    ok: true,
+    photo: galleryPhotoFromPath(env, destinationPath, false)
+  };
+}
+
+async function deleteGalleryPhoto(env, photoPath) {
+  const parsed = parseGalleryPhotoPath(photoPath);
+  if (!parsed.ok) {
+    return { ok: false, error: "Invalid gallery photo path." };
+  }
+
+  const deleted = await deleteGalleryStorageObject(env, parsed.path);
+  if (!deleted.ok) return deleted;
+
+  return {
+    ok: true,
+    photo: galleryPhotoFromPath(env, parsed.path, parsed.hidden)
+  };
+}
+
+async function moveGalleryStorageObject(env, sourcePath, destinationPath) {
+  try {
+    const resp = await fetch(
+      `${env.SUPABASE_URL}/storage/v1/object/move`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          bucketId: "gallery",
+          sourceKey: sourcePath,
+          destinationKey: destinationPath
+        })
+      }
+    );
+
+    const text = await resp.text();
+    if (!resp.ok) {
+      let error = text;
+      try {
+        error = JSON.parse(text);
+      } catch {}
+
+      return {
+        ok: false,
+        error
+      };
+    }
+
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err?.message || String(err)
+    };
+  }
+}
+
+async function deleteGalleryStorageObject(env, photoPath) {
+  try {
+    const resp = await fetch(
+      `${env.SUPABASE_URL}/storage/v1/object/gallery`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          prefixes: [photoPath]
+        })
+      }
+    );
+
+    const text = await resp.text();
+    if (!resp.ok) {
+      let error = text;
+      try {
+        error = JSON.parse(text);
+      } catch {}
+
+      return {
+        ok: false,
+        error
+      };
+    }
+
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err?.message || String(err)
+    };
+  }
+}
+
 async function uploadSaleGlovePhoto(env, { slug, filename, contentType, dataUrl }) {
   try {
     const base64 = String(dataUrl || "").split(",").pop();
@@ -1817,9 +2909,80 @@ async function uploadSaleGlovePhoto(env, { slug, filename, contentType, dataUrl 
   }
 }
 
-async function listGallerySection(env, section) {
+async function uploadOrderPhoto(env, { orderNumber, filename, contentType, dataUrl }) {
+  try {
+    const base64 = String(dataUrl || "").split(",").pop();
+
+    if (!base64) {
+      return {
+        ok: false,
+        error: "Invalid image data."
+      };
+    }
+
+    const bytes = base64ToUint8Array(base64);
+    const maxBytes = 8 * 1024 * 1024;
+    if (bytes.byteLength > maxBytes) {
+      return {
+        ok: false,
+        error: "Image is too large. Please use a photo under 8 MB."
+      };
+    }
+
+    const ext = extensionFromContentType(contentType, filename);
+    const cleanName = safeStorageName(filename)
+      .replace(/\.[a-z0-9]+$/i, "");
+    const safeOrder = safeStorageName(orderNumber)
+      .replace(/\.[a-z0-9]+$/i, "") || "order";
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const path = `${safeOrder}/${stamp}-${cleanName}.${ext}`;
+
+    const uploadResp = await fetch(
+      `${env.SUPABASE_URL}/storage/v1/object/order-photos/${path}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": contentType,
+          "x-upsert": "true"
+        },
+        body: bytes
+      }
+    );
+
+    const uploadText = await uploadResp.text();
+
+    if (!uploadResp.ok) {
+      let error = uploadText;
+      try {
+        error = JSON.parse(uploadText);
+      } catch {}
+
+      return {
+        ok: false,
+        error
+      };
+    }
+
+    return {
+      ok: true,
+      path,
+      url: `${env.SUPABASE_URL}/storage/v1/object/public/order-photos/${path}`
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err?.message || String(err)
+    };
+  }
+}
+
+async function listGallerySection(env, section, options = {}) {
   try {
     const safeSection = safeGallerySection(section);
+    const hidden = options.hidden === true;
+    const prefix = hidden ? `_hidden/${safeSection}` : safeSection;
 
     const resp = await fetch(
       `${env.SUPABASE_URL}/storage/v1/object/list/gallery`,
@@ -1831,7 +2994,7 @@ async function listGallerySection(env, section) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          prefix: safeSection,
+          prefix,
           limit: 100,
           offset: 0,
           sortBy: {
@@ -1866,13 +3029,8 @@ async function listGallerySection(env, section) {
         item.name !== ".emptyFolderPlaceholder"
       )
       .map(item => {
-        const path = `${safeSection}/${item.name}`;
-
-        return {
-          name: item.name,
-          path,
-          url: `${env.SUPABASE_URL}/storage/v1/object/public/gallery/${path}`
-        };
+        const path = `${prefix}/${item.name}`;
+        return galleryPhotoFromPath(env, path, hidden);
       });
 
     return {
@@ -1885,6 +3043,59 @@ async function listGallerySection(env, section) {
       error: err && err.message ? err.message : String(err)
     };
   }
+}
+
+function galleryPhotoFromPath(env, path, hidden = false) {
+  const parsed = parseGalleryPhotoPath(path);
+  const name = parsed.name || String(path || "").split("/").pop() || "";
+  const section = parsed.section || "";
+
+  return {
+    name,
+    path,
+    section,
+    hidden,
+    url: `${env.SUPABASE_URL}/storage/v1/object/public/gallery/${path}`
+  };
+}
+
+function parseGalleryPhotoPath(path) {
+  const clean = String(path || "").trim().replace(/^\/+/, "");
+  if (!clean || clean.includes("..") || clean.includes("\\")) {
+    return { ok: false };
+  }
+
+  const parts = clean.split("/").filter(Boolean);
+  let hidden = false;
+  let section = "";
+  let name = "";
+
+  if (parts.length === 2) {
+    [section, name] = parts;
+  } else if (parts.length === 3 && parts[0] === "_hidden") {
+    hidden = true;
+    section = parts[1];
+    name = parts[2];
+  } else {
+    return { ok: false };
+  }
+
+  const safeSection = safeGallerySection(section);
+  if (safeSection !== section || !name || name === ".emptyFolderPlaceholder" || name.includes("/")) {
+    return { ok: false };
+  }
+
+  if (name.startsWith(".") || /[\\/\u0000-\u001f]/.test(name)) {
+    return { ok: false };
+  }
+
+  return {
+    ok: true,
+    hidden,
+    section,
+    name,
+    path: hidden ? `_hidden/${section}/${name}` : `${section}/${name}`
+  };
 }
 
 function base64ToUint8Array(base64) {

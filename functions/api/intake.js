@@ -43,64 +43,32 @@ export async function onRequest(context) {
     }
 
     const body = await request.json();
+    const shared = buildSharedIncoming(body);
+    const gloves = buildGloveIncomingList(body);
 
-    const incoming = {
-  customer_name: cleanText(body.customerName),
-  email_address: cleanText(body.emailAddress),
-  phone_number: cleanText(body.phoneNumber),
-  sms_opt_in: body.smsOptIn === true,
-  brand_model: cleanText(body.brandModel),
-  glove_type: cleanText(body.gloveType),
-  web_type: cleanText(body.webType),
-  services_requested: cleanText(body.servicesRequested),
-  primary_lace_color: cleanText(body.primaryLaceColor),
-  secondary_lace_color: cleanText(body.secondaryLaceColor),
-  custom_color_request: cleanText(body.customColorRequest),
-  drop_off_method: cleanText(body.dropOffMethod),
-  street_address: cleanText(body.streetAddress),
-  city: cleanText(body.city),
-  state: cleanText(body.state),
-  zip_code: cleanText(body.zipCode),
-  glove_notes: cleanText(body.gloveNotes),
-  customer_notes: cleanText(body.gloveNotes),
-  social_tag: cleanText(body.socialTag),
-  turnaround_acknowledged: cleanText(body.turnaroundAcknowledged),
-  referral_source: cleanText(body.referralSource)
-};
-
-    if (!incoming.customer_name) {
+    if (!shared.customer_name) {
       return json({ ok: false, error: "Missing required field: customer name." }, 200, jsonHeaders);
     }
 
-    if (!incoming.email_address) {
+    if (!shared.email_address) {
       return json({ ok: false, error: "Missing required field: email address." }, 200, jsonHeaders);
     }
 
-    if (!incoming.phone_number) {
+    if (!shared.phone_number) {
       return json({ ok: false, error: "Missing required field: phone number." }, 200, jsonHeaders);
     }
 
-    if (!incoming.glove_type) {
-      return json({ ok: false, error: "Missing required field: glove type." }, 200, jsonHeaders);
-    }
-
-    if (incoming.glove_type === "Fielders Glove" && !incoming.web_type) {
-      return json({ ok: false, error: "Web type is required for fielders gloves." }, 200, jsonHeaders);
-    }
-
-    if (!incoming.services_requested) {
-      return json({ ok: false, error: "Missing required field: services requested." }, 200, jsonHeaders);
-    }
-
-    if (!incoming.primary_lace_color) {
-      return json({ ok: false, error: "Missing required field: primary lace color." }, 200, jsonHeaders);
-    }
-
-    if (!incoming.drop_off_method) {
+    if (!shared.drop_off_method) {
       return json({ ok: false, error: "Missing required field: drop-off method." }, 200, jsonHeaders);
     }
 
-    if (!incoming.turnaround_acknowledged) {
+    if (looksLikeShipMethod(shared.drop_off_method)) {
+      if (!shared.street_address || !shared.city || !shared.state || !shared.zip_code) {
+        return json({ ok: false, error: "Shipping requests need street, city, state, and zip." }, 200, jsonHeaders);
+      }
+    }
+
+    if (!shared.turnaround_acknowledged) {
       return json(
         {
           ok: false,
@@ -109,6 +77,27 @@ export async function onRequest(context) {
         200,
         jsonHeaders
       );
+    }
+
+    for (let i = 0; i < gloves.length; i += 1) {
+      const glove = gloves[i];
+      const label = gloves.length > 1 ? `Glove ${i + 1}: ` : "";
+
+      if (!glove.glove_type) {
+        return json({ ok: false, error: `${label}Missing required field: glove type.` }, 200, jsonHeaders);
+      }
+
+      if (glove.glove_type === "Fielders Glove" && !glove.web_type) {
+        return json({ ok: false, error: `${label}Web type is required for fielders gloves.` }, 200, jsonHeaders);
+      }
+
+      if (!glove.services_requested) {
+        return json({ ok: false, error: `${label}Missing required field: services requested.` }, 200, jsonHeaders);
+      }
+
+      if (!glove.primary_lace_color) {
+        return json({ ok: false, error: `${label}Missing required field: primary lace color.` }, 200, jsonHeaders);
+      }
     }
 
     const nextOrderResp = await supabaseFetch(
@@ -128,51 +117,15 @@ export async function onRequest(context) {
       );
     }
 
-    const nextOrderNumber = getNextOrderNumber(nextOrderResp.data);
-
-    const newOrder = {
-      timestamp_submitted: new Date().toISOString(),
-      customer_name: incoming.customer_name,
-      phone_number: incoming.phone_number,
-      email_address: incoming.email_address,
-
-      brand_model: incoming.brand_model,
-      glove_type: incoming.glove_type,
-      web_type: incoming.web_type,
-      services_requested: incoming.services_requested,
-
-      primary_lace_color: incoming.primary_lace_color,
-      secondary_lace_color: incoming.secondary_lace_color,
-      custom_color_request: incoming.custom_color_request,
-
-      drop_off_method: incoming.drop_off_method,
-      street_address: looksLikeShipMethod(incoming.drop_off_method) ? incoming.street_address : null,
-      city: looksLikeShipMethod(incoming.drop_off_method) ? incoming.city : null,
-      state: looksLikeShipMethod(incoming.drop_off_method) ? incoming.state : null,
-      zip_code: looksLikeShipMethod(incoming.drop_off_method) ? incoming.zip_code : null,
-
-      glove_notes: incoming.glove_notes,
-      customer_notes: incoming.customer_notes,
-      social_tag: incoming.social_tag,
-      turnaround_acknowledged: incoming.turnaround_acknowledged,
-      referral_source: incoming.referral_source,
-      glove_photos: [],
-
-      order_number: nextOrderNumber,
-      status: "Received",
-      date_received: null,
-      estimated_completion: null,
-      price_quoted: null,
-      paid: "Unpaid",
-      allow_ship_without_payment: false,
-      tracking_number: null,
-      carrier: null,
-      date_completed: null,
-      internal_notes: null,
-      last_status_emailed: null,
-      sms_opt_in: incoming.sms_opt_in,
-      last_status_texted: null
-    };
+    const firstOrderNumber = getNextOrderNumber(nextOrderResp.data);
+    const firstOrderInt = parseInt(firstOrderNumber, 10);
+    const submittedAt = new Date().toISOString();
+    const newOrders = gloves.map((glove, index) => buildOrderRow(
+      shared,
+      glove,
+      String(firstOrderInt + index).padStart(4, "0"),
+      submittedAt
+    ));
 
     const insert = await supabaseFetch(
       env,
@@ -182,11 +135,11 @@ export async function onRequest(context) {
         headers: {
           Prefer: "return=representation"
         },
-        body: JSON.stringify(newOrder)
+        body: JSON.stringify(newOrders)
       }
     );
 
-    if (!insert.ok || !Array.isArray(insert.data) || !insert.data[0]) {
+    if (!insert.ok || !Array.isArray(insert.data) || insert.data.length !== newOrders.length) {
       return json(
         {
           ok: false,
@@ -198,80 +151,86 @@ export async function onRequest(context) {
       );
     }
 
-    let inserted = insert.data[0];
+    const insertedRows = insert.data;
 
-    const customerEmailResult = await sendStatusEmail(env, inserted, "Received");
+    for (const inserted of insertedRows) {
+      const customerEmailResult = await sendStatusEmail(env, inserted, "Received");
 
-    if (!customerEmailResult.ok) {
-      return json(
-        {
-          ok: false,
-          error: "Order was created, but the Received email failed to send.",
-          details: customerEmailResult.error
-        },
-        200,
-        jsonHeaders
-      );
-    }
-    
-    const customerTextResult = await sendReceivedText(env, inserted);
-
-    if (!customerTextResult.ok) {
-      return json(
-        {
-          ok: false,
-          error: "Order was created and email sent, but the Received text failed to send.",
-          details: customerTextResult.error
-        },
-        200,
-        jsonHeaders
-      );
-    }
-    
-    const ownerEmailResult = await sendOwnerNewOrderEmail(env, inserted);
-
-    if (!ownerEmailResult.ok) {
-      return json(
-        {
-          ok: false,
-          error: "Order was created and customer email sent, but owner notification failed.",
-          details: ownerEmailResult.error
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    await sendPushoverNotification(env, {
-      orderNumber: inserted.order_number,
-      name: inserted.customer_name,
-      gloveType: inserted.glove_type,
-      services: inserted.services_requested
-    });
-
-    const stamp = await supabaseFetch(
-      env,
-      `/rest/v1/orders?order_number=eq.${encodeURIComponent(inserted.order_number)}`,
-      {
-        method: "PATCH",
-        headers: {
-          Prefer: "return=representation"
-        },
-        body: JSON.stringify({
-          last_status_emailed: "Received",
-          last_status_texted: inserted.sms_opt_in === true ? "Received" : null
-        })
+      if (!customerEmailResult.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Order was created, but the Received email failed to send.",
+            details: customerEmailResult.error
+          },
+          200,
+          jsonHeaders
+        );
       }
-    );
 
-    if (stamp.ok && Array.isArray(stamp.data) && stamp.data[0]) {
-      inserted = stamp.data[0];
+      const customerTextResult = await sendReceivedText(env, inserted);
+
+      if (!customerTextResult.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Order was created and email sent, but the Received text failed to send.",
+            details: customerTextResult.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      const ownerEmailResult = await sendOwnerNewOrderEmail(env, inserted);
+
+      if (!ownerEmailResult.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Order was created and customer email sent, but owner notification failed.",
+            details: ownerEmailResult.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      await sendPushoverNotification(env, {
+        orderNumber: inserted.order_number,
+        name: inserted.customer_name,
+        gloveType: inserted.glove_type,
+        services: inserted.services_requested
+      });
     }
+
+    const stampedRows = [];
+    for (const inserted of insertedRows) {
+      const stamp = await supabaseFetch(
+        env,
+        `/rest/v1/orders?order_number=eq.${encodeURIComponent(inserted.order_number)}`,
+        {
+          method: "PATCH",
+          headers: {
+            Prefer: "return=representation"
+          },
+          body: JSON.stringify({
+            last_status_emailed: "Received",
+            last_status_texted: inserted.sms_opt_in === true ? "Received" : null
+          })
+        }
+      );
+
+      stampedRows.push(stamp.ok && Array.isArray(stamp.data) && stamp.data[0] ? stamp.data[0] : inserted);
+    }
+
+    const orders = stampedRows.map(mapOrderFromDb);
 
     return json(
       {
         ok: true,
-        order: mapOrderFromDb(inserted)
+        order: orders[0],
+        orders
       },
       200,
       jsonHeaders
@@ -296,6 +255,87 @@ function json(payload, status = 200, headers = {}) {
     status,
     headers
   });
+}
+
+function buildSharedIncoming(body) {
+  return {
+    customer_name: cleanText(body.customerName),
+    email_address: cleanText(body.emailAddress),
+    phone_number: cleanText(body.phoneNumber),
+    sms_opt_in: body.smsOptIn === true,
+    drop_off_method: cleanText(body.dropOffMethod),
+    street_address: cleanText(body.streetAddress),
+    city: cleanText(body.city),
+    state: cleanText(body.state),
+    zip_code: cleanText(body.zipCode),
+    social_tag: cleanText(body.socialTag),
+    turnaround_acknowledged: cleanText(body.turnaroundAcknowledged),
+    referral_source: cleanText(body.referralSource)
+  };
+}
+
+function buildGloveIncomingList(body) {
+  const rawGloves = Array.isArray(body.gloves) && body.gloves.length
+    ? body.gloves
+    : [body];
+
+  return rawGloves.map(glove => ({
+    brand_model: cleanText(glove.brandModel),
+    glove_type: cleanText(glove.gloveType),
+    web_type: cleanText(glove.webType),
+    services_requested: cleanText(glove.servicesRequested),
+    primary_lace_color: cleanText(glove.primaryLaceColor),
+    secondary_lace_color: cleanText(glove.secondaryLaceColor),
+    custom_color_request: cleanText(glove.customColorRequest),
+    glove_notes: cleanText(glove.gloveNotes),
+    customer_notes: cleanText(glove.gloveNotes)
+  }));
+}
+
+function buildOrderRow(shared, glove, orderNumber, submittedAt) {
+  return {
+    timestamp_submitted: submittedAt,
+    customer_name: shared.customer_name,
+    phone_number: shared.phone_number,
+    email_address: shared.email_address,
+
+    brand_model: glove.brand_model,
+    glove_type: glove.glove_type,
+    web_type: glove.web_type,
+    services_requested: glove.services_requested,
+
+    primary_lace_color: glove.primary_lace_color,
+    secondary_lace_color: glove.secondary_lace_color,
+    custom_color_request: glove.custom_color_request,
+
+    drop_off_method: shared.drop_off_method,
+    street_address: looksLikeShipMethod(shared.drop_off_method) ? shared.street_address : null,
+    city: looksLikeShipMethod(shared.drop_off_method) ? shared.city : null,
+    state: looksLikeShipMethod(shared.drop_off_method) ? shared.state : null,
+    zip_code: looksLikeShipMethod(shared.drop_off_method) ? shared.zip_code : null,
+
+    glove_notes: glove.glove_notes,
+    customer_notes: glove.customer_notes,
+    social_tag: shared.social_tag,
+    turnaround_acknowledged: shared.turnaround_acknowledged,
+    referral_source: shared.referral_source,
+    glove_photos: [],
+
+    order_number: orderNumber,
+    status: "Received",
+    date_received: null,
+    estimated_completion: null,
+    price_quoted: null,
+    paid: "Unpaid",
+    allow_ship_without_payment: false,
+    tracking_number: null,
+    carrier: null,
+    date_completed: null,
+    internal_notes: null,
+    last_status_emailed: null,
+    sms_opt_in: shared.sms_opt_in,
+    last_status_texted: null
+  };
 }
 
 /* =========================
