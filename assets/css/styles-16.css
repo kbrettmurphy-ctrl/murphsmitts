@@ -2666,8 +2666,9 @@ footer{
 }
 
 .service-form-wrap{
-  max-width:760px;
-  margin:var(--space-2) auto 0;
+  width:100%;
+  max-width:none;
+  margin-top:var(--space-2);
 }
 
 .service-form-wrap .mm-form{
