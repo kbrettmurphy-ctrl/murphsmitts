@@ -77,6 +77,7 @@ let laceInventory = [];
 let reorderBannerDismissed = false;
 let allOrders = [];
 let activeView = "current";
+let orderDetailReturnView = "current";
 let mapFocusOrderNumber = null;
 let mapFocusHandled = false;
 const orderMapMarkerByNumber = new Map();
@@ -5690,9 +5691,10 @@ function initOrderMap() {
       scrollWheelZoom: true
     }).setView([39.5, -98.35], 4);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      subdomains: "abcd",
+      maxZoom: 20,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
     }).addTo(orderMap);
 
     orderMapMarkers = L.layerGroup().addTo(orderMap);
@@ -5701,7 +5703,7 @@ function initOrderMap() {
       const btn = e.target.closest("[data-map-order]");
       if (!btn) return;
       e.preventDefault();
-      openOrder(btn.dataset.mapOrder);
+      openOrder(btn.dataset.mapOrder, { returnView: "map" });
     });
   }
 
@@ -7777,8 +7779,27 @@ function fileToDataUrl(file) {
   });
 }
 
-function openOrder(orderNumber) {
+function closeOrderDetail() {
+  clearSaveStatus();
+  detailMode = "edit";
+  if (saveOrderBtn) {
+    saveOrderBtn.textContent = "Save";
+  }
+
+  const returnView = orderDetailReturnView || "current";
+  setActiveView(returnView);
+
+  if (isOrderFilterView(returnView)) {
+    requestAnimationFrame(() => {
+      setAdminScrollTop(listScrollY);
+    });
+  }
+}
+
+function openOrder(orderNumber, { returnView } = {}) {
   listScrollY = getAdminScrollTop();
+  orderDetailReturnView = returnView || activeView || "current";
+
   const order = allOrders.find(o => String(o.orderNumber) === String(orderNumber));
   if (!order) {
     alert("Order not found.");
@@ -7863,6 +7884,7 @@ orderFilterButtons.forEach(btn => {
 
 orderNewBtn?.addEventListener("click", () => {
   listScrollY = getAdminScrollTop();
+  orderDetailReturnView = activeView || "current";
   orderFiltersExpanded = false;
   inventoryFiltersExpanded = false;
   syncOrderFilterUI();
@@ -7987,18 +8009,7 @@ window.addEventListener("scroll", closeInventorySheet, { passive: true, capture:
 window.addEventListener("scroll", closeOrderPhotoActionMenu, { passive: true, capture: true });
 window.addEventListener("scroll", closeAdminFilterPopovers, { passive: true, capture: true });
 
-backBtn.addEventListener("click", () => {
-  clearSaveStatus();
-  detailMode = "edit";
-  if (saveOrderBtn) {
-    saveOrderBtn.textContent = "Save";
-  }
-  showView(dashboardView);
-
-  requestAnimationFrame(() => {
-    setAdminScrollTop(listScrollY);
-  });
-});
+backBtn.addEventListener("click", closeOrderDetail);
 
 saleGlovesMenuBtn?.addEventListener("click", openMenu);
 
@@ -8030,7 +8041,7 @@ mapRefreshBtn?.addEventListener("click", async () => {
 mapUnmappedList?.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-map-order]");
   if (!btn) return;
-  openOrder(btn.dataset.mapOrder);
+  openOrder(btn.dataset.mapOrder, { returnView: "map" });
 });
 
 mapLogoutBtn?.addEventListener("click", () => {
