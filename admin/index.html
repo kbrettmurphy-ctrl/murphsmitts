@@ -151,7 +151,7 @@
 
         <div class="map-panel">
           <div class="map-card">
-            <div class="map-header-row">
+            <div class="upload-card-heading">
               <div>
                 <h2>Shipped Glove Map</h2>
                 <p id="mapStatus" class="muted">Loading map...</p>
@@ -174,6 +174,7 @@
           </div>
 
           <div class="topbar-actions">
+            <button id="galleryUploaderToggleBtn" class="secondary topbar-icon-action" type="button" aria-label="Show gallery uploader" aria-expanded="false">+</button>
             <button id="uploadLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
               <span class="logout-action-text">Log Out</span>
               <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -186,7 +187,7 @@
         </header>
 
         <div class="upload-panel">
-          <div class="upload-card gallery-upload-card">
+          <div id="galleryUploaderCard" class="upload-card gallery-upload-card is-collapsed">
             <div class="upload-card-heading">
               <div>
                 <h2>Gallery Uploader</h2>
@@ -194,6 +195,7 @@
                   Choose a section, then upload glove photos.
                 </p>
               </div>
+              <button id="galleryUploaderCloseBtn" class="secondary topbar-icon-action gallery-uploader-close-btn" type="button" aria-label="Hide gallery uploader">×</button>
             </div>
 
             <div class="detail-block upload-section-block">

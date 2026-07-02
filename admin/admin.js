@@ -1,5 +1,10 @@
 const API_BASE_URL = window.MM_ADMIN_CONFIG.API_BASE_URL;
 const TOKEN_KEY = "mm_admin_token";
+const ADMIN_PHOTO_ACTION_PLACEHOLDER_LABEL = "Action";
+const ADMIN_PHOTO_ACTION_PLACEHOLDER = `<option value="" disabled hidden>${ADMIN_PHOTO_ACTION_PLACEHOLDER_LABEL}</option>`;
+const ADMIN_PHOTO_PLACEHOLDER_VALUES = new Set(["", "action", "actions"]);
+const ADMIN_STORE_PHOTO_ACTIONS = new Set(["primary", "hover", "delete"]);
+const ADMIN_GALLERY_PHOTO_ACTIONS = new Set(["view", "hide", "restore", "delete"]);
 
 // Admin v2 default: keep controls compact, icon-first, and as close to native iOS/macOS behavior as practical.
 if ("scrollRestoration" in history) {
@@ -57,6 +62,9 @@ const saleGlovesMenuBtn = document.getElementById("saleGlovesMenuBtn");
 const saleGlovesRefreshBtn = document.getElementById("saleGlovesRefreshBtn");
 const saleGlovesLogoutBtn = document.getElementById("saleGlovesLogoutBtn");
 const addSaleGloveBtn = document.getElementById("addSaleGloveBtn");
+const galleryUploaderToggleBtn = document.getElementById("galleryUploaderToggleBtn");
+const galleryUploaderCloseBtn = document.getElementById("galleryUploaderCloseBtn");
+const galleryUploaderCard = document.getElementById("galleryUploaderCard");
 const mapMenuBtn = document.getElementById("mapMenuBtn");
 const mapRefreshBtn = document.getElementById("mapRefreshBtn");
 const mapLogoutBtn = document.getElementById("mapLogoutBtn");
@@ -84,6 +92,7 @@ let galleryPhotoPressStart = null;
 let orderPhotoPressTimer = null;
 let orderPhotoPressStart = null;
 let orderActivityLoadToken = 0;
+let adminMenuTapSuppressUntil = 0;
 let suppressPhotoLightboxUntil = 0;
 let inventoryPressTimer = null;
 let inventoryPressStart = null;
@@ -111,6 +120,30 @@ let orderMapMarkers = null;
 let mapRenderToken = 0;
 
 window.inventoryViewMode = "active";
+
+document.addEventListener("selectstart", (e) => {
+  if (isEditableAdminTarget(e.target)) return;
+  if (isAdminActionSurface(e.target)) {
+    e.preventDefault();
+  }
+});
+
+document.addEventListener("contextmenu", (e) => {
+  if (isEditableAdminTarget(e.target)) return;
+  if (isAdminActionSurface(e.target)) {
+    e.preventDefault();
+  }
+});
+
+function isEditableAdminTarget(target) {
+  return !!target?.closest?.("input, textarea, select, [contenteditable='true']");
+}
+
+function isAdminActionSurface(target) {
+  return !!target?.closest?.(
+    ".order-card, .inventory-card, .workflow-sheet, .workflow-action-btn, .admin-filter-popover, .gallery-manager-item, .gallery-manager-thumb, .photo-thumb-wrap, .photo-thumb-img, .sale-photo-action-select, .gallery-manager-action-select, .topbar-icon-action"
+  );
+}
 
 /* =========================
    VIEW / MENU
@@ -755,13 +788,15 @@ function renderPhotoGallery(order) {
       ${photos.length ? `
         <div class="photo-grid">
           ${photos.map((url, index) => `
-            <img
-              class="photo-thumb-img"
-              src="${escapeAttr(url)}"
-              data-index="${index}"
-              alt="Glove photo ${index + 1}"
-              loading="lazy"
-            >
+            <div class="photo-thumb-wrap">
+              <img
+                class="photo-thumb-img"
+                src="${escapeAttr(url)}"
+                data-index="${index}"
+                alt="Glove photo ${index + 1}"
+                loading="lazy"
+              >
+            </div>
           `).join("")}
         </div>
       ` : `
@@ -3247,8 +3282,13 @@ function wireOrderPhotoControls(order) {
       openOrderPhotoActionMenu(order, url, e);
     });
 
+    img.addEventListener("selectstart", (e) => {
+      e.preventDefault();
+    });
+
     img.addEventListener("touchstart", (e) => {
       if (e.touches.length !== 1) return;
+      setAdminLongPressArmed(true);
       const touch = e.touches[0];
       orderPhotoPressStart = {
         x: touch.clientX,
@@ -3256,7 +3296,9 @@ function wireOrderPhotoControls(order) {
       };
       orderPhotoPressTimer = window.setTimeout(() => {
         orderPhotoPressTimer = null;
+        setAdminLongPressArmed(false);
         suppressPhotoLightboxUntil = Date.now() + 700;
+        suppressNextAdminMenuActivation();
         openOrderPhotoActionMenu(order, url, e);
       }, 520);
     }, { passive: true });
@@ -3499,6 +3541,7 @@ function cancelOrderPhotoLongPress() {
     window.clearTimeout(orderPhotoPressTimer);
     orderPhotoPressTimer = null;
   }
+  setAdminLongPressArmed(false);
   orderPhotoPressStart = null;
 }
 
@@ -3520,7 +3563,12 @@ function ensureOrderPhotoActionMenu() {
 
   getAdminMenuLayer().appendChild(orderPhotoActionMenuEl);
   orderPhotoActionMenuEl.querySelector(".workflow-backdrop")?.addEventListener("click", closeOrderPhotoActionMenu);
-  orderPhotoActionMenuEl.querySelector("[data-photo-action='remove']")?.addEventListener("click", async () => {
+  orderPhotoActionMenuEl.querySelector("[data-photo-action='remove']")?.addEventListener("click", async (e) => {
+    if (shouldSuppressAdminMenuActivation()) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     const order = orderPhotoActionMenuEl.order;
     const url = orderPhotoActionMenuEl.url;
     closeOrderPhotoActionMenu();
@@ -4159,7 +4207,7 @@ function openWorkflowSheet(order, source, suppressOpeningTouch = false) {
   form.innerHTML = "";
   form.classList.remove("is-submenu");
   workflowSheetEl.querySelector(".workflow-sheet-title").textContent = "Workflow actions";
-  workflowSheetEl.classList.remove("workflow-action-selected");
+  workflowSheetEl.classList.remove("workflow-action-selected", "workflow-form-compact", "workflow-form-small", "workflow-form-large");
   workflowSheetEl.classList.add("open");
   document.body.classList.add("workflow-open");
   document.addEventListener("keydown", handleWorkflowMenuKeydown);
@@ -4182,7 +4230,7 @@ function closeWorkflowSheet() {
   document.removeEventListener("touchend", consumeWorkflowOpeningTouchEnd, true);
   document.removeEventListener("keydown", handleWorkflowMenuKeydown);
   workflowSheetEl.classList.remove("open");
-  workflowSheetEl.classList.remove("workflow-action-selected");
+  workflowSheetEl.classList.remove("workflow-action-selected", "workflow-form-compact", "workflow-form-small", "workflow-form-large");
   workflowSheetEl.querySelector(".workflow-action-list").innerHTML = "";
   workflowSheetEl.querySelector(".workflow-sheet-form").innerHTML = "";
   workflowSheetEl.querySelector(".workflow-sheet-form").classList.remove("is-submenu");
@@ -4230,6 +4278,11 @@ function createWorkflowSheet() {
   workflowSheetEl.addEventListener("click", (e) => {
     const actionBtn = e.target.closest(".workflow-action-btn");
     if (actionBtn) {
+      if (shouldSuppressAdminMenuActivation()) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       openWorkflowActionForm(workflowSheetEl.order, actionBtn.dataset.action, { button: actionBtn });
       return;
     }
@@ -4355,6 +4408,123 @@ function getActionButtonKey(button) {
   return button?.dataset?.action || button?.dataset?.inventoryAction || "";
 }
 
+function buildStorePhotoActionSelectOptions(photo) {
+  const isPrimary = !!photo.is_primary;
+  const isHover = !isPrimary && !!photo.is_hover;
+  const placeholderSelected = !isPrimary && !isHover;
+
+  return `
+    <option value="" disabled hidden${placeholderSelected ? " selected" : ""}>${ADMIN_PHOTO_ACTION_PLACEHOLDER_LABEL}</option>
+    <option value="primary"${isPrimary ? " selected" : ""}>Primary</option>
+    <option value="hover"${isHover ? " selected" : ""}>Hover</option>
+    <option value="delete">Delete</option>
+  `;
+}
+
+function buildGalleryPhotoActionSelectOptions(photo) {
+  const toggleAction = photo.hidden ? "restore" : "hide";
+  const toggleLabel = photo.hidden ? "Restore" : "Hide";
+
+  return `
+    <option value="" disabled hidden selected>${ADMIN_PHOTO_ACTION_PLACEHOLDER_LABEL}</option>
+    <option value="view">View</option>
+    <option value="${toggleAction}">${toggleLabel}</option>
+    <option value="delete">Delete</option>
+  `;
+}
+
+function resetAdminPhotoActionSelect(select) {
+  if (!select) return;
+  let placeholder = select.querySelector('option[value=""]');
+  if (!placeholder) {
+    select.insertAdjacentHTML("afterbegin", ADMIN_PHOTO_ACTION_PLACEHOLDER);
+    placeholder = select.querySelector('option[value=""]');
+  }
+  const placeholderIndex = Array.from(select.options).indexOf(placeholder);
+  if (placeholderIndex >= 0) {
+    select.selectedIndex = placeholderIndex;
+  }
+}
+
+function syncStorePhotoActionSelect(select) {
+  if (!select) return;
+  if (select.dataset.isPrimary === "true") {
+    select.value = "primary";
+    return;
+  }
+  if (select.dataset.isHover === "true") {
+    select.value = "hover";
+    return;
+  }
+  resetAdminPhotoActionSelect(select);
+}
+
+function isAdminPhotoActionValue(value, allowedActions) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (ADMIN_PHOTO_PLACEHOLDER_VALUES.has(normalized)) return false;
+  return allowedActions.has(normalized);
+}
+
+function bindAdminPhotoActionSelect(select, { allowedActions, restore, onAction }) {
+  if (!select || select.dataset.actionSelectBound === "true") return;
+  select.dataset.actionSelectBound = "true";
+
+  let valueBeforeOpen = select.value;
+
+  const captureOpenValue = () => {
+    valueBeforeOpen = select.value;
+  };
+
+  select.addEventListener("mousedown", captureOpenValue);
+  select.addEventListener("touchstart", captureOpenValue, { passive: true });
+  select.addEventListener("focus", captureOpenValue);
+
+  select.addEventListener("change", async () => {
+    const actionValue = String(select.value || "").trim().toLowerCase();
+    const previousValue = String(valueBeforeOpen || "").trim().toLowerCase();
+
+    if (!isAdminPhotoActionValue(actionValue, allowedActions)) {
+      restore(select);
+      return;
+    }
+
+    if (actionValue === previousValue) {
+      restore(select);
+      return;
+    }
+
+    try {
+      await onAction(actionValue, select);
+    } catch (err) {
+      restore(select);
+      throw err;
+    }
+  });
+}
+
+function getWorkflowFormSize(actionKey) {
+  const compact = new Set([
+    "customerApproved",
+    "pendingResponse",
+    "inTransitToMe",
+    "markPaid"
+  ]);
+  const large = new Set([
+    "readyToGo",
+    "completed"
+  ]);
+
+  if (compact.has(actionKey)) return "compact";
+  if (large.has(actionKey)) return "large";
+  return "small";
+}
+
+function getInventoryFormSize(action) {
+  if (action === "add") return "large";
+  if (action === "set") return "compact";
+  return "small";
+}
+
 function openAdminActionSubmenu(root, button, html, options = {}) {
   const form = root?.querySelector(".workflow-sheet-form");
   if (!root || !form || !button) return;
@@ -4366,6 +4536,8 @@ function openAdminActionSubmenu(root, button, html, options = {}) {
     root.actionKey = actionKey;
   }
 
+  root.classList.remove("workflow-form-compact", "workflow-form-small", "workflow-form-large");
+  root.classList.add(`workflow-form-${options.formSize || "small"}`);
   root.classList.add("workflow-action-selected");
   root.querySelectorAll(".workflow-action-btn").forEach((actionBtn) => {
     const active = getActionButtonKey(actionBtn) === actionKey;
@@ -4373,6 +4545,11 @@ function openAdminActionSubmenu(root, button, html, options = {}) {
     actionBtn.classList.toggle("active", active);
   });
 
+  form.classList.remove("is-submenu");
+  form.style.left = "";
+  form.style.top = "";
+  form.style.right = "";
+  form.style.bottom = "";
   form.innerHTML = html;
 
   requestAnimationFrame(() => {
@@ -4382,6 +4559,18 @@ function openAdminActionSubmenu(root, button, html, options = {}) {
       positionWorkflowMenu(root.querySelector(".workflow-sheet"), root.anchor);
     }
   });
+}
+
+function suppressNextAdminMenuActivation(duration = 700) {
+  adminMenuTapSuppressUntil = Date.now() + duration;
+}
+
+function shouldSuppressAdminMenuActivation() {
+  return Date.now() < adminMenuTapSuppressUntil;
+}
+
+function setAdminLongPressArmed(armed) {
+  document.body.classList.toggle("admin-longpress-armed", armed);
 }
 
 function positionActionSubmenu(root, activeButton) {
@@ -4584,6 +4773,8 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
     `;
   }
 
+  const formSize = getWorkflowFormSize(actionKey);
+
   openAdminActionSubmenu(workflowSheetEl, activeButton, `
     <div class="workflow-form-content">
       ${inner}
@@ -4592,7 +4783,7 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
         <button class="primary workflow-form-submit" type="button">Save</button>
       </div>
     </div>
-  `, { assignActionKey: true });
+  `, { assignActionKey: true, formSize });
 }
 
 async function submitWorkflowAction(order, actionKey) {
@@ -4661,10 +4852,13 @@ function appendInternalNote(existingNotes, newNote) {
 
 function startWorkflowPress(e, order) {
   cancelWorkflowPress();
+  setAdminLongPressArmed(true);
   const anchor = getMenuAnchorPosition(e, e.currentTarget);
   workflowPressTimer = setTimeout(() => {
     clearTextSelection();
+    setAdminLongPressArmed(false);
     suppressNextOrderCardClick(800);
+    suppressNextAdminMenuActivation();
     openWorkflowSheet(order, anchor, true);
   }, 500);
 }
@@ -4674,6 +4868,7 @@ function cancelWorkflowPress() {
     clearTimeout(workflowPressTimer);
     workflowPressTimer = null;
   }
+  setAdminLongPressArmed(false);
 }
 
 function clearTextSelection() {
@@ -5116,15 +5311,42 @@ function renderOrderMapMarkers(items, token, options = {}) {
   return { mapped, failures };
 }
 
+function getMapPopupStatusToneClass(status) {
+  const normalized = normalizeStatus(status);
+  if (normalized === "on hold") return "map-popup-status-on-hold";
+  return "";
+}
+
+function renderMapPopupMeta(order) {
+  const orderNumber = String(order.orderNumber || "").trim();
+  const statusLabel = String(getOrderStatusDisplay(order.status) || "").trim();
+  const statusClass = statusLabel ? getMapPopupStatusToneClass(order.status) : "";
+
+  if (orderNumber && statusLabel) {
+    return `Order #${escapeHtml(orderNumber)} · <span class="map-popup-status${statusClass ? ` ${statusClass}` : ""}">${escapeHtml(statusLabel)}</span>`;
+  }
+
+  if (orderNumber) {
+    return `Order #${escapeHtml(orderNumber)}`;
+  }
+
+  if (statusLabel) {
+    return `<span class="map-popup-status${statusClass ? ` ${statusClass}` : ""}">${escapeHtml(statusLabel)}</span>`;
+  }
+
+  return "";
+}
+
 function renderMapPopup(order, address) {
   const location = getMapPopupLocation(order, address);
+  const metaHtml = renderMapPopupMeta(order);
 
   return `
     <div class="map-popup">
       <div class="map-popup-head">
         <div>
           <div class="map-popup-name">${escapeHtml(order.customerName || "Customer")}</div>
-          <div class="map-popup-meta">Order #${escapeHtml(order.orderNumber || "")}</div>
+          ${metaHtml ? `<div class="map-popup-meta">${metaHtml}</div>` : ""}
         </div>
       </div>
       ${location ? `<div class="map-popup-location">${escapeHtml(location)}</div>` : ""}
@@ -5773,15 +5995,10 @@ async function loadSaleGlovePhotos(gloveId) {
                 class="sale-photo-action-select"
                 data-glove-id="${escapeAttr(gloveId)}"
                 data-photo-id="${escapeAttr(photo.id)}"
+                data-is-primary="${photo.is_primary ? "true" : "false"}"
+                data-is-hover="${photo.is_hover ? "true" : "false"}"
               >
-                <option value="" selected disabled hidden>Actions</option>
-                <option value="primary" ${photo.is_primary ? "disabled" : ""}>
-                  Primary
-                </option>
-                <option value="hover" ${photo.is_hover ? "disabled" : ""}>
-                  Hover
-                </option>
-                <option value="delete">Delete</option>
+                ${buildStorePhotoActionSelectOptions(photo)}
               </select>
             </div>
           </div>
@@ -5790,43 +6007,44 @@ async function loadSaleGlovePhotos(gloveId) {
     `;
 
     wrap.querySelectorAll(".sale-photo-action-select").forEach(select => {
-      select.addEventListener("change", async () => {
-        const actionValue = select.value;
-        if (!actionValue) return;
+      bindAdminPhotoActionSelect(select, {
+        allowedActions: ADMIN_STORE_PHOTO_ACTIONS,
+        restore: syncStorePhotoActionSelect,
+        onAction: async (actionValue, actionSelect) => {
+          const gloveIdFromSelect = actionSelect.dataset.gloveId;
+          const photoId = actionSelect.dataset.photoId;
 
-        const gloveIdFromSelect = select.dataset.gloveId;
-        const photoId = select.dataset.photoId;
-
-        if (actionValue === "delete") {
-          const ok = confirm("Delete this photo from the listing?");
-          if (!ok) {
-            select.value = "";
-            return;
+          if (actionValue === "delete") {
+            const ok = confirm("Delete this photo from the listing?");
+            if (!ok) {
+              syncStorePhotoActionSelect(actionSelect);
+              return;
+            }
           }
-        }
 
-        try {
-          select.disabled = true;
+          actionSelect.disabled = true;
 
-          const action =
-            actionValue === "primary"
-              ? "setSalePhotoPrimary"
-              : actionValue === "hover"
-                ? "setSalePhotoHover"
-                : "deleteSaleGlovePhoto";
+          try {
+            const action =
+              actionValue === "primary"
+                ? "setSalePhotoPrimary"
+                : actionValue === "hover"
+                  ? "setSalePhotoHover"
+                  : "deleteSaleGlovePhoto";
 
-          await postJson({
-            action,
-            gloveId: gloveIdFromSelect,
-            photoId
-          }, true);
+            await postJson({
+              action,
+              gloveId: gloveIdFromSelect,
+              photoId
+            }, true);
 
-          await loadSaleGlovePhotos(gloveId);
-
-        } catch (err) {
-          alert(err.message || "Photo action failed.");
-          select.disabled = false;
-          select.value = "";
+            await loadSaleGlovePhotos(gloveId);
+          } catch (err) {
+            alert(err.message || "Photo action failed.");
+            throw err;
+          } finally {
+            actionSelect.disabled = false;
+          }
         }
       });
     });
@@ -5962,6 +6180,10 @@ function closeAdminFilterPopovers() {
 }
 
 function attachInventoryRowActions(row, item) {
+  row.addEventListener("selectstart", (e) => {
+    e.preventDefault();
+  });
+
   row.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     openInventoryActions(item, e);
@@ -5975,6 +6197,7 @@ function attachInventoryRowActions(row, item) {
 
   row.addEventListener("touchstart", (e) => {
     if (e.touches.length !== 1) return;
+    setAdminLongPressArmed(true);
     const touch = e.touches[0];
     inventoryPressStart = {
       x: touch.clientX,
@@ -5982,6 +6205,8 @@ function attachInventoryRowActions(row, item) {
     };
     inventoryPressTimer = window.setTimeout(() => {
       inventoryPressTimer = null;
+      setAdminLongPressArmed(false);
+      suppressNextAdminMenuActivation();
       openInventoryActions(item, row);
     }, 520);
   }, { passive: true });
@@ -6003,6 +6228,7 @@ function cancelInventoryLongPress() {
     window.clearTimeout(inventoryPressTimer);
     inventoryPressTimer = null;
   }
+  setAdminLongPressArmed(false);
   inventoryPressStart = null;
 }
 
@@ -6035,7 +6261,7 @@ function ensureInventorySheet() {
 
 function closeInventorySheet() {
   if (!inventorySheetEl) return;
-  inventorySheetEl.classList.remove("open", "workflow-action-selected");
+  inventorySheetEl.classList.remove("open", "workflow-action-selected", "workflow-form-compact", "workflow-form-small", "workflow-form-large");
   inventorySheetEl.querySelector(".workflow-sheet-form")?.classList.remove("is-submenu");
   inventorySheetEl.anchor = null;
 }
@@ -6055,6 +6281,11 @@ function openInventoryActions(item, source) {
   sheetRoot.querySelector(".workflow-customer-name").textContent = colorName || "Lace color";
   sheetRoot.querySelector(".workflow-current-status").textContent = `${qty} on hand · ${status.label}`;
   form.innerHTML = "";
+  form.classList.remove("is-submenu");
+  form.style.left = "";
+  form.style.top = "";
+  form.style.right = "";
+  form.style.bottom = "";
   list.innerHTML = item.active === false
     ? `
       <button class="workflow-action-btn" type="button" data-inventory-action="restore">Restore Color</button>
@@ -6070,7 +6301,14 @@ function openInventoryActions(item, source) {
     `;
 
   list.querySelectorAll("[data-inventory-action]").forEach(btn => {
-    btn.addEventListener("click", () => handleInventoryAction(item, btn.dataset.inventoryAction, btn));
+    btn.addEventListener("click", (e) => {
+      if (shouldSuppressAdminMenuActivation()) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      handleInventoryAction(item, btn.dataset.inventoryAction, btn);
+    });
     btn.addEventListener("mouseenter", () => {
       if (!isDesktopHoverMenu()) return;
       if (!inventoryActionHasForm(btn.dataset.inventoryAction)) {
@@ -6151,7 +6389,7 @@ function renderInventoryActionForm(item, action, button) {
     fields = `
       <label for="inventoryColorInput">Lace color</label>
       <input id="inventoryColorInput" type="text" autocomplete="off" value="${escapeAttr(colorName)}" />
-      <p>Renaming a lace color can affect future matching for orders that already reference the old color.</p>
+      <p class="workflow-form-helper">Renaming can affect future order matching.</p>
     `;
   }
 
@@ -6170,9 +6408,16 @@ function renderInventoryActionForm(item, action, button) {
   `;
 
   if (button) {
-    openAdminActionSubmenu(sheetRoot, button, html);
+    openAdminActionSubmenu(sheetRoot, button, html, { formSize: getInventoryFormSize(action) });
   } else {
+    sheetRoot.classList.remove("workflow-form-compact", "workflow-form-small", "workflow-form-large");
+    sheetRoot.classList.add("workflow-form-large");
     sheetRoot.classList.add("workflow-action-selected");
+    form.classList.remove("is-submenu");
+    form.style.left = "";
+    form.style.top = "";
+    form.style.right = "";
+    form.style.bottom = "";
     form.innerHTML = html;
   }
 
@@ -6186,7 +6431,7 @@ function renderInventoryActionForm(item, action, button) {
     saveInventoryAction(item, action, e.currentTarget);
   });
 
-  if (!isDesktopHoverMenu() || !button) {
+  if (isDesktopHoverMenu()) {
     form.querySelector("input")?.focus();
   }
 }
@@ -6194,8 +6439,11 @@ function renderInventoryActionForm(item, action, button) {
 function openAddInventoryForm(source) {
   const sheetRoot = ensureInventorySheet();
   const sheet = sheetRoot.querySelector(".workflow-sheet");
-  sheetRoot.anchor = getAdminAnchorPosition(null, source);
-  sheetRoot.className = "admin-action-menu-root workflow-sheet-root inventory-sheet-root open workflow-action-selected";
+  const rect = source?.getBoundingClientRect?.();
+  sheetRoot.anchor = rect
+    ? { x: rect.right, y: rect.bottom + 8 }
+    : getAdminAnchorPosition(null, source);
+  sheetRoot.className = "admin-action-menu-root workflow-sheet-root inventory-sheet-root open workflow-action-selected workflow-form-large";
   sheetRoot.querySelector(".workflow-customer-name").textContent = "New lace color";
   sheetRoot.querySelector(".workflow-current-status").textContent = "Inventory";
   sheetRoot.querySelector(".workflow-action-list").innerHTML = "";
@@ -6373,6 +6621,14 @@ function initUploadView() {
 
   let stagedFiles = [];
 
+  function setGalleryUploaderOpen(open) {
+    galleryUploaderCard?.classList.toggle("is-collapsed", !open);
+    if (galleryUploaderToggleBtn) {
+      galleryUploaderToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      galleryUploaderToggleBtn.setAttribute("aria-label", open ? "Hide gallery uploader" : "Show gallery uploader");
+    }
+  }
+
   function clearSelection() {
     stagedFiles = [];
     input.value = "";
@@ -6412,6 +6668,15 @@ function initUploadView() {
   });
 
   clearBtn.addEventListener("click", clearSelection);
+
+  galleryUploaderToggleBtn?.addEventListener("click", () => {
+    const nextOpen = galleryUploaderCard?.classList.contains("is-collapsed") !== false;
+    setGalleryUploaderOpen(nextOpen);
+  });
+
+  galleryUploaderCloseBtn?.addEventListener("click", () => {
+    setGalleryUploaderOpen(false);
+  });
 
   uploadBtn.addEventListener("click", async () => {
     const files = stagedFiles;
@@ -6471,6 +6736,7 @@ function initUploadView() {
     galleryManagerFilter = managerFilter.value || "all";
     renderGalleryManagerPhotos();
   });
+  setGalleryUploaderOpen(false);
   loadGalleryManagerPhotos();
 }
 
@@ -6583,7 +6849,10 @@ function renderGalleryManagerPhotos() {
               <span class="gallery-manager-pill">${photo.hidden ? "Hidden" : "Visible"}</span>
             </div>
           </div>
-          <button class="secondary gallery-manager-action-btn" type="button" data-gallery-action="menu" aria-label="Gallery photo actions">Actions</button>
+          <label class="sr-only" for="galleryActionSelect${index}">Gallery photo actions</label>
+          <select id="galleryActionSelect${index}" class="gallery-manager-action-select" data-gallery-action="select" aria-label="Gallery photo actions">
+            ${buildGalleryPhotoActionSelectOptions(photo)}
+          </select>
         </article>
       `).join("")}
     </div>
@@ -6609,12 +6878,18 @@ function attachGalleryManagerItemActions(item) {
     if (photo) openGalleryPhotoActionMenu(photo, e);
   });
 
-  item.querySelector("[data-gallery-action='menu']")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const photo = getGalleryManagerPhoto(item);
-    if (photo) openGalleryPhotoActionMenu(photo, e);
-  });
+  const gallerySelect = item.querySelector("[data-gallery-action='select']");
+  if (gallerySelect) {
+    bindAdminPhotoActionSelect(gallerySelect, {
+      allowedActions: ADMIN_GALLERY_PHOTO_ACTIONS,
+      restore: resetAdminPhotoActionSelect,
+      onAction: async (action, actionSelect) => {
+        const photo = getGalleryManagerPhoto(item);
+        if (photo) await runGalleryPhotoAction(photo, action);
+        resetAdminPhotoActionSelect(actionSelect);
+      }
+    });
+  }
 
   item.querySelector("[data-gallery-action='view']")?.addEventListener("click", (e) => {
     e.preventDefault();

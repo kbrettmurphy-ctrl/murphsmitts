@@ -2071,7 +2071,7 @@ async function uploadOrderPhotoAction(env, body) {
 
 async function removeOrderPhotoAction(env, body) {
   const orderNumber = cleanText(body.orderNumber);
-  const url = cleanText(body.url);
+  const url = cleanText(body.url || body.photoUrl);
 
   if (!orderNumber || !url) {
     return { ok: false, error: "Missing order number or photo URL." };
@@ -2143,11 +2143,13 @@ async function updateOrderPhotos(env, orderNumber, photos) {
 function parseDbPhotoList(value) {
   if (Array.isArray(value)) return uniquePhotoUrls(value);
   if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
     try {
-      const parsed = JSON.parse(value);
+      const parsed = JSON.parse(trimmed);
       return Array.isArray(parsed) ? uniquePhotoUrls(parsed) : [];
     } catch {
-      return [];
+      return /^https?:\/\//i.test(trimmed) ? uniquePhotoUrls([trimmed]) : [];
     }
   }
   return [];
@@ -2474,11 +2476,7 @@ function mapOrderFromDb(row) {
     socialTag: row.social_tag,
     turnaroundAcknowledged: row.turnaround_acknowledged,
     referralSource: row.referral_source,
-    glovePhotos: Array.isArray(row.glove_photos)
-      ? row.glove_photos
-      : row.glove_photos
-        ? JSON.parse(row.glove_photos)
-        : [],
+    glovePhotos: parseDbPhotoList(row.glove_photos),
 
     orderNumber: row.order_number,
     status: row.status,
