@@ -139,7 +139,7 @@ body_class: inner
                 </div>
 
                 <div class="glove-card-body">
-                  <div class="glove-subgroup">
+                  <div class="glove-subgroup" data-simple-title="Glove Details">
                     <h5 class="glove-subgroup-title">Basics</h5>
                     <p class="service-help">A model number helps, but it is fine if you are not sure. The glove type determines whether web type is needed.</p>
 
@@ -173,7 +173,7 @@ body_class: inner
                     </div>
                   </div>
 
-                  <div class="glove-subgroup">
+                  <div class="glove-subgroup" data-simple-title="Services">
                     <h5 class="glove-subgroup-title">Services</h5>
                     <p class="service-help">Select what you think the glove needs. I will confirm the right work and price before starting.</p>
 
@@ -192,7 +192,7 @@ body_class: inner
                     </div>
                   </div>
 
-                  <div class="glove-subgroup">
+                  <div class="glove-subgroup" data-simple-title="Lace Color Selection">
                     <h5 class="glove-subgroup-title">Lace</h5>
                     <div class="lace-decision-support mm-status-message">
                       <div>
@@ -231,7 +231,7 @@ body_class: inner
                     </div>
                   </div>
 
-                  <div class="glove-subgroup">
+                  <div class="glove-subgroup" data-simple-title="Glove Notes">
                     <h5 class="glove-subgroup-title">Notes / Photos</h5>
 
                     <div class="mm-field">
@@ -383,6 +383,7 @@ body_class: inner
   const servicesGroup = document.getElementById("servicesGroup");
   const dropOffGroup = document.getElementById("dropOffGroup");
   const turnaroundGroup = document.getElementById("turnaroundGroup");
+  const gloveInformationSection = document.querySelector(".glove-information-section");
   let gloveCount = 1;
 
   function selectedValue(name, root = form) {
@@ -601,6 +602,11 @@ body_class: inner
     });
   }
 
+  function syncGloveLayoutMode() {
+    const extraCount = additionalGloves.querySelectorAll("[data-glove-section]").length;
+    gloveInformationSection?.classList.toggle("is-multi-glove", extraCount > 0);
+  }
+
   function toggleAdditionalGlove(section) {
     const index = section.dataset.gloveIndex;
     const gloveType = selectedValue(`gloveType-${index}`, section);
@@ -738,6 +744,7 @@ body_class: inner
     additionalGloves.insertAdjacentHTML("beforeend", gloveSectionTemplate(gloveCount));
     const section = additionalGloves.lastElementChild;
     renumberGloveSections();
+    syncGloveLayoutMode();
     setTimeout(() => scrollToElement(section), 20);
   });
 
@@ -747,6 +754,7 @@ body_class: inner
     removeBtn.closest("[data-glove-section]")?.remove();
     gloveCount = 1 + additionalGloves.querySelectorAll("[data-glove-section]").length;
     renumberGloveSections();
+    syncGloveLayoutMode();
     clearStatus();
   });
 
@@ -806,6 +814,7 @@ body_class: inner
       form.reset();
       additionalGloves.innerHTML = "";
       gloveCount = 1;
+      syncGloveLayoutMode();
       clearInvalidStates();
       toggleConditionalFields();
       const orderNumbers = Array.isArray(data.orders)
@@ -827,6 +836,7 @@ body_class: inner
   });
 
   toggleConditionalFields();
+  syncGloveLayoutMode();
 })();
 </script>
 

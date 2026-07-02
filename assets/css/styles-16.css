@@ -2928,6 +2928,63 @@ footer{
   margin-bottom:var(--space-3);
 }
 
+.glove-information-section:not(.is-multi-glove) > .service-section-title{
+  display:none;
+}
+
+.glove-information-section:not(.is-multi-glove){
+  border:0;
+  border-radius:0;
+  overflow:visible;
+  background:transparent;
+}
+
+.glove-information-section:not(.is-multi-glove) > .service-section-body{
+  padding:0;
+}
+
+.glove-information-section:not(.is-multi-glove) > .service-section-body > .service-help,
+.glove-information-section:not(.is-multi-glove) [data-primary-glove-card] > .glove-section-heading,
+.glove-information-section:not(.is-multi-glove) .glove-subgroup-title{
+  display:none;
+}
+
+.glove-information-section:not(.is-multi-glove) [data-primary-glove-card]{
+  overflow:visible;
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
+
+.glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-card-body{
+  padding:0;
+}
+
+.glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup{
+  margin:20px 0 0;
+  padding:0 20px 20px;
+  border:1px solid var(--mm-border);
+  border-radius:var(--radius-lg);
+  overflow:hidden;
+  background:rgba(255, 250, 243, .88);
+}
+
+.glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup + .glove-subgroup{
+  padding-top:0;
+  border-top:1px solid var(--mm-border);
+}
+
+.glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup::before{
+  content:attr(data-simple-title);
+  display:block;
+  margin:0 -20px 20px;
+  padding:15px 20px;
+  background:var(--mm-navy);
+  color:var(--mm-bg-soft);
+  font-size:var(--text-md);
+  font-weight:var(--weight-semibold);
+}
+
 .glove-remove-btn{
   margin-right:14px;
   border:1px solid rgba(246, 239, 229, .34);
