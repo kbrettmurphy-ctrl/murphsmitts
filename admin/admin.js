@@ -77,6 +77,9 @@ let laceInventory = [];
 let reorderBannerDismissed = false;
 let allOrders = [];
 let activeView = "current";
+let mapFocusOrderNumber = null;
+let mapFocusHandled = false;
+const orderMapMarkerByNumber = new Map();
 let currentOrder = null;
 let detailMode = "edit";
 let customerSuggestionState = null;
@@ -2286,6 +2289,11 @@ function setActiveView(viewName) {
   }
 
   if (viewName === "map") {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get("order")) {
+      mapFocusOrderNumber = null;
+      mapFocusHandled = true;
+    }
     showView(mapView);
     closeMenu();
     resetViewScroll(mapView, { invalidateMap: true, blurActive: true });
@@ -3004,6 +3012,7 @@ function renderOrderDetail(order) {
     <div id="editShippingSection" class="detail-section ${isLocal ? "is-hidden" : ""}">
       <div class="detail-section-header">
         <h2>Shipping</h2>
+        ${renderShowOnMapControl(order)}
       </div>
       <div class="detail-section-grid">
         <div class="detail-block">
@@ -3139,6 +3148,7 @@ function renderOrderDetail(order) {
   wireStatusDeliveryControls(order);
   ensureDetailCollapseDelegation();
   wireDetailSectionSummaries();
+  wireShowOnMapControl();
   loadOrderActivity(order.orderNumber);
 }
 
@@ -5266,6 +5276,181 @@ function clearTextSelection() {
   }
 }
 
+function readAdminDeepLink() {
+  const params = new URLSearchParams(window.location.search);
+  const view = String(params.get("view") || "").trim();
+  const order = String(params.get("order") || "").trim();
+
+  if (view === "map" && order) {
+    mapFocusOrderNumber = order;
+    mapFocusHandled = false;
+    return "map";
+  }
+
+  if (["current", "map", "inventory", "upload", "gloves-sale"].includes(view)) {
+    return view;
+  }
+
+  return null;
+}
+
+function updateAdminMapDeepLink(orderNumber) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("view", "map");
+  if (orderNumber) {
+    url.searchParams.set("order", String(orderNumber));
+  } else {
+    url.searchParams.delete("order");
+  }
+  window.history.replaceState({}, "", url);
+}
+
+function clearAdminMapDeepLinkOrder() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("order");
+  window.history.replaceState({}, "", url);
+}
+
+function hasOrderMapCoordinates(order) {
+  const lat = Number(order?.mapLat);
+  const lng = Number(order?.mapLng);
+  return Number.isFinite(lat) && Number.isFinite(lng);
+}
+
+function mapAddressHasStreet(address) {
+  const value = String(address || "").trim();
+  if (!value) return false;
+  if (/^\d+\s+\S/.test(value)) return true;
+  return /\b(st|street|ave|avenue|rd|road|dr|drive|ln|lane|way|blvd|boulevard|ct|court|pl|place|cir|circle|hwy|highway|pkwy|parkway|trl|trail|pike|run|pass|cove|loop)\b/i.test(value);
+}
+
+function mapStreetTokens(streetAddress) {
+  const cleaned = String(streetAddress || "")
+    .replace(/\b(?:apt|apartment|unit|ste|suite|bldg|building|fl|floor|#)\s*[\w-]+.*$/i, "")
+    .replace(/[.,;]+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  if (!cleaned) return [];
+
+  return cleaned
+    .split(/\s+/)
+    .filter(token => token && !/^\d+$/.test(token) && token.length > 2)
+    .slice(0, 3);
+}
+
+function mapStreetAppearsInGeocodedText(streetAddress, geocodedText) {
+  const tokens = mapStreetTokens(streetAddress);
+  if (!tokens.length) return true;
+  const haystack = String(geocodedText || "").toLowerCase();
+  return tokens.some(token => haystack.includes(token));
+}
+
+function isMapCityStateZipOnlyAddress(address) {
+  const value = String(address || "").trim();
+  return /^[^,]+,\s*[A-Za-z]{2}\s+\d{5}(?:-\d{4})?$/.test(value);
+}
+
+function deriveMapGeocodeQuality(order) {
+  const street = String(order?.streetAddress || order?.address || "").trim();
+  const geocoded = String(order?.mapGeocodedAddress || "").trim();
+  const source = String(order?.mapGeocodeSource || "").trim().toLowerCase();
+
+  if (order?.mapGeocodeStatus === "failed" || !hasOrderMapCoordinates(order)) {
+    return "failed";
+  }
+
+  if (geocoded && isMapCityStateZipOnlyAddress(geocoded)) {
+    return "approximate";
+  }
+
+  if (street && mapAddressHasStreet(street) && geocoded && !mapStreetAppearsInGeocodedText(street, geocoded)) {
+    return "approximate";
+  }
+
+  if (source === "nominatim" && street && mapAddressHasStreet(street) && geocoded) {
+    return mapStreetAppearsInGeocodedText(street, geocoded) ? "exact" : "approximate";
+  }
+
+  return "exact";
+}
+
+function getMapGeocodeQuality(order) {
+  if (!order) return "failed";
+
+  const stored = String(order.mapGeocodeQuality || "").trim().toLowerCase();
+  if (stored === "exact" || stored === "approximate" || stored === "failed") {
+    return stored;
+  }
+
+  return deriveMapGeocodeQuality(order);
+}
+
+function getMapFocusZoom(quality) {
+  if (quality === "exact") return 14;
+  if (quality === "approximate") return 11;
+  return 13;
+}
+
+function canShowOrderOnMap(order) {
+  if (!order || !hasOrderMapCoordinates(order)) return false;
+  if (String(order.mapGeocodeStatus || "").trim().toLowerCase() === "failed") return false;
+
+  const currentHash = buildMapAddressHash(order);
+  const storedHash = String(order.mapAddressHash || "").trim();
+  if (storedHash && storedHash !== currentHash) return false;
+
+  return true;
+}
+
+function renderShowOnMapControl(order) {
+  if (!canShowOrderOnMap(order)) return "";
+
+  return `<button type="button" class="detail-show-on-map-link" data-show-on-map="${escapeAttr(order.orderNumber || "")}">Show on Map</button>`;
+}
+
+function wireShowOnMapControl() {
+  orderDetail?.querySelectorAll("[data-show-on-map]").forEach(button => {
+    if (button.dataset.showOnMapBound === "1") return;
+    button.dataset.showOnMapBound = "1";
+    button.addEventListener("click", (e) => {
+      e.preventDefault();
+      const orderNumber = button.dataset.showOnMap;
+      if (orderNumber) openOrderOnAdminMap(orderNumber);
+    });
+  });
+}
+
+function openOrderOnAdminMap(orderNumber) {
+  mapFocusOrderNumber = String(orderNumber || "").trim();
+  mapFocusHandled = false;
+  updateAdminMapDeepLink(mapFocusOrderNumber);
+  setActiveView("map");
+}
+
+function focusMapOnOrder(orderNumber) {
+  const marker = orderMapMarkerByNumber.get(String(orderNumber || "").trim());
+  if (!marker || !orderMap) return false;
+
+  const order = allOrders.find(item => String(item.orderNumber) === String(orderNumber));
+  const quality = getMapGeocodeQuality(order);
+  const zoom = getMapFocusZoom(quality);
+
+  orderMap.setView(marker.getLatLng(), zoom, { animate: true });
+  marker.openPopup();
+  return true;
+}
+
+function tryFocusMapOrder() {
+  if (!mapFocusOrderNumber || mapFocusHandled) return;
+
+  const focused = focusMapOnOrder(mapFocusOrderNumber);
+  if (focused) {
+    mapFocusHandled = true;
+    clearAdminMapDeepLinkOrder();
+  }
+}
+
 async function renderMapView() {
   const token = ++mapRenderToken;
 
@@ -5333,6 +5518,8 @@ async function renderMapView() {
   if (mapWarningBeforeFinal && finalRender && !finalRender.failures.length) {
     setMapStatus(mapWarningBeforeFinal, "warning");
   }
+
+  tryFocusMapOrder();
 }
 
 function setMapStatus(message, tone = "") {
@@ -5471,7 +5658,8 @@ function getStoredMapLocation(item) {
   return {
     address: item.storedGeocodedAddress || item.address,
     coords: { lat, lng },
-    source: item.storedGeocodeSource || "stored"
+    source: item.storedGeocodeSource || "stored",
+    quality: getMapGeocodeQuality(item.order)
   };
 }
 
@@ -5650,6 +5838,7 @@ function renderOrderMapMarkers(items, token, options = {}) {
   if (!orderMap || !orderMapMarkers || !window.L) return null;
 
   orderMapMarkers.clearLayers();
+  orderMapMarkerByNumber.clear();
 
   let mapped = 0;
   const bounds = [];
@@ -5664,8 +5853,10 @@ function renderOrderMapMarkers(items, token, options = {}) {
     if (item.mapLocation?.coords) {
       const { coords } = item.mapLocation;
       const marker = L.marker([coords.lat, coords.lng]);
-      marker.bindPopup(renderMapPopup(item.order, item.mapLocation.address || item.address));
+      const quality = item.mapLocation.quality || getMapGeocodeQuality(item.order);
+      marker.bindPopup(renderMapPopup(item.order, item.mapLocation.address || item.address, quality));
       marker.addTo(orderMapMarkers);
+      orderMapMarkerByNumber.set(String(item.order.orderNumber || "").trim(), marker);
 
       bounds.push([coords.lat, coords.lng]);
       mapped += 1;
@@ -5680,9 +5871,11 @@ function renderOrderMapMarkers(items, token, options = {}) {
 
   if (token !== mapRenderToken) return null;
 
-  if (bounds.length === 1) {
-    orderMap.setView(bounds[0], 9);
-  } else if (bounds.length > 1) {
+  if (bounds.length === 1 && !mapFocusOrderNumber) {
+    const singleItem = items.find(item => item.mapLocation?.coords);
+    const quality = singleItem?.mapLocation?.quality || getMapGeocodeQuality(singleItem?.order);
+    orderMap.setView(bounds[0], getMapFocusZoom(quality));
+  } else if (bounds.length > 1 && !mapFocusOrderNumber) {
     orderMap.fitBounds(bounds, {
       padding: [28, 28],
       maxZoom: 10
@@ -5725,9 +5918,13 @@ function renderMapPopupMeta(order) {
   return "";
 }
 
-function renderMapPopup(order, address) {
+function renderMapPopup(order, address, quality = "") {
   const location = getMapPopupLocation(order, address);
   const metaHtml = renderMapPopupMeta(order);
+  const resolvedQuality = quality || getMapGeocodeQuality(order);
+  const approximateNote = resolvedQuality === "approximate"
+    ? `<div class="map-popup-approximate">Approximate location</div>`
+    : "";
 
   return `
     <div class="map-popup">
@@ -5738,6 +5935,7 @@ function renderMapPopup(order, address) {
         </div>
       </div>
       ${location ? `<div class="map-popup-location">${escapeHtml(location)}</div>` : ""}
+      ${approximateNote}
       <button class="map-popup-btn" type="button" data-map-order="${escapeAttr(order.orderNumber || "")}">View Order</button>
     </div>
   `;
@@ -7785,6 +7983,10 @@ document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
 
   try {
     await loadOrders();
+    const deepLinkView = readAdminDeepLink();
+    if (deepLinkView) {
+      activeView = deepLinkView;
+    }
     setActiveView(activeView);
     showView(dashboardView);
   } catch (err) {

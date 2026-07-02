@@ -2146,6 +2146,12 @@ button.secondary{
   color:var(--red);
 }
 
+.map-popup-approximate{
+  font-size:.72rem;
+  line-height:1.35;
+  color:rgba(9,47,77,.56);
+}
+
 .map-popup-btn{
   border:none;
   background:transparent;
@@ -2863,6 +2869,25 @@ button.secondary{
   font-size:1.05rem;
   line-height:1.15;
   letter-spacing:-.015em;
+}
+
+.detail-show-on-map-link{
+  border:none;
+  background:transparent;
+  color:rgba(146, 198, 255, .92);
+  padding:0;
+  font:inherit;
+  font-size:.78rem;
+  font-weight:600;
+  line-height:1.2;
+  cursor:pointer;
+  white-space:nowrap;
+}
+
+.detail-show-on-map-link:hover,
+.detail-show-on-map-link:focus-visible{
+  text-decoration:underline;
+  text-underline-offset:3px;
 }
 
 .detail-section-grid{

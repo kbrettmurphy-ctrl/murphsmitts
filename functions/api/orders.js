@@ -2500,6 +2500,7 @@ function mapOrderFromDb(row) {
     mapGeocodedAddress: row.map_geocoded_address,
     mapGeocodeSource: row.map_geocode_source,
     mapGeocodeStatus: row.map_geocode_status,
+    mapGeocodeQuality: row.map_geocode_quality,
     mapGeocodeError: row.map_geocode_error,
     mapAddressHash: row.map_address_hash,
     mapGeocodedAt: row.map_geocoded_at,
@@ -2599,6 +2600,7 @@ function mapUpdatesToDb(updates) {
   if ("mapGeocodedAddress" in updates) out.map_geocoded_address = cleanText(updates.mapGeocodedAddress);
   if ("mapGeocodeSource" in updates) out.map_geocode_source = cleanText(updates.mapGeocodeSource);
   if ("mapGeocodeStatus" in updates) out.map_geocode_status = cleanText(updates.mapGeocodeStatus);
+  if ("mapGeocodeQuality" in updates) out.map_geocode_quality = cleanText(updates.mapGeocodeQuality);
   if ("mapGeocodeError" in updates) out.map_geocode_error = cleanText(updates.mapGeocodeError);
   if ("mapAddressHash" in updates) out.map_address_hash = cleanText(updates.mapAddressHash);
   if ("mapGeocodedAt" in updates) out.map_geocoded_at = cleanText(updates.mapGeocodedAt);
@@ -3754,7 +3756,8 @@ async function geocodeMissingOrderAddresses(env, rawItems) {
         lng: Number(order.mapLng),
         address: order.mapGeocodedAddress,
         source: order.mapGeocodeSource,
-        status: order.mapGeocodeStatus
+        status: order.mapGeocodeStatus,
+        quality: getStoredMapGeocodeQuality(existing.data)
       };
       continue;
     }
@@ -3771,6 +3774,7 @@ async function geocodeMissingOrderAddresses(env, rawItems) {
           map_geocoded_address: geocode.address || item.candidates[0],
           map_geocode_source: geocode.source || null,
           map_geocode_status: "ok",
+          map_geocode_quality: geocode.quality || "exact",
           map_geocode_error: null,
           map_address_hash: item.addressHash || null,
           map_geocoded_at: geocodedAt
@@ -3781,6 +3785,7 @@ async function geocodeMissingOrderAddresses(env, rawItems) {
           map_geocoded_address: null,
           map_geocode_source: null,
           map_geocode_status: "failed",
+          map_geocode_quality: "failed",
           map_geocode_error: geocode.reason || "No coordinates found.",
           map_address_hash: item.addressHash || null,
           map_geocoded_at: geocodedAt
@@ -3817,6 +3822,7 @@ async function geocodeMissingOrderAddresses(env, rawItems) {
       address: geocode.ok ? (geocode.address || item.candidates[0]) : null,
       source: geocode.ok ? (geocode.source || null) : null,
       status: geocode.ok ? "ok" : "failed",
+      quality: geocode.ok ? (geocode.quality || "exact") : "failed",
       error: geocode.ok ? null : (geocode.reason || "No coordinates found.")
     };
   }
@@ -3864,6 +3870,149 @@ function hasMatchingStoredMapLocation(row, addressHash) {
   );
 }
 
+function hasStreetInAddress(address) {
+  const value = String(address || "").trim();
+  if (!value) return false;
+  if (/^\d+\s+\S/.test(value)) return true;
+  return /\b(st|street|ave|avenue|rd|road|dr|drive|ln|lane|way|blvd|boulevard|ct|court|pl|place|cir|circle|hwy|highway|pkwy|parkway|trl|trail|pike|run|pass|cove|loop)\b/i.test(value);
+}
+
+function nominatimHasStreetLevel(addressObj) {
+  if (!addressObj || typeof addressObj !== "object") return false;
+  return !!(
+    addressObj.house_number ||
+    addressObj.house_name ||
+    addressObj.road ||
+    addressObj.street ||
+    addressObj.pedestrian ||
+    addressObj.residential ||
+    addressObj.footway
+  );
+}
+
+function extractStreetTokens(streetAddress) {
+  const cleaned = String(streetAddress || "")
+    .replace(/\b(?:apt|apartment|unit|ste|suite|bldg|building|fl|floor|#)\s*[\w-]+.*$/i, "")
+    .replace(/[.,;]+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  if (!cleaned) return [];
+
+  const tokens = cleaned
+    .split(/\s+/)
+    .filter(token => token && !/^\d+$/.test(token) && token.length > 2);
+
+  return tokens.slice(0, 3);
+}
+
+function streetAppearsInGeocodedText(streetAddress, geocodedText) {
+  const tokens = extractStreetTokens(streetAddress);
+  if (!tokens.length) return true;
+
+  const haystack = String(geocodedText || "").toLowerCase();
+  return tokens.some(token => haystack.includes(token));
+}
+
+function isCityStateZipOnlyAddress(address) {
+  const value = String(address || "").trim();
+  if (!value) return false;
+  return /^[^,]+,\s*[A-Za-z]{2}\s+\d{5}(?:-\d{4})?$/.test(value);
+}
+
+function classifyCensusGeocodeQuality(submittedAddress, matchedAddress) {
+  const expectsStreet = hasStreetInAddress(submittedAddress);
+  const matched = String(matchedAddress || submittedAddress || "").trim();
+
+  if (!expectsStreet) {
+    return isCityStateZipOnlyAddress(matched) ? "approximate" : "exact";
+  }
+
+  if (!streetAppearsInGeocodedText(submittedAddress, matched)) {
+    return "approximate";
+  }
+
+  return "exact";
+}
+
+function classifyNominatimGeocodeQuality(submittedAddress, result) {
+  const expectsStreet = hasStreetInAddress(submittedAddress);
+  const addressObj = result?.addressDetails || {};
+  const hasStreetLevel = nominatimHasStreetLevel(addressObj);
+  const displayAddress = String(result?.address || submittedAddress || "").trim();
+  const lowPrecisionTypes = new Set([
+    "postcode",
+    "administrative",
+    "city",
+    "town",
+    "village",
+    "hamlet",
+    "county",
+    "state",
+    "region"
+  ]);
+  const isLowPrecision =
+    lowPrecisionTypes.has(String(result?.type || "").trim()) ||
+    (String(result?.class || "").trim() === "place" && !hasStreetLevel);
+
+  if (isCityStateZipOnlyAddress(displayAddress) || (isCityStateZipOnlyAddress(submittedAddress) && isLowPrecision)) {
+    return "approximate";
+  }
+
+  if (expectsStreet && (!hasStreetLevel || isLowPrecision)) {
+    return "approximate";
+  }
+
+  if (expectsStreet && !streetAppearsInGeocodedText(submittedAddress, displayAddress)) {
+    return "approximate";
+  }
+
+  if (!expectsStreet && !hasStreetLevel) {
+    return "approximate";
+  }
+
+  return "exact";
+}
+
+function deriveMapGeocodeQualityFromRow(row) {
+  const stored = cleanDisplay(row?.map_geocode_quality)?.toLowerCase();
+  if (stored === "exact" || stored === "approximate" || stored === "failed") {
+    return stored;
+  }
+
+  if (cleanDisplay(row?.map_geocode_status) === "failed") {
+    return "failed";
+  }
+
+  const lat = Number(row?.map_lat);
+  const lng = Number(row?.map_lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return "failed";
+  }
+
+  const street = cleanDisplay(row?.street_address);
+  const geocoded = cleanDisplay(row?.map_geocoded_address);
+  const source = cleanDisplay(row?.map_geocode_source);
+
+  if (geocoded && isCityStateZipOnlyAddress(geocoded)) {
+    return "approximate";
+  }
+
+  if (street && hasStreetInAddress(street) && geocoded && !streetAppearsInGeocodedText(street, geocoded)) {
+    return "approximate";
+  }
+
+  if (source === "nominatim" && street && hasStreetInAddress(street) && geocoded) {
+    return streetAppearsInGeocodedText(street, geocoded) ? "exact" : "approximate";
+  }
+
+  return "exact";
+}
+
+function getStoredMapGeocodeQuality(row) {
+  return deriveMapGeocodeQualityFromRow(row);
+}
+
 async function geocodeCandidateAddresses(item) {
   let lastReason = "No coordinates found.";
 
@@ -3877,7 +4026,8 @@ async function geocodeCandidateAddresses(item) {
         address: census.address || address,
         lat: census.lat,
         lng: census.lng,
-        source: "census"
+        source: "census",
+        quality: classifyCensusGeocodeQuality(address, census.address || address)
       };
     }
     lastReason = census.reason || lastReason;
@@ -3887,10 +4037,11 @@ async function geocodeCandidateAddresses(item) {
       return {
         key: item.key,
         ok: true,
-        address,
+        address: nominatim.address || address,
         lat: nominatim.lat,
         lng: nominatim.lng,
-        source: "nominatim"
+        source: "nominatim",
+        quality: classifyNominatimGeocodeQuality(address, nominatim)
       };
     }
     lastReason = nominatim.reason || lastReason;
@@ -3903,7 +4054,8 @@ async function geocodeCandidateAddresses(item) {
   return {
     key: item.key,
     ok: false,
-    reason: lastReason
+    reason: lastReason,
+    quality: "failed"
   };
 }
 
@@ -3936,7 +4088,8 @@ async function geocodeWithCensus(address) {
       ok: true,
       address: cleanDisplay(match.matchedAddress),
       lat,
-      lng
+      lng,
+      matchedAddress: cleanDisplay(match.matchedAddress)
     };
   } catch (err) {
     return {
@@ -3975,7 +4128,11 @@ async function geocodeWithNominatim(address) {
     return {
       ok: true,
       lat,
-      lng
+      lng,
+      address: cleanDisplay(first?.display_name) || cleanDisplay(address),
+      addressDetails: first?.address || {},
+      type: cleanDisplay(first?.type),
+      class: cleanDisplay(first?.class)
     };
   } catch (err) {
     return {
