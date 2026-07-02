@@ -796,6 +796,28 @@ function getDefaultSectionExpanded(sectionKey, order) {
     case "gloveDetails":
     case "lace":
       return false;
+    case "services": {
+      const parsed = parseServicesValue(order.servicesRequested || "");
+      return parsed.selected.length > 0 || parsed.otherChecked;
+    }
+    case "shipping": {
+      if (looksLocalDropOff(order)) return false;
+      const tracking = String(order.trackingNumber || order.tracking || "").trim();
+      const carrier = String(order.carrier || "").trim();
+      const street = String(order.streetAddress || order.address || "").trim();
+      const city = String(order.city || "").trim();
+      const state = String(order.state || "").trim();
+      const zip = String(order.zipCode || order.zip || "").trim();
+      return !!(
+        tracking ||
+        carrier ||
+        street ||
+        city ||
+        state ||
+        zip ||
+        order.allowShipWithoutPayment === true
+      );
+    }
     case "notes": {
       const customerNotes = String(order.gloveNotes || order.customerNotes || "").trim();
       const internalNotes = String(order.internalNotes || "").trim();
@@ -884,6 +906,80 @@ function summarizePhotos(order) {
   const count = Array.isArray(order.glovePhotos) ? order.glovePhotos.length : 0;
   if (!count) return "No photos";
   return count === 1 ? "1 photo" : `${count} photos`;
+}
+
+function summarizeServices(order) {
+  const parsed = parseServicesValue(order.servicesRequested || "");
+  const parts = [...parsed.selected];
+
+  if (parsed.otherChecked && parsed.otherText) {
+    parts.push(parsed.otherText);
+  } else if (parsed.otherChecked) {
+    parts.push("Other");
+  }
+
+  return parts.length ? parts.join(" · ") : "No services selected";
+}
+
+function summarizeServicesFromForm() {
+  const checked = Array.from(
+    document.querySelectorAll('input[name="editServicesRequested"]:checked')
+  ).map(el => el.value);
+
+  const otherChecked = document.getElementById("editServiceOtherCheck")?.checked;
+  const otherText = String(document.getElementById("editServiceOtherText")?.value || "").trim();
+
+  if (otherChecked && otherText) checked.push(otherText);
+  else if (otherChecked) checked.push("Other");
+
+  return checked.length ? checked.join(" · ") : "No services selected";
+}
+
+function summarizeShipping(order) {
+  if (looksLocalDropOff(order)) return "Local Drop-Off";
+
+  const tracking = String(order.trackingNumber || order.tracking || "").trim();
+  const carrier = String(order.carrier || "").trim();
+  const street = String(order.streetAddress || order.address || "").trim();
+  const city = String(order.city || "").trim();
+  const state = String(order.state || "").trim();
+  const zip = String(order.zipCode || order.zip || "").trim();
+  const allowShip = order.allowShipWithoutPayment === true;
+  const hasShippingData = !!(tracking || carrier || street || city || state || zip || allowShip);
+
+  if (!hasShippingData) return "No shipping info";
+
+  const parts = ["Shipped"];
+  if (carrier && tracking) parts.push(`${carrier} · ${tracking}`);
+  else if (tracking) parts.push(tracking);
+  else if (carrier) parts.push(carrier);
+  if (allowShip) parts.push("Ship without payment allowed");
+
+  return parts.join(" · ");
+}
+
+function summarizeShippingFromForm() {
+  const dropOff = document.getElementById("editDropOffMethod")?.value || currentOrder?.dropOffMethod || "";
+  if (looksLocalDropOff({ dropOffMethod: dropOff })) return "Local Drop-Off";
+
+  const tracking = String(document.getElementById("editTrackingNumber")?.value || "").trim();
+  const carrier = String(document.getElementById("editCarrier")?.value || "").trim();
+  const street = String(document.getElementById("editStreetAddress")?.value || "").trim();
+  const city = String(document.getElementById("editCity")?.value || "").trim();
+  const state = String(document.getElementById("editState")?.value || "").trim();
+  const zip = String(document.getElementById("editZipCode")?.value || "").trim();
+  const allowShip = document.getElementById("editAllowShipWithoutPayment")?.value === "true";
+  const hasShippingData = !!(tracking || carrier || street || city || state || zip || allowShip);
+
+  if (!hasShippingData) return "No shipping info";
+
+  const parts = ["Shipped"];
+  if (carrier && tracking) parts.push(`${carrier} · ${tracking}`);
+  else if (tracking) parts.push(tracking);
+  else if (carrier) parts.push(carrier);
+  if (allowShip) parts.push("Ship without payment allowed");
+
+  return parts.join(" · ");
 }
 
 function summarizeCustomerFromForm() {
@@ -975,6 +1071,14 @@ function getDetailSectionSummary(sectionKey, order = currentOrder) {
         : summarizeNotes(order || {});
     case "photos":
       return summarizePhotos(order || {});
+    case "services":
+      return orderDetail?.querySelector("#editServicesRequestedWrap")
+        ? summarizeServicesFromForm()
+        : summarizeServices(order || {});
+    case "shipping":
+      return orderDetail?.querySelector("#editShippingSection")
+        ? summarizeShippingFromForm()
+        : summarizeShipping(order || {});
     case "activity":
       return "";
     default:
@@ -995,16 +1099,18 @@ function renderCollapsibleDetailSection(sectionKey, title, summary, bodyHtml, {
   isEmpty = false,
   sectionId = `${sectionKey}Section`,
   bodyId = `${sectionKey}SectionBody`,
-  headerActionsHtml = ""
+  headerActionsHtml = "",
+  extraClass = ""
 } = {}) {
   const expanded = getSectionExpanded(sectionKey, defaultExpanded);
   const collapsed = !isEmpty && !expanded;
   const ariaExpanded = isEmpty || expanded;
+  const extraClassText = extraClass ? ` ${extraClass}` : "";
 
   return `
     <section
       id="${sectionId}"
-      class="detail-section detail-collapsible-section detail-${sectionKey}-section${collapsed ? " is-collapsed" : ""}${isEmpty ? " is-empty" : ""}"
+      class="detail-section detail-collapsible-section detail-${sectionKey}-section${collapsed ? " is-collapsed" : ""}${isEmpty ? " is-empty" : ""}${extraClassText}"
       data-section-key="${sectionKey}">
       <div class="detail-section-toggle-row">
         <button
@@ -1053,7 +1159,19 @@ function wireDetailSectionSummaries() {
     { ids: ["editStatus", "editPaid", "editPriceQuoted", "editShippingCost"], key: "orderStatus" },
     { ids: ["editBrandModel", "editGloveType", "editDropOffMethod", "editWebType"], key: "gloveDetails" },
     { ids: ["editPrimaryLaceColor", "editSecondaryLaceColor", "editPrimaryLaceUsed", "editSecondaryLaceUsed", "editCustomColorRequest"], key: "lace" },
-    { ids: ["editGloveNotes", "editInternalNotes"], key: "notes" }
+    { ids: ["editGloveNotes", "editInternalNotes"], key: "notes" },
+    {
+      ids: [
+        "editAllowShipWithoutPayment",
+        "editTrackingNumber",
+        "editCarrier",
+        "editStreetAddress",
+        "editCity",
+        "editState",
+        "editZipCode"
+      ],
+      key: "shipping"
+    }
   ];
 
   summaryBindings.forEach(({ ids, key }) => {
@@ -1065,6 +1183,15 @@ function wireDetailSectionSummaries() {
       el.addEventListener("change", () => updateDetailSectionSummary(key));
     });
   });
+
+  const servicesWrap = document.getElementById("editServicesRequestedWrap");
+  if (servicesWrap && servicesWrap.dataset.summaryBound !== "1") {
+    servicesWrap.dataset.summaryBound = "1";
+    servicesWrap.addEventListener("change", () => updateDetailSectionSummary("services"));
+    document.getElementById("editServiceOtherText")?.addEventListener("input", () => {
+      updateDetailSectionSummary("services");
+    });
+  }
 }
 
 function renderPhotoGallery(order) {
@@ -2968,16 +3095,17 @@ function renderOrderDetail(order) {
     { defaultExpanded: getDefaultSectionExpanded("gloveDetails", order) }
   );
 
-  const servicesSection = `
-    <section class="detail-section">
-      <div class="detail-section-header">
-        <h2>Services</h2>
-      </div>
+  const servicesSection = renderCollapsibleDetailSection(
+    "services",
+    "Services",
+    summarizeServices(order),
+    `
       <div class="detail-section-grid">
         ${renderServicesEditor(order.servicesRequested || "")}
       </div>
-    </section>
-  `;
+    `,
+    { defaultExpanded: getDefaultSectionExpanded("services", order) }
+  );
 
   const laceSection = renderCollapsibleDetailSection(
     "lace",
@@ -3008,12 +3136,11 @@ function renderOrderDetail(order) {
     { defaultExpanded: getDefaultSectionExpanded("lace", order) }
   );
 
-  const shippingSection = `
-    <div id="editShippingSection" class="detail-section ${isLocal ? "is-hidden" : ""}">
-      <div class="detail-section-header">
-        <h2>Shipping</h2>
-        ${renderShowOnMapControl(order)}
-      </div>
+  const shippingSection = renderCollapsibleDetailSection(
+    "shipping",
+    "Shipping",
+    summarizeShipping(order),
+    `
       <div class="detail-section-grid">
         <div class="detail-block">
           <div class="label">Allow Ship Without Payment</div>
@@ -3053,8 +3180,14 @@ function renderOrderDetail(order) {
           <input id="editZipCode" type="text" inputmode="numeric" />
         </div>
       </div>
-    </div>
-  `;
+    `,
+    {
+      defaultExpanded: getDefaultSectionExpanded("shipping", order),
+      sectionId: "editShippingSection",
+      headerActionsHtml: renderShowOnMapControl(order),
+      extraClass: isLocal ? "is-hidden" : ""
+    }
+  );
 
   const notesSection = renderCollapsibleDetailSection(
     "notes",
@@ -4071,6 +4204,7 @@ function wireDetailForm() {
 
     updateDetailSectionSummary("gloveDetails");
     updateDetailSectionSummary("orderStatus");
+    updateDetailSectionSummary("shipping");
   }
 
   if (gloveTypeEl) {
