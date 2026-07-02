@@ -1465,6 +1465,17 @@ hr.rule{
   scroll-margin-top: calc(var(--headerH) + 24px);
 }
 
+.gallery-group .mm-section-intro{
+  margin-bottom: var(--space-4);
+}
+
+.gallery-group h2.mm-section-title{
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
 /* =========================
    GALLERY
    ========================= */
