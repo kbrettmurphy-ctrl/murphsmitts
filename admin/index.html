@@ -237,6 +237,33 @@
               No photos selected.
             </p>
           </div>
+
+          <div class="upload-card gallery-manager-card">
+            <div class="upload-card-heading gallery-manager-heading">
+              <div class="gallery-manager-title-block">
+                <h2>Gallery Photos</h2>
+                <p id="galleryManagerStatus" class="muted" aria-live="polite">
+                  Loading gallery photos...
+                </p>
+              </div>
+              <div class="gallery-manager-controls">
+                <label class="sr-only" for="galleryManagerFilter">Filter gallery photos</label>
+                <select id="galleryManagerFilter" class="gallery-manager-filter">
+                  <option value="all">All</option>
+                  <option value="fielding-gloves">Fielding Gloves</option>
+                  <option value="catchers-mitts">Catcher's Mitts</option>
+                  <option value="first-base-mitts">First Base Mitts</option>
+                  <option value="custom-color-relaces">Custom Color Relaces</option>
+                  <option value="vintage">Vintage</option>
+                </select>
+                <button id="galleryRefreshBtn" class="secondary gallery-refresh-btn" type="button">
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            <div id="galleryManagerList" class="gallery-manager-list"></div>
+          </div>
         </div>
       </section>
 

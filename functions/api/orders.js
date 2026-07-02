@@ -662,6 +662,40 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "hideGalleryPhoto" || action === "restoreGalleryPhoto" || action === "deleteGalleryPhoto") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const photoPath = cleanText(body.path);
+      const result = action === "hideGalleryPhoto"
+        ? await hideGalleryPhoto(env, photoPath)
+        : action === "restoreGalleryPhoto"
+          ? await restoreGalleryPhoto(env, photoPath)
+          : await deleteGalleryPhoto(env, photoPath);
+
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: result.error || "Gallery photo action failed."
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json(
+        {
+          ok: true,
+          photo: result.photo || null
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
     if (action === "listSaleGloves") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -1317,6 +1351,15 @@ export async function onRequest(context) {
     }
 
     if (action === "listGalleryPhotos") {
+      const includeHidden = body.includeHidden === true;
+
+      if (includeHidden) {
+        const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+        if (!auth.ok) {
+          return json(auth, 200, jsonHeaders);
+        }
+      }
+
       const sections = [
         "fielding-gloves",
         "catchers-mitts",
@@ -1326,6 +1369,7 @@ export async function onRequest(context) {
       ];
 
       const gallery = {};
+      const hiddenGallery = {};
 
       for (const section of sections) {
         const listed = await listGallerySection(env, section);
@@ -1343,12 +1387,31 @@ export async function onRequest(context) {
         }
 
         gallery[section] = listed.photos;
+
+        if (includeHidden) {
+          const hidden = await listGallerySection(env, section, { hidden: true });
+
+          if (!hidden.ok) {
+            return json(
+              {
+                ok: false,
+                error: `Failed to load hidden gallery section: ${section}`,
+                details: hidden.error
+              },
+              200,
+              jsonHeaders
+            );
+          }
+
+          hiddenGallery[section] = hidden.photos;
+        }
       }
 
       return json(
         {
           ok: true,
-          gallery
+          gallery,
+          hiddenGallery
         },
         200,
         jsonHeaders
@@ -2382,6 +2445,133 @@ async function uploadGalleryPhoto(env, { section, filename, contentType, dataUrl
   }
 }
 
+async function hideGalleryPhoto(env, photoPath) {
+  const parsed = parseGalleryPhotoPath(photoPath);
+  if (!parsed.ok || parsed.hidden) {
+    return { ok: false, error: "Invalid visible gallery photo path." };
+  }
+
+  const destinationPath = `_hidden/${parsed.section}/${parsed.name}`;
+  const moved = await moveGalleryStorageObject(env, parsed.path, destinationPath);
+  if (!moved.ok) return moved;
+
+  return {
+    ok: true,
+    photo: galleryPhotoFromPath(env, destinationPath, true)
+  };
+}
+
+async function restoreGalleryPhoto(env, photoPath) {
+  const parsed = parseGalleryPhotoPath(photoPath);
+  if (!parsed.ok || !parsed.hidden) {
+    return { ok: false, error: "Invalid hidden gallery photo path." };
+  }
+
+  const destinationPath = `${parsed.section}/${parsed.name}`;
+  const moved = await moveGalleryStorageObject(env, parsed.path, destinationPath);
+  if (!moved.ok) return moved;
+
+  return {
+    ok: true,
+    photo: galleryPhotoFromPath(env, destinationPath, false)
+  };
+}
+
+async function deleteGalleryPhoto(env, photoPath) {
+  const parsed = parseGalleryPhotoPath(photoPath);
+  if (!parsed.ok) {
+    return { ok: false, error: "Invalid gallery photo path." };
+  }
+
+  const deleted = await deleteGalleryStorageObject(env, parsed.path);
+  if (!deleted.ok) return deleted;
+
+  return {
+    ok: true,
+    photo: galleryPhotoFromPath(env, parsed.path, parsed.hidden)
+  };
+}
+
+async function moveGalleryStorageObject(env, sourcePath, destinationPath) {
+  try {
+    const resp = await fetch(
+      `${env.SUPABASE_URL}/storage/v1/object/move`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          bucketId: "gallery",
+          sourceKey: sourcePath,
+          destinationKey: destinationPath
+        })
+      }
+    );
+
+    const text = await resp.text();
+    if (!resp.ok) {
+      let error = text;
+      try {
+        error = JSON.parse(text);
+      } catch {}
+
+      return {
+        ok: false,
+        error
+      };
+    }
+
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err?.message || String(err)
+    };
+  }
+}
+
+async function deleteGalleryStorageObject(env, photoPath) {
+  try {
+    const resp = await fetch(
+      `${env.SUPABASE_URL}/storage/v1/object/gallery`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          prefixes: [photoPath]
+        })
+      }
+    );
+
+    const text = await resp.text();
+    if (!resp.ok) {
+      let error = text;
+      try {
+        error = JSON.parse(text);
+      } catch {}
+
+      return {
+        ok: false,
+        error
+      };
+    }
+
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err?.message || String(err)
+    };
+  }
+}
+
 async function uploadSaleGlovePhoto(env, { slug, filename, contentType, dataUrl }) {
   try {
     const base64 = String(dataUrl || "").split(",").pop();
@@ -2523,9 +2713,11 @@ async function uploadOrderPhoto(env, { orderNumber, filename, contentType, dataU
   }
 }
 
-async function listGallerySection(env, section) {
+async function listGallerySection(env, section, options = {}) {
   try {
     const safeSection = safeGallerySection(section);
+    const hidden = options.hidden === true;
+    const prefix = hidden ? `_hidden/${safeSection}` : safeSection;
 
     const resp = await fetch(
       `${env.SUPABASE_URL}/storage/v1/object/list/gallery`,
@@ -2537,7 +2729,7 @@ async function listGallerySection(env, section) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          prefix: safeSection,
+          prefix,
           limit: 100,
           offset: 0,
           sortBy: {
@@ -2572,13 +2764,8 @@ async function listGallerySection(env, section) {
         item.name !== ".emptyFolderPlaceholder"
       )
       .map(item => {
-        const path = `${safeSection}/${item.name}`;
-
-        return {
-          name: item.name,
-          path,
-          url: `${env.SUPABASE_URL}/storage/v1/object/public/gallery/${path}`
-        };
+        const path = `${prefix}/${item.name}`;
+        return galleryPhotoFromPath(env, path, hidden);
       });
 
     return {
@@ -2591,6 +2778,59 @@ async function listGallerySection(env, section) {
       error: err && err.message ? err.message : String(err)
     };
   }
+}
+
+function galleryPhotoFromPath(env, path, hidden = false) {
+  const parsed = parseGalleryPhotoPath(path);
+  const name = parsed.name || String(path || "").split("/").pop() || "";
+  const section = parsed.section || "";
+
+  return {
+    name,
+    path,
+    section,
+    hidden,
+    url: `${env.SUPABASE_URL}/storage/v1/object/public/gallery/${path}`
+  };
+}
+
+function parseGalleryPhotoPath(path) {
+  const clean = String(path || "").trim().replace(/^\/+/, "");
+  if (!clean || clean.includes("..") || clean.includes("\\")) {
+    return { ok: false };
+  }
+
+  const parts = clean.split("/").filter(Boolean);
+  let hidden = false;
+  let section = "";
+  let name = "";
+
+  if (parts.length === 2) {
+    [section, name] = parts;
+  } else if (parts.length === 3 && parts[0] === "_hidden") {
+    hidden = true;
+    section = parts[1];
+    name = parts[2];
+  } else {
+    return { ok: false };
+  }
+
+  const safeSection = safeGallerySection(section);
+  if (safeSection !== section || !name || name === ".emptyFolderPlaceholder" || name.includes("/")) {
+    return { ok: false };
+  }
+
+  if (name.startsWith(".") || /[\\/\u0000-\u001f]/.test(name)) {
+    return { ok: false };
+  }
+
+  return {
+    ok: true,
+    hidden,
+    section,
+    name,
+    path: hidden ? `_hidden/${section}/${name}` : `${section}/${name}`
+  };
 }
 
 function base64ToUint8Array(base64) {

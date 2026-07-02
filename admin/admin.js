@@ -76,6 +76,11 @@ let workflowSheetEl = null;
 let inventorySheetEl = null;
 let adminMenuLayer = null;
 let orderPhotoActionMenuEl = null;
+let galleryPhotoActionMenuEl = null;
+let galleryPhotos = [];
+let galleryManagerFilter = "all";
+let galleryPhotoPressTimer = null;
+let galleryPhotoPressStart = null;
 let orderPhotoPressTimer = null;
 let orderPhotoPressStart = null;
 let suppressPhotoLightboxUntil = 0;
@@ -1761,6 +1766,7 @@ function setActiveView(viewName) {
   beginAdminViewSwitch();
   closeInventorySheet();
   closeOrderPhotoActionMenu();
+  closeGalleryPhotoActionMenu();
   orderFiltersExpanded = false;
   inventoryFiltersExpanded = false;
   activeView = viewName;
@@ -1775,6 +1781,7 @@ function setActiveView(viewName) {
 
   if (viewName === "upload") {
     showView(uploadView);
+    loadGalleryManagerPhotos();
     closeMenu();
     resetViewScroll(uploadView, { blurActive: true });
     return;
@@ -6244,6 +6251,8 @@ function initUploadView() {
   const preview = document.getElementById("galleryUploadPreview");
   const uploadBtn = document.getElementById("galleryUploadBtn");
   const clearBtn = document.getElementById("galleryClearBtn");
+  const refreshBtn = document.getElementById("galleryRefreshBtn");
+  const managerFilter = document.getElementById("galleryManagerFilter");
 
   if (!input || !status || !preview || !uploadBtn || !clearBtn) return;
 
@@ -6339,7 +6348,295 @@ function initUploadView() {
 
     clearSelection();
     status.textContent = `Uploaded ${uploaded} photo${uploaded === 1 ? "" : "s"} to the website gallery.`;
+    await loadGalleryManagerPhotos();
   });
+
+  refreshBtn?.addEventListener("click", loadGalleryManagerPhotos);
+  managerFilter?.addEventListener("change", () => {
+    galleryManagerFilter = managerFilter.value || "all";
+    renderGalleryManagerPhotos();
+  });
+  loadGalleryManagerPhotos();
+}
+
+const GALLERY_SECTION_LABELS = {
+  "fielding-gloves": "Fielding Gloves",
+  "catchers-mitts": "Catcher's Mitts",
+  "first-base-mitts": "First Base Mitts",
+  "custom-color-relaces": "Custom Color Relaces",
+  "vintage": "Vintage"
+};
+
+function getGallerySectionLabel(section) {
+  return GALLERY_SECTION_LABELS[section] || section || "Gallery";
+}
+
+async function loadGalleryManagerPhotos() {
+  const list = document.getElementById("galleryManagerList");
+  const status = document.getElementById("galleryManagerStatus");
+  const refreshBtn = document.getElementById("galleryRefreshBtn");
+  if (!list || !status) return;
+
+  try {
+    if (refreshBtn) refreshBtn.disabled = true;
+    status.textContent = "Loading gallery photos...";
+    list.innerHTML = "";
+
+    const data = await postJson({
+      action: "listGalleryPhotos",
+      includeHidden: true
+    }, true);
+
+    galleryPhotos = flattenGalleryPhotos(data.gallery || {}, data.hiddenGallery || {});
+    renderGalleryManagerPhotos();
+  } catch (err) {
+    galleryPhotos = [];
+    list.innerHTML = `<p class="muted gallery-manager-empty">Gallery photos could not be loaded.</p>`;
+    status.textContent = err.message || "Gallery photos could not be loaded.";
+  } finally {
+    if (refreshBtn) refreshBtn.disabled = false;
+  }
+}
+
+function flattenGalleryPhotos(gallery, hiddenGallery) {
+  const sections = Object.keys(GALLERY_SECTION_LABELS);
+  return sections.flatMap(section => {
+    const active = (Array.isArray(gallery[section]) ? gallery[section] : [])
+      .map(photo => ({
+        ...photo,
+        section,
+        sectionLabel: getGallerySectionLabel(section),
+        hidden: false
+      }));
+
+    const hidden = (Array.isArray(hiddenGallery[section]) ? hiddenGallery[section] : [])
+      .map(photo => ({
+        ...photo,
+        section,
+        sectionLabel: getGallerySectionLabel(section),
+        hidden: true
+      }));
+
+    return [...active, ...hidden];
+  });
+}
+
+function renderGalleryManagerPhotos() {
+  const list = document.getElementById("galleryManagerList");
+  const status = document.getElementById("galleryManagerStatus");
+  const filterSelect = document.getElementById("galleryManagerFilter");
+  if (!list || !status) return;
+
+  const activeFilter = galleryManagerFilter || "all";
+  if (filterSelect && filterSelect.value !== activeFilter) {
+    filterSelect.value = activeFilter;
+  }
+
+  const entries = getFilteredGalleryManagerEntries();
+  const activeCount = entries.filter(entry => !entry.photo.hidden).length;
+  const hiddenCount = entries.filter(entry => entry.photo.hidden).length;
+  const filterLabel = activeFilter === "all" ? "" : ` ${getGallerySectionLabel(activeFilter)}`;
+
+  status.textContent = galleryPhotos.length
+    ? `${activeCount}${filterLabel} visible${hiddenCount ? ` · ${hiddenCount} hidden` : ""}`
+    : "No gallery photos have been uploaded yet.";
+
+  if (!galleryPhotos.length) {
+    list.innerHTML = `<p class="muted gallery-manager-empty">No gallery photos yet.</p>`;
+    return;
+  }
+
+  if (!entries.length) {
+    list.innerHTML = `<p class="muted gallery-manager-empty">No ${escapeHtml(getGallerySectionLabel(activeFilter))} photos found.</p>`;
+    return;
+  }
+
+  list.innerHTML = `
+    <div class="gallery-manager-grid">
+      ${entries.map(({ photo, index }) => `
+        <article
+          class="gallery-manager-item${photo.hidden ? " is-hidden" : ""}"
+          data-gallery-index="${index}"
+          tabindex="0">
+          <button class="gallery-manager-thumb" type="button" data-gallery-action="view">
+            <img src="${escapeAttr(photo.url)}" alt="${escapeAttr(photo.name || "Gallery photo")}" loading="lazy">
+          </button>
+          <div class="gallery-manager-meta">
+            <div class="gallery-manager-name">${escapeHtml(photo.name || "Gallery photo")}</div>
+            <div class="gallery-manager-subrow">
+              <span>${escapeHtml(photo.sectionLabel)}</span>
+              <span class="gallery-manager-pill">${photo.hidden ? "Hidden" : "Visible"}</span>
+            </div>
+          </div>
+          <button class="secondary gallery-manager-action-btn" type="button" data-gallery-action="menu" aria-label="Gallery photo actions">Actions</button>
+        </article>
+      `).join("")}
+    </div>
+  `;
+
+  list.querySelectorAll(".gallery-manager-item").forEach(item => {
+    attachGalleryManagerItemActions(item);
+  });
+}
+
+function getFilteredGalleryManagerEntries() {
+  const activeFilter = galleryManagerFilter || "all";
+
+  return galleryPhotos
+    .map((photo, index) => ({ photo, index }))
+    .filter(({ photo }) => activeFilter === "all" || photo.section === activeFilter);
+}
+
+function attachGalleryManagerItemActions(item) {
+  item.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    const photo = getGalleryManagerPhoto(item);
+    if (photo) openGalleryPhotoActionMenu(photo, e);
+  });
+
+  item.querySelector("[data-gallery-action='menu']")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const photo = getGalleryManagerPhoto(item);
+    if (photo) openGalleryPhotoActionMenu(photo, e);
+  });
+
+  item.querySelector("[data-gallery-action='view']")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    const photo = getGalleryManagerPhoto(item);
+    if (photo?.url) window.open(photo.url, "_blank", "noopener");
+  });
+
+  item.addEventListener("touchstart", (e) => {
+    const touch = e.touches?.[0];
+    galleryPhotoPressStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
+    clearTimeout(galleryPhotoPressTimer);
+    galleryPhotoPressTimer = setTimeout(() => {
+      const photo = getGalleryManagerPhoto(item);
+      if (photo) openGalleryPhotoActionMenu(photo, e);
+    }, 520);
+  }, { passive: true });
+
+  item.addEventListener("touchmove", (e) => {
+    if (!galleryPhotoPressStart) return;
+    const touch = e.touches?.[0];
+    if (!touch) return;
+    const dx = Math.abs(touch.clientX - galleryPhotoPressStart.x);
+    const dy = Math.abs(touch.clientY - galleryPhotoPressStart.y);
+    if (dx > 10 || dy > 10) cancelGalleryPhotoPress();
+  }, { passive: true });
+
+  item.addEventListener("touchend", cancelGalleryPhotoPress, { passive: true });
+  item.addEventListener("touchcancel", cancelGalleryPhotoPress, { passive: true });
+}
+
+function cancelGalleryPhotoPress() {
+  if (galleryPhotoPressTimer) {
+    clearTimeout(galleryPhotoPressTimer);
+    galleryPhotoPressTimer = null;
+  }
+  galleryPhotoPressStart = null;
+}
+
+function getGalleryManagerPhoto(item) {
+  const index = Number(item?.dataset?.galleryIndex);
+  return Number.isFinite(index) ? galleryPhotos[index] : null;
+}
+
+function ensureGalleryPhotoActionMenu() {
+  if (galleryPhotoActionMenuEl) return galleryPhotoActionMenuEl;
+
+  galleryPhotoActionMenuEl = document.createElement("div");
+  galleryPhotoActionMenuEl.className = "admin-action-menu-root workflow-sheet-root gallery-photo-menu-root";
+  galleryPhotoActionMenuEl.innerHTML = `
+    <div class="admin-action-backdrop workflow-backdrop"></div>
+    <div class="admin-action-menu workflow-sheet" role="menu" aria-label="Gallery photo actions">
+      <div class="admin-action-section workflow-section">
+        <div class="workflow-action-list"></div>
+      </div>
+    </div>
+  `;
+
+  getAdminMenuLayer().appendChild(galleryPhotoActionMenuEl);
+  galleryPhotoActionMenuEl.querySelector(".workflow-backdrop")?.addEventListener("click", closeGalleryPhotoActionMenu);
+  galleryPhotoActionMenuEl.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-gallery-menu-action]");
+    if (!btn) return;
+    e.preventDefault();
+    const action = btn.dataset.galleryMenuAction;
+    const photo = galleryPhotoActionMenuEl.photo;
+    closeGalleryPhotoActionMenu();
+    await runGalleryPhotoAction(photo, action);
+  });
+
+  return galleryPhotoActionMenuEl;
+}
+
+function openGalleryPhotoActionMenu(photo, source) {
+  if (!photo) return;
+  const root = ensureGalleryPhotoActionMenu();
+  const actions = root.querySelector(".workflow-action-list");
+  root.photo = photo;
+  root.anchor = getAdminAnchorPosition(source, source?.currentTarget || source?.target);
+
+  actions.innerHTML = `
+    <button class="workflow-action-btn" type="button" data-gallery-menu-action="view">View Full Photo</button>
+    ${photo.hidden
+      ? `<button class="workflow-action-btn" type="button" data-gallery-menu-action="restore">Restore / Show in Gallery</button>`
+      : `<button class="workflow-action-btn" type="button" data-gallery-menu-action="hide">Hide from Gallery</button>`}
+    <button class="workflow-action-btn danger" type="button" data-gallery-menu-action="delete">Delete Photo</button>
+  `;
+
+  root.classList.add("open");
+  document.addEventListener("keydown", handleGalleryPhotoMenuKeydown);
+  requestAnimationFrame(() => {
+    positionWorkflowMenu(root.querySelector(".workflow-sheet"), root.anchor);
+  });
+}
+
+function closeGalleryPhotoActionMenu() {
+  if (!galleryPhotoActionMenuEl) return;
+  galleryPhotoActionMenuEl.classList.remove("open");
+  galleryPhotoActionMenuEl.photo = null;
+  document.removeEventListener("keydown", handleGalleryPhotoMenuKeydown);
+}
+
+function handleGalleryPhotoMenuKeydown(e) {
+  if (e.key !== "Escape") return;
+  closeGalleryPhotoActionMenu();
+}
+
+async function runGalleryPhotoAction(photo, action) {
+  const status = document.getElementById("galleryManagerStatus");
+  if (!photo || !action) return;
+
+  if (action === "view") {
+    if (photo.url) window.open(photo.url, "_blank", "noopener");
+    return;
+  }
+
+  if (action === "delete") {
+    const ok = window.confirm("Delete this gallery photo? This removes it from the website gallery storage bucket.");
+    if (!ok) return;
+  }
+
+  try {
+    if (status) status.textContent = "Updating gallery photo...";
+    const apiAction = action === "hide"
+      ? "hideGalleryPhoto"
+      : action === "restore"
+        ? "restoreGalleryPhoto"
+        : "deleteGalleryPhoto";
+
+    await postJson({
+      action: apiAction,
+      path: photo.path
+    }, true);
+
+    await loadGalleryManagerPhotos();
+  } catch (err) {
+    if (status) status.textContent = err.message || "Gallery photo action failed.";
+  }
 }
 
 function fileToDataUrl(file) {
