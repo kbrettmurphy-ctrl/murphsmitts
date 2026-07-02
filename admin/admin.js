@@ -769,6 +769,72 @@ function renderPhotoGallery(order) {
   `;
 }
 
+function getDeliveryDisplay(value) {
+  return value ? escapeHtml(value) : "Not sent";
+}
+
+function clientTextResendAllowed(status) {
+  const s = normalizeStatus(status);
+  return (
+    s === "estimate sent" ||
+    s === "in progress" ||
+    s === "ready to go" ||
+    s === "completed"
+  );
+}
+
+function clientEmailResendAllowed(status) {
+  const s = normalizeStatus(status);
+  return !!s && ![
+    "picked up",
+    "pending response",
+    "in transit to me",
+    "customer approved"
+  ].includes(s);
+}
+
+function renderStatusDelivery(order) {
+  const emailAvailable = !!String(order.emailAddress || "").trim() && clientEmailResendAllowed(order.status);
+  const textAvailable =
+    !!String(order.phoneNumber || "").trim() &&
+    order.smsOptIn === true &&
+    clientTextResendAllowed(order.status);
+  const textSuffix = order.lastStatusTextedAt ? ` · ${escapeHtml(formatDeliveryDateTime(order.lastStatusTextedAt))}` : "";
+
+  return `
+    <div id="statusDeliveryBlock" class="status-delivery-block detail-block full">
+      <div class="status-delivery-heading">Status Delivery</div>
+      <div class="status-delivery-rows">
+        <div class="status-delivery-row">
+          <span>Last emailed</span>
+          <strong>${getDeliveryDisplay(order.lastStatusEmailed)}</strong>
+        </div>
+        <div class="status-delivery-row">
+          <span>Last texted</span>
+          <strong>${getDeliveryDisplay(order.lastStatusTexted)}${textSuffix}</strong>
+        </div>
+      </div>
+      <div class="status-delivery-actions">
+        <button id="resendStatusEmailBtn" class="secondary status-delivery-btn" type="button" ${emailAvailable ? "" : "disabled"}>Send Email Again</button>
+        <button id="resendStatusTextBtn" class="secondary status-delivery-btn" type="button" ${textAvailable ? "" : "disabled"}>Send Text Again</button>
+      </div>
+      <p id="statusDeliveryMessage" class="status-delivery-message" aria-live="polite"></p>
+    </div>
+  `;
+}
+
+function formatDeliveryDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
 function emptyToNull(value) {
   const s = String(value ?? "").trim();
   return s === "" ? null : s;
@@ -2352,6 +2418,8 @@ function renderOrderDetail(order) {
             <div class="label">Date Completed</div>
             <input id="editDateCompleted" type="date" />
           </div>
+
+          ${renderStatusDelivery(order)}
         </div>
       </section>
 
@@ -2543,6 +2611,7 @@ function renderOrderDetail(order) {
   wireOrderPhotoLightbox(order);
 
   wireDetailForm();
+  wireStatusDeliveryControls(order);
 }
 
 function getBlankAdminOrder() {
@@ -3536,6 +3605,66 @@ async function saveCurrentOrderFromForm() {
   renderOrderDetail(updated);
   saveStatusEl.textContent = "Saved.";
   resetAdminScroll(detailView);
+}
+
+function setStatusDeliveryMessage(message, type = "") {
+  const el = document.getElementById("statusDeliveryMessage");
+  if (!el) return;
+  el.textContent = message || "";
+  el.dataset.type = type;
+}
+
+function refreshStatusDelivery(order, message = "", type = "") {
+  const block = document.getElementById("statusDeliveryBlock");
+  if (!block) return;
+  block.outerHTML = renderStatusDelivery(order);
+  wireStatusDeliveryControls(order);
+  setStatusDeliveryMessage(message, type);
+}
+
+async function resendCurrentStatus(kind, order) {
+  const activeOrder = currentOrder || order;
+  if (!activeOrder?.orderNumber) return;
+
+  const isEmail = kind === "email";
+  const confirmMessage = isEmail
+    ? "Send current status email again?"
+    : "Send current status text again?";
+
+  if (!window.confirm(confirmMessage)) return;
+
+  const button = document.getElementById(isEmail ? "resendStatusEmailBtn" : "resendStatusTextBtn");
+  if (button) button.disabled = true;
+  setStatusDeliveryMessage(isEmail ? "Sending email..." : "Sending text...", "pending");
+
+  try {
+    const data = await postJson({
+      action: isEmail ? "resendStatusEmail" : "resendStatusText",
+      orderNumber: activeOrder.orderNumber
+    }, true);
+
+    const updated = data.order;
+    if (!updated) {
+      throw new Error("Resend succeeded, but no updated order was returned.");
+    }
+
+    mergeUpdatedOrder(updated);
+    localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
+    refreshStatusDelivery(updated, isEmail ? "Status email sent." : "Status text sent.", "success");
+  } catch (err) {
+    setStatusDeliveryMessage(err.message || "Unable to resend status.", "error");
+    if (button) button.disabled = false;
+  }
+}
+
+function wireStatusDeliveryControls(order) {
+  document.getElementById("resendStatusEmailBtn")?.addEventListener("click", () => {
+    resendCurrentStatus("email", order);
+  });
+
+  document.getElementById("resendStatusTextBtn")?.addEventListener("click", () => {
+    resendCurrentStatus("text", order);
+  });
 }
 
 function getAdminOrderFormPayload() {

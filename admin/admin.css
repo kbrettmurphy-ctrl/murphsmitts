@@ -2622,6 +2622,87 @@ button.secondary{
   gap:10px;
 }
 
+.status-delivery-block{
+  display:grid;
+  gap:9px;
+  margin-top:2px;
+  padding-top:12px;
+  border-top:1px solid rgba(218,202,177,.14);
+}
+
+.status-delivery-heading{
+  color:rgba(218,202,177,.72);
+  font-size:.72rem;
+  font-weight:700;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+}
+
+.status-delivery-rows{
+  display:grid;
+  gap:0;
+  border-top:1px solid rgba(218,202,177,.10);
+  border-bottom:1px solid rgba(218,202,177,.10);
+}
+
+.status-delivery-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  min-height:34px;
+  padding:7px 0;
+  color:rgba(218,202,177,.70);
+  font-size:.84rem;
+}
+
+.status-delivery-row + .status-delivery-row{
+  border-top:1px solid rgba(218,202,177,.10);
+}
+
+.status-delivery-row strong{
+  color:var(--cream);
+  font-size:.86rem;
+  font-weight:650;
+  text-align:right;
+}
+
+.status-delivery-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+.status-delivery-btn{
+  width:auto;
+  min-height:34px;
+  padding:0 11px;
+  border-radius:12px;
+  font-size:.82rem;
+  font-weight:700;
+}
+
+.status-delivery-btn:disabled{
+  opacity:.46;
+  cursor:not-allowed;
+}
+
+.status-delivery-message{
+  min-height:16px;
+  margin:0;
+  color:rgba(218,202,177,.72);
+  font-size:.8rem;
+  line-height:1.35;
+}
+
+.status-delivery-message[data-type="success"]{
+  color:#90d7a8;
+}
+
+.status-delivery-message[data-type="error"]{
+  color:#ffb4ae;
+}
+
 .detail-grid{
   display:flex;
   flex-direction:column;
@@ -3709,6 +3790,58 @@ button.secondary:active,
 .detail-block .field-like.readonly{
   background:rgba(9,47,77,.06);
   color:rgba(9,47,77,.76);
+}
+
+.status-delivery-block{
+  border-top-color:rgba(9,47,77,.14);
+}
+
+.status-delivery-heading{
+  color:rgba(9,47,77,.68);
+}
+
+.status-delivery-rows{
+  border-top-color:rgba(9,47,77,.12);
+  border-bottom-color:rgba(9,47,77,.12);
+}
+
+.status-delivery-row{
+  color:rgba(9,47,77,.72);
+}
+
+.status-delivery-row + .status-delivery-row{
+  border-top-color:rgba(9,47,77,.10);
+}
+
+.status-delivery-row strong{
+  color:var(--navy);
+}
+
+.status-delivery-btn{
+  background:rgba(9,47,77,.08);
+  color:var(--navy);
+  border:1px solid rgba(9,47,77,.12);
+}
+
+.status-delivery-btn:not(:disabled):hover,
+.status-delivery-btn:not(:disabled):focus-visible{
+  background:rgba(9,47,77,.12);
+}
+
+.status-delivery-btn:disabled{
+  opacity:.56;
+}
+
+.status-delivery-message{
+  color:rgba(9,47,77,.68);
+}
+
+.status-delivery-message[data-type="success"]{
+  color:#197246;
+}
+
+.status-delivery-message[data-type="error"]{
+  color:var(--red);
 }
 
 .checkbox-item,

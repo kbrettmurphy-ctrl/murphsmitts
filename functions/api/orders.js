@@ -293,6 +293,26 @@ export async function onRequest(context) {
       return json(result, 200, jsonHeaders);
     }
 
+    if (action === "resendStatusEmail") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await resendStatusEmailAction(env, body);
+      return json(result, 200, jsonHeaders);
+    }
+
+    if (action === "resendStatusText") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await resendStatusTextAction(env, body);
+      return json(result, 200, jsonHeaders);
+    }
+
     if (action === "updateOrder") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -1540,6 +1560,132 @@ async function getNextAdminOrderNumber(env) {
   return String(maxNum + 1).padStart(4, "0");
 }
 
+async function resendStatusEmailAction(env, body) {
+  const orderNumber = cleanText(body.orderNumber);
+  if (!orderNumber) {
+    return { ok: false, error: "Missing orderNumber." };
+  }
+
+  const existing = await fetchOrderByNumber(env, orderNumber);
+  if (!existing.ok || !existing.data) {
+    return { ok: false, error: `Order not found: ${orderNumber}` };
+  }
+
+  const statusDisplay = normalizeDisplayStatus(existing.data.status);
+  const status = normalizeStatus(statusDisplay);
+  if (!status) {
+    return { ok: false, error: "This order does not have a status to send." };
+  }
+
+  if (isInternalOnlyStatus(status)) {
+    return { ok: false, error: `${statusDisplay} is internal-only and is not emailed.` };
+  }
+
+  if (!cleanText(existing.data.email_address)) {
+    return { ok: false, error: "This order does not have a customer email address." };
+  }
+
+  if (!env.RESEND_API_KEY) {
+    return { ok: false, error: "Missing RESEND_API_KEY environment variable." };
+  }
+
+  const emailResult = await sendStatusEmail(env, existing.data, statusDisplay);
+  if (emailResult.skipped) {
+    return { ok: false, error: emailResult.reason || "Status email was skipped." };
+  }
+  if (!emailResult.ok) {
+    return { ok: false, error: "Status email failed to send.", details: emailResult.error };
+  }
+
+  const stamp = await supabaseFetch(
+    env,
+    `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify({
+        last_status_emailed: statusDisplay
+      })
+    }
+  );
+
+  if (!stamp.ok || !Array.isArray(stamp.data) || !stamp.data[0]) {
+    return { ok: false, error: "Status email sent, but delivery status could not be updated.", details: stamp.error };
+  }
+
+  return {
+    ok: true,
+    order: mapOrderFromDb(stamp.data[0])
+  };
+}
+
+async function resendStatusTextAction(env, body) {
+  const orderNumber = cleanText(body.orderNumber);
+  if (!orderNumber) {
+    return { ok: false, error: "Missing orderNumber." };
+  }
+
+  const existing = await fetchOrderByNumber(env, orderNumber);
+  if (!existing.ok || !existing.data) {
+    return { ok: false, error: `Order not found: ${orderNumber}` };
+  }
+
+  const statusDisplay = normalizeDisplayStatus(existing.data.status);
+  const status = normalizeStatus(statusDisplay);
+  if (!status) {
+    return { ok: false, error: "This order does not have a status to text." };
+  }
+
+  if (!shouldSendTextForStatus(status)) {
+    return { ok: false, error: `${statusDisplay} is not configured for status text messages.` };
+  }
+
+  if (!toBoolean(existing.data.sms_opt_in)) {
+    return { ok: false, error: "This customer has not opted in to SMS updates." };
+  }
+
+  if (!cleanText(existing.data.phone_number)) {
+    return { ok: false, error: "This order does not have a customer phone number." };
+  }
+
+  if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
+    return { ok: false, error: "Missing Twilio environment variables." };
+  }
+
+  const textResult = await sendStatusText(env, existing.data, statusDisplay);
+  if (textResult.skipped) {
+    return { ok: false, error: textResult.reason || "Status text was skipped." };
+  }
+  if (!textResult.ok) {
+    return { ok: false, error: "Status text failed to send.", details: textResult.error };
+  }
+
+  const stamp = await supabaseFetch(
+    env,
+    `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify({
+        last_status_texted: statusDisplay
+      })
+    }
+  );
+
+  if (!stamp.ok || !Array.isArray(stamp.data) || !stamp.data[0]) {
+    return { ok: false, error: "Status text sent, but delivery status could not be updated.", details: stamp.error };
+  }
+
+  return {
+    ok: true,
+    order: mapOrderFromDb(stamp.data[0])
+  };
+}
+
 async function uploadOrderPhotoAction(env, body) {
   const orderNumber = cleanText(body.orderNumber);
   const filename = cleanText(body.filename);
@@ -2020,6 +2166,7 @@ function mapOrderFromDb(row) {
     lastStatusEmailed: row.last_status_emailed,
     smsOptIn: row.sms_opt_in === true,
     lastStatusTexted: row.last_status_texted,
+    lastStatusTextedAt: row.last_status_texted_at,
     mapLat: row.map_lat,
     mapLng: row.map_lng,
     mapGeocodedAddress: row.map_geocoded_address,
