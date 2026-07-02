@@ -3114,17 +3114,55 @@ footer{
 }
 
 @media (max-width: 820px){
+  .contact-page.container{
+    width:min(var(--max), calc(100% - 20px));
+  }
+
   .contact-page .mm-grid-2,
   .dropoff-guidance{
     grid-template-columns:1fr;
   }
 
-  .service-section{
-    margin-top:18px;
+  .contact-tab-card{
+    padding:var(--space-3);
+    border-radius:var(--radius-md);
   }
 
-  .service-section-body{
-    padding:16px;
+  .service-form-wrap .service-section{
+    margin-top:var(--space-5);
+    border:0;
+    border-radius:0;
+    overflow:visible;
+    background:transparent;
+  }
+
+  .service-form-wrap .service-section + .service-section{
+    padding-top:var(--space-4);
+    border-top:1px solid var(--mm-border);
+  }
+
+  .service-form-wrap .service-section-title{
+    padding:0 0 10px;
+    background:transparent;
+    color:var(--mm-navy);
+    font-size:var(--text-sm);
+    font-weight:800;
+    letter-spacing:.02em;
+    border-bottom:1px solid rgba(9, 47, 77, .12);
+  }
+
+  .service-form-wrap .service-section-body{
+    padding:var(--space-3) 0 0;
+  }
+
+  .service-form-wrap .mm-field input:not([type]),
+  .service-form-wrap .mm-field input[type="text"],
+  .service-form-wrap .mm-field input[type="email"],
+  .service-form-wrap .mm-field input[type="tel"],
+  .service-form-wrap .mm-field textarea,
+  .service-form-wrap .mm-field select,
+  .service-form-wrap .mm-inline-other input[type="text"]{
+    padding:12px 14px;
   }
 
   .service-form-wrap .mm-inline-other{
@@ -3136,8 +3174,76 @@ footer{
     margin-top:-2px;
   }
 
+  .glove-information-section:not(.is-multi-glove) > .service-section-body{
+    padding:0;
+  }
+
+  .glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup{
+    margin:var(--space-4) 0 0;
+    padding:0;
+    border:0;
+    border-radius:0;
+    overflow:visible;
+    background:transparent;
+  }
+
+  .glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup:first-child{
+    margin-top:0;
+  }
+
+  .glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup::before{
+    margin:0 0 var(--space-3);
+    padding:0 0 8px;
+    background:transparent;
+    color:var(--mm-navy);
+    font-size:var(--text-sm);
+    font-weight:800;
+    border-bottom:1px solid rgba(9, 47, 77, .12);
+  }
+
+  .glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-subgroup + .glove-subgroup{
+    padding-top:var(--space-4);
+    border-top:1px solid var(--mm-border);
+  }
+
+  .glove-information-section.is-multi-glove{
+    border:0;
+    border-radius:0;
+    overflow:visible;
+    background:transparent;
+  }
+
+  .glove-information-section.is-multi-glove > .service-section-body{
+    padding:var(--space-3) 0 0;
+  }
+
+  .glove-information-section.is-multi-glove .glove-request-card{
+    border:0;
+    border-radius:0;
+    overflow:visible;
+    background:transparent;
+  }
+
+  .glove-information-section.is-multi-glove .glove-request-card + .glove-request-card,
+  .glove-information-section.is-multi-glove .additional-gloves .glove-request-card{
+    margin-top:var(--space-4);
+    padding-top:var(--space-4);
+    border-top:1px solid var(--mm-border);
+  }
+
+  .glove-information-section.is-multi-glove .glove-card-body{
+    padding:var(--space-3) 0 0;
+  }
+
+  .glove-information-section.is-multi-glove .glove-subgroup{
+    padding-left:0;
+    padding-right:0;
+  }
+
   .glove-section-heading{
     align-items:stretch;
+    border-radius:var(--radius-sm);
+    overflow:hidden;
   }
 
   .glove-remove-btn{
@@ -3149,10 +3255,14 @@ footer{
     display:grid;
   }
 
+  .dropoff-guidance .mm-status-message{
+    padding:var(--space-2) var(--space-3);
+  }
+
   .form-lace-reference-grid{
     grid-template-columns:repeat(3, minmax(0, 1fr));
     gap:var(--space-2);
-    padding:0 var(--space-3) var(--space-3);
+    padding:var(--space-2) var(--space-3) var(--space-3);
   }
 }
 
