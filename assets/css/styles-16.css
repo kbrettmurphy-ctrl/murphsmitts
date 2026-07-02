@@ -3727,3 +3727,153 @@ body.home footer{
   -webkit-touch-callout:none;
   pointer-events:none;
 }
+
+/* =========================
+   DESKTOP DENSITY
+   Calmer public scale at 100% zoom (771px+).
+   ========================= */
+
+@media (min-width: 771px){
+  :root{
+    --text-md: 16px;
+    --text-lg: 18px;
+    --text-xl: 24px;
+    --text-2xl: 30px;
+    --space-5: 22px;
+    --space-6: 28px;
+    --space-7: 44px;
+    --space-8: 58px;
+  }
+
+  .hero h1{
+    font-size: clamp(31px, 4vw, 47px);
+  }
+
+  .hero-inner{
+    gap: var(--space-6);
+  }
+
+  .hero-media img{
+    max-height: 390px;
+  }
+
+  .mm-section-title{
+    font-size: clamp(22px, 2.3vw, 29px);
+  }
+
+  h1.mm-section-title{
+    font-size: clamp(27px, 3.6vw, 40px);
+  }
+
+  .page{
+    padding-top: 100px;
+    padding-bottom: 50px;
+  }
+
+  .page h1{
+    font-size: clamp(22px, 3.6vw, 31px);
+  }
+
+  .mm-final-cta .mm-section-title{
+    font-size: clamp(20px, 1.65vw, 25px);
+  }
+
+  .btn,
+  .mm-button{
+    padding: 12px 18px;
+    min-height: 40px;
+  }
+
+  .btn-contact{
+    padding: 11px 16px;
+  }
+
+  .card{
+    padding: 16px;
+  }
+
+  .mm-card{
+    padding: var(--space-4);
+  }
+
+  .home-process-step,
+  .home-reviews-grid .review-card,
+  .process-info-panel,
+  .process-review-item,
+  .contact-tab-card{
+    padding: var(--space-4);
+  }
+
+  .service-item,
+  .home-service-item,
+  .relacing-info-item{
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .split{
+    gap: 30px;
+  }
+
+  .price-grid{
+    gap: 22px;
+    margin-top: 18px;
+  }
+
+  .price h2,
+  .card h2{
+    font-size: 16px;
+  }
+
+  .gallery-grid{
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .gallery-strip,
+  .lace-strip{
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .cta{
+    gap: 12px;
+  }
+
+  .contact-page .mm-field input:not([type]),
+  .contact-page .mm-field input[type="text"],
+  .contact-page .mm-field input[type="email"],
+  .contact-page .mm-field input[type="tel"],
+  .contact-page .mm-field textarea,
+  .contact-page .mm-field select,
+  .contact-page .mm-inline-other input[type="text"]{
+    min-height: 50px;
+    padding: 10px 14px;
+  }
+
+  .contact-page .mm-field textarea{
+    min-height: 124px;
+  }
+
+  .contact-page .mm-field textarea.compact-textarea{
+    min-height: 50px;
+  }
+
+  .service-form-wrap .service-section-title{
+    padding: 10px 14px;
+  }
+
+  footer{
+    padding: 20px 0;
+    margin-top: 36px;
+  }
+
+  .footer-inner{
+    gap: 16px;
+  }
+
+  .footer-left,
+  .footer-center,
+  .footer-right{
+    min-height: 84px;
+  }
+}
