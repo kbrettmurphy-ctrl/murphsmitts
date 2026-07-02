@@ -28,10 +28,10 @@
   /* Shared admin menu/form width tokens — see .workflow-sheet block below */
   --admin-menu-min-width:160px;
   --admin-menu-max-width:240px;
-  --admin-form-compact-max:220px;
-  --admin-form-small-max:280px;
-  --admin-form-large-max:min(320px, calc(100vw - 32px));
-  --admin-submenu-max:280px;
+  --admin-form-compact-max:min(360px, calc(100vw - 32px));
+  --admin-form-small-max:min(360px, calc(100vw - 32px));
+  --admin-form-large-max:min(360px, calc(100vw - 32px));
+  --admin-submenu-max:min(360px, calc(100vw - 32px));
   --admin-z-popover:1200;
   --admin-z-menu:1400;
   --admin-z-submenu:1410;
@@ -2459,6 +2459,9 @@ button.secondary{
 
 .workflow-sheet-form:not(:empty){
   padding:8px;
+  min-width:0;
+  width:100%;
+  box-sizing:border-box;
 }
 
 .workflow-sheet-form.is-submenu{
@@ -2512,8 +2515,13 @@ button.secondary{
   display:grid;
   gap:10px;
   min-width:0;
-  width:max-content;
+  width:100%;
   max-width:100%;
+}
+
+.workflow-action-form{
+  min-width:0;
+  width:100%;
 }
 
 .workflow-action-form label,
@@ -2524,6 +2532,7 @@ button.secondary{
   font-size:.78rem;
   white-space:normal;
   overflow-wrap:anywhere;
+  word-break:break-word;
 }
 
 .workflow-action-form input + label,
@@ -2890,9 +2899,14 @@ button.secondary{
   text-underline-offset:3px;
 }
 
-.detail-shipping-actions{
+.detail-shipping-actions,
+.detail-photo-actions{
   display:flex;
   justify-content:flex-end;
+  margin:8px 0 0;
+}
+
+.detail-shipping-actions{
   margin:0 0 8px;
 }
 

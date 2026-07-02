@@ -789,47 +789,13 @@ function captureOrderDetailCollapseState() {
   });
 }
 
-function getDefaultSectionExpanded(sectionKey, order) {
+function getDefaultSectionExpanded(sectionKey) {
   switch (sectionKey) {
     case "customer":
-    case "orderStatus":
-      return true;
-    case "gloveDetails":
-    case "lace":
-      return false;
-    case "services": {
-      const parsed = parseServicesValue(order.servicesRequested || "");
-      return parsed.selected.length > 0 || parsed.otherChecked;
-    }
-    case "shipping": {
-      if (looksLocalDropOff(order)) return false;
-      const tracking = String(order.trackingNumber || order.tracking || "").trim();
-      const carrier = String(order.carrier || "").trim();
-      const street = String(order.streetAddress || order.address || "").trim();
-      const city = String(order.city || "").trim();
-      const state = String(order.state || "").trim();
-      const zip = String(order.zipCode || order.zip || "").trim();
-      return !!(
-        tracking ||
-        carrier ||
-        street ||
-        city ||
-        state ||
-        zip ||
-        order.allowShipWithoutPayment === true
-      );
-    }
-    case "notes": {
-      const customerNotes = String(order.gloveNotes || order.customerNotes || "").trim();
-      const internalNotes = String(order.internalNotes || "").trim();
-      return !!(customerNotes || internalNotes);
-    }
     case "photos":
-      return (Array.isArray(order.glovePhotos) ? order.glovePhotos.length : 0) > 0;
-    case "activity":
-      return false;
-    default:
       return true;
+    default:
+      return false;
   }
 }
 
@@ -1233,6 +1199,9 @@ function renderPhotoGallery(order) {
     ` : `
       <p class="muted order-photo-empty">No order photos yet.</p>
     `}
+    <div class="detail-photo-actions">
+      <button id="orderPhotoAddBtn" class="detail-show-on-map-link detail-photo-add-link" type="button">Add Photo</button>
+    </div>
   `;
 
   const photoSection = renderCollapsibleDetailSection(
@@ -1241,10 +1210,9 @@ function renderPhotoGallery(order) {
     summarizePhotos(order),
     photoBody,
     {
-      defaultExpanded: getDefaultSectionExpanded("photos", order),
+      defaultExpanded: getDefaultSectionExpanded("photos"),
       sectionId: "detailPhotoSection",
-      bodyId: "photosSectionBody",
-      headerActionsHtml: `<button id="orderPhotoAddBtn" class="secondary topbar-icon-action detail-photo-add-btn" type="button" aria-label="Add order photos">+</button>`
+      bodyId: "photosSectionBody"
     }
   );
 
@@ -3071,7 +3039,7 @@ function renderOrderDetail(order) {
         ${renderReferralSourceEditor(order.referralSource || "")}
       </div>
     `,
-    { defaultExpanded: getDefaultSectionExpanded("customer", order) }
+    { defaultExpanded: getDefaultSectionExpanded("customer") }
   );
 
   const orderStatusSection = renderCollapsibleDetailSection(
@@ -3138,7 +3106,7 @@ function renderOrderDetail(order) {
           ${renderStatusDelivery(order)}
       </div>
     `,
-    { defaultExpanded: getDefaultSectionExpanded("orderStatus", order) }
+    { defaultExpanded: getDefaultSectionExpanded("orderStatus") }
   );
 
   const gloveDetailsSection = renderCollapsibleDetailSection(
@@ -3168,7 +3136,7 @@ function renderOrderDetail(order) {
         </div>
       </div>
     `,
-    { defaultExpanded: getDefaultSectionExpanded("gloveDetails", order) }
+    { defaultExpanded: getDefaultSectionExpanded("gloveDetails") }
   );
 
   const servicesSection = renderCollapsibleDetailSection(
@@ -3180,7 +3148,7 @@ function renderOrderDetail(order) {
         ${renderServicesEditor(order.servicesRequested || "")}
       </div>
     `,
-    { defaultExpanded: getDefaultSectionExpanded("services", order) }
+    { defaultExpanded: getDefaultSectionExpanded("services") }
   );
 
   const laceSection = renderCollapsibleDetailSection(
@@ -3209,7 +3177,7 @@ function renderOrderDetail(order) {
         </div>
       </div>
     `,
-    { defaultExpanded: getDefaultSectionExpanded("lace", order) }
+    { defaultExpanded: getDefaultSectionExpanded("lace") }
   );
 
   const showOnMapHtml = renderShowOnMapControl(order);
@@ -3260,7 +3228,7 @@ function renderOrderDetail(order) {
       </div>
     `,
     {
-      defaultExpanded: getDefaultSectionExpanded("shipping", order),
+      defaultExpanded: getDefaultSectionExpanded("shipping"),
       sectionId: "editShippingSection",
       extraClass: isLocal ? "is-hidden" : ""
     }
@@ -3283,7 +3251,7 @@ function renderOrderDetail(order) {
         </div>
       </div>
     `,
-    { defaultExpanded: getDefaultSectionExpanded("notes", order) }
+    { defaultExpanded: getDefaultSectionExpanded("notes") }
   );
 
   orderDetail.innerHTML = `
@@ -4125,7 +4093,7 @@ function refreshOrderPhotoSection(order) {
     nextSection?.insertAdjacentElement("afterend", nextLightbox);
   }
 
-  const expanded = getSectionExpanded("photos", getDefaultSectionExpanded("photos", order));
+  const expanded = getSectionExpanded("photos", getDefaultSectionExpanded("photos"));
   const section = document.getElementById("detailPhotoSection");
   const toggle = section?.querySelector("[data-section-toggle='photos']");
   section?.classList.toggle("is-collapsed", !expanded);
@@ -5182,6 +5150,35 @@ function setAdminLongPressArmed(armed) {
   document.body.classList.toggle("admin-longpress-armed", armed);
 }
 
+function clampActionSubmenuToViewport(form) {
+  if (!form) return;
+
+  const margin = 12;
+  const rect = form.getBoundingClientRect();
+  let deltaLeft = 0;
+  let deltaTop = 0;
+
+  if (rect.right > window.innerWidth - margin) {
+    deltaLeft = (window.innerWidth - margin) - rect.right;
+  }
+  if (rect.left + deltaLeft < margin) {
+    deltaLeft = margin - rect.left;
+  }
+  if (rect.bottom > window.innerHeight - margin) {
+    deltaTop = (window.innerHeight - margin) - rect.bottom;
+  }
+  if (rect.top + deltaTop < margin) {
+    deltaTop = margin - rect.top;
+  }
+
+  if (!deltaLeft && !deltaTop) return;
+
+  const currentLeft = Number.parseFloat(form.style.left) || 0;
+  const currentTop = Number.parseFloat(form.style.top) || 0;
+  form.style.left = `${currentLeft + deltaLeft}px`;
+  form.style.top = `${currentTop + deltaTop}px`;
+}
+
 function positionActionSubmenu(root, activeButton) {
   const form = root?.querySelector(".workflow-sheet-form");
   if (!form) return;
@@ -5201,8 +5198,11 @@ function positionActionSubmenu(root, activeButton) {
 
   const margin = 12;
   const gap = 8;
+  const maxWidth = Math.min(360, window.innerWidth - margin * 2);
+  form.style.maxWidth = `${maxWidth}px`;
+
   const formRect = form.getBoundingClientRect();
-  const width = formRect.width || 292;
+  const width = Math.min(formRect.width || maxWidth, maxWidth);
   const height = formRect.height || 140;
   const canOpenRight = buttonRect.right + gap + width <= window.innerWidth - margin;
   const viewportLeft = canOpenRight
@@ -5218,6 +5218,10 @@ function positionActionSubmenu(root, activeButton) {
 
   form.style.left = `${left}px`;
   form.style.top = `${top}px`;
+
+  requestAnimationFrame(() => {
+    clampActionSubmenuToViewport(form);
+  });
 }
 
 function consumeWorkflowOpeningTouchEnd(e) {
@@ -5734,9 +5738,9 @@ function initOrderMap() {
   if (!orderMap) {
     orderMap = L.map(orderMapEl, {
       scrollWheelZoom: true,
-      zoomSnap: 0.25,
-      zoomDelta: 0.25,
-      wheelPxPerZoomLevel: 160,
+      zoomSnap: 0.5,
+      zoomDelta: 0.5,
+      wheelPxPerZoomLevel: 80,
       wheelDebounceTime: 20,
       zoomAnimation: true,
       markerZoomAnimation: true
