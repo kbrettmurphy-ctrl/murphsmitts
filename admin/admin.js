@@ -2390,6 +2390,59 @@ function toggleDesktopOrderActionMenu(row, button, order) {
   positionDesktopOrderActionMenu(button, menu);
 }
 
+function normalizeAdminView(viewName) {
+  const view = String(viewName || "").trim().toLowerCase();
+  if (!view || view === "orders") return "current";
+  if (view === "map") return "map";
+  if (view === "upload") return "upload";
+  if (view === "inventory") return "inventory";
+  if (view === "gloves-sale") return "gloves-sale";
+  if (isOrderFilterView(view)) return view;
+  return "current";
+}
+
+function isKnownAdminView(viewName) {
+  const view = String(viewName || "").trim().toLowerCase();
+  if (!view || view === "orders") return true;
+  return ["map", "upload", "inventory", "gloves-sale"].includes(view) || isOrderFilterView(view);
+}
+
+function syncAdminViewUrl(viewName) {
+  const view = normalizeAdminView(viewName);
+  const url = new URL(window.location.href);
+
+  if (view === "map") {
+    url.searchParams.set("view", "map");
+    if (mapFocusOrderNumber) {
+      url.searchParams.set("order", String(mapFocusOrderNumber));
+    } else {
+      url.searchParams.delete("order");
+    }
+  } else if (view === "upload") {
+    url.searchParams.set("view", "upload");
+    url.searchParams.delete("order");
+  } else if (view === "inventory") {
+    url.searchParams.set("view", "inventory");
+    url.searchParams.delete("order");
+  } else if (view === "gloves-sale") {
+    url.searchParams.set("view", "gloves-sale");
+    url.searchParams.delete("order");
+  } else if (isOrderFilterView(view)) {
+    if (view === "current") {
+      url.searchParams.delete("view");
+    } else {
+      url.searchParams.set("view", "orders");
+    }
+    url.searchParams.delete("order");
+  }
+
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (next !== current) {
+    window.history.replaceState({}, "", url);
+  }
+}
+
 function setActiveView(viewName) {
   if (!isAuthenticated()) {
     activeView = "current";
@@ -2399,23 +2452,26 @@ function setActiveView(viewName) {
     return;
   }
 
+  const resolvedView = normalizeAdminView(viewName);
+
   beginAdminViewSwitch();
   closeInventorySheet();
   closeOrderPhotoActionMenu();
   closeGalleryPhotoActionMenu();
   orderFiltersExpanded = false;
   inventoryFiltersExpanded = false;
-  activeView = viewName;
+  activeView = resolvedView;
   navLinks.forEach(link => {
-    const isOrdersLink = link.dataset.view === "current" && isOrderFilterView(viewName);
-    link.classList.toggle("active", link.dataset.view === viewName || isOrdersLink);
+    const isOrdersLink = link.dataset.view === "current" && isOrderFilterView(resolvedView);
+    link.classList.toggle("active", link.dataset.view === resolvedView || isOrdersLink);
   });
 
-  viewTitle.textContent = getViewTitle(viewName);
+  viewTitle.textContent = getViewTitle(resolvedView);
   syncOrderFilterUI();
   syncInventoryFilterUI();
 
-  if (viewName === "upload") {
+  if (resolvedView === "upload") {
+    syncAdminViewUrl(resolvedView);
     showView(uploadView);
     loadGalleryManagerPhotos();
     closeMenu();
@@ -2423,7 +2479,8 @@ function setActiveView(viewName) {
     return;
   }
 
-  if (viewName === "gloves-sale") {
+  if (resolvedView === "gloves-sale") {
+    syncAdminViewUrl(resolvedView);
     const loadPromise = loadSaleGloves();
     showView(saleGlovesView);
     closeMenu();
@@ -2432,12 +2489,13 @@ function setActiveView(viewName) {
     return;
   }
 
-  if (viewName === "map") {
+  if (resolvedView === "map") {
     const params = new URLSearchParams(window.location.search);
     if (!params.get("order")) {
       mapFocusOrderNumber = null;
       mapFocusHandled = true;
     }
+    syncAdminViewUrl(resolvedView);
     showView(mapView);
     closeMenu();
     resetViewScroll(mapView, { invalidateMap: true, blurActive: true });
@@ -2446,7 +2504,7 @@ function setActiveView(viewName) {
   }
 
   let renderPromise = null;
-  if (viewName === "inventory") {
+  if (resolvedView === "inventory") {
     searchInput.value = "";
     syncSearchUI();
     renderPromise = loadInventory().catch(err => {
@@ -2456,6 +2514,7 @@ function setActiveView(viewName) {
     applyFilters();
   }
 
+  syncAdminViewUrl(resolvedView);
   showView(dashboardView);
   closeMenu();
   resetViewScroll(dashboardView, { blurActive: true });
@@ -5436,25 +5495,12 @@ function readAdminDeepLink() {
   if (view === "map" && order) {
     mapFocusOrderNumber = order;
     mapFocusHandled = false;
-    return "map";
   }
 
-  if (["current", "map", "inventory", "upload", "gloves-sale"].includes(view)) {
-    return view;
-  }
+  if (!view) return null;
+  if (!isKnownAdminView(view)) return null;
 
-  return null;
-}
-
-function updateAdminMapDeepLink(orderNumber) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("view", "map");
-  if (orderNumber) {
-    url.searchParams.set("order", String(orderNumber));
-  } else {
-    url.searchParams.delete("order");
-  }
-  window.history.replaceState({}, "", url);
+  return normalizeAdminView(view);
 }
 
 function clearAdminMapDeepLinkOrder() {
@@ -5576,7 +5622,6 @@ function wireShowOnMapControl() {
 function openOrderOnAdminMap(orderNumber) {
   mapFocusOrderNumber = String(orderNumber || "").trim();
   mapFocusHandled = false;
-  updateAdminMapDeepLink(mapFocusOrderNumber);
   setActiveView("map");
 }
 
@@ -5688,7 +5733,13 @@ function initOrderMap() {
 
   if (!orderMap) {
     orderMap = L.map(orderMapEl, {
-      scrollWheelZoom: true
+      scrollWheelZoom: true,
+      zoomSnap: 0.25,
+      zoomDelta: 0.25,
+      wheelPxPerZoomLevel: 160,
+      wheelDebounceTime: 20,
+      zoomAnimation: true,
+      markerZoomAnimation: true
     }).setView([39.5, -98.35], 4);
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
@@ -6175,8 +6226,8 @@ async function login(pinValue) {
     pinInput.value = "";
     loginStatus.textContent = "";
     syncAuthUI();
-    showView(dashboardView);
     await loadOrders();
+    setActiveView("current");
   } catch (err) {
     loginStatus.textContent = err.message;
     pinInput.value = "";
@@ -7786,7 +7837,7 @@ function closeOrderDetail() {
     saveOrderBtn.textContent = "Save";
   }
 
-  const returnView = orderDetailReturnView || "current";
+  const returnView = normalizeAdminView(orderDetailReturnView || "current");
   setActiveView(returnView);
 
   if (isOrderFilterView(returnView)) {
@@ -8146,11 +8197,7 @@ document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
   try {
     await loadOrders();
     const deepLinkView = readAdminDeepLink();
-    if (deepLinkView) {
-      activeView = deepLinkView;
-    }
-    setActiveView(activeView);
-    showView(dashboardView);
+    setActiveView(deepLinkView || "current");
   } catch (err) {
     clearToken();
     closeMenu();
