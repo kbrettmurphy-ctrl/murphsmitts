@@ -92,6 +92,7 @@ let galleryPhotoPressStart = null;
 let orderPhotoPressTimer = null;
 let orderPhotoPressStart = null;
 let orderActivityLoadToken = 0;
+let orderActivityUserExpanded = null;
 let adminMenuTapSuppressUntil = 0;
 let suppressPhotoLightboxUntil = 0;
 let inventoryPressTimer = null;
@@ -866,15 +867,75 @@ function renderStatusDelivery(order) {
 
 function renderOrderActivity(order) {
   return `
-    <section id="orderActivitySection" class="detail-section order-activity-section">
-      <div class="detail-section-header">
-        <h2>Activity</h2>
-      </div>
+    <section id="orderActivitySection" class="detail-section order-activity-section is-collapsed">
+      <button
+        id="orderActivityToggle"
+        class="order-activity-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="orderActivityList">
+        <span class="order-activity-toggle-main">
+          <span class="order-activity-toggle-title">Activity</span>
+          <span id="orderActivityCount" class="order-activity-toggle-meta muted"></span>
+        </span>
+        <span class="order-activity-chevron" aria-hidden="true">›</span>
+      </button>
       <div id="orderActivityList" class="order-activity-list" data-order-number="${escapeAttr(order.orderNumber || "")}">
         <p class="muted order-activity-empty">Loading activity...</p>
       </div>
     </section>
   `;
+}
+
+function formatOrderActivityCount(count) {
+  if (!count) return "";
+  return count === 1 ? "· 1 event" : `· ${count} events`;
+}
+
+function updateOrderActivityCollapse(activity, { isError = false } = {}) {
+  const section = document.getElementById("orderActivitySection");
+  const toggle = document.getElementById("orderActivityToggle");
+  const countEl = document.getElementById("orderActivityCount");
+  if (!section || !toggle) return;
+
+  const items = Array.isArray(activity) ? activity : [];
+  const hasEntries = !isError && items.length > 0;
+
+  if (!hasEntries) {
+    section.classList.add("is-empty");
+    section.classList.remove("is-collapsed");
+    toggle.setAttribute("aria-expanded", "true");
+    if (countEl) countEl.textContent = "";
+    return;
+  }
+
+  section.classList.remove("is-empty");
+
+  if (countEl) {
+    countEl.textContent = formatOrderActivityCount(items.length);
+  }
+
+  const expanded = orderActivityUserExpanded === null
+    ? false
+    : orderActivityUserExpanded;
+
+  section.classList.toggle("is-collapsed", !expanded);
+  toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+}
+
+function wireOrderActivityCollapse() {
+  const toggle = document.getElementById("orderActivityToggle");
+  if (!toggle) return;
+
+  toggle.addEventListener("click", () => {
+    const section = document.getElementById("orderActivitySection");
+    if (!section || section.classList.contains("is-empty")) return;
+
+    const collapsed = section.classList.toggle("is-collapsed");
+    const expanded = !collapsed;
+    orderActivityUserExpanded = expanded;
+    toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+  });
 }
 
 async function loadOrderActivity(orderNumber) {
@@ -893,10 +954,13 @@ async function loadOrderActivity(orderNumber) {
     if (token !== orderActivityLoadToken) return;
     if (!currentOrder || String(currentOrder.orderNumber) !== String(orderNumber)) return;
 
-    activityList.innerHTML = renderOrderActivityRows(data.activity || []);
+    const activity = data.activity || [];
+    activityList.innerHTML = renderOrderActivityRows(activity);
+    updateOrderActivityCollapse(activity);
   } catch {
     if (token !== orderActivityLoadToken) return;
     activityList.innerHTML = `<p class="muted order-activity-empty">Activity could not be loaded.</p>`;
+    updateOrderActivityCollapse([], { isError: true });
   }
 }
 
@@ -2476,6 +2540,7 @@ function renderOrders(list) {
 function renderOrderDetail(order) {
   detailMode = "edit";
   currentOrder = order;
+  orderActivityUserExpanded = null;
   if (detailTitle) {
     detailTitle.textContent = "Order Detail";
   }
@@ -2765,6 +2830,7 @@ function renderOrderDetail(order) {
 
   wireDetailForm();
   wireStatusDeliveryControls(order);
+  wireOrderActivityCollapse();
   loadOrderActivity(order.orderNumber);
 }
 

@@ -2951,6 +2951,75 @@ button.secondary{
   color:#ffb4ae;
 }
 
+.order-activity-toggle{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  width:100%;
+  margin:0;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  text-align:left;
+  cursor:pointer;
+}
+
+.order-activity-toggle:focus-visible{
+  outline:2px solid rgba(0,122,255,.45);
+  outline-offset:2px;
+  border-radius:6px;
+}
+
+.order-activity-toggle-main{
+  display:flex;
+  align-items:baseline;
+  gap:6px;
+  min-width:0;
+}
+
+.order-activity-toggle-title{
+  margin:0;
+  color:var(--cream);
+  font-size:1.05rem;
+  line-height:1.15;
+  letter-spacing:-.015em;
+  font-weight:650;
+}
+
+.order-activity-toggle-meta{
+  font-size:.82rem;
+  font-weight:500;
+  line-height:1.2;
+}
+
+.order-activity-chevron{
+  flex:0 0 auto;
+  color:rgba(218,202,177,.58);
+  font-size:1.1rem;
+  line-height:1;
+  transition:transform var(--motion-base, .18s) ease;
+}
+
+.order-activity-section:not(.is-collapsed):not(.is-empty) .order-activity-chevron{
+  transform:rotate(90deg);
+}
+
+.order-activity-section.is-collapsed .order-activity-list{
+  display:none;
+}
+
+.order-activity-section.is-empty .order-activity-toggle{
+  cursor:default;
+  pointer-events:none;
+}
+
+.order-activity-section.is-empty .order-activity-chevron{
+  display:none;
+}
+
 .order-activity-list{
   display:grid;
   gap:8px;
@@ -4026,6 +4095,7 @@ button.secondary:active,
 .store-photo-header h3,
 .map-card h2,
 .detail-section-header h2,
+.order-activity-toggle-title,
 .store-empty-state strong,
 .inventory-color-name,
 .inventory-qty strong,
