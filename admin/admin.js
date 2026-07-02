@@ -935,6 +935,18 @@ function summarizeServicesFromForm() {
   return checked.length ? checked.join(" · ") : "No services selected";
 }
 
+function buildCompactShippingAddress(street, city, state, zip) {
+  const streetLine = String(street || "").trim();
+  const cityLine = [String(city || "").trim(), String(state || "").trim()].filter(Boolean).join(", ");
+  const zipLine = String(zip || "").trim();
+  const cityStateZip = [cityLine, zipLine].filter(Boolean).join(" ");
+
+  if (streetLine && cityStateZip) return `${streetLine}, ${cityStateZip}`;
+  if (streetLine) return streetLine;
+  if (cityStateZip) return cityStateZip;
+  return "";
+}
+
 function summarizeShipping(order) {
   if (looksLocalDropOff(order)) return "Local Drop-Off";
 
@@ -945,11 +957,13 @@ function summarizeShipping(order) {
   const state = String(order.state || "").trim();
   const zip = String(order.zipCode || order.zip || "").trim();
   const allowShip = order.allowShipWithoutPayment === true;
-  const hasShippingData = !!(tracking || carrier || street || city || state || zip || allowShip);
+  const address = buildCompactShippingAddress(street, city, state, zip);
+  const hasShippingData = !!(tracking || carrier || address || allowShip);
 
   if (!hasShippingData) return "No shipping info";
 
   const parts = ["Shipped"];
+  if (address) parts.push(address);
   if (carrier && tracking) parts.push(`${carrier} · ${tracking}`);
   else if (tracking) parts.push(tracking);
   else if (carrier) parts.push(carrier);
@@ -969,11 +983,13 @@ function summarizeShippingFromForm() {
   const state = String(document.getElementById("editState")?.value || "").trim();
   const zip = String(document.getElementById("editZipCode")?.value || "").trim();
   const allowShip = document.getElementById("editAllowShipWithoutPayment")?.value === "true";
-  const hasShippingData = !!(tracking || carrier || street || city || state || zip || allowShip);
+  const address = buildCompactShippingAddress(street, city, state, zip);
+  const hasShippingData = !!(tracking || carrier || address || allowShip);
 
   if (!hasShippingData) return "No shipping info";
 
   const parts = ["Shipped"];
+  if (address) parts.push(address);
   if (carrier && tracking) parts.push(`${carrier} · ${tracking}`);
   else if (tracking) parts.push(tracking);
   else if (carrier) parts.push(carrier);
@@ -3136,11 +3152,13 @@ function renderOrderDetail(order) {
     { defaultExpanded: getDefaultSectionExpanded("lace", order) }
   );
 
+  const showOnMapHtml = renderShowOnMapControl(order);
   const shippingSection = renderCollapsibleDetailSection(
     "shipping",
     "Shipping",
     summarizeShipping(order),
     `
+      ${showOnMapHtml ? `<div class="detail-shipping-actions">${showOnMapHtml}</div>` : ""}
       <div class="detail-section-grid">
         <div class="detail-block">
           <div class="label">Allow Ship Without Payment</div>
@@ -3184,7 +3202,6 @@ function renderOrderDetail(order) {
     {
       defaultExpanded: getDefaultSectionExpanded("shipping", order),
       sectionId: "editShippingSection",
-      headerActionsHtml: renderShowOnMapControl(order),
       extraClass: isLocal ? "is-hidden" : ""
     }
   );

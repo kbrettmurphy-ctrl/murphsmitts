@@ -2890,6 +2890,12 @@ button.secondary{
   text-underline-offset:3px;
 }
 
+.detail-shipping-actions{
+  display:flex;
+  justify-content:flex-end;
+  margin:0 0 8px;
+}
+
 .detail-section-grid{
   display:grid;
   gap:10px;
