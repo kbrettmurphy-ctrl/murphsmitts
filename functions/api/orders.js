@@ -211,6 +211,33 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "listOrderActivity") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const orderNumber = cleanText(body.orderNumber);
+      if (!orderNumber) {
+        return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+      }
+
+      const result = await listOrderActivity(env, orderNumber);
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Activity could not be loaded.",
+            details: result.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json({ ok: true, activity: result.activity }, 200, jsonHeaders);
+    }
+
     if (action === "deleteOrder") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -451,6 +478,8 @@ export async function onRequest(context) {
         newPrimaryUsed: Number(updated.primary_lace_used || 0),
         newSecondaryUsed: Number(updated.secondary_lace_used || 0)
       });
+
+      await logOrderActivities(env, getOrderUpdateActivityEvents(oldRow, updated));
       
       if (shouldEmailForStatus) {
         const emailResult = await sendStatusEmail(
@@ -488,6 +517,13 @@ export async function onRequest(context) {
         if (stamp.ok && Array.isArray(stamp.data) && stamp.data[0]) {
           updated = stamp.data[0];
         }
+
+        await logOrderActivity(env, {
+          orderNumber,
+          eventType: "status_email_sent",
+          eventLabel: "Status email sent",
+          eventDetail: normalizeDisplayStatus(updated.status)
+        });
       }
 
       if (shouldTextForStatus) {
@@ -549,6 +585,13 @@ export async function onRequest(context) {
         if (textStamp.ok && Array.isArray(textStamp.data) && textStamp.data[0]) {
           updated = textStamp.data[0];
         }
+
+        await logOrderActivity(env, {
+          orderNumber,
+          eventType: "status_text_sent",
+          eventLabel: "Status text sent",
+          eventDetail: normalizeDisplayStatus(updated.status)
+        });
       }
 
       return json(
@@ -1507,6 +1550,189 @@ async function fetchOrderByNumber(env, orderNumber) {
   };
 }
 
+async function listOrderActivity(env, orderNumber) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/order_activity?select=*&order_number=eq.${encodeURIComponent(orderNumber)}&order=created_at.desc&limit=50`
+  );
+
+  if (!resp.ok) return resp;
+
+  return {
+    ok: true,
+    activity: Array.isArray(resp.data) ? resp.data.map(mapOrderActivityFromDb) : []
+  };
+}
+
+async function logOrderActivities(env, events) {
+  for (const event of events) {
+    await logOrderActivity(env, event);
+  }
+}
+
+async function logOrderActivity(env, event) {
+  const orderNumber = cleanText(event?.orderNumber);
+  const eventType = cleanText(event?.eventType);
+  const eventLabel = cleanText(event?.eventLabel);
+
+  if (!orderNumber || !eventType || !eventLabel) {
+    return { ok: false, error: "Missing activity fields." };
+  }
+
+  try {
+    const resp = await supabaseFetch(
+      env,
+      `/rest/v1/order_activity`,
+      {
+        method: "POST",
+        headers: {
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify({
+          order_number: orderNumber,
+          event_type: eventType,
+          event_label: eventLabel,
+          event_detail: cleanText(event?.eventDetail) || null,
+          actor: cleanText(event?.actor) || "admin",
+          metadata: event?.metadata || null
+        })
+      }
+    );
+
+    if (!resp.ok) {
+      console.warn("Order activity insert failed", resp.error);
+      return { ok: false, error: resp.error };
+    }
+
+    return { ok: true };
+  } catch (err) {
+    console.warn("Order activity insert failed", err);
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
+
+function mapOrderActivityFromDb(row) {
+  return {
+    id: row.id,
+    orderNumber: row.order_number,
+    eventType: row.event_type,
+    eventLabel: row.event_label,
+    eventDetail: row.event_detail,
+    actor: row.actor,
+    metadata: row.metadata,
+    createdAt: row.created_at
+  };
+}
+
+function getOrderUpdateActivityEvents(oldRow, newRow) {
+  const orderNumber = cleanText(newRow.order_number || oldRow.order_number);
+  const events = [];
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "status_changed",
+    eventLabel: "Status changed",
+    oldValue: normalizeDisplayStatus(oldRow.status),
+    newValue: normalizeDisplayStatus(newRow.status)
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "price_changed",
+    eventLabel: "Price changed",
+    oldValue: formatActivityMoney(oldRow.price_quoted),
+    newValue: formatActivityMoney(newRow.price_quoted)
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "paid_changed",
+    eventLabel: "Paid changed",
+    oldValue: oldRow.paid,
+    newValue: newRow.paid
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "date_received_changed",
+    eventLabel: "Date received changed",
+    oldValue: oldRow.date_received,
+    newValue: newRow.date_received
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "estimated_completion_changed",
+    eventLabel: "Estimated completion changed",
+    oldValue: oldRow.estimated_completion,
+    newValue: newRow.estimated_completion
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "date_completed_changed",
+    eventLabel: "Date completed changed",
+    oldValue: oldRow.date_completed,
+    newValue: newRow.date_completed
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "tracking_changed",
+    eventLabel: "Tracking changed",
+    oldValue: formatActivityTracking(oldRow),
+    newValue: formatActivityTracking(newRow)
+  });
+
+  addActivityChange(events, {
+    orderNumber,
+    eventType: "shipping_override_changed",
+    eventLabel: "Shipping override changed",
+    oldValue: formatActivityBoolean(oldRow.allow_ship_without_payment),
+    newValue: formatActivityBoolean(newRow.allow_ship_without_payment)
+  });
+
+  if (cleanText(oldRow.internal_notes) !== cleanText(newRow.internal_notes)) {
+    events.push({
+      orderNumber,
+      eventType: "internal_notes_updated",
+      eventLabel: "Internal notes updated",
+      eventDetail: "Notes changed"
+    });
+  }
+
+  return events;
+}
+
+function addActivityChange(events, change) {
+  const oldValue = cleanText(change.oldValue);
+  const newValue = cleanText(change.newValue);
+  if (oldValue === newValue) return;
+  if (!oldValue && !newValue) return;
+
+  events.push({
+    orderNumber: change.orderNumber,
+    eventType: change.eventType,
+    eventLabel: change.eventLabel,
+    eventDetail: `${oldValue || "blank"} -> ${newValue || "blank"}`
+  });
+}
+
+function formatActivityMoney(value) {
+  if (value === null || value === undefined || value === "") return "";
+  const number = Number(value);
+  if (!Number.isFinite(number)) return cleanText(value);
+  return `$${number.toFixed(2)}`;
+}
+
+function formatActivityTracking(row) {
+  return [cleanText(row.carrier), cleanText(row.tracking_number)].filter(Boolean).join(" ");
+}
+
+function formatActivityBoolean(value) {
+  return toBoolean(value) ? "Yes" : "No";
+}
+
 async function createOrderAction(env, body) {
   const input = body.order || {};
   const customerName = cleanText(input.customerName);
@@ -1578,6 +1804,16 @@ async function createOrderAction(env, body) {
     );
 
     if (insert.ok && Array.isArray(insert.data) && insert.data[0]) {
+      await logOrderActivity(env, {
+        orderNumber: insert.data[0].order_number,
+        eventType: "order_created_manual",
+        eventLabel: "Order created manually",
+        eventDetail: customerName,
+        metadata: {
+          source: "admin"
+        }
+      });
+
       return {
         ok: true,
         order: mapOrderFromDb(insert.data[0])
@@ -1678,6 +1914,13 @@ async function resendStatusEmailAction(env, body) {
     return { ok: false, error: "Status email sent, but delivery status could not be updated.", details: stamp.error };
   }
 
+  await logOrderActivity(env, {
+    orderNumber,
+    eventType: "status_email_resent",
+    eventLabel: "Status email resent",
+    eventDetail: statusDisplay
+  });
+
   return {
     ok: true,
     order: mapOrderFromDb(stamp.data[0])
@@ -1743,6 +1986,13 @@ async function resendStatusTextAction(env, body) {
     return { ok: false, error: "Status text sent, but delivery status could not be updated.", details: stamp.error };
   }
 
+  await logOrderActivity(env, {
+    orderNumber,
+    eventType: "status_text_resent",
+    eventLabel: "Status text resent",
+    eventDetail: statusDisplay
+  });
+
   return {
     ok: true,
     order: mapOrderFromDb(stamp.data[0])
@@ -1800,6 +2050,16 @@ async function uploadOrderPhotoAction(env, body) {
     };
   }
 
+  await logOrderActivity(env, {
+    orderNumber,
+    eventType: "order_photo_added",
+    eventLabel: "Order photo added",
+    eventDetail: "1 photo added",
+    metadata: {
+      path: uploaded.path
+    }
+  });
+
   return {
     ok: true,
     url: uploaded.url,
@@ -1841,6 +2101,13 @@ async function removeOrderPhotoAction(env, body) {
       details: updated.error
     };
   }
+
+  await logOrderActivity(env, {
+    orderNumber,
+    eventType: "order_photo_removed",
+    eventLabel: "Order photo removed",
+    eventDetail: "Photo removed"
+  });
 
   return {
     ok: true,

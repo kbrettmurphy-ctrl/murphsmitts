@@ -2832,6 +2832,66 @@ button.secondary{
   color:#ffb4ae;
 }
 
+.order-activity-list{
+  display:grid;
+  gap:8px;
+}
+
+.order-activity-empty{
+  margin:0;
+  color:rgba(218,202,177,.70);
+  font-size:.84rem;
+}
+
+.order-activity-group{
+  display:grid;
+  gap:3px;
+}
+
+.order-activity-date{
+  color:rgba(218,202,177,.66);
+  font-size:.7rem;
+  font-weight:750;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+}
+
+.order-activity-row{
+  display:grid;
+  grid-template-columns:64px minmax(0,1fr);
+  gap:10px;
+  align-items:start;
+  padding:7px 0;
+  border-top:1px solid rgba(218,202,177,.10);
+}
+
+.order-activity-time{
+  color:rgba(218,202,177,.64);
+  font-size:.78rem;
+  line-height:1.35;
+  white-space:nowrap;
+}
+
+.order-activity-main{
+  display:grid;
+  gap:2px;
+  min-width:0;
+}
+
+.order-activity-main strong{
+  color:var(--cream);
+  font-size:.84rem;
+  font-weight:650;
+  line-height:1.25;
+}
+
+.order-activity-main span{
+  color:rgba(218,202,177,.70);
+  font-size:.81rem;
+  line-height:1.35;
+  overflow-wrap:anywhere;
+}
+
 .detail-grid{
   display:flex;
   flex-direction:column;
@@ -3886,6 +3946,30 @@ button.secondary:active,
 
 .detail-order-status{
   color:rgba(9,47,77,.64);
+}
+
+.order-activity-empty{
+  color:rgba(9,47,77,.62);
+}
+
+.order-activity-date{
+  color:rgba(9,47,77,.56);
+}
+
+.order-activity-row{
+  border-top-color:rgba(9,47,77,.10);
+}
+
+.order-activity-time{
+  color:rgba(9,47,77,.58);
+}
+
+.order-activity-main strong{
+  color:var(--navy);
+}
+
+.order-activity-main span{
+  color:rgba(9,47,77,.66);
 }
 
 .gallery-upload-card select,

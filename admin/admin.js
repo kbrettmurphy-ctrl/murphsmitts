@@ -83,6 +83,7 @@ let galleryPhotoPressTimer = null;
 let galleryPhotoPressStart = null;
 let orderPhotoPressTimer = null;
 let orderPhotoPressStart = null;
+let orderActivityLoadToken = 0;
 let suppressPhotoLightboxUntil = 0;
 let inventoryPressTimer = null;
 let inventoryPressStart = null;
@@ -826,6 +827,115 @@ function renderStatusDelivery(order) {
       <p id="statusDeliveryMessage" class="status-delivery-message" aria-live="polite"></p>
     </div>
   `;
+}
+
+function renderOrderActivity(order) {
+  return `
+    <section id="orderActivitySection" class="detail-section order-activity-section">
+      <div class="detail-section-header">
+        <h2>Activity</h2>
+      </div>
+      <div id="orderActivityList" class="order-activity-list" data-order-number="${escapeAttr(order.orderNumber || "")}">
+        <p class="muted order-activity-empty">Loading activity...</p>
+      </div>
+    </section>
+  `;
+}
+
+async function loadOrderActivity(orderNumber) {
+  const activityList = document.getElementById("orderActivityList");
+  if (!activityList || !orderNumber) return;
+
+  const token = orderActivityLoadToken + 1;
+  orderActivityLoadToken = token;
+
+  try {
+    const data = await postJson({
+      action: "listOrderActivity",
+      orderNumber
+    }, true);
+
+    if (token !== orderActivityLoadToken) return;
+    if (!currentOrder || String(currentOrder.orderNumber) !== String(orderNumber)) return;
+
+    activityList.innerHTML = renderOrderActivityRows(data.activity || []);
+  } catch {
+    if (token !== orderActivityLoadToken) return;
+    activityList.innerHTML = `<p class="muted order-activity-empty">Activity could not be loaded.</p>`;
+  }
+}
+
+function renderOrderActivityRows(activity) {
+  if (!Array.isArray(activity) || !activity.length) {
+    return `<p class="muted order-activity-empty">No activity yet.</p>`;
+  }
+
+  let currentGroup = "";
+  let html = "";
+
+  activity.forEach(item => {
+    const date = parseActivityDate(item.createdAt || item.created_at);
+    const group = formatActivityDateGroup(date);
+    if (group !== currentGroup) {
+      if (currentGroup) html += `</div>`;
+      currentGroup = group;
+      html += `
+        <div class="order-activity-group">
+          <div class="order-activity-date">${escapeHtml(group)}</div>
+      `;
+    }
+
+    html += `
+      <div class="order-activity-row">
+        <time class="order-activity-time">${escapeHtml(formatActivityTime(date))}</time>
+        <div class="order-activity-main">
+          <strong>${escapeHtml(item.eventLabel || item.event_label || "Activity")}</strong>
+          ${item.eventDetail || item.event_detail ? `<span>${escapeHtml(item.eventDetail || item.event_detail)}</span>` : ""}
+        </div>
+      </div>
+    `;
+  });
+
+  if (currentGroup) html += `</div>`;
+  return html;
+}
+
+function parseActivityDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatActivityDateGroup(date) {
+  if (!date) return "Unknown";
+
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (isSameCalendarDay(date, today)) return "Today";
+  if (isSameCalendarDay(date, yesterday)) return "Yesterday";
+
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() === today.getFullYear() ? undefined : "numeric"
+  });
+}
+
+function isSameCalendarDay(a, b) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function formatActivityTime(date) {
+  if (!date) return "";
+  return date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit"
+  });
 }
 
 function formatDeliveryDateTime(value) {
@@ -2560,6 +2670,7 @@ function renderOrderDetail(order) {
       </section>
 
       ${renderPhotoGallery(order)}
+      ${renderOrderActivity(order)}
 
       <div class="detail-delete-row">
         <button id="detailDeleteBtn" class="detail-delete-btn" type="button">Delete Order</button>
@@ -2619,6 +2730,7 @@ function renderOrderDetail(order) {
 
   wireDetailForm();
   wireStatusDeliveryControls(order);
+  loadOrderActivity(order.orderNumber);
 }
 
 function getBlankAdminOrder() {
@@ -3325,6 +3437,7 @@ async function uploadOrderPhotos(order, files) {
   };
   mergeUpdatedOrder(nextOrder);
   refreshOrderPhotoSection(nextOrder);
+  loadOrderActivity(nextOrder.orderNumber);
 
   if (uploaded && failed) {
     setOrderPhotoStatus(`${uploaded} added, ${failed} failed.`);
@@ -3454,6 +3567,7 @@ async function removeOrderPhoto(order, url) {
     };
     mergeUpdatedOrder(nextOrder);
     refreshOrderPhotoSection(nextOrder);
+    loadOrderActivity(nextOrder.orderNumber);
     setOrderPhotoStatus("Photo removed.");
   } catch (err) {
     setOrderPhotoStatus(err.message || "Remove failed.");
@@ -3658,6 +3772,7 @@ async function resendCurrentStatus(kind, order) {
     mergeUpdatedOrder(updated);
     localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
     refreshStatusDelivery(updated, isEmail ? "Status email sent." : "Status text sent.", "success");
+    loadOrderActivity(updated.orderNumber);
   } catch (err) {
     setStatusDeliveryMessage(err.message || "Unable to resend status.", "error");
     if (button) button.disabled = false;
