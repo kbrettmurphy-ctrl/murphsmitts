@@ -2989,10 +2989,27 @@ button.secondary{
   font-weight:650;
 }
 
-.order-activity-toggle-meta{
+.order-activity-toggle-meta,
+.detail-section-summary{
   font-size:.82rem;
   font-weight:500;
   line-height:1.2;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  min-width:0;
+}
+
+.detail-section-toggle-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.detail-section-toggle-row .detail-section-toggle{
+  flex:1;
+  min-width:0;
 }
 
 .order-activity-chevron{
@@ -3003,20 +3020,20 @@ button.secondary{
   transition:transform var(--motion-base, .18s) ease;
 }
 
-.order-activity-section:not(.is-collapsed):not(.is-empty) .order-activity-chevron{
+.detail-collapsible-section:not(.is-collapsed):not(.is-empty) .order-activity-chevron{
   transform:rotate(90deg);
 }
 
-.order-activity-section.is-collapsed .order-activity-list{
+.detail-collapsible-section.is-collapsed .detail-section-body{
   display:none;
 }
 
-.order-activity-section.is-empty .order-activity-toggle{
+.detail-collapsible-section.is-empty .detail-section-toggle{
   cursor:default;
   pointer-events:none;
 }
 
-.order-activity-section.is-empty .order-activity-chevron{
+.detail-collapsible-section.is-empty .order-activity-chevron{
   display:none;
 }
 

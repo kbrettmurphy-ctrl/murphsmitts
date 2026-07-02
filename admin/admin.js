@@ -92,7 +92,9 @@ let galleryPhotoPressStart = null;
 let orderPhotoPressTimer = null;
 let orderPhotoPressStart = null;
 let orderActivityLoadToken = 0;
-let orderActivityUserExpanded = null;
+let orderDetailCollapseState = {};
+let orderDetailCollapseOrderNumber = null;
+let detailCollapseDelegated = false;
 let adminMenuTapSuppressUntil = 0;
 let suppressPhotoLightboxUntil = 0;
 let inventoryPressTimer = null;
@@ -773,38 +775,334 @@ function renderFieldLike(label, value) {
   `;
 }
 
-function renderPhotoGallery(order) {
-  const photos = Array.isArray(order.glovePhotos) ? order.glovePhotos : [];
+function captureOrderDetailCollapseState() {
+  if (!orderDetail) return;
+
+  orderDetail.querySelectorAll("[data-section-key]").forEach(section => {
+    const key = section.dataset.sectionKey;
+    if (!key || section.classList.contains("is-empty")) return;
+    orderDetailCollapseState[key] = !section.classList.contains("is-collapsed");
+  });
+}
+
+function getDefaultSectionExpanded(sectionKey, order) {
+  switch (sectionKey) {
+    case "customer":
+    case "orderStatus":
+      return true;
+    case "gloveDetails":
+    case "lace":
+      return false;
+    case "notes": {
+      const customerNotes = String(order.gloveNotes || order.customerNotes || "").trim();
+      const internalNotes = String(order.internalNotes || "").trim();
+      return !!(customerNotes || internalNotes);
+    }
+    case "photos":
+      return (Array.isArray(order.glovePhotos) ? order.glovePhotos.length : 0) > 0;
+    case "activity":
+      return false;
+    default:
+      return true;
+  }
+}
+
+function getSectionExpanded(sectionKey, defaultExpanded) {
+  if (Object.prototype.hasOwnProperty.call(orderDetailCollapseState, sectionKey)) {
+    return orderDetailCollapseState[sectionKey];
+  }
+  return defaultExpanded;
+}
+
+function summarizeCustomer(order) {
+  const parts = [];
+  const name = String(order.customerName || "").trim();
+  const orderNum = String(order.orderNumber || "").trim();
+  const phone = formatPhoneForInput(order.phoneNumber || "").trim();
+  const email = String(order.emailAddress || "").trim();
+
+  if (name) parts.push(name);
+  if (orderNum) parts.push(`#${orderNum}`);
+  if (phone) parts.push(phone);
+  else if (email) parts.push(email);
+
+  return parts.join(" · ") || "No customer info";
+}
+
+function summarizeOrderStatus(order) {
+  const parts = [];
+  if (order.status) parts.push(order.status);
+  parts.push(normalizeText(order.paid) === "paid" ? "Paid" : "Unpaid");
+
+  const price = formatMoneyForInput(order.priceQuoted);
+  if (price) parts.push(price);
+
+  return parts.join(" · ") || "Status";
+}
+
+function summarizeGloveDetails(order) {
+  const parts = [];
+  if (order.brandModel) parts.push(String(order.brandModel).trim());
+  if (order.gloveType) parts.push(String(order.gloveType).trim());
+  if (order.dropOffMethod) parts.push(String(order.dropOffMethod).trim());
+  return parts.join(" · ") || "No glove details";
+}
+
+function summarizeLace(order) {
+  const parts = [];
+  const primary = String(order.primaryLaceColor || order.lacePrimary || "").trim();
+  const secondary = String(order.secondaryLaceColor || order.laceAccent || "").trim();
+  const primaryUsed = order.primaryLaceUsed;
+  const secondaryUsed = order.secondaryLaceUsed;
+
+  if (primary) parts.push(primary);
+  if (secondary) parts.push(secondary);
+  if (primaryUsed !== null && primaryUsed !== undefined && primaryUsed !== "") {
+    parts.push(`${primaryUsed} primary used`);
+  }
+  if (secondaryUsed !== null && secondaryUsed !== undefined && secondaryUsed !== "") {
+    parts.push(`${secondaryUsed} secondary used`);
+  }
+
+  return parts.join(" · ") || "No lace info";
+}
+
+function summarizeNotes(order) {
+  const customer = String(order.gloveNotes || order.customerNotes || "").trim();
+  const internal = String(order.internalNotes || "").trim();
+
+  if (customer && internal) return "Customer + internal notes";
+  if (customer) return "Customer note";
+  if (internal) return "Internal note";
+  return "No notes";
+}
+
+function summarizePhotos(order) {
+  const count = Array.isArray(order.glovePhotos) ? order.glovePhotos.length : 0;
+  if (!count) return "No photos";
+  return count === 1 ? "1 photo" : `${count} photos`;
+}
+
+function summarizeCustomerFromForm() {
+  const order = currentOrder || {};
+  const phone = formatPhoneForInput(document.getElementById("editPhoneNumber")?.value || "").trim();
+  const email = String(order.emailAddress || "").trim();
+  const parts = [];
+
+  if (order.customerName) parts.push(String(order.customerName).trim());
+  if (order.orderNumber) parts.push(`#${order.orderNumber}`);
+  if (phone) parts.push(phone);
+  else if (email) parts.push(email);
+
+  return parts.join(" · ") || "No customer info";
+}
+
+function summarizeOrderStatusFromForm() {
+  const parts = [];
+  const status = document.getElementById("editStatus")?.value;
+  const paid = document.getElementById("editPaid")?.value;
+  const price = String(document.getElementById("editPriceQuoted")?.value || "").trim();
+
+  if (status) parts.push(status);
+  if (paid) parts.push(paid);
+  if (price) parts.push(price);
+
+  return parts.join(" · ") || "Status";
+}
+
+function summarizeGloveDetailsFromForm() {
+  const parts = [];
+  const brand = String(document.getElementById("editBrandModel")?.value || "").trim();
+  const gloveType = String(document.getElementById("editGloveType")?.value || "").trim();
+  const dropOff = String(document.getElementById("editDropOffMethod")?.value || "").trim();
+
+  if (brand) parts.push(brand);
+  if (gloveType) parts.push(gloveType);
+  if (dropOff) parts.push(dropOff);
+
+  return parts.join(" · ") || "No glove details";
+}
+
+function summarizeLaceFromForm() {
+  const parts = [];
+  const primary = String(document.getElementById("editPrimaryLaceColor")?.value || "").trim();
+  const secondary = String(document.getElementById("editSecondaryLaceColor")?.value || "").trim();
+  const primaryUsed = String(document.getElementById("editPrimaryLaceUsed")?.value || "").trim();
+  const secondaryUsed = String(document.getElementById("editSecondaryLaceUsed")?.value || "").trim();
+
+  if (primary) parts.push(primary);
+  if (secondary) parts.push(secondary);
+  if (primaryUsed) parts.push(`${primaryUsed} primary used`);
+  if (secondaryUsed) parts.push(`${secondaryUsed} secondary used`);
+
+  return parts.join(" · ") || "No lace info";
+}
+
+function summarizeNotesFromForm() {
+  const customer = String(document.getElementById("editGloveNotes")?.value || "").trim();
+  const internal = String(document.getElementById("editInternalNotes")?.value || "").trim();
+
+  if (customer && internal) return "Customer + internal notes";
+  if (customer) return "Customer note";
+  if (internal) return "Internal note";
+  return "No notes";
+}
+
+function getDetailSectionSummary(sectionKey, order = currentOrder) {
+  switch (sectionKey) {
+    case "customer":
+      return orderDetail?.querySelector("#editPhoneNumber")
+        ? summarizeCustomerFromForm()
+        : summarizeCustomer(order || {});
+    case "orderStatus":
+      return orderDetail?.querySelector("#editStatus")
+        ? summarizeOrderStatusFromForm()
+        : summarizeOrderStatus(order || {});
+    case "gloveDetails":
+      return orderDetail?.querySelector("#editBrandModel")
+        ? summarizeGloveDetailsFromForm()
+        : summarizeGloveDetails(order || {});
+    case "lace":
+      return orderDetail?.querySelector("#editPrimaryLaceColor")
+        ? summarizeLaceFromForm()
+        : summarizeLace(order || {});
+    case "notes":
+      return orderDetail?.querySelector("#editGloveNotes")
+        ? summarizeNotesFromForm()
+        : summarizeNotes(order || {});
+    case "photos":
+      return summarizePhotos(order || {});
+    case "activity":
+      return "";
+    default:
+      return "";
+  }
+}
+
+function updateDetailSectionSummary(sectionKey, order = currentOrder) {
+  const summaryEl = orderDetail?.querySelector(`[data-section-summary="${sectionKey}"]`);
+  if (!summaryEl) return;
+
+  const summary = getDetailSectionSummary(sectionKey, order);
+  summaryEl.textContent = summary ? `· ${summary}` : "";
+}
+
+function renderCollapsibleDetailSection(sectionKey, title, summary, bodyHtml, {
+  defaultExpanded = true,
+  isEmpty = false,
+  sectionId = `${sectionKey}Section`,
+  bodyId = `${sectionKey}SectionBody`,
+  headerActionsHtml = ""
+} = {}) {
+  const expanded = getSectionExpanded(sectionKey, defaultExpanded);
+  const collapsed = !isEmpty && !expanded;
+  const ariaExpanded = isEmpty || expanded;
 
   return `
-    <section id="detailPhotoSection" class="detail-section detail-photo-section">
-      <div class="detail-section-header">
-        <h2>Photos</h2>
-        <button id="orderPhotoAddBtn" class="secondary topbar-icon-action detail-photo-add-btn" type="button" aria-label="Add order photos">+</button>
+    <section
+      id="${sectionId}"
+      class="detail-section detail-collapsible-section detail-${sectionKey}-section${collapsed ? " is-collapsed" : ""}${isEmpty ? " is-empty" : ""}"
+      data-section-key="${sectionKey}">
+      <div class="detail-section-toggle-row">
+        <button
+          type="button"
+          class="detail-section-toggle order-activity-toggle"
+          data-section-toggle="${sectionKey}"
+          aria-expanded="${ariaExpanded ? "true" : "false"}"
+          aria-controls="${bodyId}">
+          <span class="order-activity-toggle-main">
+            <span class="order-activity-toggle-title">${escapeHtml(title)}</span>
+            <span class="detail-section-summary muted" data-section-summary="${sectionKey}">${summary ? `· ${escapeHtml(summary)}` : ""}</span>
+          </span>
+          <span class="order-activity-chevron" aria-hidden="true">›</span>
+        </button>
+        ${headerActionsHtml}
       </div>
-
-      <input id="orderPhotoInput" class="order-photo-input" type="file" accept="image/*" multiple>
-      <p id="orderPhotoStatus" class="upload-status order-photo-status" aria-live="polite"></p>
-
-      ${photos.length ? `
-        <div class="photo-grid">
-          ${photos.map((url, index) => `
-            <div class="photo-thumb-wrap">
-              <img
-                class="photo-thumb-img"
-                src="${escapeAttr(url)}"
-                data-index="${index}"
-                alt="Glove photo ${index + 1}"
-                loading="lazy"
-              >
-            </div>
-          `).join("")}
-        </div>
-      ` : `
-        <p class="muted order-photo-empty">No order photos yet.</p>
-      `}
+      <div id="${bodyId}" class="detail-section-body">
+        ${bodyHtml}
+      </div>
     </section>
+  `;
+}
 
+function ensureDetailCollapseDelegation() {
+  if (detailCollapseDelegated || !orderDetail) return;
+
+  detailCollapseDelegated = true;
+  orderDetail.addEventListener("click", (e) => {
+    const toggle = e.target.closest("[data-section-toggle]");
+    if (!toggle) return;
+
+    const key = toggle.dataset.sectionToggle;
+    const section = orderDetail.querySelector(`[data-section-key="${key}"]`);
+    if (!section || section.classList.contains("is-empty")) return;
+
+    const collapsed = section.classList.toggle("is-collapsed");
+    const expanded = !collapsed;
+    orderDetailCollapseState[key] = expanded;
+    toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+  });
+}
+
+function wireDetailSectionSummaries() {
+  const summaryBindings = [
+    { ids: ["editPhoneNumber"], key: "customer" },
+    { ids: ["editStatus", "editPaid", "editPriceQuoted", "editShippingCost"], key: "orderStatus" },
+    { ids: ["editBrandModel", "editGloveType", "editDropOffMethod", "editWebType"], key: "gloveDetails" },
+    { ids: ["editPrimaryLaceColor", "editSecondaryLaceColor", "editPrimaryLaceUsed", "editSecondaryLaceUsed", "editCustomColorRequest"], key: "lace" },
+    { ids: ["editGloveNotes", "editInternalNotes"], key: "notes" }
+  ];
+
+  summaryBindings.forEach(({ ids, key }) => {
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el || el.dataset.summaryBound === "1") return;
+      el.dataset.summaryBound = "1";
+      el.addEventListener("input", () => updateDetailSectionSummary(key));
+      el.addEventListener("change", () => updateDetailSectionSummary(key));
+    });
+  });
+}
+
+function renderPhotoGallery(order) {
+  const photos = Array.isArray(order.glovePhotos) ? order.glovePhotos : [];
+  const photoBody = `
+    <input id="orderPhotoInput" class="order-photo-input" type="file" accept="image/*" multiple>
+    <p id="orderPhotoStatus" class="upload-status order-photo-status" aria-live="polite"></p>
+    ${photos.length ? `
+      <div class="photo-grid">
+        ${photos.map((url, index) => `
+          <div class="photo-thumb-wrap">
+            <img
+              class="photo-thumb-img"
+              src="${escapeAttr(url)}"
+              data-index="${index}"
+              alt="Glove photo ${index + 1}"
+              loading="lazy"
+            >
+          </div>
+        `).join("")}
+      </div>
+    ` : `
+      <p class="muted order-photo-empty">No order photos yet.</p>
+    `}
+  `;
+
+  const photoSection = renderCollapsibleDetailSection(
+    "photos",
+    "Photos",
+    summarizePhotos(order),
+    photoBody,
+    {
+      defaultExpanded: getDefaultSectionExpanded("photos", order),
+      sectionId: "detailPhotoSection",
+      bodyId: "photosSectionBody",
+      headerActionsHtml: `<button id="orderPhotoAddBtn" class="secondary topbar-icon-action detail-photo-add-btn" type="button" aria-label="Add order photos">+</button>`
+    }
+  );
+
+  return `
+    ${photoSection}
     <div id="photoLightbox" class="photo-lightbox">
       <img id="lightboxImage" src="">
     </div>
@@ -866,36 +1164,35 @@ function renderStatusDelivery(order) {
 }
 
 function renderOrderActivity(order) {
-  return `
-    <section id="orderActivitySection" class="detail-section order-activity-section is-collapsed">
-      <button
-        id="orderActivityToggle"
-        class="order-activity-toggle"
-        type="button"
-        aria-expanded="false"
-        aria-controls="orderActivityList">
-        <span class="order-activity-toggle-main">
-          <span class="order-activity-toggle-title">Activity</span>
-          <span id="orderActivityCount" class="order-activity-toggle-meta muted"></span>
-        </span>
-        <span class="order-activity-chevron" aria-hidden="true">›</span>
-      </button>
-      <div id="orderActivityList" class="order-activity-list" data-order-number="${escapeAttr(order.orderNumber || "")}">
-        <p class="muted order-activity-empty">Loading activity...</p>
-      </div>
-    </section>
+  const activityBody = `
+    <div id="orderActivityList" class="order-activity-list" data-order-number="${escapeAttr(order.orderNumber || "")}">
+      <p class="muted order-activity-empty">Loading activity...</p>
+    </div>
   `;
+
+  return renderCollapsibleDetailSection(
+    "activity",
+    "Activity",
+    "",
+    activityBody,
+    {
+      defaultExpanded: false,
+      isEmpty: true,
+      sectionId: "orderActivitySection",
+      bodyId: "activitySectionBody"
+    }
+  );
 }
 
 function formatOrderActivityCount(count) {
   if (!count) return "";
-  return count === 1 ? "· 1 event" : `· ${count} events`;
+  return count === 1 ? "1 event" : `${count} events`;
 }
 
 function updateOrderActivityCollapse(activity, { isError = false } = {}) {
   const section = document.getElementById("orderActivitySection");
-  const toggle = document.getElementById("orderActivityToggle");
-  const countEl = document.getElementById("orderActivityCount");
+  const toggle = section?.querySelector("[data-section-toggle='activity']");
+  const countEl = section?.querySelector("[data-section-summary='activity']");
   if (!section || !toggle) return;
 
   const items = Array.isArray(activity) ? activity : [];
@@ -912,30 +1209,13 @@ function updateOrderActivityCollapse(activity, { isError = false } = {}) {
   section.classList.remove("is-empty");
 
   if (countEl) {
-    countEl.textContent = formatOrderActivityCount(items.length);
+    const countText = formatOrderActivityCount(items.length);
+    countEl.textContent = countText ? `· ${countText}` : "";
   }
 
-  const expanded = orderActivityUserExpanded === null
-    ? false
-    : orderActivityUserExpanded;
-
+  const expanded = getSectionExpanded("activity", false);
   section.classList.toggle("is-collapsed", !expanded);
   toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
-}
-
-function wireOrderActivityCollapse() {
-  const toggle = document.getElementById("orderActivityToggle");
-  if (!toggle) return;
-
-  toggle.addEventListener("click", () => {
-    const section = document.getElementById("orderActivitySection");
-    if (!section || section.classList.contains("is-empty")) return;
-
-    const collapsed = section.classList.toggle("is-collapsed");
-    const expanded = !collapsed;
-    orderActivityUserExpanded = expanded;
-    toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
-  });
 }
 
 async function loadOrderActivity(orderNumber) {
@@ -2540,7 +2820,15 @@ function renderOrders(list) {
 function renderOrderDetail(order) {
   detailMode = "edit";
   currentOrder = order;
-  orderActivityUserExpanded = null;
+
+  const orderNum = String(order.orderNumber || "");
+  if (orderDetailCollapseOrderNumber === orderNum) {
+    captureOrderDetailCollapseState();
+  } else {
+    orderDetailCollapseOrderNumber = orderNum;
+    orderDetailCollapseState = {};
+  }
+
   if (detailTitle) {
     detailTitle.textContent = "Order Detail";
   }
@@ -2555,32 +2843,32 @@ function renderOrderDetail(order) {
   const secondaryLaceColor = order.secondaryLaceColor || order.laceAccent || "";
   const customColorRequest = order.customColorRequest || order.customLaceNotes || "";
 
-  orderDetail.innerHTML = `
-    <div class="detail-form-shell">
-      <section class="detail-section">
-        <div class="detail-section-header">
-          <h2>Customer</h2>
+  const customerSection = renderCollapsibleDetailSection(
+    "customer",
+    "Customer",
+    summarizeCustomer(order),
+    `
+      <div class="detail-section-grid">
+        ${renderFieldLike("Order #", order.orderNumber || "")}
+        ${renderFieldLike("Customer", order.customerName || "")}
+        ${renderPhoneInput("Phone", "editPhoneNumber", order.phoneNumber || "")}
+        ${renderFieldLike("Email", order.emailAddress || "")}
+        <div class="detail-block">
+          <div class="label">Social Tag</div>
+          <input id="editSocialTag" type="text" value="${escapeAttr(order.socialTag || "")}" />
         </div>
+        ${renderReferralSourceEditor(order.referralSource || "")}
+      </div>
+    `,
+    { defaultExpanded: getDefaultSectionExpanded("customer", order) }
+  );
 
-        <div class="detail-section-grid">
-          ${renderFieldLike("Order #", order.orderNumber || "")}
-          ${renderFieldLike("Customer", order.customerName || "")}
-          ${renderPhoneInput("Phone", "editPhoneNumber", order.phoneNumber || "")}
-          ${renderFieldLike("Email", order.emailAddress || "")}
-          <div class="detail-block">
-            <div class="label">Social Tag</div>
-            <input id="editSocialTag" type="text" value="${escapeAttr(order.socialTag || "")}" />
-          </div>
-          ${renderReferralSourceEditor(order.referralSource || "")}
-        </div>
-      </section>
-
-      <section class="detail-section">
-        <div class="detail-section-header">
-          <h2>Order Status</h2>
-        </div>
-
-        <div class="detail-section-grid">
+  const orderStatusSection = renderCollapsibleDetailSection(
+    "orderStatus",
+    "Order Status",
+    summarizeOrderStatus(order),
+    `
+      <div class="detail-section-grid">
           <div class="detail-block">
             <div class="label">Status</div>
             <select id="editStatus">
@@ -2637,138 +2925,157 @@ function renderOrderDetail(order) {
           </div>
 
           ${renderStatusDelivery(order)}
-        </div>
-      </section>
+      </div>
+    `,
+    { defaultExpanded: getDefaultSectionExpanded("orderStatus", order) }
+  );
 
-      <section class="detail-section">
-        <div class="detail-section-header">
-          <h2>Glove Details</h2>
-        </div>
-
-        <div class="detail-section-grid">
-          <div class="detail-block">
-            <div class="label">Brand / Model</div>
-            <input id="editBrandModel" type="text" />
-          </div>
-
-          <div class="detail-block">
-            <div class="label">Glove Type</div>
-            <select id="editGloveType">${gloveTypeOptions(order.gloveType)}</select>
-          </div>
-
-          <div id="editWebTypeWrap" class="detail-block">
-            <div class="label">Web Type</div>
-            <select id="editWebType">${webTypeOptions(order.webType)}</select>
-          </div>
-
-          <div class="detail-block">
-            <div class="label">Drop-Off Method</div>
-            <select id="editDropOffMethod">${dropOffMethodOptions(order.dropOffMethod)}</select>
-          </div>
-        </div>
-      </section>
-
-      <section class="detail-section">
-        <div class="detail-section-header">
-          <h2>Services</h2>
+  const gloveDetailsSection = renderCollapsibleDetailSection(
+    "gloveDetails",
+    "Glove Details",
+    summarizeGloveDetails(order),
+    `
+      <div class="detail-section-grid">
+        <div class="detail-block">
+          <div class="label">Brand / Model</div>
+          <input id="editBrandModel" type="text" />
         </div>
 
-        <div class="detail-section-grid">
-          ${renderServicesEditor(order.servicesRequested || "")}
-        </div>
-      </section>
-
-      <section class="detail-section">
-        <div class="detail-section-header">
-          <h2>Lace</h2>
+        <div class="detail-block">
+          <div class="label">Glove Type</div>
+          <select id="editGloveType">${gloveTypeOptions(order.gloveType)}</select>
         </div>
 
-        <div class="detail-section-grid">
-          ${renderLaceInput("Primary Lace Color", "editPrimaryLaceColor", primaryLaceColor, "Choose")}
-
-          <div class="detail-block">
-            <div class="label">Primary Lace Used</div>
-            <input id="editPrimaryLaceUsed" type="number" step="0.25" min="0" placeholder="0" />
-          </div>
-
-          ${renderLaceInput("Secondary / Accent Lace Color", "editSecondaryLaceColor", secondaryLaceColor, "Only if multi-colors wanted")}
-
-          <div class="detail-block">
-            <div class="label">Secondary Lace Used</div>
-            <input id="editSecondaryLaceUsed" type="number" step="0.25" min="0" placeholder="0" />
-          </div>
-
-          <div class="detail-block full">
-            <div class="label">Custom Color Request</div>
-            <textarea id="editCustomColorRequest" rows="1" placeholder="Don’t see your color? Describe it here.">${escapeHtml(customColorRequest)}</textarea>
-          </div>
-        </div>
-      </section>
-
-      <div id="editShippingSection" class="detail-section ${isLocal ? "is-hidden" : ""}">
-        <div class="detail-section-header">
-          <h2>Shipping</h2>
+        <div id="editWebTypeWrap" class="detail-block">
+          <div class="label">Web Type</div>
+          <select id="editWebType">${webTypeOptions(order.webType)}</select>
         </div>
 
-        <div class="detail-section-grid">
-          <div class="detail-block">
-            <div class="label">Allow Ship Without Payment</div>
-            <select id="editAllowShipWithoutPayment">
-              <option value="false">No</option>
-              <option value="true">Yes</option>
-            </select>
-          </div>
-
-          <div class="detail-block">
-            <div class="label">Tracking Number</div>
-            <input id="editTrackingNumber" type="text" />
-          </div>
-
-          <div class="detail-block">
-            <div class="label">Carrier</div>
-            <select id="editCarrier">${carrierOptions(order.carrier)}</select>
-          </div>
-
-          <div class="detail-block full">
-            <div class="label">Street Address</div>
-            <input id="editStreetAddress" type="text" />
-          </div>
-
-          <div class="detail-block">
-            <div class="label">City</div>
-            <input id="editCity" type="text" />
-          </div>
-
-          <div class="detail-block">
-            <div class="label">State</div>
-            <select id="editState">${stateOptions(order.state)}</select>
-          </div>
-
-          <div class="detail-block">
-            <div class="label">Zip Code</div>
-            <input id="editZipCode" type="text" inputmode="numeric" />
-          </div>
+        <div class="detail-block">
+          <div class="label">Drop-Off Method</div>
+          <select id="editDropOffMethod">${dropOffMethodOptions(order.dropOffMethod)}</select>
         </div>
       </div>
+    `,
+    { defaultExpanded: getDefaultSectionExpanded("gloveDetails", order) }
+  );
 
-      <section class="detail-section">
-        <div class="detail-section-header">
-          <h2>Notes</h2>
+  const servicesSection = `
+    <section class="detail-section">
+      <div class="detail-section-header">
+        <h2>Services</h2>
+      </div>
+      <div class="detail-section-grid">
+        ${renderServicesEditor(order.servicesRequested || "")}
+      </div>
+    </section>
+  `;
+
+  const laceSection = renderCollapsibleDetailSection(
+    "lace",
+    "Lace",
+    summarizeLace(order),
+    `
+      <div class="detail-section-grid">
+        ${renderLaceInput("Primary Lace Color", "editPrimaryLaceColor", primaryLaceColor, "Choose")}
+
+        <div class="detail-block">
+          <div class="label">Primary Lace Used</div>
+          <input id="editPrimaryLaceUsed" type="number" step="0.25" min="0" placeholder="0" />
         </div>
 
-        <div class="detail-section-grid">
-          <div class="detail-block full">
-            <div class="label">Customer Notes</div>
-            <textarea id="editGloveNotes" rows="2"></textarea>
-          </div>
+        ${renderLaceInput("Secondary / Accent Lace Color", "editSecondaryLaceColor", secondaryLaceColor, "Only if multi-colors wanted")}
 
-          <div class="detail-block full">
-            <div class="label">Internal Notes</div>
-            <textarea id="editInternalNotes" rows="2"></textarea>
-          </div>
+        <div class="detail-block">
+          <div class="label">Secondary Lace Used</div>
+          <input id="editSecondaryLaceUsed" type="number" step="0.25" min="0" placeholder="0" />
         </div>
-      </section>
 
+        <div class="detail-block full">
+          <div class="label">Custom Color Request</div>
+          <textarea id="editCustomColorRequest" rows="1" placeholder="Don’t see your color? Describe it here.">${escapeHtml(customColorRequest)}</textarea>
+        </div>
+      </div>
+    `,
+    { defaultExpanded: getDefaultSectionExpanded("lace", order) }
+  );
+
+  const shippingSection = `
+    <div id="editShippingSection" class="detail-section ${isLocal ? "is-hidden" : ""}">
+      <div class="detail-section-header">
+        <h2>Shipping</h2>
+      </div>
+      <div class="detail-section-grid">
+        <div class="detail-block">
+          <div class="label">Allow Ship Without Payment</div>
+          <select id="editAllowShipWithoutPayment">
+            <option value="false">No</option>
+            <option value="true">Yes</option>
+          </select>
+        </div>
+
+        <div class="detail-block">
+          <div class="label">Tracking Number</div>
+          <input id="editTrackingNumber" type="text" />
+        </div>
+
+        <div class="detail-block">
+          <div class="label">Carrier</div>
+          <select id="editCarrier">${carrierOptions(order.carrier)}</select>
+        </div>
+
+        <div class="detail-block full">
+          <div class="label">Street Address</div>
+          <input id="editStreetAddress" type="text" />
+        </div>
+
+        <div class="detail-block">
+          <div class="label">City</div>
+          <input id="editCity" type="text" />
+        </div>
+
+        <div class="detail-block">
+          <div class="label">State</div>
+          <select id="editState">${stateOptions(order.state)}</select>
+        </div>
+
+        <div class="detail-block">
+          <div class="label">Zip Code</div>
+          <input id="editZipCode" type="text" inputmode="numeric" />
+        </div>
+      </div>
+    </div>
+  `;
+
+  const notesSection = renderCollapsibleDetailSection(
+    "notes",
+    "Notes",
+    summarizeNotes(order),
+    `
+      <div class="detail-section-grid">
+        <div class="detail-block full">
+          <div class="label">Customer Notes</div>
+          <textarea id="editGloveNotes" rows="2"></textarea>
+        </div>
+
+        <div class="detail-block full">
+          <div class="label">Internal Notes</div>
+          <textarea id="editInternalNotes" rows="2"></textarea>
+        </div>
+      </div>
+    `,
+    { defaultExpanded: getDefaultSectionExpanded("notes", order) }
+  );
+
+  orderDetail.innerHTML = `
+    <div class="detail-form-shell">
+      ${customerSection}
+      ${orderStatusSection}
+      ${gloveDetailsSection}
+      ${servicesSection}
+      ${laceSection}
+      ${shippingSection}
+      ${notesSection}
       ${renderPhotoGallery(order)}
       ${renderOrderActivity(order)}
 
@@ -2830,7 +3137,8 @@ function renderOrderDetail(order) {
 
   wireDetailForm();
   wireStatusDeliveryControls(order);
-  wireOrderActivityCollapse();
+  ensureDetailCollapseDelegation();
+  wireDetailSectionSummaries();
   loadOrderActivity(order.orderNumber);
 }
 
@@ -3579,6 +3887,10 @@ function refreshOrderPhotoSection(order) {
   const existingSection = document.getElementById("detailPhotoSection");
   if (!existingSection) return;
 
+  if (!Object.prototype.hasOwnProperty.call(orderDetailCollapseState, "photos")) {
+    orderDetailCollapseState.photos = !existingSection.classList.contains("is-collapsed");
+  }
+
   const existingLightbox = document.getElementById("photoLightbox");
   const holder = document.createElement("div");
   holder.innerHTML = renderPhotoGallery(order);
@@ -3592,6 +3904,13 @@ function refreshOrderPhotoSection(order) {
   } else if (nextLightbox) {
     nextSection?.insertAdjacentElement("afterend", nextLightbox);
   }
+
+  const expanded = getSectionExpanded("photos", getDefaultSectionExpanded("photos", order));
+  const section = document.getElementById("detailPhotoSection");
+  const toggle = section?.querySelector("[data-section-toggle='photos']");
+  section?.classList.toggle("is-collapsed", !expanded);
+  toggle?.setAttribute("aria-expanded", expanded ? "true" : "false");
+  updateDetailSectionSummary("photos", order);
 
   wireOrderPhotoControls(order);
   wireOrderPhotoLightbox(order);
@@ -3739,6 +4058,9 @@ function wireDetailForm() {
         }
       });
     }
+
+    updateDetailSectionSummary("gloveDetails");
+    updateDetailSectionSummary("orderStatus");
   }
 
   if (gloveTypeEl) {
