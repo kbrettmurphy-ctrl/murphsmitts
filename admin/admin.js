@@ -5251,7 +5251,7 @@ function renderSaleGloveEditor(glove) {
   saleGlovesList.innerHTML = `
     <div class="store-editor-panel">
       <div class="store-editor-card">
-        <div class="store-editor-header">
+        <div class="upload-card-heading store-editor-header">
           <div>
             <h2>${isNew ? "Add Glove" : "Edit Glove"}</h2>
             <p class="muted">Create or update a glove listing.</p>
@@ -5353,7 +5353,7 @@ function renderSaleGloveEditor(glove) {
 
         ${isNew ? "" : `
            <div class="store-photo-section">
-             <div class="store-photo-header">
+             <div class="upload-card-heading store-photo-header">
                <div>
                  <h3>Photos</h3>
                  <p class="muted">Upload photos and choose the primary and hover images.</p>
@@ -5393,15 +5393,15 @@ function renderSaleGloveEditor(glove) {
            </div>
         `}
 
-        <div class="store-editor-actions">
-           <button id="saveSaleGloveBtn" class="secondary store-save-btn" type="button">
+        <div class="admin-action-row store-editor-actions">
+           <button id="saveSaleGloveBtn" class="secondary admin-action-btn admin-action-btn-primary store-save-btn" type="button">
              ${isNew ? "Create Glove" : "Save Changes"}
            </button>
 
-           <button id="cancelSaleGloveBtn" class="secondary store-cancel-btn" type="button">Cancel</button>
+           <button id="cancelSaleGloveBtn" class="secondary admin-action-btn store-cancel-btn" type="button">Cancel</button>
 
            ${isNew ? "" : `
-             <button id="deleteSaleGloveBtn" class="secondary store-delete-btn" type="button">
+             <button id="deleteSaleGloveBtn" class="secondary admin-action-btn admin-action-btn-danger store-delete-btn" type="button">
                Delete
              </button>
            `}
@@ -5659,7 +5659,7 @@ async function loadSaleGlovePhotos(gloveId) {
                 data-glove-id="${escapeAttr(gloveId)}"
                 data-photo-id="${escapeAttr(photo.id)}"
               >
-                <option value="">Actions</option>
+                <option value="" selected disabled hidden>Actions</option>
                 <option value="primary" ${photo.is_primary ? "disabled" : ""}>
                   Primary
                 </option>
