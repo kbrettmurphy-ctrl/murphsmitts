@@ -12,3 +12,9 @@ _site/
 .jekyll-cache/
 .sass-cache/
 .jekyll-metadata
+
+# Supabase local CLI state
+supabase/.temp/
+
+# Supabase local CLI state
+supabase/.temp/
