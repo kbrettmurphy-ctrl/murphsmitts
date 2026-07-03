@@ -5165,36 +5165,10 @@ function setAdminLongPressArmed(armed) {
   document.body.classList.toggle("admin-longpress-armed", armed);
 }
 
-function clampActionSubmenuToViewport(form) {
-  if (!form) return;
-
-  const margin = 12;
-  const rect = form.getBoundingClientRect();
-  const width = rect.width;
-  const height = rect.height;
-  let left = rect.left;
-  let top = rect.top;
-
-  if (left + width > window.innerWidth - margin) {
-    left = window.innerWidth - margin - width;
-  }
-  if (left < margin) {
-    left = margin;
-  }
-  if (top + height > window.innerHeight - margin) {
-    top = window.innerHeight - margin - height;
-  }
-  if (top < margin) {
-    top = margin;
-  }
-
-  form.style.left = `${left}px`;
-  form.style.top = `${top}px`;
-}
-
 function positionActionSubmenu(root, activeButton) {
   const form = root?.querySelector(".workflow-sheet-form");
-  if (!form) return;
+  const menuEl = root?.querySelector(".workflow-sheet");
+  if (!form || !menuEl) return;
 
   form.classList.remove("is-submenu");
   form.style.left = "";
@@ -5210,41 +5184,31 @@ function positionActionSubmenu(root, activeButton) {
 
   form.classList.add("is-submenu");
 
-  const margin = 12;
-  const gap = 8;
-  const maxWidth = Math.min(360, window.innerWidth - margin * 2);
+  const margin = 16;
+  const gap = 6;
+  const maxWidth = Math.min(360, window.innerWidth - 32);
+  form.style.width = `${Math.min(340, maxWidth)}px`;
   form.style.maxWidth = `${maxWidth}px`;
 
-  const menuRect = root.querySelector(".workflow-sheet")?.getBoundingClientRect();
-  const buttonRect = activeButton.getBoundingClientRect();
-  if (!menuRect) return;
-
-  form.style.visibility = "hidden";
-  form.style.left = "0px";
-  form.style.top = "0px";
-
   requestAnimationFrame(() => {
+    const menuRect = menuEl.getBoundingClientRect();
+    const itemRect = activeButton.getBoundingClientRect();
     const formRect = form.getBoundingClientRect();
-    const width = Math.min(Math.max(formRect.width, 220), maxWidth);
-    const height = formRect.height || 120;
-    const spaceRight = window.innerWidth - margin - (menuRect.right + gap);
-    const spaceLeft = menuRect.left - gap - margin;
-    let left = spaceRight >= width || spaceRight >= spaceLeft
-      ? menuRect.right + gap
-      : menuRect.left - gap - width;
-    let top = buttonRect.top;
+    const width = formRect.width;
+    const height = formRect.height;
 
-    top = Math.min(top, window.innerHeight - margin - height);
-    top = Math.max(margin, top);
-    left = Math.min(Math.max(margin, left), window.innerWidth - margin - width);
+    let viewportLeft = menuRect.right + gap;
+    if (viewportLeft + width > window.innerWidth - margin) {
+      viewportLeft = menuRect.left - gap - width;
+    }
+    viewportLeft = Math.max(margin, Math.min(viewportLeft, window.innerWidth - margin - width));
 
-    form.style.left = `${left}px`;
-    form.style.top = `${top}px`;
+    let viewportTop = itemRect.top;
+    viewportTop = Math.max(margin, Math.min(viewportTop, window.innerHeight - margin - height));
+
+    form.style.left = `${viewportLeft - menuRect.left}px`;
+    form.style.top = `${viewportTop - menuRect.top}px`;
     form.style.visibility = "";
-
-    requestAnimationFrame(() => {
-      clampActionSubmenuToViewport(form);
-    });
   });
 }
 
