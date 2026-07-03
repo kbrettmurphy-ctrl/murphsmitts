@@ -618,27 +618,34 @@ function formatCurrency(value) {
   return `$${moneyNumber(value).toFixed(2)}`;
 }
 
-const BENCH_STATUS_PRIORITY = {
-  "in progress": 1,
-  "received": 2,
-  "waiting on lace/parts": 3,
-  "waiting on parts": 3,
-  "waiting parts": 3
+const ON_DECK_STATUS_PRIORITY = {
+  "in transit to me": 1,
+  "customer approved": 2,
+  "received": 3
 };
 
-function getBenchPriority(order) {
-  return BENCH_STATUS_PRIORITY[normalizeStatus(order?.status)] ?? 99;
+const OUTSTANDING_UNPAID_STATUSES = new Set([
+  "in progress",
+  "ready to go",
+  "completed",
+  "picked up"
+]);
+
+function isOutstandingUnpaidOrder(order) {
+  if (isOnHoldOrder(order) || isPaid(order)) return false;
+  return OUTSTANDING_UNPAID_STATUSES.has(normalizeStatus(order?.status));
 }
 
-function isBenchOrder(order) {
-  return isCurrentOrder(order) && getBenchPriority(order) < 99;
+function isOnDeckOrder(order) {
+  if (!isCurrentOrder(order)) return false;
+  return Object.prototype.hasOwnProperty.call(
+    ON_DECK_STATUS_PRIORITY,
+    normalizeStatus(order?.status)
+  );
 }
 
-function getDashboardGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Morning, Brett. Here's what's on deck.";
-  if (hour < 17) return "Afternoon, Brett. Here's what's on deck.";
-  return "Evening, Brett. Here's what's on deck.";
+function getOnDeckPriority(order) {
+  return ON_DECK_STATUS_PRIORITY[normalizeStatus(order?.status)] ?? 99;
 }
 
 function computeDashboardStats(orders = allOrders) {
@@ -647,8 +654,8 @@ function computeDashboardStats(orders = allOrders) {
   const completedThisMonth = list.filter(isCompletedThisMonth);
   const paidCompletedThisMonth = completedThisMonth.filter(isPaid);
   const revenueThisMonth = paidCompletedThisMonth.reduce((sum, order) => sum + moneyNumber(order.priceQuoted), 0);
-  const unpaidActive = currentOrders.filter(order => !isPaid(order));
-  const outstandingUnpaid = unpaidActive.reduce((sum, order) => sum + moneyNumber(order.priceQuoted), 0);
+  const outstandingOrders = list.filter(isOutstandingUnpaidOrder);
+  const outstandingUnpaid = outstandingOrders.reduce((sum, order) => sum + moneyNumber(order.priceQuoted), 0);
   const turnaroundDays = list
     .filter(isCompletedOrder)
     .map(order => daysBetween(parseOrderDate(order.dateReceived), parseOrderDate(order.dateCompleted)))
@@ -671,26 +678,34 @@ function computeDashboardStats(orders = allOrders) {
     completedThisMonth: completedThisMonth.length,
     revenueThisMonth,
     outstandingUnpaid,
-    unpaidActiveCount: unpaidActive.length,
+    outstandingUnpaidCount: outstandingOrders.length,
     averagePaidOrder,
     averageTurnaround,
     paidOrdersThisMonth: paidCompletedThisMonth.length
   };
 }
 
+function sortDashboardOrders(list, getPriority) {
+  return [...list].sort((a, b) => {
+    if (typeof getPriority === "function") {
+      const priorityDiff = getPriority(a) - getPriority(b);
+      if (priorityDiff !== 0) return priorityDiff;
+    }
+
+    const aNum = Number(String(a.orderNumber || "").replace(/[^\d]/g, "")) || 0;
+    const bNum = Number(String(b.orderNumber || "").replace(/[^\d]/g, "")) || 0;
+    return aNum - bNum;
+  });
+}
+
 function getBenchPreviewOrders(orders = allOrders, limit = 5) {
   const list = Array.isArray(orders) ? orders : [];
-  return list
-    .filter(isBenchOrder)
-    .sort((a, b) => {
-      const priorityDiff = getBenchPriority(a) - getBenchPriority(b);
-      if (priorityDiff !== 0) return priorityDiff;
+  return sortDashboardOrders(list.filter(isInProgressOrder)).slice(0, limit);
+}
 
-      const aNum = Number(String(a.orderNumber || "").replace(/[^\d]/g, "")) || 0;
-      const bNum = Number(String(b.orderNumber || "").replace(/[^\d]/g, "")) || 0;
-      return aNum - bNum;
-    })
-    .slice(0, limit);
+function getOnDeckOrders(orders = allOrders, limit = 5) {
+  const list = Array.isArray(orders) ? orders : [];
+  return sortDashboardOrders(list.filter(isOnDeckOrder), getOnDeckPriority).slice(0, limit);
 }
 
 function getDashboardAttentionItems(orders = allOrders) {
@@ -718,24 +733,6 @@ function getDashboardAttentionItems(orders = allOrders) {
     });
   }
 
-  const customerApproved = eligible.filter(order => normalizeStatus(order.status) === "customer approved");
-  if (customerApproved.length) {
-    items.push({
-      key: "customer-approved",
-      label: `${customerApproved.length} customer approved`,
-      view: "approved"
-    });
-  }
-
-  const inTransit = eligible.filter(order => normalizeStatus(order.status) === "in transit to me");
-  if (inTransit.length) {
-    items.push({
-      key: "in-transit",
-      label: `${inTransit.length} in transit to me`,
-      view: "transit"
-    });
-  }
-
   const staleCustomer = eligible.filter(order => {
     if (!isWaitingOnCustomer(order)) return false;
     const updated = parseOrderDate(order.updatedAt);
@@ -746,12 +743,42 @@ function getDashboardAttentionItems(orders = allOrders) {
   if (staleCustomer.length) {
     items.push({
       key: "stale-customer",
-      label: `${staleCustomer.length} estimate/pending response older than 48h`,
+      label: `${staleCustomer.length} estimates pending over 48 hours`,
       view: "estimate"
     });
   }
 
   return items;
+}
+
+function renderDashboardOrderRow(order) {
+  const lace = String(order.primaryLaceColor || order.lacePrimary || "").trim();
+  const brand = String(order.brandModel || "").trim();
+  const meta = [brand, lace].filter(Boolean).join(" · ");
+
+  return `
+    <div class="dashboard-bench-row">
+      <div class="dashboard-bench-main">
+        <div class="dashboard-bench-title">${escapeHtml(order.customerName || "Customer")}</div>
+        <div class="dashboard-bench-meta">
+          <span>#${escapeHtml(order.orderNumber || "")}</span>
+          ${meta ? `<span>${escapeHtml(meta)}</span>` : ""}
+          <span>${escapeHtml(getOrderStatusDisplay(order.status))}</span>
+        </div>
+      </div>
+      <button
+        class="secondary dashboard-bench-open"
+        type="button"
+        data-dashboard-order="${escapeAttr(order.orderNumber || "")}"
+      >Open</button>
+    </div>
+  `;
+}
+
+function renderDashboardOrderList(orders, emptyMessage) {
+  return orders.length
+    ? orders.map(renderDashboardOrderRow).join("")
+    : `<p class="dashboard-empty muted">${escapeHtml(emptyMessage)}</p>`;
 }
 
 function renderDashboardMetricCard(label, value, { sub = "", view = "" } = {}) {
@@ -774,6 +801,7 @@ function renderHomeDashboard() {
 
   const stats = computeDashboardStats();
   const benchOrders = getBenchPreviewOrders();
+  const onDeckOrders = getOnDeckOrders();
   const attentionItems = getDashboardAttentionItems();
   const avgTurnaroundDisplay = stats.averageTurnaround === null
     ? "—"
@@ -793,7 +821,7 @@ function renderHomeDashboard() {
     renderDashboardMetricCard("Ready to Go", stats.readyToGo, { view: "ready" }),
     renderDashboardMetricCard("In Progress", stats.inProgress, { view: "progress" }),
     renderDashboardMetricCard("Completed This Month", stats.completedThisMonth, { view: "completed" }),
-    renderDashboardMetricCard("Average Turnaround", avgTurnaroundDisplay)
+    renderDashboardMetricCard("Average Turnaround", avgTurnaroundDisplay, { sub: "All completed orders" })
   ].join("");
 
   const financeHtml = [
@@ -801,37 +829,14 @@ function renderHomeDashboard() {
     renderDashboardMetricCard(
       "Outstanding Unpaid",
       formatCurrency(stats.outstandingUnpaid),
-      { sub: `${stats.unpaidActiveCount} orders` }
+      { sub: `${stats.outstandingUnpaidCount} orders` }
     ),
-    renderDashboardMetricCard("Average Paid Order", avgPaidOrderDisplay),
+    renderDashboardMetricCard("Average Paid Order", avgPaidOrderDisplay, { sub: "This month" }),
     renderDashboardMetricCard("Paid Orders This Month", stats.paidOrdersThisMonth)
   ].join("");
 
-  const benchHtml = benchOrders.length
-    ? benchOrders.map(order => {
-        const lace = String(order.primaryLaceColor || order.lacePrimary || "").trim();
-        const brand = String(order.brandModel || "").trim();
-        const meta = [brand, lace].filter(Boolean).join(" · ");
-
-        return `
-          <div class="dashboard-bench-row">
-            <div class="dashboard-bench-main">
-              <div class="dashboard-bench-title">${escapeHtml(order.customerName || "Customer")}</div>
-              <div class="dashboard-bench-meta">
-                <span>#${escapeHtml(order.orderNumber || "")}</span>
-                ${meta ? `<span>${escapeHtml(meta)}</span>` : ""}
-                <span>${escapeHtml(getOrderStatusDisplay(order.status))}</span>
-              </div>
-            </div>
-            <button
-              class="secondary dashboard-bench-open"
-              type="button"
-              data-dashboard-order="${escapeAttr(order.orderNumber || "")}"
-            >Open</button>
-          </div>
-        `;
-      }).join("")
-    : `<p class="dashboard-empty muted">No bench work queued.</p>`;
+  const benchHtml = renderDashboardOrderList(benchOrders, "No bench work queued.");
+  const onDeckHtml = renderDashboardOrderList(onDeckOrders, "No orders on deck.");
 
   const attentionHtml = attentionItems.length
     ? attentionItems.map(item => `
@@ -845,10 +850,6 @@ function renderHomeDashboard() {
 
   dashboardPanel.innerHTML = `
     <div class="dashboard-shell">
-      <div class="dashboard-greeting dashboard-card">
-        <div class="dashboard-greeting-title">${escapeHtml(getDashboardGreeting())}</div>
-      </div>
-
       <section class="dashboard-section">
         <h2 class="dashboard-section-title">Shop Metrics</h2>
         <div class="dashboard-grid">${metricsHtml}</div>
@@ -862,6 +863,11 @@ function renderHomeDashboard() {
       <section class="dashboard-section">
         <h2 class="dashboard-section-title">Today's Bench</h2>
         <div class="dashboard-card dashboard-bench-card">${benchHtml}</div>
+      </section>
+
+      <section class="dashboard-section">
+        <h2 class="dashboard-section-title">On Deck</h2>
+        <div class="dashboard-card dashboard-bench-card">${onDeckHtml}</div>
       </section>
 
       <section class="dashboard-section">
