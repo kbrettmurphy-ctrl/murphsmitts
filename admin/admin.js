@@ -938,7 +938,7 @@ function renderDashboardOrderRow(order, { timerControls = false } = {}) {
   `;
 
   return `
-    <div class="dashboard-bench-row">
+    <div class="dashboard-bench-row" data-order-number="${escapeAttr(order.orderNumber || "")}">
       <div class="dashboard-bench-main">
         <div class="dashboard-bench-title">${escapeHtml(order.customerName || "Customer")}</div>
         <div class="dashboard-bench-meta">
@@ -1358,6 +1358,40 @@ function wireHomeDashboardActions() {
       setActiveView(viewBtn.dataset.dashboardView);
     }
   });
+
+  /* Right-click / long-press on a Clubhouse row opens the workflow
+     sheet, mirroring the Orders list card gesture. Skips the timer
+     button, phase popover, Open button, and any other button so their
+     behavior is untouched. */
+  const resolveDashboardRowOrder = (e) => {
+    if (
+      e.target.closest?.(".dashboard-bench-actions") ||
+      e.target.closest?.(".dashboard-timer-popover") ||
+      e.target.closest?.("button")
+    ) {
+      return null;
+    }
+    const rowEl = e.target.closest?.(".dashboard-bench-row");
+    if (!rowEl) return null;
+    return allOrders.find(o => String(o.orderNumber) === String(rowEl.dataset.orderNumber)) || null;
+  };
+
+  dashboardPanel.addEventListener("contextmenu", (e) => {
+    const order = resolveDashboardRowOrder(e);
+    if (!order) return;
+    e.preventDefault();
+    openWorkflowSheet(order, e);
+  });
+
+  dashboardPanel.addEventListener("touchstart", (e) => {
+    const order = resolveDashboardRowOrder(e);
+    if (!order) return;
+    startWorkflowPress(e, order);
+  }, { passive: true });
+
+  dashboardPanel.addEventListener("touchmove", cancelWorkflowPress, { passive: true });
+  dashboardPanel.addEventListener("touchend", cancelWorkflowPress);
+  dashboardPanel.addEventListener("touchcancel", cancelWorkflowPress);
 
   /* Close the bench timer phase popover on outside clicks by removing
      the element directly — never re-render the dashboard from here
@@ -6764,6 +6798,10 @@ async function submitWorkflowAction(order, actionKey) {
 
   try {
     await saveOrderUpdate(order.orderNumber, updates, true);
+    if (activeView === "dashboard") {
+      renderHomeDashboard();
+      refreshDashboardLaborSessions();
+    }
     closeWorkflowSheet();
   } catch (err) {
     const form = workflowSheetEl.querySelector(".workflow-sheet-form");
