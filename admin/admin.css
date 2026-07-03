@@ -2268,6 +2268,18 @@ button.secondary{
     min-width:var(--admin-menu-min-width);
     max-width:min(var(--admin-menu-max-width), calc(100vw - 24px));
   }
+
+  .workflow-sheet-form.is-submenu{
+    position:fixed;
+    width:max-content;
+    min-width:220px;
+    max-width:min(360px, calc(100vw - 32px));
+    margin:0;
+  }
+
+  .workflow-sheet-form.is-submenu .workflow-form-content{
+    min-width:220px;
+  }
 }
 
 .workflow-sheet-header{
@@ -4838,10 +4850,10 @@ button.secondary,
     --radius:16px;
     --admin-menu-min-width:160px;
     --admin-menu-max-width:240px;
-    --admin-form-compact-max:220px;
-    --admin-form-small-max:280px;
-    --admin-form-large-max:min(320px, calc(100vw - 32px));
-    --admin-submenu-max:280px;
+    --admin-form-compact-max:min(360px, calc(100vw - 32px));
+    --admin-form-small-max:min(360px, calc(100vw - 32px));
+    --admin-form-large-max:min(360px, calc(100vw - 32px));
+    --admin-submenu-max:min(360px, calc(100vw - 32px));
   }
 
   body{

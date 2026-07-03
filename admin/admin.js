@@ -4809,8 +4809,19 @@ function closeWorkflowSheet() {
   workflowSheetEl.classList.remove("open");
   workflowSheetEl.classList.remove("workflow-action-selected", "workflow-form-compact", "workflow-form-small", "workflow-form-large");
   workflowSheetEl.querySelector(".workflow-action-list").innerHTML = "";
-  workflowSheetEl.querySelector(".workflow-sheet-form").innerHTML = "";
-  workflowSheetEl.querySelector(".workflow-sheet-form").classList.remove("is-submenu");
+  const form = workflowSheetEl.querySelector(".workflow-sheet-form");
+  if (form) {
+    form.innerHTML = "";
+    form.classList.remove("is-submenu");
+    form.style.left = "";
+    form.style.top = "";
+    form.style.right = "";
+    form.style.bottom = "";
+    form.style.maxWidth = "";
+    form.style.width = "";
+    form.style.minWidth = "";
+    form.style.visibility = "";
+  }
   document.body.classList.remove("workflow-open");
 }
 
@@ -5127,6 +5138,10 @@ function openAdminActionSubmenu(root, button, html, options = {}) {
   form.style.top = "";
   form.style.right = "";
   form.style.bottom = "";
+  form.style.maxWidth = "";
+  form.style.width = "";
+  form.style.minWidth = "";
+  form.style.visibility = "";
   form.innerHTML = html;
 
   requestAnimationFrame(() => {
@@ -5155,28 +5170,26 @@ function clampActionSubmenuToViewport(form) {
 
   const margin = 12;
   const rect = form.getBoundingClientRect();
-  let deltaLeft = 0;
-  let deltaTop = 0;
+  const width = rect.width;
+  const height = rect.height;
+  let left = rect.left;
+  let top = rect.top;
 
-  if (rect.right > window.innerWidth - margin) {
-    deltaLeft = (window.innerWidth - margin) - rect.right;
+  if (left + width > window.innerWidth - margin) {
+    left = window.innerWidth - margin - width;
   }
-  if (rect.left + deltaLeft < margin) {
-    deltaLeft = margin - rect.left;
+  if (left < margin) {
+    left = margin;
   }
-  if (rect.bottom > window.innerHeight - margin) {
-    deltaTop = (window.innerHeight - margin) - rect.bottom;
+  if (top + height > window.innerHeight - margin) {
+    top = window.innerHeight - margin - height;
   }
-  if (rect.top + deltaTop < margin) {
-    deltaTop = margin - rect.top;
+  if (top < margin) {
+    top = margin;
   }
 
-  if (!deltaLeft && !deltaTop) return;
-
-  const currentLeft = Number.parseFloat(form.style.left) || 0;
-  const currentTop = Number.parseFloat(form.style.top) || 0;
-  form.style.left = `${currentLeft + deltaLeft}px`;
-  form.style.top = `${currentTop + deltaTop}px`;
+  form.style.left = `${left}px`;
+  form.style.top = `${top}px`;
 }
 
 function positionActionSubmenu(root, activeButton) {
@@ -5188,39 +5201,50 @@ function positionActionSubmenu(root, activeButton) {
   form.style.top = "";
   form.style.right = "";
   form.style.bottom = "";
+  form.style.maxWidth = "";
+  form.style.width = "";
+  form.style.minWidth = "";
+  form.style.visibility = "";
 
   if (!isDesktopHoverMenu() || !activeButton || !form.innerHTML.trim()) return;
 
   form.classList.add("is-submenu");
-  const buttonRect = activeButton.getBoundingClientRect();
-  const menuRect = root.querySelector(".workflow-sheet")?.getBoundingClientRect();
-  if (!menuRect) return;
 
   const margin = 12;
   const gap = 8;
   const maxWidth = Math.min(360, window.innerWidth - margin * 2);
   form.style.maxWidth = `${maxWidth}px`;
 
-  const formRect = form.getBoundingClientRect();
-  const width = Math.min(formRect.width || maxWidth, maxWidth);
-  const height = formRect.height || 140;
-  const canOpenRight = buttonRect.right + gap + width <= window.innerWidth - margin;
-  const viewportLeft = canOpenRight
-    ? buttonRect.right + gap
-    : Math.max(margin, buttonRect.left - width - gap);
-  const viewportTop = Math.min(
-    Math.max(margin, buttonRect.top),
-    Math.max(margin, window.innerHeight - height - margin)
-  );
+  const menuRect = root.querySelector(".workflow-sheet")?.getBoundingClientRect();
+  const buttonRect = activeButton.getBoundingClientRect();
+  if (!menuRect) return;
 
-  const left = viewportLeft - menuRect.left;
-  const top = viewportTop - menuRect.top;
-
-  form.style.left = `${left}px`;
-  form.style.top = `${top}px`;
+  form.style.visibility = "hidden";
+  form.style.left = "0px";
+  form.style.top = "0px";
 
   requestAnimationFrame(() => {
-    clampActionSubmenuToViewport(form);
+    const formRect = form.getBoundingClientRect();
+    const width = Math.min(Math.max(formRect.width, 220), maxWidth);
+    const height = formRect.height || 120;
+    const spaceRight = window.innerWidth - margin - (menuRect.right + gap);
+    const spaceLeft = menuRect.left - gap - margin;
+    let left = spaceRight >= width || spaceRight >= spaceLeft
+      ? menuRect.right + gap
+      : menuRect.left - gap - width;
+    let top = buttonRect.top;
+
+    top = Math.min(top, window.innerHeight - margin - height);
+    top = Math.max(margin, top);
+    left = Math.min(Math.max(margin, left), window.innerWidth - margin - width);
+
+    form.style.left = `${left}px`;
+    form.style.top = `${top}px`;
+    form.style.visibility = "";
+
+    requestAnimationFrame(() => {
+      clampActionSubmenuToViewport(form);
+    });
   });
 }
 
