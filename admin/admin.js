@@ -4812,7 +4812,7 @@ function closeWorkflowSheet() {
   const form = workflowSheetEl.querySelector(".workflow-sheet-form");
   if (form) {
     form.innerHTML = "";
-    form.classList.remove("is-submenu");
+    form.classList.remove("is-submenu", "workflow-submenu--confirm", "workflow-submenu--form");
     form.style.left = "";
     form.style.top = "";
     form.style.right = "";
@@ -5107,29 +5107,6 @@ function getWorkflowFormSize(actionKey) {
   return "small";
 }
 
-function getDesktopSubmenuDimensions(root) {
-  const viewportMax = window.innerWidth - 32;
-
-  if (root?.classList.contains("workflow-form-compact")) {
-    return {
-      width: 280,
-      maxWidth: Math.min(300, viewportMax)
-    };
-  }
-
-  if (root?.classList.contains("workflow-form-large")) {
-    return {
-      width: 300,
-      maxWidth: Math.min(320, viewportMax)
-    };
-  }
-
-  return {
-    width: 300,
-    maxWidth: Math.min(320, viewportMax)
-  };
-}
-
 function getInventoryFormSize(action) {
   if (action === "add") return "large";
   if (action === "set") return "compact";
@@ -5156,7 +5133,7 @@ function openAdminActionSubmenu(root, button, html, options = {}) {
     actionBtn.classList.toggle("active", active);
   });
 
-  form.classList.remove("is-submenu");
+  form.classList.remove("is-submenu", "workflow-submenu--confirm", "workflow-submenu--form");
   form.style.left = "";
   form.style.top = "";
   form.style.right = "";
@@ -5166,6 +5143,11 @@ function openAdminActionSubmenu(root, button, html, options = {}) {
   form.style.minWidth = "";
   form.style.visibility = "";
   form.innerHTML = html;
+
+  if (desktopMenu) {
+    const formSize = options.formSize || "small";
+    form.classList.add(formSize === "compact" ? "workflow-submenu--confirm" : "workflow-submenu--form");
+  }
 
   requestAnimationFrame(() => {
     if (desktopMenu) {
@@ -5208,30 +5190,34 @@ function positionActionSubmenu(root, activeButton) {
   form.classList.add("is-submenu");
 
   const margin = 16;
-  const gap = 3;
-  const { width: submenuWidth, maxWidth } = getDesktopSubmenuDimensions(root);
-  form.style.width = `${Math.min(submenuWidth, maxWidth)}px`;
-  form.style.maxWidth = `${maxWidth}px`;
+  const gap = 1;
 
   requestAnimationFrame(() => {
     const menuRect = menuEl.getBoundingClientRect();
     const itemRect = activeButton.getBoundingClientRect();
-    const formRect = form.getBoundingClientRect();
-    const width = formRect.width;
-    const height = formRect.height;
 
-    let viewportLeft = menuRect.right + gap;
-    if (viewportLeft + width > window.innerWidth - margin) {
-      viewportLeft = menuRect.left - gap - width;
-    }
-    viewportLeft = Math.max(margin, Math.min(viewportLeft, window.innerWidth - margin - width));
+    form.style.visibility = "hidden";
+    form.style.left = `${menuRect.right + gap - menuRect.left}px`;
+    form.style.top = `${itemRect.top - menuRect.top}px`;
 
-    let viewportTop = itemRect.top;
-    viewportTop = Math.max(margin, Math.min(viewportTop, window.innerHeight - margin - height));
+    requestAnimationFrame(() => {
+      const formRect = form.getBoundingClientRect();
+      const width = formRect.width;
+      const height = formRect.height;
 
-    form.style.left = `${viewportLeft - menuRect.left}px`;
-    form.style.top = `${viewportTop - menuRect.top}px`;
-    form.style.visibility = "";
+      let viewportLeft = menuRect.right + gap;
+      if (viewportLeft + width > window.innerWidth - margin) {
+        viewportLeft = menuRect.left - gap - width;
+      }
+      viewportLeft = Math.max(margin, Math.min(viewportLeft, window.innerWidth - margin - width));
+
+      let viewportTop = itemRect.top;
+      viewportTop = Math.max(margin, Math.min(viewportTop, window.innerHeight - margin - height));
+
+      form.style.left = `${viewportLeft - menuRect.left}px`;
+      form.style.top = `${viewportTop - menuRect.top}px`;
+      form.style.visibility = "";
+    });
   });
 }
 

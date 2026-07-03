@@ -2269,23 +2269,59 @@ button.secondary{
     max-width:min(var(--admin-menu-max-width), calc(100vw - 24px));
   }
 
-  .workflow-sheet-form.is-submenu{
+  .workflow-sheet-form.is-submenu:not(:empty){
     position:absolute;
-    width:280px;
-    max-width:min(300px, calc(100vw - 32px));
+    width:max-content;
+    inline-size:max-content;
     min-width:0;
+    max-width:calc(100vw - 32px);
     margin:0;
+    box-sizing:border-box;
   }
 
-  .workflow-sheet-root.workflow-form-small .workflow-sheet-form.is-submenu,
-  .workflow-sheet-root.workflow-form-large .workflow-sheet-form.is-submenu{
-    width:300px;
-    max-width:min(320px, calc(100vw - 32px));
+  .workflow-sheet-form.is-submenu.workflow-submenu--confirm{
+    max-width:min(240px, calc(100vw - 32px));
   }
 
-  .workflow-sheet-form.is-submenu .workflow-form-content{
+  .workflow-sheet-form.is-submenu.workflow-submenu--form{
+    width:230px;
+    inline-size:230px;
+    max-width:min(250px, calc(100vw - 32px));
+  }
+
+  .workflow-sheet-root.workflow-form-small .workflow-sheet-form.is-submenu.workflow-submenu--form,
+  .workflow-sheet-root.workflow-form-large .workflow-sheet-form.is-submenu.workflow-submenu--form{
+    width:230px;
+    inline-size:230px;
+    max-width:min(250px, calc(100vw - 32px));
+  }
+
+  .workflow-sheet-form.is-submenu.workflow-submenu--confirm .workflow-form-content,
+  .workflow-sheet-form.is-submenu.workflow-submenu--confirm .workflow-action-form{
+    width:max-content;
+    inline-size:max-content;
+    min-width:0;
+    max-width:100%;
+  }
+
+  .workflow-sheet-form.is-submenu.workflow-submenu--form .workflow-form-content,
+  .workflow-sheet-form.is-submenu.workflow-submenu--form .workflow-action-form{
     width:100%;
     min-width:0;
+    max-width:100%;
+  }
+
+  .workflow-sheet-form.is-submenu .workflow-action-form input,
+  .workflow-sheet-form.is-submenu .workflow-action-form textarea,
+  .workflow-sheet-form.is-submenu .workflow-action-form select{
+    width:100%;
+    min-width:0;
+    max-width:100%;
+  }
+
+  .workflow-sheet-form.is-submenu .workflow-form-actions{
+    width:fit-content;
+    max-width:100%;
   }
 }
 
