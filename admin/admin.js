@@ -954,17 +954,7 @@ function renderFinanceFilterOptions(selectedKey) {
   `).join("");
 }
 
-function renderHomeDashboard() {
-  if (!dashboardPanel) return;
-
-  const stats = computeDashboardStats();
-  const financeStats = computeFinanceStats();
-  const benchOrders = getBenchPreviewOrders();
-  const onDeckOrders = getOnDeckOrders();
-  const attentionItems = getDashboardAttentionItems();
-  const avgTurnaroundDisplay = stats.averageTurnaround === null
-    ? "—"
-    : `${Math.round(stats.averageTurnaround)}d`;
+function renderFinanceMetricCards(financeStats) {
   const avgPaidOrderDisplay = !financeStats.rangeReady || financeStats.averagePaidOrder === null
     ? "—"
     : formatCurrency(financeStats.averagePaidOrder);
@@ -977,6 +967,54 @@ function renderHomeDashboard() {
   const paidOrdersDisplay = financeStats.rangeReady
     ? String(financeStats.paidOrders)
     : "—";
+
+  return [
+    renderDashboardMetricCard("Revenue", revenueDisplay),
+    renderDashboardMetricCard("Outstanding Unpaid", outstandingDisplay),
+    renderDashboardMetricCard("Average Paid Order", avgPaidOrderDisplay),
+    renderDashboardMetricCard("Paid Orders", paidOrdersDisplay)
+  ].join("");
+}
+
+/* Updates only the finance range label and metric cards in place.
+   Must not rebuild the custom date inputs — replacing a focused
+   date input closes the native iOS picker and commits today. */
+function updateFinanceSnapshotSummary() {
+  if (!dashboardPanel) return;
+  const financeSection = dashboardPanel.querySelector(".dashboard-section-finance");
+  if (!financeSection) return;
+
+  const financeStats = computeFinanceStats();
+  const rangeEl = financeSection.querySelector(".dashboard-section-range");
+  if (rangeEl) rangeEl.textContent = financeStats.range.label;
+
+  const grid = financeSection.querySelector(".dashboard-grid-finance");
+  if (grid) grid.innerHTML = renderFinanceMetricCards(financeStats);
+}
+
+function setFinanceFilterMenuOpen(open) {
+  financeFilterMenuOpen = open;
+  const popover = document.getElementById("financeFilterPopover");
+  if (popover) popover.hidden = !open;
+
+  const toggle = document.getElementById("financeFilterToggleBtn");
+  if (toggle) {
+    toggle.classList.toggle("is-active", open);
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+}
+
+function renderHomeDashboard() {
+  if (!dashboardPanel) return;
+
+  const stats = computeDashboardStats();
+  const financeStats = computeFinanceStats();
+  const benchOrders = getBenchPreviewOrders();
+  const onDeckOrders = getOnDeckOrders();
+  const attentionItems = getDashboardAttentionItems();
+  const avgTurnaroundDisplay = stats.averageTurnaround === null
+    ? "—"
+    : `${Math.round(stats.averageTurnaround)}d`;
   const financeRangeLabel = financeStats.range.label;
 
   const metricsHtml = [
@@ -993,12 +1031,7 @@ function renderHomeDashboard() {
     renderDashboardMetricCard("Average Turnaround", avgTurnaroundDisplay, { sub: "All completed orders" })
   ].join("");
 
-  const financeHtml = [
-    renderDashboardMetricCard("Revenue", revenueDisplay),
-    renderDashboardMetricCard("Outstanding Unpaid", outstandingDisplay),
-    renderDashboardMetricCard("Average Paid Order", avgPaidOrderDisplay),
-    renderDashboardMetricCard("Paid Orders", paidOrdersDisplay)
-  ].join("");
+  const financeHtml = renderFinanceMetricCards(financeStats);
 
   const financeCustomHtml = financeFilterKey === "custom"
     ? `
@@ -1117,8 +1150,7 @@ function wireHomeDashboardActions() {
   dashboardPanel.addEventListener("click", (e) => {
     const financeToggle = e.target.closest("#financeFilterToggleBtn");
     if (financeToggle) {
-      financeFilterMenuOpen = !financeFilterMenuOpen;
-      renderHomeDashboard();
+      setFinanceFilterMenuOpen(!financeFilterMenuOpen);
       return;
     }
 
@@ -1142,18 +1174,20 @@ function wireHomeDashboardActions() {
     }
   });
 
+  /* Close the popover without re-rendering the dashboard — a full
+     re-render here would destroy a focused custom date input and
+     kill the native date picker. */
   document.addEventListener("click", (e) => {
     if (!financeFilterMenuOpen) return;
     if (e.target.closest?.(".dashboard-finance-controls")) return;
-    financeFilterMenuOpen = false;
-    renderHomeDashboard();
+    setFinanceFilterMenuOpen(false);
   });
 
   dashboardPanel.addEventListener("change", (e) => {
     if (e.target.matches("[data-finance-custom-date]")) {
       financeFilterCustomStart = document.getElementById("financeCustomStart")?.value || "";
       financeFilterCustomEnd = document.getElementById("financeCustomEnd")?.value || "";
-      renderHomeDashboard();
+      updateFinanceSnapshotSummary();
     }
   });
 }
