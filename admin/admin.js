@@ -135,6 +135,7 @@ let mapRenderToken = 0;
 let financeFilterKey = "ytd";
 let financeFilterCustomStart = "";
 let financeFilterCustomEnd = "";
+let financeFilterMenuOpen = false;
 
 window.inventoryViewMode = "active";
 
@@ -926,19 +927,30 @@ function renderDashboardMetricCard(label, value, { sub = "", view = "" } = {}) {
   `;
 }
 
-function renderFinanceFilterOptions(selectedKey) {
-  const options = [
-    ["this-month", "This Month"],
-    ["last-30-days", "Last 30 Days"],
-    ["last-60-days", "Last 60 Days"],
-    ["ytd", "Year to Date"],
-    ["last-365-days", "Last 365 Days"],
-    ["all-time", "All Time"],
-    ["custom", "Custom"]
-  ];
+const FINANCE_FILTER_OPTIONS = [
+  ["this-month", "This Month", "This Month"],
+  ["last-30-days", "Last 30 Days", "30 Days"],
+  ["last-60-days", "Last 60 Days", "60 Days"],
+  ["ytd", "Year to Date", "YTD"],
+  ["last-365-days", "Last 365 Days", "365 Days"],
+  ["all-time", "All Time", "All Time"],
+  ["custom", "Custom", "Custom"]
+];
 
-  return options.map(([value, label]) => `
-    <option value="${escapeAttr(value)}" ${value === selectedKey ? "selected" : ""}>${escapeHtml(label)}</option>
+function getFinanceFilterShortLabel(key) {
+  const option = FINANCE_FILTER_OPTIONS.find(([value]) => value === key);
+  return option ? option[2] : "YTD";
+}
+
+function renderFinanceFilterOptions(selectedKey) {
+  return FINANCE_FILTER_OPTIONS.map(([value, label]) => `
+    <button
+      type="button"
+      class="dashboard-finance-filter-option${value === selectedKey ? " active" : ""}"
+      role="menuitemradio"
+      aria-checked="${value === selectedKey ? "true" : "false"}"
+      data-finance-filter="${escapeAttr(value)}"
+    >${escapeHtml(label)}</button>
   `).join("");
 }
 
@@ -1061,10 +1073,34 @@ function renderHomeDashboard() {
             <p class="dashboard-section-range muted">${escapeHtml(financeRangeLabel)}</p>
           </div>
           <div class="dashboard-finance-controls">
-            <label class="sr-only" for="financeFilterSelect">Finance date range</label>
-            <select id="financeFilterSelect" class="dashboard-finance-filter">
-              ${renderFinanceFilterOptions(financeFilterKey)}
-            </select>
+            <button
+              id="financeFilterToggleBtn"
+              class="dashboard-finance-filter-toggle${financeFilterMenuOpen ? " is-active" : ""}"
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded="${financeFilterMenuOpen ? "true" : "false"}"
+              aria-controls="financeFilterPopover"
+              aria-label="Finance date range"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 7h16"></path>
+                <circle cx="9" cy="7" r="2"></circle>
+                <path d="M4 17h16"></path>
+                <circle cx="15" cy="17" r="2"></circle>
+              </svg>
+              <span>${escapeHtml(getFinanceFilterShortLabel(financeFilterKey))}</span>
+            </button>
+            <div
+              id="financeFilterPopover"
+              class="admin-filter-popover dashboard-finance-filter-popover"
+              role="menu"
+              aria-label="Finance date range"
+              ${financeFilterMenuOpen ? "" : "hidden"}
+            >
+              <div class="admin-filter-list dashboard-finance-filter-list">
+                ${renderFinanceFilterOptions(financeFilterKey)}
+              </div>
+            </div>
           </div>
         </div>
         ${financeCustomHtml}
@@ -1079,6 +1115,21 @@ function wireHomeDashboardActions() {
   dashboardPanel.dataset.wired = "true";
 
   dashboardPanel.addEventListener("click", (e) => {
+    const financeToggle = e.target.closest("#financeFilterToggleBtn");
+    if (financeToggle) {
+      financeFilterMenuOpen = !financeFilterMenuOpen;
+      renderHomeDashboard();
+      return;
+    }
+
+    const financeOption = e.target.closest("[data-finance-filter]");
+    if (financeOption) {
+      financeFilterKey = financeOption.dataset.financeFilter || "ytd";
+      financeFilterMenuOpen = false;
+      renderHomeDashboard();
+      return;
+    }
+
     const orderBtn = e.target.closest("[data-dashboard-order]");
     if (orderBtn) {
       openOrder(orderBtn.dataset.dashboardOrder, { returnView: "dashboard" });
@@ -1091,13 +1142,14 @@ function wireHomeDashboardActions() {
     }
   });
 
-  dashboardPanel.addEventListener("change", (e) => {
-    if (e.target.id === "financeFilterSelect") {
-      financeFilterKey = e.target.value || "ytd";
-      renderHomeDashboard();
-      return;
-    }
+  document.addEventListener("click", (e) => {
+    if (!financeFilterMenuOpen) return;
+    if (e.target.closest?.(".dashboard-finance-controls")) return;
+    financeFilterMenuOpen = false;
+    renderHomeDashboard();
+  });
 
+  dashboardPanel.addEventListener("change", (e) => {
     if (e.target.matches("[data-finance-custom-date]")) {
       financeFilterCustomStart = document.getElementById("financeCustomStart")?.value || "";
       financeFilterCustomEnd = document.getElementById("financeCustomEnd")?.value || "";
