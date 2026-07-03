@@ -5107,6 +5107,29 @@ function getWorkflowFormSize(actionKey) {
   return "small";
 }
 
+function getDesktopSubmenuDimensions(root) {
+  const viewportMax = window.innerWidth - 32;
+
+  if (root?.classList.contains("workflow-form-compact")) {
+    return {
+      width: 280,
+      maxWidth: Math.min(300, viewportMax)
+    };
+  }
+
+  if (root?.classList.contains("workflow-form-large")) {
+    return {
+      width: 300,
+      maxWidth: Math.min(320, viewportMax)
+    };
+  }
+
+  return {
+    width: 300,
+    maxWidth: Math.min(320, viewportMax)
+  };
+}
+
 function getInventoryFormSize(action) {
   if (action === "add") return "large";
   if (action === "set") return "compact";
@@ -5185,9 +5208,9 @@ function positionActionSubmenu(root, activeButton) {
   form.classList.add("is-submenu");
 
   const margin = 16;
-  const gap = 6;
-  const maxWidth = Math.min(360, window.innerWidth - 32);
-  form.style.width = `${Math.min(340, maxWidth)}px`;
+  const gap = 3;
+  const { width: submenuWidth, maxWidth } = getDesktopSubmenuDimensions(root);
+  form.style.width = `${Math.min(submenuWidth, maxWidth)}px`;
   form.style.maxWidth = `${maxWidth}px`;
 
   requestAnimationFrame(() => {
@@ -5300,11 +5323,11 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
       </div>
     `;
   } else if (actionKey === "customerApproved") {
-    inner = `<div class="workflow-action-form"><p>Mark this order as Customer Approved?</p></div>`;
+    inner = `<div class="workflow-action-form"><p>Mark as Customer Approved?</p></div>`;
   } else if (actionKey === "pendingResponse") {
-    inner = `<div class="workflow-action-form"><p>Place this order in Pending Response?</p></div>`;
+    inner = `<div class="workflow-action-form"><p>Mark as Pending Response?</p></div>`;
   } else if (actionKey === "inTransitToMe") {
-    inner = `<div class="workflow-action-form"><p>Mark this order as In Transit to Me?</p></div>`;
+    inner = `<div class="workflow-action-form"><p>Mark as In Transit to Me?</p></div>`;
   } else if (actionKey === "waitingOnLaceParts") {
     inner = `
       <div class="workflow-action-form">
@@ -5369,7 +5392,7 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
   } else if (actionKey === "markPaid") {
     inner = `
       <div class="workflow-action-form">
-        <p>${normalizeText(order.paid) === "paid" ? "This order is already marked paid." : "Mark this order as paid?"}</p>
+        <p>${normalizeText(order.paid) === "paid" ? "Already marked paid." : "Mark as paid?"}</p>
       </div>
     `;
   }

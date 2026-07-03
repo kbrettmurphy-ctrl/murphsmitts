@@ -2271,10 +2271,16 @@ button.secondary{
 
   .workflow-sheet-form.is-submenu{
     position:absolute;
-    width:340px;
-    max-width:min(360px, calc(100vw - 32px));
-    min-width:220px;
+    width:280px;
+    max-width:min(300px, calc(100vw - 32px));
+    min-width:0;
     margin:0;
+  }
+
+  .workflow-sheet-root.workflow-form-small .workflow-sheet-form.is-submenu,
+  .workflow-sheet-root.workflow-form-large .workflow-sheet-form.is-submenu{
+    width:300px;
+    max-width:min(320px, calc(100vw - 32px));
   }
 
   .workflow-sheet-form.is-submenu .workflow-form-content{
