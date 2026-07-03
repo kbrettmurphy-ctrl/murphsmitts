@@ -1477,8 +1477,7 @@ button.dashboard-metric:active{
 }
 
 .topbar h1,
-#viewTitle,
-#clubhouseTitle{
+#viewTitle{
   margin:0;
   font-size:1.55rem;
   line-height:1;
@@ -4222,7 +4221,8 @@ button.dashboard-metric:active{
   #orderCount,
   #uploadCount,
   #saleGlovesCount,
-  #mapCount{
+  #mapCount,
+  #clubhouseCount{
     font-size:.8rem;
   }
 
@@ -4337,7 +4337,6 @@ body,
 
 .topbar h1,
 #viewTitle,
-#clubhouseTitle,
 #detailView .detail-topbar h1{
   color:var(--navy);
 }
@@ -5255,6 +5254,7 @@ button.secondary,
   #uploadCount,
   #saleGlovesCount,
   #mapCount,
+  #clubhouseCount,
   .detail-topbar-actions .status{
     font-size:.78rem;
   }
