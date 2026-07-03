@@ -979,14 +979,10 @@ function renderHomeDashboard() {
   ].join("");
 
   const financeHtml = [
-    renderDashboardMetricCard("Revenue", revenueDisplay, { sub: financeRangeLabel }),
-    renderDashboardMetricCard(
-      "Outstanding Unpaid",
-      outstandingDisplay,
-      { sub: financeStats.rangeReady ? `${financeStats.outstandingUnpaidCount} orders · ${financeRangeLabel}` : financeRangeLabel }
-    ),
-    renderDashboardMetricCard("Average Paid Order", avgPaidOrderDisplay, { sub: financeRangeLabel }),
-    renderDashboardMetricCard("Paid Orders", paidOrdersDisplay, { sub: financeRangeLabel })
+    renderDashboardMetricCard("Revenue", revenueDisplay),
+    renderDashboardMetricCard("Outstanding Unpaid", outstandingDisplay),
+    renderDashboardMetricCard("Average Paid Order", avgPaidOrderDisplay),
+    renderDashboardMetricCard("Paid Orders", paidOrdersDisplay)
   ].join("");
 
   const financeCustomHtml = financeFilterKey === "custom"
@@ -1029,6 +1025,27 @@ function renderHomeDashboard() {
 
   dashboardPanel.innerHTML = `
     <div class="dashboard-shell">
+      <section class="dashboard-section dashboard-section-bench">
+        <div class="dashboard-section-heading-row">
+          <h2 class="dashboard-section-title">Today's Bench</h2>
+          <span class="dashboard-section-kicker dashboard-section-kicker-primary">Work now</span>
+        </div>
+        <div class="dashboard-card dashboard-bench-card dashboard-bench-card--primary">${benchHtml}</div>
+      </section>
+
+      <section class="dashboard-section dashboard-section-ondeck">
+        <div class="dashboard-section-heading-row">
+          <h2 class="dashboard-section-title">On Deck</h2>
+          <span class="dashboard-section-kicker">Coming up</span>
+        </div>
+        <div class="dashboard-card dashboard-bench-card dashboard-bench-card--secondary">${onDeckHtml}</div>
+      </section>
+
+      <section class="dashboard-section">
+        <h2 class="dashboard-section-title">Needs Attention</h2>
+        <div class="dashboard-card dashboard-attention-card">${attentionHtml}</div>
+      </section>
+
       <section class="dashboard-section">
         <h2 class="dashboard-section-title">Shop Metrics</h2>
         <div class="dashboard-grid">${metricsHtml}</div>
@@ -1049,27 +1066,6 @@ function renderHomeDashboard() {
         </div>
         ${financeCustomHtml}
         <div class="dashboard-grid dashboard-grid-finance">${financeHtml}</div>
-      </section>
-
-      <section class="dashboard-section dashboard-section-bench">
-        <div class="dashboard-section-heading-row">
-          <h2 class="dashboard-section-title">Today's Bench</h2>
-          <span class="dashboard-section-kicker dashboard-section-kicker-primary">Work now</span>
-        </div>
-        <div class="dashboard-card dashboard-bench-card dashboard-bench-card--primary">${benchHtml}</div>
-      </section>
-
-      <section class="dashboard-section dashboard-section-ondeck">
-        <div class="dashboard-section-heading-row">
-          <h2 class="dashboard-section-title">On Deck</h2>
-          <span class="dashboard-section-kicker">Coming up</span>
-        </div>
-        <div class="dashboard-card dashboard-bench-card dashboard-bench-card--secondary">${onDeckHtml}</div>
-      </section>
-
-      <section class="dashboard-section">
-        <h2 class="dashboard-section-title">Needs Attention</h2>
-        <div class="dashboard-card dashboard-attention-card">${attentionHtml}</div>
       </section>
     </div>
   `;
