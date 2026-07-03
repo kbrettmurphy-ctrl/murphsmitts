@@ -727,9 +727,9 @@ function getFinanceDateRange(
     case "this-month":
     default:
       return {
-        start: startOfDay(new Date(today.getFullYear(), today.getMonth(), 1)),
+        start: startOfDay(new Date(today.getFullYear(), 0, 1)),
         end: endOfDay(now),
-        label: "This month"
+        label: "Year to date"
       };
   }
 }
