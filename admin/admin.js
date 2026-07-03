@@ -557,8 +557,12 @@ function isCancelledOrder(order) {
   return normalizeStatus(order?.status) === "cancelled";
 }
 
+function isOnHoldOrder(order) {
+  return normalizeStatus(order?.status) === "on hold";
+}
+
 function isCurrentOrder(order) {
-  return !isCompletedOrder(order) && !isCancelledOrder(order);
+  return !isCompletedOrder(order) && !isCancelledOrder(order) && !isOnHoldOrder(order);
 }
 
 function isWaitingOnCustomer(order) {
@@ -616,24 +620,25 @@ function formatCurrency(value) {
 
 const BENCH_STATUS_PRIORITY = {
   "in progress": 1,
-  "customer approved": 2,
-  "in transit to me": 3,
-  "estimate sent": 4,
-  "pending response": 4,
-  "waiting on lace/parts": 5,
-  "waiting on parts": 5,
-  "waiting parts": 5
+  "received": 2,
+  "waiting on lace/parts": 3,
+  "waiting on parts": 3,
+  "waiting parts": 3
 };
 
 function getBenchPriority(order) {
   return BENCH_STATUS_PRIORITY[normalizeStatus(order?.status)] ?? 99;
 }
 
+function isBenchOrder(order) {
+  return isCurrentOrder(order) && getBenchPriority(order) < 99;
+}
+
 function getDashboardGreeting() {
   const hour = new Date().getHours();
-  if (hour < 12) return "Morning, Brett.";
-  if (hour < 17) return "Afternoon, Brett.";
-  return "Evening, Brett.";
+  if (hour < 12) return "Morning, Brett. Here's what's on deck.";
+  if (hour < 17) return "Afternoon, Brett. Here's what's on deck.";
+  return "Evening, Brett. Here's what's on deck.";
 }
 
 function computeDashboardStats(orders = allOrders) {
@@ -649,7 +654,7 @@ function computeDashboardStats(orders = allOrders) {
     .map(order => daysBetween(parseOrderDate(order.dateReceived), parseOrderDate(order.dateCompleted)))
     .filter(days => days !== null);
 
-  const averageOrderValue = paidCompletedThisMonth.length
+  const averagePaidOrder = paidCompletedThisMonth.length
     ? revenueThisMonth / paidCompletedThisMonth.length
     : null;
 
@@ -667,7 +672,7 @@ function computeDashboardStats(orders = allOrders) {
     revenueThisMonth,
     outstandingUnpaid,
     unpaidActiveCount: unpaidActive.length,
-    averageOrderValue,
+    averagePaidOrder,
     averageTurnaround,
     paidOrdersThisMonth: paidCompletedThisMonth.length
   };
@@ -676,7 +681,7 @@ function computeDashboardStats(orders = allOrders) {
 function getBenchPreviewOrders(orders = allOrders, limit = 5) {
   const list = Array.isArray(orders) ? orders : [];
   return list
-    .filter(order => isCurrentOrder(order) && getBenchPriority(order) < 99)
+    .filter(isBenchOrder)
     .sort((a, b) => {
       const priorityDiff = getBenchPriority(a) - getBenchPriority(b);
       if (priorityDiff !== 0) return priorityDiff;
@@ -693,8 +698,9 @@ function getDashboardAttentionItems(orders = allOrders) {
   const items = [];
   const now = Date.now();
   const staleMs = 48 * 60 * 60 * 1000;
+  const eligible = list.filter(isCurrentOrder);
 
-  const readyUnpaid = list.filter(order => isReadyToGo(order) && !isPaid(order));
+  const readyUnpaid = eligible.filter(order => isReadyToGo(order) && !isPaid(order));
   if (readyUnpaid.length) {
     items.push({
       key: "ready-unpaid",
@@ -703,7 +709,7 @@ function getDashboardAttentionItems(orders = allOrders) {
     });
   }
 
-  const waitingParts = list.filter(order => isCurrentOrder(order) && isWaitingOnParts(order));
+  const waitingParts = eligible.filter(isWaitingOnParts);
   if (waitingParts.length) {
     items.push({
       key: "waiting-parts",
@@ -712,7 +718,25 @@ function getDashboardAttentionItems(orders = allOrders) {
     });
   }
 
-  const staleCustomer = list.filter(order => {
+  const customerApproved = eligible.filter(order => normalizeStatus(order.status) === "customer approved");
+  if (customerApproved.length) {
+    items.push({
+      key: "customer-approved",
+      label: `${customerApproved.length} customer approved`,
+      view: "approved"
+    });
+  }
+
+  const inTransit = eligible.filter(order => normalizeStatus(order.status) === "in transit to me");
+  if (inTransit.length) {
+    items.push({
+      key: "in-transit",
+      label: `${inTransit.length} in transit to me`,
+      view: "transit"
+    });
+  }
+
+  const staleCustomer = eligible.filter(order => {
     if (!isWaitingOnCustomer(order)) return false;
     const updated = parseOrderDate(order.updatedAt);
     if (!updated) return false;
@@ -724,21 +748,6 @@ function getDashboardAttentionItems(orders = allOrders) {
       key: "stale-customer",
       label: `${staleCustomer.length} estimate/pending response older than 48h`,
       view: "estimate"
-    });
-  }
-
-  const lowLace = getLowInventoryItems(laceInventory);
-  if (lowLace.length) {
-    const names = lowLace
-      .slice(0, 3)
-      .map(item => String(item.color || "").trim())
-      .filter(Boolean)
-      .join(", ");
-    const suffix = lowLace.length > 3 ? ` +${lowLace.length - 3} more` : "";
-    items.push({
-      key: "low-lace",
-      label: `Low lace: ${names}${suffix}`,
-      view: "inventory"
     });
   }
 
@@ -769,24 +778,21 @@ function renderHomeDashboard() {
   const avgTurnaroundDisplay = stats.averageTurnaround === null
     ? "—"
     : `${Math.round(stats.averageTurnaround)}d`;
-  const avgOrderValueDisplay = stats.averageOrderValue === null
+  const avgPaidOrderDisplay = stats.averagePaidOrder === null
     ? "—"
-    : formatCurrency(stats.averageOrderValue);
+    : formatCurrency(stats.averagePaidOrder);
 
   const metricsHtml = [
     renderDashboardMetricCard("Current Orders", stats.currentOrders, { view: "current" }),
-    renderDashboardMetricCard("Waiting on Customer", stats.waitingOnCustomer, { view: "estimate" }),
-    renderDashboardMetricCard("Waiting on Lace/Parts", stats.waitingOnParts, { view: "waiting" }),
+    ...(stats.waitingOnCustomer > 0
+      ? [renderDashboardMetricCard("Waiting on Customer", stats.waitingOnCustomer, { view: "estimate" })]
+      : []),
+    ...(stats.waitingOnParts > 0
+      ? [renderDashboardMetricCard("Waiting on Lace/Parts", stats.waitingOnParts, { view: "waiting" })]
+      : []),
     renderDashboardMetricCard("Ready to Go", stats.readyToGo, { view: "ready" }),
     renderDashboardMetricCard("In Progress", stats.inProgress, { view: "progress" }),
     renderDashboardMetricCard("Completed This Month", stats.completedThisMonth, { view: "completed" }),
-    renderDashboardMetricCard("Revenue This Month", formatCurrency(stats.revenueThisMonth)),
-    renderDashboardMetricCard(
-      "Outstanding / Unpaid",
-      formatCurrency(stats.outstandingUnpaid),
-      { sub: `${stats.unpaidActiveCount} active unpaid`, view: "current" }
-    ),
-    renderDashboardMetricCard("Average Order Value", avgOrderValueDisplay),
     renderDashboardMetricCard("Average Turnaround", avgTurnaroundDisplay)
   ].join("");
 
@@ -797,7 +803,7 @@ function renderHomeDashboard() {
       formatCurrency(stats.outstandingUnpaid),
       { sub: `${stats.unpaidActiveCount} orders` }
     ),
-    renderDashboardMetricCard("Average Order Value", avgOrderValueDisplay),
+    renderDashboardMetricCard("Average Paid Order", avgPaidOrderDisplay),
     renderDashboardMetricCard("Paid Orders This Month", stats.paidOrdersThisMonth)
   ].join("");
 
@@ -841,7 +847,6 @@ function renderHomeDashboard() {
     <div class="dashboard-shell">
       <div class="dashboard-greeting dashboard-card">
         <div class="dashboard-greeting-title">${escapeHtml(getDashboardGreeting())}</div>
-        <div class="dashboard-greeting-sub muted">MurphOS shop snapshot</div>
       </div>
 
       <section class="dashboard-section">
@@ -932,7 +937,7 @@ function getOrderStatusDisplay(status) {
 
 function getViewTitle(viewName) {
   switch (viewName) {
-    case "dashboard": return "Dashboard";
+    case "dashboard": return "Clubhouse";
     case "map": return "Map";
     case "upload": return "Gallery";
     case "inventory": return "Lace Inventory";
