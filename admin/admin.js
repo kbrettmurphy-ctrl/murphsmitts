@@ -129,7 +129,7 @@ let listScrollY = 0;
 let orderMap = null;
 let orderMapMarkers = null;
 let mapRenderToken = 0;
-let financeFilterKey = "this-month";
+let financeFilterKey = "ytd";
 let financeFilterCustomStart = "";
 let financeFilterCustomEnd = "";
 
