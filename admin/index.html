@@ -23,7 +23,8 @@
       </div>
 
       <nav class="side-nav">
-        <button class="nav-link nav-main active" data-view="current">Orders</button>
+        <button class="nav-link nav-main active" data-view="dashboard">Dashboard</button>
+        <button class="nav-link nav-main" data-view="current">Orders</button>
         <button class="nav-link nav-main" data-view="map">Map</button>
         <button class="nav-link nav-main" data-view="inventory">Lace Inventory</button>
         <button class="nav-link nav-main" data-view="upload">Gallery</button>
@@ -41,6 +42,29 @@
           <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="PIN" />
           <p id="loginStatus" class="status"></p>
         </div>
+      </section>
+
+      <section id="homeDashboardView" class="view">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="homeMenuBtn" class="icon-btn" aria-label="Open menu">☰</button>
+            <div>
+              <h1>Dashboard</h1>
+              <p class="muted">MurphOS · Shop snapshot</p>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <button id="homeLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
+              <span class="logout-action-text">Log Out</span>
+              <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M10 6H6.8A2.8 2.8 0 0 0 4 8.8v6.4A2.8 2.8 0 0 0 6.8 18H10"></path>
+                <path d="M14 8l4 4-4 4"></path>
+                <path d="M8.8 12H18"></path>
+              </svg>
+            </button>
+          </div>
+        </header>
+        <div id="dashboardPanel" class="dashboard-panel" aria-live="polite"></div>
       </section>
 
       <section id="dashboardView" class="view">

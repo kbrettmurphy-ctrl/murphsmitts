@@ -12,6 +12,8 @@ if ("scrollRestoration" in history) {
 }
 
 const loginView = document.getElementById("loginView");
+const homeDashboardView = document.getElementById("homeDashboardView");
+const dashboardPanel = document.getElementById("dashboardPanel");
 const dashboardView = document.getElementById("dashboardView");
 const detailView = document.getElementById("detailView");
 const uploadView = document.getElementById("uploadView");
@@ -51,6 +53,8 @@ const saveStatusEl = document.getElementById("saveStatus");
 const sideMenu = document.getElementById("sideMenu");
 const menuBackdrop = document.getElementById("menuBackdrop");
 const menuBtn = document.getElementById("menuBtn");
+const homeMenuBtn = document.getElementById("homeMenuBtn");
+const homeLogoutBtn = document.getElementById("homeLogoutBtn");
 const closeMenuBtn = document.getElementById("closeMenuBtn");
 const navLinks = Array.from(document.querySelectorAll(".nav-link"));
 
@@ -76,8 +80,8 @@ const mapUnmappedList = document.getElementById("mapUnmappedList");
 let laceInventory = [];
 let reorderBannerDismissed = false;
 let allOrders = [];
-let activeView = "current";
-let orderDetailReturnView = "current";
+let activeView = "dashboard";
+let orderDetailReturnView = "dashboard";
 let mapFocusOrderNumber = null;
 let mapFocusHandled = false;
 const orderMapMarkerByNumber = new Map();
@@ -156,7 +160,7 @@ function isAdminActionSurface(target) {
    VIEW / MENU
 ========================= */
 function showView(view) {
-  [loginView, dashboardView, detailView, uploadView, mapView, saleGlovesView]
+  [loginView, homeDashboardView, dashboardView, detailView, uploadView, mapView, saleGlovesView]
     .filter(Boolean)
     .forEach(v => v.classList.remove("active"));
 
@@ -179,6 +183,7 @@ function resetAdminScroll(activeContainer = null) {
     document.body,
     mainPanel,
     loginView,
+    homeDashboardView,
     dashboardView,
     detailView,
     uploadView,
@@ -544,6 +549,342 @@ function isCompletedOrder(order) {
   return status === "completed" || status === "picked up";
 }
 
+function isPaid(order) {
+  return normalizeText(order?.paid) === "paid";
+}
+
+function isCancelledOrder(order) {
+  return normalizeStatus(order?.status) === "cancelled";
+}
+
+function isCurrentOrder(order) {
+  return !isCompletedOrder(order) && !isCancelledOrder(order);
+}
+
+function isWaitingOnCustomer(order) {
+  const status = normalizeStatus(order?.status);
+  return status === "estimate sent" || status === "pending response";
+}
+
+function isWaitingOnParts(order) {
+  const status = normalizeStatus(order?.status);
+  return (
+    status === "waiting on lace/parts" ||
+    status === "waiting on parts" ||
+    status === "waiting parts"
+  );
+}
+
+function isReadyToGo(order) {
+  return normalizeStatus(order?.status) === "ready to go";
+}
+
+function isInProgressOrder(order) {
+  return normalizeStatus(order?.status) === "in progress";
+}
+
+function parseOrderDate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  const date = new Date(raw.includes("T") ? raw : `${raw}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isThisMonth(date) {
+  if (!date) return false;
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+}
+
+function isCompletedThisMonth(order) {
+  if (!isCompletedOrder(order)) return false;
+  const completed = parseOrderDate(order.dateCompleted);
+  return completed ? isThisMonth(completed) : false;
+}
+
+function daysBetween(startDate, endDate) {
+  if (!startDate || !endDate) return null;
+  const ms = endDate.getTime() - startDate.getTime();
+  if (ms < 0) return null;
+  return Math.round(ms / (1000 * 60 * 60 * 24));
+}
+
+function formatCurrency(value) {
+  return `$${moneyNumber(value).toFixed(2)}`;
+}
+
+const BENCH_STATUS_PRIORITY = {
+  "in progress": 1,
+  "customer approved": 2,
+  "in transit to me": 3,
+  "estimate sent": 4,
+  "pending response": 4,
+  "waiting on lace/parts": 5,
+  "waiting on parts": 5,
+  "waiting parts": 5
+};
+
+function getBenchPriority(order) {
+  return BENCH_STATUS_PRIORITY[normalizeStatus(order?.status)] ?? 99;
+}
+
+function getDashboardGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Morning, Brett.";
+  if (hour < 17) return "Afternoon, Brett.";
+  return "Evening, Brett.";
+}
+
+function computeDashboardStats(orders = allOrders) {
+  const list = Array.isArray(orders) ? orders : [];
+  const currentOrders = list.filter(isCurrentOrder);
+  const completedThisMonth = list.filter(isCompletedThisMonth);
+  const paidCompletedThisMonth = completedThisMonth.filter(isPaid);
+  const revenueThisMonth = paidCompletedThisMonth.reduce((sum, order) => sum + moneyNumber(order.priceQuoted), 0);
+  const unpaidActive = currentOrders.filter(order => !isPaid(order));
+  const outstandingUnpaid = unpaidActive.reduce((sum, order) => sum + moneyNumber(order.priceQuoted), 0);
+  const turnaroundDays = list
+    .filter(isCompletedOrder)
+    .map(order => daysBetween(parseOrderDate(order.dateReceived), parseOrderDate(order.dateCompleted)))
+    .filter(days => days !== null);
+
+  const averageOrderValue = paidCompletedThisMonth.length
+    ? revenueThisMonth / paidCompletedThisMonth.length
+    : null;
+
+  const averageTurnaround = turnaroundDays.length
+    ? turnaroundDays.reduce((sum, days) => sum + days, 0) / turnaroundDays.length
+    : null;
+
+  return {
+    currentOrders: currentOrders.length,
+    waitingOnCustomer: currentOrders.filter(isWaitingOnCustomer).length,
+    waitingOnParts: currentOrders.filter(isWaitingOnParts).length,
+    readyToGo: currentOrders.filter(isReadyToGo).length,
+    inProgress: currentOrders.filter(isInProgressOrder).length,
+    completedThisMonth: completedThisMonth.length,
+    revenueThisMonth,
+    outstandingUnpaid,
+    unpaidActiveCount: unpaidActive.length,
+    averageOrderValue,
+    averageTurnaround,
+    paidOrdersThisMonth: paidCompletedThisMonth.length
+  };
+}
+
+function getBenchPreviewOrders(orders = allOrders, limit = 5) {
+  const list = Array.isArray(orders) ? orders : [];
+  return list
+    .filter(order => isCurrentOrder(order) && getBenchPriority(order) < 99)
+    .sort((a, b) => {
+      const priorityDiff = getBenchPriority(a) - getBenchPriority(b);
+      if (priorityDiff !== 0) return priorityDiff;
+
+      const aNum = Number(String(a.orderNumber || "").replace(/[^\d]/g, "")) || 0;
+      const bNum = Number(String(b.orderNumber || "").replace(/[^\d]/g, "")) || 0;
+      return aNum - bNum;
+    })
+    .slice(0, limit);
+}
+
+function getDashboardAttentionItems(orders = allOrders) {
+  const list = Array.isArray(orders) ? orders : [];
+  const items = [];
+  const now = Date.now();
+  const staleMs = 48 * 60 * 60 * 1000;
+
+  const readyUnpaid = list.filter(order => isReadyToGo(order) && !isPaid(order));
+  if (readyUnpaid.length) {
+    items.push({
+      key: "ready-unpaid",
+      label: `${readyUnpaid.length} ready to go but unpaid`,
+      view: "ready"
+    });
+  }
+
+  const waitingParts = list.filter(order => isCurrentOrder(order) && isWaitingOnParts(order));
+  if (waitingParts.length) {
+    items.push({
+      key: "waiting-parts",
+      label: `${waitingParts.length} waiting on lace/parts`,
+      view: "waiting"
+    });
+  }
+
+  const staleCustomer = list.filter(order => {
+    if (!isWaitingOnCustomer(order)) return false;
+    const updated = parseOrderDate(order.updatedAt);
+    if (!updated) return false;
+    return now - updated.getTime() >= staleMs;
+  });
+
+  if (staleCustomer.length) {
+    items.push({
+      key: "stale-customer",
+      label: `${staleCustomer.length} estimate/pending response older than 48h`,
+      view: "estimate"
+    });
+  }
+
+  const lowLace = getLowInventoryItems(laceInventory);
+  if (lowLace.length) {
+    const names = lowLace
+      .slice(0, 3)
+      .map(item => String(item.color || "").trim())
+      .filter(Boolean)
+      .join(", ");
+    const suffix = lowLace.length > 3 ? ` +${lowLace.length - 3} more` : "";
+    items.push({
+      key: "low-lace",
+      label: `Low lace: ${names}${suffix}`,
+      view: "inventory"
+    });
+  }
+
+  return items;
+}
+
+function renderDashboardMetricCard(label, value, { sub = "", view = "" } = {}) {
+  const tag = view ? "button" : "div";
+  const attrs = view
+    ? ` type="button" class="dashboard-card dashboard-metric is-clickable" data-dashboard-view="${escapeAttr(view)}"`
+    : ` class="dashboard-card dashboard-metric"`;
+
+  return `
+    <${tag}${attrs}>
+      <span class="dashboard-metric-label">${escapeHtml(label)}</span>
+      <span class="dashboard-metric-value">${escapeHtml(String(value))}</span>
+      ${sub ? `<span class="dashboard-metric-sub">${escapeHtml(sub)}</span>` : ""}
+    </${tag}>
+  `;
+}
+
+function renderHomeDashboard() {
+  if (!dashboardPanel) return;
+
+  const stats = computeDashboardStats();
+  const benchOrders = getBenchPreviewOrders();
+  const attentionItems = getDashboardAttentionItems();
+  const avgTurnaroundDisplay = stats.averageTurnaround === null
+    ? "—"
+    : `${Math.round(stats.averageTurnaround)}d`;
+  const avgOrderValueDisplay = stats.averageOrderValue === null
+    ? "—"
+    : formatCurrency(stats.averageOrderValue);
+
+  const metricsHtml = [
+    renderDashboardMetricCard("Current Orders", stats.currentOrders, { view: "current" }),
+    renderDashboardMetricCard("Waiting on Customer", stats.waitingOnCustomer, { view: "estimate" }),
+    renderDashboardMetricCard("Waiting on Lace/Parts", stats.waitingOnParts, { view: "waiting" }),
+    renderDashboardMetricCard("Ready to Go", stats.readyToGo, { view: "ready" }),
+    renderDashboardMetricCard("In Progress", stats.inProgress, { view: "progress" }),
+    renderDashboardMetricCard("Completed This Month", stats.completedThisMonth, { view: "completed" }),
+    renderDashboardMetricCard("Revenue This Month", formatCurrency(stats.revenueThisMonth)),
+    renderDashboardMetricCard(
+      "Outstanding / Unpaid",
+      formatCurrency(stats.outstandingUnpaid),
+      { sub: `${stats.unpaidActiveCount} active unpaid`, view: "current" }
+    ),
+    renderDashboardMetricCard("Average Order Value", avgOrderValueDisplay),
+    renderDashboardMetricCard("Average Turnaround", avgTurnaroundDisplay)
+  ].join("");
+
+  const financeHtml = [
+    renderDashboardMetricCard("Revenue This Month", formatCurrency(stats.revenueThisMonth)),
+    renderDashboardMetricCard(
+      "Outstanding Unpaid",
+      formatCurrency(stats.outstandingUnpaid),
+      { sub: `${stats.unpaidActiveCount} orders` }
+    ),
+    renderDashboardMetricCard("Average Order Value", avgOrderValueDisplay),
+    renderDashboardMetricCard("Paid Orders This Month", stats.paidOrdersThisMonth)
+  ].join("");
+
+  const benchHtml = benchOrders.length
+    ? benchOrders.map(order => {
+        const lace = String(order.primaryLaceColor || order.lacePrimary || "").trim();
+        const brand = String(order.brandModel || "").trim();
+        const meta = [brand, lace].filter(Boolean).join(" · ");
+
+        return `
+          <div class="dashboard-bench-row">
+            <div class="dashboard-bench-main">
+              <div class="dashboard-bench-title">${escapeHtml(order.customerName || "Customer")}</div>
+              <div class="dashboard-bench-meta">
+                <span>#${escapeHtml(order.orderNumber || "")}</span>
+                ${meta ? `<span>${escapeHtml(meta)}</span>` : ""}
+                <span>${escapeHtml(getOrderStatusDisplay(order.status))}</span>
+              </div>
+            </div>
+            <button
+              class="secondary dashboard-bench-open"
+              type="button"
+              data-dashboard-order="${escapeAttr(order.orderNumber || "")}"
+            >Open</button>
+          </div>
+        `;
+      }).join("")
+    : `<p class="dashboard-empty muted">No bench work queued.</p>`;
+
+  const attentionHtml = attentionItems.length
+    ? attentionItems.map(item => `
+        <button
+          class="dashboard-attention-item"
+          type="button"
+          data-dashboard-view="${escapeAttr(item.view)}"
+        >${escapeHtml(item.label)}</button>
+      `).join("")
+    : `<p class="dashboard-empty muted">Nothing needs attention right now.</p>`;
+
+  dashboardPanel.innerHTML = `
+    <div class="dashboard-shell">
+      <div class="dashboard-greeting dashboard-card">
+        <div class="dashboard-greeting-title">${escapeHtml(getDashboardGreeting())}</div>
+        <div class="dashboard-greeting-sub muted">MurphOS shop snapshot</div>
+      </div>
+
+      <section class="dashboard-section">
+        <h2 class="dashboard-section-title">Shop Metrics</h2>
+        <div class="dashboard-grid">${metricsHtml}</div>
+      </section>
+
+      <section class="dashboard-section">
+        <h2 class="dashboard-section-title">Finance Snapshot</h2>
+        <div class="dashboard-grid dashboard-grid-finance">${financeHtml}</div>
+      </section>
+
+      <section class="dashboard-section">
+        <h2 class="dashboard-section-title">Today's Bench</h2>
+        <div class="dashboard-card dashboard-bench-card">${benchHtml}</div>
+      </section>
+
+      <section class="dashboard-section">
+        <h2 class="dashboard-section-title">Needs Attention</h2>
+        <div class="dashboard-card dashboard-attention-card">${attentionHtml}</div>
+      </section>
+    </div>
+  `;
+}
+
+function wireHomeDashboardActions() {
+  if (!dashboardPanel || dashboardPanel.dataset.wired === "true") return;
+  dashboardPanel.dataset.wired = "true";
+
+  dashboardPanel.addEventListener("click", (e) => {
+    const orderBtn = e.target.closest("[data-dashboard-order]");
+    if (orderBtn) {
+      openOrder(orderBtn.dataset.dashboardOrder, { returnView: "dashboard" });
+      return;
+    }
+
+    const viewBtn = e.target.closest("[data-dashboard-view]");
+    if (viewBtn) {
+      setActiveView(viewBtn.dataset.dashboardView);
+    }
+  });
+}
+
 function isWaitingForCustomerResponse(order) {
   return normalizeStatus(order.status) === "pending response";
 }
@@ -591,6 +932,7 @@ function getOrderStatusDisplay(status) {
 
 function getViewTitle(viewName) {
   switch (viewName) {
+    case "dashboard": return "Dashboard";
     case "map": return "Map";
     case "upload": return "Gallery";
     case "inventory": return "Lace Inventory";
@@ -2360,18 +2702,20 @@ function toggleDesktopOrderActionMenu(row, button, order) {
 
 function normalizeAdminView(viewName) {
   const view = String(viewName || "").trim().toLowerCase();
-  if (!view || view === "orders") return "current";
+  if (!view || view === "dashboard") return "dashboard";
+  if (view === "orders" || view === "current") return "current";
   if (view === "map") return "map";
   if (view === "upload") return "upload";
   if (view === "inventory") return "inventory";
   if (view === "gloves-sale") return "gloves-sale";
   if (isOrderFilterView(view)) return view;
-  return "current";
+  return "dashboard";
 }
 
 function isKnownAdminView(viewName) {
   const view = String(viewName || "").trim().toLowerCase();
-  if (!view || view === "orders") return true;
+  if (!view || view === "dashboard") return true;
+  if (view === "orders" || view === "current") return true;
   return ["map", "upload", "inventory", "gloves-sale"].includes(view) || isOrderFilterView(view);
 }
 
@@ -2379,7 +2723,10 @@ function syncAdminViewUrl(viewName) {
   const view = normalizeAdminView(viewName);
   const url = new URL(window.location.href);
 
-  if (view === "map") {
+  if (view === "dashboard") {
+    url.searchParams.delete("view");
+    url.searchParams.delete("order");
+  } else if (view === "map") {
     url.searchParams.set("view", "map");
     if (mapFocusOrderNumber) {
       url.searchParams.set("order", String(mapFocusOrderNumber));
@@ -2396,11 +2743,7 @@ function syncAdminViewUrl(viewName) {
     url.searchParams.set("view", "gloves-sale");
     url.searchParams.delete("order");
   } else if (isOrderFilterView(view)) {
-    if (view === "current") {
-      url.searchParams.delete("view");
-    } else {
-      url.searchParams.set("view", "orders");
-    }
+    url.searchParams.set("view", "orders");
     url.searchParams.delete("order");
   }
 
@@ -2413,7 +2756,7 @@ function syncAdminViewUrl(viewName) {
 
 function setActiveView(viewName) {
   if (!isAuthenticated()) {
-    activeView = "current";
+    activeView = "dashboard";
     showView(loginView);
     closeMenu();
     syncAuthUI();
@@ -2430,13 +2773,25 @@ function setActiveView(viewName) {
   inventoryFiltersExpanded = false;
   activeView = resolvedView;
   navLinks.forEach(link => {
+    const isDashboardLink = link.dataset.view === "dashboard" && resolvedView === "dashboard";
     const isOrdersLink = link.dataset.view === "current" && isOrderFilterView(resolvedView);
-    link.classList.toggle("active", link.dataset.view === resolvedView || isOrdersLink);
+    link.classList.toggle("active", isDashboardLink || isOrdersLink || link.dataset.view === resolvedView);
   });
 
-  viewTitle.textContent = getViewTitle(resolvedView);
+  if (viewTitle) {
+    viewTitle.textContent = getViewTitle(resolvedView);
+  }
   syncOrderFilterUI();
   syncInventoryFilterUI();
+
+  if (resolvedView === "dashboard") {
+    syncAdminViewUrl(resolvedView);
+    renderHomeDashboard();
+    showView(homeDashboardView);
+    closeMenu();
+    resetViewScroll(homeDashboardView, { blurActive: true });
+    return;
+  }
 
   if (resolvedView === "upload") {
     syncAdminViewUrl(resolvedView);
@@ -2718,7 +3073,9 @@ async function refreshActiveViewFromPull() {
   setPullRefreshIndicator(74, "refreshing");
 
   try {
-    if (isOrderFilterView(activeView)) {
+    if (activeView === "dashboard") {
+      await loadOrders();
+    } else if (isOrderFilterView(activeView)) {
       await loadOrders();
     } else if (activeView === "map") {
       if (mapStatus) mapStatus.textContent = "Refreshing orders...";
@@ -6228,7 +6585,7 @@ async function login(pinValue) {
     loginStatus.textContent = "";
     syncAuthUI();
     await loadOrders();
-    setActiveView("current");
+    setActiveView("dashboard");
   } catch (err) {
     loginStatus.textContent = err.message;
     pinInput.value = "";
@@ -6258,6 +6615,10 @@ async function loadOrders() {
    } catch {
      // Don't block orders if inventory check fails.
    }
+
+  if (activeView === "dashboard") {
+    renderHomeDashboard();
+  }
 }
 
 async function loadSaleGloves() {
@@ -8119,6 +8480,15 @@ if (saveOrderBtn) {
 }
 
 menuBtn.addEventListener("click", openMenu);
+homeMenuBtn?.addEventListener("click", openMenu);
+homeLogoutBtn?.addEventListener("click", () => {
+  clearToken();
+  currentOrder = null;
+  clearSaveStatus();
+  closeMenu();
+  syncAuthUI();
+  showView(loginView);
+});
 closeMenuBtn.addEventListener("click", closeMenu);
 menuBackdrop.addEventListener("click", closeMenu);
 
@@ -8185,6 +8555,7 @@ document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
   installSwipeDeleteStyles();
   initUploadView();
   initPullToRefresh();
+  wireHomeDashboardActions();
   searchExpanded = false;
   syncSearchUI();
   syncAuthUI();
@@ -8198,7 +8569,7 @@ document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
   try {
     await loadOrders();
     const deepLinkView = readAdminDeepLink();
-    setActiveView(deepLinkView || "current");
+    setActiveView(deepLinkView || "dashboard");
   } catch (err) {
     clearToken();
     closeMenu();
