@@ -604,7 +604,7 @@ button.secondary{
 }
 
 .store-photo-grid{
-  grid-template-columns:repeat(auto-fill,minmax(104px,1fr));
+  grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
 }
 
 .upload-preview-item{
@@ -803,9 +803,8 @@ button.secondary{
   font-weight:700;
 }
 
-/* Shared compact photo action selects (Store + Gallery) — sizing only; theme below */
-.gallery-manager-action-select,
-.sale-photo-action-select{
+/* Gallery manager photo action select — compact sizing; theme below */
+.gallery-manager-action-select{
   width:100%;
   max-width:116px;
   height:28px;
@@ -813,6 +812,23 @@ button.secondary{
   display:block;
   margin:0 auto;
   padding:0 22px 0 7px;
+  border-radius:10px;
+  font-size:.8rem;
+  font-weight:600;
+  line-height:1.2;
+}
+
+/* Gloves For Sale photo role select — native select, wide enough for Primary/Hover/Action */
+.sale-photo-action-select{
+  box-sizing:border-box;
+  width:100%;
+  min-width:130px;
+  max-width:min(150px, 100%);
+  height:28px;
+  min-height:28px;
+  display:block;
+  margin:0 auto;
+  padding:0 24px 0 8px;
   border-radius:10px;
   font-size:.8rem;
   font-weight:600;
