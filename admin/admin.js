@@ -100,6 +100,9 @@ let galleryPhotoPressStart = null;
 let orderPhotoPressTimer = null;
 let orderPhotoPressStart = null;
 let orderActivityLoadToken = 0;
+let laborTimerLoadToken = 0;
+let laborTimerTickInterval = null;
+let laborTimerDelegated = false;
 let orderDetailCollapseState = {};
 let orderDetailCollapseOrderNumber = null;
 let detailCollapseDelegated = false;
@@ -1992,6 +1995,335 @@ function formatActivityTime(date) {
   });
 }
 
+const LABOR_TIMER_PHASES = [
+  "Inspection",
+  "Cleaning",
+  "Relacing",
+  "Conditioning",
+  "Palm Pad",
+  "Photos",
+  "Packing/Shipping",
+  "Admin/Messaging",
+  "Other"
+];
+
+function formatLaborDuration(minutes) {
+  const totalMinutes = Number(minutes);
+  if (!Number.isFinite(totalMinutes) || totalMinutes < 0) return "—";
+
+  const rounded = Math.round(totalMinutes);
+  if (rounded < 60) return `${rounded}m`;
+
+  const hours = Math.floor(rounded / 60);
+  const remainder = rounded % 60;
+  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+}
+
+function formatLaborElapsed(startedAt) {
+  const started = new Date(startedAt);
+  if (Number.isNaN(started.getTime())) return "—";
+  const minutes = (Date.now() - started.getTime()) / 60000;
+  return formatLaborDuration(minutes);
+}
+
+function formatLaborDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value || "");
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function getLaborSessionsSummary(sessions) {
+  if (!Array.isArray(sessions) || !sessions.length) return "";
+
+  const active = sessions.find(session => !session.endedAt);
+  if (active) return `Running · ${active.phase}`;
+
+  const totalMinutes = sessions
+    .filter(session => session.endedAt)
+    .reduce((sum, session) => sum + Number(session.durationMinutes || 0), 0);
+
+  if (totalMinutes > 0) return `${formatLaborDuration(totalMinutes)} logged`;
+  return "";
+}
+
+function renderLaborPhaseOptions(selectedPhase = "") {
+  const selected = String(selectedPhase || "");
+  return `
+    <option value="">Select phase</option>
+    ${LABOR_TIMER_PHASES.map(phase => `
+      <option value="${escapeAttr(phase)}"${phase === selected ? " selected" : ""}>${escapeHtml(phase)}</option>
+    `).join("")}
+  `;
+}
+
+function renderLaborTimerSection(order) {
+  const body = `
+    <div id="laborTimerPanel" class="labor-timer" data-order-number="${escapeAttr(order.orderNumber || "")}">
+      <p class="muted labor-timer-empty">Loading labor timer...</p>
+    </div>
+  `;
+
+  return renderCollapsibleDetailSection(
+    "laborTimer",
+    "Labor Timer",
+    "",
+    body,
+    {
+      defaultExpanded: getDefaultSectionExpanded("laborTimer"),
+      sectionId: "laborTimerSection",
+      bodyId: "laborTimerSectionBody"
+    }
+  );
+}
+
+function renderLaborSessionRows(sessions) {
+  const completed = (Array.isArray(sessions) ? sessions : [])
+    .filter(session => session.endedAt)
+    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+
+  if (!completed.length) {
+    return `<p class="muted labor-timer-empty">No labor logged yet.</p>`;
+  }
+
+  return `
+    <div class="labor-session-list">
+      ${completed.map(session => `
+        <div class="labor-session-row">
+          <div class="labor-session-main">
+            <strong>${escapeHtml(session.phase || "Work")}</strong>
+            <span class="labor-session-duration">${escapeHtml(formatLaborDuration(session.durationMinutes))}</span>
+          </div>
+          <div class="labor-session-meta muted">
+            <span>${escapeHtml(formatLaborDateTime(session.startedAt))}</span>
+            ${session.notes ? `<span class="labor-session-notes">${escapeHtml(session.notes)}</span>` : ""}
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderLaborTimerPanel(sessions, { error = "" } = {}) {
+  const active = (Array.isArray(sessions) ? sessions : []).find(session => !session.endedAt) || null;
+  const totalMinutes = (Array.isArray(sessions) ? sessions : [])
+    .filter(session => session.endedAt)
+    .reduce((sum, session) => sum + Number(session.durationMinutes || 0), 0);
+  const notesValue = active?.notes || "";
+  const selectedPhase = active?.phase || "";
+
+  return `
+    ${error ? `<p class="labor-timer-error" role="alert">${escapeHtml(error)}</p>` : ""}
+
+    ${active ? `
+      <div class="labor-timer-card labor-timer-card--active">
+        <div class="labor-timer-active-label">Active timer</div>
+        <div class="labor-timer-active-main">
+          <strong>${escapeHtml(active.phase)}</strong>
+          <span id="laborTimerElapsed" class="labor-timer-elapsed">${escapeHtml(formatLaborElapsed(active.startedAt))}</span>
+        </div>
+        <div class="labor-timer-active-meta muted">
+          Started ${escapeHtml(formatLaborDateTime(active.startedAt))}
+        </div>
+      </div>
+    ` : ""}
+
+    <div class="labor-timer-card labor-timer-controls">
+      <div class="labor-timer-field">
+        <label class="labor-timer-label" for="laborTimerPhase">Phase</label>
+        <select id="laborTimerPhase" class="labor-timer-select"${active ? " disabled" : ""}>
+          ${renderLaborPhaseOptions(selectedPhase)}
+        </select>
+      </div>
+
+      <div class="labor-timer-field">
+        <label class="labor-timer-label" for="laborTimerNotes">Notes</label>
+        <textarea
+          id="laborTimerNotes"
+          class="labor-timer-notes"
+          rows="2"
+          placeholder="Optional notes for this session"
+        >${escapeHtml(notesValue)}</textarea>
+      </div>
+
+      <div class="labor-timer-actions">
+        <button
+          id="laborTimerStartBtn"
+          class="labor-timer-btn"
+          type="button"
+          data-labor-start
+          ${active ? "disabled" : ""}
+        >Start Timer</button>
+        ${active ? `
+          <button
+            id="laborTimerStopBtn"
+            class="labor-timer-btn labor-timer-btn--stop"
+            type="button"
+            data-labor-stop
+            data-session-id="${escapeAttr(active.id)}"
+          >Stop Timer</button>
+        ` : ""}
+      </div>
+    </div>
+
+    <div class="labor-timer-total">
+      <span class="labor-timer-total-label">Total logged</span>
+      <strong class="labor-timer-total-value">${escapeHtml(formatLaborDuration(totalMinutes))}</strong>
+    </div>
+
+    <div class="labor-timer-history">
+      <div class="labor-timer-history-label">Session history</div>
+      ${renderLaborSessionRows(sessions)}
+    </div>
+  `;
+}
+
+function updateLaborTimerSummary(sessions) {
+  const summary = getLaborSessionsSummary(sessions);
+  const summaryEl = orderDetail?.querySelector(`[data-section-summary="laborTimer"]`);
+  if (summaryEl) {
+    summaryEl.textContent = summary ? `· ${summary}` : "";
+  }
+}
+
+function stopLaborTimerTick() {
+  if (laborTimerTickInterval) {
+    clearInterval(laborTimerTickInterval);
+    laborTimerTickInterval = null;
+  }
+}
+
+function startLaborTimerTick(activeSession) {
+  stopLaborTimerTick();
+  if (!activeSession?.startedAt) return;
+
+  const elapsedEl = document.getElementById("laborTimerElapsed");
+  if (!elapsedEl) return;
+
+  const startedAt = activeSession.startedAt;
+  laborTimerTickInterval = setInterval(() => {
+    if (!document.getElementById("laborTimerElapsed")) {
+      stopLaborTimerTick();
+      return;
+    }
+    elapsedEl.textContent = formatLaborElapsed(startedAt);
+  }, 1000);
+}
+
+async function loadLaborSessions(orderNumber, { preserveError = "" } = {}) {
+  const panel = document.getElementById("laborTimerPanel");
+  if (!panel || !orderNumber) return;
+
+  const token = laborTimerLoadToken + 1;
+  laborTimerLoadToken = token;
+  stopLaborTimerTick();
+
+  try {
+    const data = await postJson({
+      action: "listLaborSessions",
+      orderNumber
+    }, true);
+
+    if (token !== laborTimerLoadToken) return;
+    if (!currentOrder || String(currentOrder.orderNumber) !== String(orderNumber)) return;
+
+    const sessions = data.sessions || [];
+    panel.innerHTML = renderLaborTimerPanel(sessions, { error: preserveError });
+    updateLaborTimerSummary(sessions);
+
+    const active = sessions.find(session => !session.endedAt);
+    if (active) startLaborTimerTick(active);
+  } catch (err) {
+    if (token !== laborTimerLoadToken) return;
+    panel.innerHTML = renderLaborTimerPanel([], {
+      error: err?.message || "Labor timer could not be loaded."
+    });
+    updateLaborTimerSummary([]);
+  }
+}
+
+async function handleLaborTimerStart(orderNumber) {
+  const phase = document.getElementById("laborTimerPhase")?.value || "";
+  const notes = document.getElementById("laborTimerNotes")?.value || "";
+
+  if (!phase) {
+    await loadLaborSessions(orderNumber, {
+      preserveError: "Select a phase before starting the timer."
+    });
+    return;
+  }
+
+  const startBtn = document.getElementById("laborTimerStartBtn");
+  if (startBtn) startBtn.disabled = true;
+
+  try {
+    await postJson({
+      action: "startLaborSession",
+      orderNumber,
+      phase,
+      notes
+    }, true);
+
+    await loadLaborSessions(orderNumber);
+    loadOrderActivity(orderNumber);
+  } catch (err) {
+    await loadLaborSessions(orderNumber, {
+      preserveError: err?.message || "Labor timer could not be started."
+    });
+  }
+}
+
+async function handleLaborTimerStop(orderNumber, sessionId) {
+  const stopBtn = document.getElementById("laborTimerStopBtn");
+  const notes = document.getElementById("laborTimerNotes")?.value || "";
+  if (stopBtn) stopBtn.disabled = true;
+
+  try {
+    await postJson({
+      action: "stopLaborSession",
+      sessionId,
+      notes
+    }, true);
+
+    stopLaborTimerTick();
+    await loadLaborSessions(orderNumber);
+    loadOrderActivity(orderNumber);
+  } catch (err) {
+    await loadLaborSessions(orderNumber, {
+      preserveError: err?.message || "Labor timer could not be stopped."
+    });
+  }
+}
+
+function ensureLaborTimerDelegation() {
+  if (laborTimerDelegated || !orderDetail) return;
+
+  laborTimerDelegated = true;
+  orderDetail.addEventListener("click", (e) => {
+    const startBtn = e.target.closest("[data-labor-start]");
+    if (startBtn) {
+      e.preventDefault();
+      const orderNumber = document.getElementById("laborTimerPanel")?.dataset.orderNumber || currentOrder?.orderNumber;
+      if (!orderNumber) return;
+      handleLaborTimerStart(orderNumber);
+      return;
+    }
+
+    const stopBtn = e.target.closest("[data-labor-stop]");
+    if (stopBtn) {
+      e.preventDefault();
+      const orderNumber = document.getElementById("laborTimerPanel")?.dataset.orderNumber || currentOrder?.orderNumber;
+      const sessionId = stopBtn.dataset.sessionId;
+      if (!orderNumber || !sessionId) return;
+      handleLaborTimerStop(orderNumber, sessionId);
+    }
+  });
+}
+
 function formatDeliveryDateTime(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -3684,6 +4016,8 @@ function renderOrderDetail(order) {
     { defaultExpanded: getDefaultSectionExpanded("orderStatus") }
   );
 
+  const laborTimerSection = renderLaborTimerSection(order);
+
   const gloveDetailsSection = renderCollapsibleDetailSection(
     "gloveDetails",
     "Glove Details",
@@ -3833,6 +4167,7 @@ function renderOrderDetail(order) {
     <div class="detail-form-shell">
       ${customerSection}
       ${orderStatusSection}
+      ${laborTimerSection}
       ${gloveDetailsSection}
       ${servicesSection}
       ${laceSection}
@@ -3902,6 +4237,8 @@ function renderOrderDetail(order) {
   ensureDetailCollapseDelegation();
   wireDetailSectionSummaries();
   wireShowOnMapControl();
+  ensureLaborTimerDelegation();
+  loadLaborSessions(order.orderNumber);
   loadOrderActivity(order.orderNumber);
 }
 

@@ -238,6 +238,131 @@ export async function onRequest(context) {
       return json({ ok: true, activity: result.activity }, 200, jsonHeaders);
     }
 
+    if (action === "listLaborSessions") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const orderNumber = cleanText(body.orderNumber);
+      if (!orderNumber) {
+        return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+      }
+
+      const result = await listLaborSessions(env, orderNumber);
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Labor sessions could not be loaded.",
+            details: result.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json({ ok: true, sessions: result.sessions }, 200, jsonHeaders);
+    }
+
+    if (action === "startLaborSession") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const orderNumber = cleanText(body.orderNumber);
+      const phase = cleanText(body.phase);
+      if (!orderNumber) {
+        return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+      }
+      if (!phase) {
+        return json({ ok: false, error: "Select a phase before starting the timer." }, 200, jsonHeaders);
+      }
+      if (!isValidLaborPhase(phase)) {
+        return json({ ok: false, error: "Invalid labor phase." }, 200, jsonHeaders);
+      }
+
+      const result = await startLaborSession(env, {
+        orderNumber,
+        phase,
+        notes: body.notes
+      });
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: result.error || "Labor session could not be started.",
+            details: result.details
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json({ ok: true, session: result.session }, 200, jsonHeaders);
+    }
+
+    if (action === "stopLaborSession") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const sessionId = cleanText(body.sessionId);
+      if (!sessionId) {
+        return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
+      }
+
+      const result = await stopLaborSession(env, {
+        sessionId,
+        notes: body.notes
+      });
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: result.error || "Labor session could not be stopped.",
+            details: result.details
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json({ ok: true, session: result.session }, 200, jsonHeaders);
+    }
+
+    if (action === "updateLaborSessionNotes") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const sessionId = cleanText(body.sessionId);
+      if (!sessionId) {
+        return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
+      }
+
+      const result = await updateLaborSessionNotes(env, {
+        sessionId,
+        notes: body.notes
+      });
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: result.error || "Labor session notes could not be updated.",
+            details: result.details
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json({ ok: true, session: result.session }, 200, jsonHeaders);
+    }
+
     if (action === "deleteOrder") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -1621,6 +1746,244 @@ function mapOrderActivityFromDb(row) {
     actor: row.actor,
     metadata: row.metadata,
     createdAt: row.created_at
+  };
+}
+
+const LABOR_TIMER_PHASES = [
+  "Inspection",
+  "Cleaning",
+  "Relacing",
+  "Conditioning",
+  "Palm Pad",
+  "Photos",
+  "Packing/Shipping",
+  "Admin/Messaging",
+  "Other"
+];
+
+function isValidLaborPhase(phase) {
+  return LABOR_TIMER_PHASES.includes(cleanText(phase));
+}
+
+function mapLaborSessionFromDb(row) {
+  return {
+    id: row.id,
+    orderNumber: row.order_number,
+    phase: row.phase,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    durationMinutes: row.duration_minutes != null ? Number(row.duration_minutes) : null,
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function calculateLaborDurationMinutes(startedAt, endedAt) {
+  const started = new Date(startedAt);
+  const ended = new Date(endedAt);
+  if (Number.isNaN(started.getTime()) || Number.isNaN(ended.getTime())) {
+    return null;
+  }
+
+  const minutes = (ended.getTime() - started.getTime()) / 60000;
+  if (!Number.isFinite(minutes) || minutes < 0) {
+    return null;
+  }
+
+  return Math.round(minutes * 100) / 100;
+}
+
+async function listLaborSessions(env, orderNumber) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/order_labor_sessions?select=*&order_number=eq.${encodeURIComponent(orderNumber)}&order=started_at.desc`
+  );
+
+  if (!resp.ok) return resp;
+
+  return {
+    ok: true,
+    sessions: Array.isArray(resp.data) ? resp.data.map(mapLaborSessionFromDb) : []
+  };
+}
+
+async function fetchOpenLaborSession(env, orderNumber) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/order_labor_sessions?select=*&order_number=eq.${encodeURIComponent(orderNumber)}&ended_at=is.null&order=started_at.desc&limit=1`
+  );
+
+  if (!resp.ok) return resp;
+
+  const row = Array.isArray(resp.data) ? (resp.data[0] || null) : null;
+  return {
+    ok: true,
+    data: row
+  };
+}
+
+async function fetchLaborSessionById(env, sessionId) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/order_labor_sessions?select=*&id=eq.${encodeURIComponent(sessionId)}&limit=1`
+  );
+
+  if (!resp.ok) return resp;
+
+  return {
+    ok: true,
+    data: Array.isArray(resp.data) ? (resp.data[0] || null) : null
+  };
+}
+
+async function startLaborSession(env, { orderNumber, phase, notes }) {
+  const open = await fetchOpenLaborSession(env, orderNumber);
+  if (!open.ok) return open;
+
+  if (open.data) {
+    return {
+      ok: false,
+      error: "Stop the active timer before starting a new session."
+    };
+  }
+
+  const startedAt = new Date().toISOString();
+  const resp = await supabaseFetch(env, `/rest/v1/order_labor_sessions`, {
+    method: "POST",
+    headers: {
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify({
+      order_number: orderNumber,
+      phase,
+      started_at: startedAt,
+      notes: cleanText(notes) || null,
+      updated_at: startedAt
+    })
+  });
+
+  if (!resp.ok) return resp;
+
+  const row = Array.isArray(resp.data) ? resp.data[0] : resp.data;
+  const session = mapLaborSessionFromDb(row);
+
+  await logOrderActivity(env, {
+    orderNumber,
+    eventType: "labor_timer",
+    eventLabel: "Labor timer started",
+    eventDetail: phase,
+    metadata: {
+      sessionId: session.id,
+      phase
+    }
+  });
+
+  return {
+    ok: true,
+    session
+  };
+}
+
+async function stopLaborSession(env, { sessionId, notes }) {
+  const existing = await fetchLaborSessionById(env, sessionId);
+  if (!existing.ok) return existing;
+
+  const row = existing.data;
+  if (!row) {
+    return {
+      ok: false,
+      error: "Labor session not found."
+    };
+  }
+
+  if (row.ended_at) {
+    return {
+      ok: false,
+      error: "This session is already stopped.",
+      session: mapLaborSessionFromDb(row)
+    };
+  }
+
+  const endedAt = new Date().toISOString();
+  const durationMinutes = calculateLaborDurationMinutes(row.started_at, endedAt);
+  const nextNotes = notes !== undefined && notes !== null
+    ? (cleanText(notes) || null)
+    : (row.notes || null);
+
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/order_labor_sessions?id=eq.${encodeURIComponent(sessionId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify({
+        ended_at: endedAt,
+        duration_minutes: durationMinutes,
+        notes: nextNotes,
+        updated_at: endedAt
+      })
+    }
+  );
+
+  if (!resp.ok) return resp;
+
+  const updated = Array.isArray(resp.data) ? resp.data[0] : resp.data;
+  const session = mapLaborSessionFromDb(updated);
+
+  await logOrderActivity(env, {
+    orderNumber: session.orderNumber,
+    eventType: "labor_timer",
+    eventLabel: "Labor timer stopped",
+    eventDetail: session.phase,
+    metadata: {
+      sessionId: session.id,
+      phase: session.phase,
+      durationMinutes: session.durationMinutes
+    }
+  });
+
+  return {
+    ok: true,
+    session
+  };
+}
+
+async function updateLaborSessionNotes(env, { sessionId, notes }) {
+  const existing = await fetchLaborSessionById(env, sessionId);
+  if (!existing.ok) return existing;
+
+  if (!existing.data) {
+    return {
+      ok: false,
+      error: "Labor session not found."
+    };
+  }
+
+  const updatedAt = new Date().toISOString();
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/order_labor_sessions?id=eq.${encodeURIComponent(sessionId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify({
+        notes: cleanText(notes) || null,
+        updated_at: updatedAt
+      })
+    }
+  );
+
+  if (!resp.ok) return resp;
+
+  const row = Array.isArray(resp.data) ? resp.data[0] : resp.data;
+  return {
+    ok: true,
+    session: mapLaborSessionFromDb(row)
   };
 }
 
