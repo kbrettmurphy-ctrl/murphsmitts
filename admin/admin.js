@@ -1090,7 +1090,7 @@ function wireHomeDashboardActions() {
 
   dashboardPanel.addEventListener("change", (e) => {
     if (e.target.id === "financeFilterSelect") {
-      financeFilterKey = e.target.value || "this-month";
+      financeFilterKey = e.target.value || "ytd";
       renderHomeDashboard();
       return;
     }
