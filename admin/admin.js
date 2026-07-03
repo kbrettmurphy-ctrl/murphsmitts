@@ -724,7 +724,7 @@ function getFinanceDateRange(
         : "Custom range";
       return { start, end, label };
     }
-    case "this-month":
+    case "ytd":
     default:
       return {
         start: startOfDay(new Date(today.getFullYear(), 0, 1)),
