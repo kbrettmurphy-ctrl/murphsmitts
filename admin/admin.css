@@ -4563,22 +4563,32 @@ button.dashboard-metric:active{
     max-width:100%;
   }
 
-  .dashboard-finance-custom{
+  .dashboard-section-finance .dashboard-finance-custom{
     display:grid;
-    grid-template-columns:1fr;
-    gap:10px;
+    grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
+    gap:8px 10px;
+    align-items:start;
     width:100%;
+    min-width:0;
   }
 
-  .dashboard-finance-custom label{
+  .dashboard-section-finance .dashboard-finance-custom label{
     min-width:0;
     width:100%;
+    display:grid;
+    gap:4px;
   }
 
-  .dashboard-finance-custom input[type="date"]{
+  .dashboard-section-finance .dashboard-finance-custom input[type="date"]{
     width:100%;
+    min-width:0;
     max-width:100%;
     box-sizing:border-box;
+    height:44px;
+    min-height:44px;
+    max-height:44px;
+    padding:8px 10px;
+    line-height:1.2;
   }
 }
 
