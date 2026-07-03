@@ -5808,3 +5808,116 @@ button.secondary,
     font-size:.78rem;
   }
 }
+
+/* =========================
+   LABOR TIMER V1.1
+   Clubhouse bench timer controls + Order Detail status pill.
+   Scoped additions only — no existing rules modified.
+   ========================= */
+
+.dashboard-bench-actions{
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex:0 0 auto;
+}
+
+.dashboard-timer-btn{
+  box-sizing:border-box;
+  min-height:32px;
+  height:32px;
+  width:32px;
+  padding:0;
+  border:1px solid rgba(9,47,77,.16);
+  border-radius:10px;
+  background:#fffaf3;
+  color:var(--navy);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.dashboard-timer-btn svg{
+  width:15px;
+  height:15px;
+  display:block;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+.dashboard-timer-btn:disabled{
+  opacity:.5;
+  cursor:default;
+}
+
+.dashboard-timer-btn--running{
+  border-color:rgba(9,47,77,.28);
+  background:rgba(9,47,77,.08);
+}
+
+.dashboard-timer-btn--paused{
+  border-color:rgba(9,47,77,.20);
+  background:rgba(218,202,177,.28);
+}
+
+.dashboard-timer-popover{
+  position:absolute;
+  top:calc(100% + 6px);
+  right:0;
+  z-index:var(--admin-z-popover);
+  min-width:170px;
+  max-width:calc(100vw - 32px);
+  padding:6px;
+  border:1px solid rgba(9,47,77,.14);
+  border-radius:14px;
+  background:#fffdf8;
+  box-shadow:0 14px 34px rgba(9,47,77,.16);
+}
+
+.dashboard-timer-phase-option{
+  display:block;
+  width:100%;
+  border:0;
+  border-radius:9px;
+  padding:7px 10px;
+  background:transparent;
+  color:var(--navy);
+  font-size:.8rem;
+  font-weight:500;
+  text-align:left;
+  cursor:pointer;
+}
+
+.dashboard-timer-phase-option:hover,
+.dashboard-timer-phase-option:focus-visible{
+  background:rgba(9,47,77,.07);
+}
+
+.dashboard-bench-timer-state{
+  color:rgba(9,47,77,.72);
+  font-weight:600;
+}
+
+.labor-timer-status{
+  display:inline-block;
+  margin-left:6px;
+  padding:2px 8px;
+  border-radius:999px;
+  font-size:.68rem;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  background:rgba(9,47,77,.08);
+  color:var(--navy);
+}
+
+.labor-timer-status--paused{
+  background:rgba(218,202,177,.45);
+}

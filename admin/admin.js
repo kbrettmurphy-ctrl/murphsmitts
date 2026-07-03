@@ -136,6 +136,9 @@ let financeFilterKey = "ytd";
 let financeFilterCustomStart = "";
 let financeFilterCustomEnd = "";
 let financeFilterMenuOpen = false;
+let dashboardLaborSessions = {};
+let dashboardTimerPopoverOrder = null;
+let dashboardTimerBusy = false;
 
 window.inventoryViewMode = "active";
 
@@ -882,10 +885,57 @@ function getDashboardAttentionItems(orders = allOrders) {
   return items;
 }
 
-function renderDashboardOrderRow(order) {
+const DASHBOARD_TIMER_ICONS = {
+  start: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="14" r="7"></circle><path d="M12 14v-4"></path><path d="M9 3h6"></path><path d="M12 3v4"></path></svg>`,
+  pause: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 7v10"></path><path d="M15 7v10"></path></svg>`,
+  resume: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 7l8 5-8 5z"></path></svg>`
+};
+
+function getDashboardTimerStateLabel(session) {
+  const stateLabel = getLaborSessionStatus(session) === "paused" ? "Paused" : "Running";
+  const elapsed = formatLaborDuration(getLaborActiveSeconds(session) / 60);
+  return `${stateLabel} · ${session.phase || "Work"} · ${elapsed}`;
+}
+
+function renderDashboardTimerButton(order, session) {
+  const orderKey = String(order.orderNumber || "");
+  const sessionStatus = session ? getLaborSessionStatus(session) : "";
+  const action = !session ? "start" : (sessionStatus === "paused" ? "resume" : "pause");
+  const ariaLabel = action === "start"
+    ? `Start timer for ${order.customerName || "customer"}`
+    : (action === "pause" ? "Pause timer" : "Resume timer");
+  const modifier = sessionStatus === "running"
+    ? " dashboard-timer-btn--running"
+    : (sessionStatus === "paused" ? " dashboard-timer-btn--paused" : "");
+
+  return `
+    <button
+      type="button"
+      class="dashboard-timer-btn${modifier}"
+      data-timer-action="${escapeAttr(action)}"
+      data-timer-order="${escapeAttr(orderKey)}"
+      aria-label="${escapeAttr(ariaLabel)}"
+    >${DASHBOARD_TIMER_ICONS[action]}</button>
+  `;
+}
+
+function renderDashboardOrderRow(order, { timerControls = false } = {}) {
   const lace = String(order.primaryLaceColor || order.lacePrimary || "").trim();
   const brand = String(order.brandModel || "").trim();
   const meta = [brand, lace].filter(Boolean).join(" · ");
+  const orderKey = String(order.orderNumber || "");
+  const session = timerControls ? (dashboardLaborSessions[orderKey] || null) : null;
+  const timerStateHtml = session
+    ? `<span class="dashboard-bench-timer-state" data-bench-timer="${escapeAttr(orderKey)}">${escapeHtml(getDashboardTimerStateLabel(session))}</span>`
+    : "";
+
+  const openButtonHtml = `
+      <button
+        class="secondary dashboard-bench-open"
+        type="button"
+        data-dashboard-order="${escapeAttr(order.orderNumber || "")}"
+      >Open</button>
+  `;
 
   return `
     <div class="dashboard-bench-row">
@@ -895,21 +945,137 @@ function renderDashboardOrderRow(order) {
           <span>#${escapeHtml(order.orderNumber || "")}</span>
           ${meta ? `<span>${escapeHtml(meta)}</span>` : ""}
           <span>${escapeHtml(getOrderStatusDisplay(order.status))}</span>
+          ${timerStateHtml}
         </div>
       </div>
-      <button
-        class="secondary dashboard-bench-open"
-        type="button"
-        data-dashboard-order="${escapeAttr(order.orderNumber || "")}"
-      >Open</button>
+      ${timerControls ? `
+        <div class="dashboard-bench-actions">
+          ${renderDashboardTimerButton(order, session)}
+          ${openButtonHtml}
+        </div>
+      ` : openButtonHtml}
     </div>
   `;
 }
 
-function renderDashboardOrderList(orders, emptyMessage) {
+function renderDashboardOrderList(orders, emptyMessage, options = {}) {
   return orders.length
-    ? orders.map(renderDashboardOrderRow).join("")
+    ? orders.map(order => renderDashboardOrderRow(order, options)).join("")
     : `<p class="dashboard-empty muted">${escapeHtml(emptyMessage)}</p>`;
+}
+
+async function refreshDashboardLaborSessions({ rerender = true } = {}) {
+  try {
+    const data = await postJson({ action: "listOpenLaborSessions" }, true);
+    const nextMap = {};
+    (data.sessions || []).forEach(session => {
+      if (!session?.orderNumber) return;
+      nextMap[String(session.orderNumber)] = session;
+    });
+
+    const changed = JSON.stringify(nextMap) !== JSON.stringify(dashboardLaborSessions);
+    dashboardLaborSessions = nextMap;
+
+    if (changed && rerender && activeView === "dashboard") {
+      renderHomeDashboard();
+    }
+  } catch {
+    /* Timer state is a dashboard extra — keep the old map and never
+       block orders or dashboard rendering on it. */
+  }
+}
+
+function closeDashboardTimerPopover() {
+  dashboardTimerPopoverOrder = null;
+  document.querySelectorAll(".dashboard-timer-popover").forEach(el => el.remove());
+}
+
+function openDashboardTimerPopover(button, orderKey) {
+  closeDashboardTimerPopover();
+
+  const actions = button.closest(".dashboard-bench-actions");
+  if (!actions) return;
+
+  dashboardTimerPopoverOrder = orderKey;
+  const popover = document.createElement("div");
+  popover.className = "dashboard-timer-popover";
+  popover.innerHTML = LABOR_TIMER_PHASES.map(phase => `
+    <button
+      type="button"
+      class="dashboard-timer-phase-option"
+      data-timer-phase="${escapeAttr(phase)}"
+      data-timer-order="${escapeAttr(orderKey)}"
+    >${escapeHtml(phase)}</button>
+  `).join("");
+  actions.appendChild(popover);
+}
+
+function hasRunningDashboardSessionOtherThan(orderKey) {
+  return Object.values(dashboardLaborSessions).some(session =>
+    String(session.orderNumber) !== String(orderKey) &&
+    getLaborSessionStatus(session) === "running"
+  );
+}
+
+async function handleDashboardTimerPhaseSelect(orderKey, phase) {
+  if (dashboardTimerBusy) return;
+  dashboardTimerBusy = true;
+  closeDashboardTimerPopover();
+
+  try {
+    await postJson({
+      action: "startLaborSession",
+      orderNumber: orderKey,
+      phase
+    }, true);
+    await refreshDashboardLaborSessions();
+  } catch (err) {
+    alert(err?.message || "Labor timer could not be started.");
+  } finally {
+    dashboardTimerBusy = false;
+  }
+}
+
+async function handleDashboardTimerAction(button) {
+  if (dashboardTimerBusy) return;
+
+  const orderKey = String(button.dataset.timerOrder || "");
+  const action = button.dataset.timerAction;
+  const session = dashboardLaborSessions[orderKey] || null;
+
+  if (action === "start") {
+    if (dashboardTimerPopoverOrder === orderKey) {
+      closeDashboardTimerPopover();
+      return;
+    }
+    if (hasRunningDashboardSessionOtherThan(orderKey)) {
+      alert("Pause or stop the current timer first.");
+      return;
+    }
+    openDashboardTimerPopover(button, orderKey);
+    return;
+  }
+
+  if (!session?.id) return;
+
+  dashboardTimerBusy = true;
+  try {
+    if (action === "pause") {
+      await postJson({ action: "pauseLaborSession", sessionId: session.id }, true);
+    } else if (action === "resume") {
+      if (hasRunningDashboardSessionOtherThan(orderKey)) {
+        alert("Pause or stop the current timer first.");
+        return;
+      }
+      await postJson({ action: "resumeLaborSession", sessionId: session.id }, true);
+    }
+    await refreshDashboardLaborSessions();
+  } catch (err) {
+    alert(err?.message || "Labor timer could not be updated.");
+    refreshDashboardLaborSessions();
+  } finally {
+    dashboardTimerBusy = false;
+  }
 }
 
 function renderDashboardMetricCard(label, value, { sub = "", view = "" } = {}) {
@@ -1058,7 +1224,11 @@ function renderHomeDashboard() {
     `
     : "";
 
-  const benchHtml = renderDashboardOrderList(benchOrders, "No bench work queued.");
+  /* Any dynamically-attached bench timer popover is about to be wiped
+     by the innerHTML rebuild — clear its state too. */
+  closeDashboardTimerPopover();
+
+  const benchHtml = renderDashboardOrderList(benchOrders, "No bench work queued.", { timerControls: true });
   const onDeckHtml = renderDashboardOrderList(onDeckOrders, "No orders on deck.");
 
   const attentionHtml = attentionItems.length
@@ -1162,6 +1332,21 @@ function wireHomeDashboardActions() {
       return;
     }
 
+    const timerPhaseBtn = e.target.closest("[data-timer-phase]");
+    if (timerPhaseBtn) {
+      handleDashboardTimerPhaseSelect(
+        timerPhaseBtn.dataset.timerOrder,
+        timerPhaseBtn.dataset.timerPhase
+      );
+      return;
+    }
+
+    const timerActionBtn = e.target.closest("[data-timer-action]");
+    if (timerActionBtn) {
+      handleDashboardTimerAction(timerActionBtn);
+      return;
+    }
+
     const orderBtn = e.target.closest("[data-dashboard-order]");
     if (orderBtn) {
       openOrder(orderBtn.dataset.dashboardOrder, { returnView: "dashboard" });
@@ -1173,6 +1358,24 @@ function wireHomeDashboardActions() {
       setActiveView(viewBtn.dataset.dashboardView);
     }
   });
+
+  /* Close the bench timer phase popover on outside clicks by removing
+     the element directly — never re-render the dashboard from here
+     (same hazard as the finance popover below). */
+  document.addEventListener("click", (e) => {
+    if (!dashboardTimerPopoverOrder) return;
+    if (e.target.closest?.(".dashboard-bench-actions")) return;
+    closeDashboardTimerPopover();
+  });
+
+  /* Keep bench timer elapsed text from going stale without re-rendering. */
+  setInterval(() => {
+    if (activeView !== "dashboard") return;
+    dashboardPanel.querySelectorAll("[data-bench-timer]").forEach(el => {
+      const session = dashboardLaborSessions[el.dataset.benchTimer];
+      if (session) el.textContent = getDashboardTimerStateLabel(session);
+    });
+  }, 30000);
 
   /* Close the popover without re-rendering the dashboard — a full
      re-render here would destroy a focused custom date input and
@@ -2112,6 +2315,40 @@ function formatLaborElapsed(startedAt) {
   return formatLaborDuration(minutes);
 }
 
+function getLaborSessionStatus(session) {
+  if (!session || session.endedAt) return "stopped";
+  if (session.status === "paused") return "paused";
+  return "running";
+}
+
+/* Client mirror of the API duration rules — active time excludes paused time:
+   running: (now - startedAt) - pauseAccumulatedSeconds
+   paused:  (pausedAt - startedAt) - pauseAccumulatedSeconds
+   clamped at >= 0. */
+function getLaborActiveSeconds(session) {
+  if (!session?.startedAt) return 0;
+  const started = new Date(session.startedAt);
+  if (Number.isNaN(started.getTime())) return 0;
+
+  const status = getLaborSessionStatus(session);
+  let referenceMs = Date.now();
+  if (status === "paused" && session.pausedAt) {
+    const paused = new Date(session.pausedAt);
+    if (!Number.isNaN(paused.getTime())) referenceMs = paused.getTime();
+  } else if (status === "stopped" && session.endedAt) {
+    const ended = new Date(session.endedAt);
+    if (!Number.isNaN(ended.getTime())) referenceMs = ended.getTime();
+  }
+
+  const pausedSeconds = Number(session.pauseAccumulatedSeconds) || 0;
+  const seconds = (referenceMs - started.getTime()) / 1000 - pausedSeconds;
+  return Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+}
+
+function formatLaborSessionElapsed(session) {
+  return formatLaborDuration(getLaborActiveSeconds(session) / 60);
+}
+
 function formatLaborDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value || "");
@@ -2127,7 +2364,10 @@ function getLaborSessionsSummary(sessions) {
   if (!Array.isArray(sessions) || !sessions.length) return "";
 
   const active = sessions.find(session => !session.endedAt);
-  if (active) return `Running · ${active.phase}`;
+  if (active) {
+    const stateLabel = getLaborSessionStatus(active) === "paused" ? "Paused" : "Running";
+    return `${stateLabel} · ${active.phase}`;
+  }
 
   const totalMinutes = sessions
     .filter(session => session.endedAt)
@@ -2207,10 +2447,13 @@ function renderLaborTimerPanel(sessions, { error = "" } = {}) {
 
     ${active ? `
       <div class="labor-timer-card labor-timer-card--active">
-        <div class="labor-timer-active-label">Active timer</div>
+        <div class="labor-timer-active-label">
+          Active timer
+          <span class="labor-timer-status${getLaborSessionStatus(active) === "paused" ? " labor-timer-status--paused" : ""}">${getLaborSessionStatus(active) === "paused" ? "Paused" : "Running"}</span>
+        </div>
         <div class="labor-timer-active-main">
           <strong>${escapeHtml(active.phase)}</strong>
-          <span id="laborTimerElapsed" class="labor-timer-elapsed">${escapeHtml(formatLaborElapsed(active.startedAt))}</span>
+          <span id="laborTimerElapsed" class="labor-timer-elapsed">${escapeHtml(formatLaborSessionElapsed(active))}</span>
         </div>
         <div class="labor-timer-active-meta muted">
           Started ${escapeHtml(formatLaborDateTime(active.startedAt))}
@@ -2244,6 +2487,24 @@ function renderLaborTimerPanel(sessions, { error = "" } = {}) {
           data-labor-start
           ${active ? "disabled" : ""}
         >Start Timer</button>
+        ${active && getLaborSessionStatus(active) === "running" ? `
+          <button
+            id="laborTimerPauseBtn"
+            class="labor-timer-btn"
+            type="button"
+            data-labor-pause
+            data-session-id="${escapeAttr(active.id)}"
+          >Pause</button>
+        ` : ""}
+        ${active && getLaborSessionStatus(active) === "paused" ? `
+          <button
+            id="laborTimerResumeBtn"
+            class="labor-timer-btn"
+            type="button"
+            data-labor-resume
+            data-session-id="${escapeAttr(active.id)}"
+          >Resume</button>
+        ` : ""}
         ${active ? `
           <button
             id="laborTimerStopBtn"
@@ -2286,17 +2547,17 @@ function stopLaborTimerTick() {
 function startLaborTimerTick(activeSession) {
   stopLaborTimerTick();
   if (!activeSession?.startedAt) return;
+  if (getLaborSessionStatus(activeSession) !== "running") return;
 
   const elapsedEl = document.getElementById("laborTimerElapsed");
   if (!elapsedEl) return;
 
-  const startedAt = activeSession.startedAt;
   laborTimerTickInterval = setInterval(() => {
     if (!document.getElementById("laborTimerElapsed")) {
       stopLaborTimerTick();
       return;
     }
-    elapsedEl.textContent = formatLaborElapsed(startedAt);
+    elapsedEl.textContent = formatLaborSessionElapsed(activeSession);
   }, 1000);
 }
 
@@ -2363,6 +2624,47 @@ async function handleLaborTimerStart(orderNumber) {
   }
 }
 
+async function handleLaborTimerPause(orderNumber, sessionId) {
+  const pauseBtn = document.getElementById("laborTimerPauseBtn");
+  const notes = document.getElementById("laborTimerNotes")?.value || "";
+  if (pauseBtn) pauseBtn.disabled = true;
+
+  try {
+    await postJson({
+      action: "pauseLaborSession",
+      sessionId,
+      notes
+    }, true);
+
+    stopLaborTimerTick();
+    await loadLaborSessions(orderNumber);
+  } catch (err) {
+    await loadLaborSessions(orderNumber, {
+      preserveError: err?.message || "Labor timer could not be paused."
+    });
+  }
+}
+
+async function handleLaborTimerResume(orderNumber, sessionId) {
+  const resumeBtn = document.getElementById("laborTimerResumeBtn");
+  const notes = document.getElementById("laborTimerNotes")?.value || "";
+  if (resumeBtn) resumeBtn.disabled = true;
+
+  try {
+    await postJson({
+      action: "resumeLaborSession",
+      sessionId,
+      notes
+    }, true);
+
+    await loadLaborSessions(orderNumber);
+  } catch (err) {
+    await loadLaborSessions(orderNumber, {
+      preserveError: err?.message || "Labor timer could not be resumed."
+    });
+  }
+}
+
 async function handleLaborTimerStop(orderNumber, sessionId) {
   const stopBtn = document.getElementById("laborTimerStopBtn");
   const notes = document.getElementById("laborTimerNotes")?.value || "";
@@ -2396,6 +2698,26 @@ function ensureLaborTimerDelegation() {
       const orderNumber = document.getElementById("laborTimerPanel")?.dataset.orderNumber || currentOrder?.orderNumber;
       if (!orderNumber) return;
       handleLaborTimerStart(orderNumber);
+      return;
+    }
+
+    const pauseBtn = e.target.closest("[data-labor-pause]");
+    if (pauseBtn) {
+      e.preventDefault();
+      const orderNumber = document.getElementById("laborTimerPanel")?.dataset.orderNumber || currentOrder?.orderNumber;
+      const sessionId = pauseBtn.dataset.sessionId;
+      if (!orderNumber || !sessionId) return;
+      handleLaborTimerPause(orderNumber, sessionId);
+      return;
+    }
+
+    const resumeBtn = e.target.closest("[data-labor-resume]");
+    if (resumeBtn) {
+      e.preventDefault();
+      const orderNumber = document.getElementById("laborTimerPanel")?.dataset.orderNumber || currentOrder?.orderNumber;
+      const sessionId = resumeBtn.dataset.sessionId;
+      if (!orderNumber || !sessionId) return;
+      handleLaborTimerResume(orderNumber, sessionId);
       return;
     }
 
@@ -3423,6 +3745,7 @@ function setActiveView(viewName) {
   if (resolvedView === "dashboard") {
     syncAdminViewUrl(resolvedView);
     renderHomeDashboard();
+    refreshDashboardLaborSessions();
     showView(homeDashboardView);
     closeMenu();
     resetViewScroll(homeDashboardView, { blurActive: true });
@@ -7259,6 +7582,7 @@ async function loadOrders() {
 
   if (activeView === "dashboard") {
     renderHomeDashboard();
+    refreshDashboardLaborSessions();
   }
 }
 

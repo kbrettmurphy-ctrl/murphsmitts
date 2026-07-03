@@ -333,6 +333,92 @@ export async function onRequest(context) {
       return json({ ok: true, session: result.session }, 200, jsonHeaders);
     }
 
+    if (action === "listOpenLaborSessions") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await fetchOpenLaborSessions(env);
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Open labor sessions could not be loaded.",
+            details: result.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json(
+        { ok: true, sessions: result.data.map(mapLaborSessionFromDb) },
+        200,
+        jsonHeaders
+      );
+    }
+
+    if (action === "pauseLaborSession") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const sessionId = cleanText(body.sessionId);
+      if (!sessionId) {
+        return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
+      }
+
+      const result = await pauseLaborSession(env, {
+        sessionId,
+        notes: body.notes
+      });
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: result.error || "Labor session could not be paused.",
+            details: result.details
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json({ ok: true, session: result.session }, 200, jsonHeaders);
+    }
+
+    if (action === "resumeLaborSession") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const sessionId = cleanText(body.sessionId);
+      if (!sessionId) {
+        return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
+      }
+
+      const result = await resumeLaborSession(env, {
+        sessionId,
+        notes: body.notes
+      });
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: result.error || "Labor session could not be resumed.",
+            details: result.details
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json({ ok: true, session: result.session }, 200, jsonHeaders);
+    }
+
     if (action === "updateLaborSessionNotes") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -1765,6 +1851,12 @@ function isValidLaborPhase(phase) {
   return LABOR_TIMER_PHASES.includes(cleanText(phase));
 }
 
+function normalizeLaborRowStatus(row) {
+  if (row.ended_at) return "stopped";
+  if (row.status === "paused") return "paused";
+  return "running";
+}
+
 function mapLaborSessionFromDb(row) {
   return {
     id: row.id,
@@ -1773,6 +1865,9 @@ function mapLaborSessionFromDb(row) {
     startedAt: row.started_at,
     endedAt: row.ended_at,
     durationMinutes: row.duration_minutes != null ? Number(row.duration_minutes) : null,
+    status: normalizeLaborRowStatus(row),
+    pausedAt: row.paused_at ?? null,
+    pauseAccumulatedSeconds: Number(row.pause_accumulated_seconds) || 0,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -1792,6 +1887,26 @@ function calculateLaborDurationMinutes(startedAt, endedAt) {
   }
 
   return Math.round(minutes * 100) / 100;
+}
+
+/* Active labor time excludes paused time:
+   running: (now - started_at) - pause_accumulated_seconds
+   paused:  (paused_at - started_at) - pause_accumulated_seconds
+   clamped at >= 0. */
+function calculateLaborActiveSeconds(row, nowIso) {
+  const started = new Date(row.started_at);
+  if (Number.isNaN(started.getTime())) return null;
+
+  const status = normalizeLaborRowStatus(row);
+  const referenceIso = status === "paused" && row.paused_at ? row.paused_at : nowIso;
+  const reference = new Date(referenceIso);
+  if (Number.isNaN(reference.getTime())) return null;
+
+  const pausedSeconds = Number(row.pause_accumulated_seconds) || 0;
+  const seconds = (reference.getTime() - started.getTime()) / 1000 - pausedSeconds;
+  if (!Number.isFinite(seconds)) return null;
+
+  return Math.max(0, seconds);
 }
 
 async function listLaborSessions(env, orderNumber) {
@@ -1823,6 +1938,20 @@ async function fetchOpenLaborSession(env, orderNumber) {
   };
 }
 
+async function fetchOpenLaborSessions(env) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/order_labor_sessions?select=*&ended_at=is.null&order=started_at.desc`
+  );
+
+  if (!resp.ok) return resp;
+
+  return {
+    ok: true,
+    data: Array.isArray(resp.data) ? resp.data : []
+  };
+}
+
 async function fetchLaborSessionById(env, sessionId) {
   const resp = await supabaseFetch(
     env,
@@ -1838,6 +1967,19 @@ async function fetchLaborSessionById(env, sessionId) {
 }
 
 async function startLaborSession(env, { orderNumber, phase, notes }) {
+  const openAll = await fetchOpenLaborSessions(env);
+  if (!openAll.ok) return openAll;
+
+  const runningAnywhere = openAll.data.some(
+    row => normalizeLaborRowStatus(row) === "running"
+  );
+  if (runningAnywhere) {
+    return {
+      ok: false,
+      error: "Pause or stop the current timer first."
+    };
+  }
+
   const open = await fetchOpenLaborSession(env, orderNumber);
   if (!open.ok) return open;
 
@@ -1858,6 +2000,8 @@ async function startLaborSession(env, { orderNumber, phase, notes }) {
       order_number: orderNumber,
       phase,
       started_at: startedAt,
+      status: "running",
+      pause_accumulated_seconds: 0,
       notes: cleanText(notes) || null,
       updated_at: startedAt
     })
@@ -1906,7 +2050,10 @@ async function stopLaborSession(env, { sessionId, notes }) {
   }
 
   const endedAt = new Date().toISOString();
-  const durationMinutes = calculateLaborDurationMinutes(row.started_at, endedAt);
+  const activeSeconds = calculateLaborActiveSeconds(row, endedAt);
+  const durationMinutes = activeSeconds === null
+    ? null
+    : Math.round((activeSeconds / 60) * 100) / 100;
   const nextNotes = notes !== undefined && notes !== null
     ? (cleanText(notes) || null)
     : (row.notes || null);
@@ -1922,8 +2069,9 @@ async function stopLaborSession(env, { sessionId, notes }) {
       body: JSON.stringify({
         ended_at: endedAt,
         duration_minutes: durationMinutes,
-        notes: nextNotes,
-        updated_at: endedAt
+        status: "stopped",
+        updated_at: endedAt,
+        notes: nextNotes
       })
     }
   );
@@ -1948,6 +2096,144 @@ async function stopLaborSession(env, { sessionId, notes }) {
   return {
     ok: true,
     session
+  };
+}
+
+async function pauseLaborSession(env, { sessionId, notes }) {
+  const existing = await fetchLaborSessionById(env, sessionId);
+  if (!existing.ok) return existing;
+
+  const row = existing.data;
+  if (!row) {
+    return {
+      ok: false,
+      error: "Labor session not found."
+    };
+  }
+
+  if (row.ended_at) {
+    return {
+      ok: false,
+      error: "This session is already stopped.",
+      session: mapLaborSessionFromDb(row)
+    };
+  }
+
+  if (row.status === "paused") {
+    return {
+      ok: false,
+      error: "This session is already paused.",
+      session: mapLaborSessionFromDb(row)
+    };
+  }
+
+  const pausedAt = new Date().toISOString();
+  const nextNotes = notes !== undefined && notes !== null
+    ? (cleanText(notes) || null)
+    : (row.notes || null);
+
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/order_labor_sessions?id=eq.${encodeURIComponent(sessionId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify({
+        status: "paused",
+        paused_at: pausedAt,
+        updated_at: pausedAt,
+        notes: nextNotes
+      })
+    }
+  );
+
+  if (!resp.ok) return resp;
+
+  const updated = Array.isArray(resp.data) ? resp.data[0] : resp.data;
+  return {
+    ok: true,
+    session: mapLaborSessionFromDb(updated)
+  };
+}
+
+async function resumeLaborSession(env, { sessionId, notes }) {
+  const existing = await fetchLaborSessionById(env, sessionId);
+  if (!existing.ok) return existing;
+
+  const row = existing.data;
+  if (!row) {
+    return {
+      ok: false,
+      error: "Labor session not found."
+    };
+  }
+
+  if (row.ended_at) {
+    return {
+      ok: false,
+      error: "This session is already stopped.",
+      session: mapLaborSessionFromDb(row)
+    };
+  }
+
+  if (row.status !== "paused") {
+    return {
+      ok: false,
+      error: "This session is already running.",
+      session: mapLaborSessionFromDb(row)
+    };
+  }
+
+  const openAll = await fetchOpenLaborSessions(env);
+  if (!openAll.ok) return openAll;
+
+  const otherRunning = openAll.data.some(
+    other => other.id !== row.id && normalizeLaborRowStatus(other) === "running"
+  );
+  if (otherRunning) {
+    return {
+      ok: false,
+      error: "Pause or stop the current timer first."
+    };
+  }
+
+  const resumedAt = new Date();
+  const pausedAtMs = row.paused_at ? new Date(row.paused_at).getTime() : NaN;
+  const pausedSeconds = Number.isNaN(pausedAtMs)
+    ? 0
+    : Math.max(0, Math.round((resumedAt.getTime() - pausedAtMs) / 1000));
+  const nextAccumulated = (Number(row.pause_accumulated_seconds) || 0) + pausedSeconds;
+  const resumedIso = resumedAt.toISOString();
+  const nextNotes = notes !== undefined && notes !== null
+    ? (cleanText(notes) || null)
+    : (row.notes || null);
+
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/order_labor_sessions?id=eq.${encodeURIComponent(sessionId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify({
+        status: "running",
+        paused_at: null,
+        pause_accumulated_seconds: nextAccumulated,
+        updated_at: resumedIso,
+        notes: nextNotes
+      })
+    }
+  );
+
+  if (!resp.ok) return resp;
+
+  const updated = Array.isArray(resp.data) ? resp.data[0] : resp.data;
+  return {
+    ok: true,
+    session: mapLaborSessionFromDb(updated)
   };
 }
 
