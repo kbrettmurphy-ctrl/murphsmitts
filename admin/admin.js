@@ -129,6 +129,9 @@ let listScrollY = 0;
 let orderMap = null;
 let orderMapMarkers = null;
 let mapRenderToken = 0;
+let financeFilterKey = "this-month";
+let financeFilterCustomStart = "";
+let financeFilterCustomEnd = "";
 
 window.inventoryViewMode = "active";
 
@@ -648,22 +651,110 @@ function getOnDeckPriority(order) {
   return ON_DECK_STATUS_PRIORITY[normalizeStatus(order?.status)] ?? 99;
 }
 
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfDay(date) {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function getOrderFinanceCompletedDate(order) {
+  return parseOrderDate(order?.dateCompleted);
+}
+
+function getOrderFinanceReceivedDate(order) {
+  return (
+    parseOrderDate(order?.dateReceived) ||
+    parseOrderDate(order?.timestampSubmitted) ||
+    parseOrderDate(order?.createdAt)
+  );
+}
+
+function getFinanceDateRange(
+  filterKey = financeFilterKey,
+  customStart = financeFilterCustomStart,
+  customEnd = financeFilterCustomEnd
+) {
+  const now = new Date();
+  const today = startOfDay(now);
+
+  switch (filterKey) {
+    case "last-30-days":
+      return {
+        start: startOfDay(new Date(today.getTime() - 29 * 86400000)),
+        end: endOfDay(now),
+        label: "Last 30 days"
+      };
+    case "last-60-days":
+      return {
+        start: startOfDay(new Date(today.getTime() - 59 * 86400000)),
+        end: endOfDay(now),
+        label: "Last 60 days"
+      };
+    case "ytd":
+      return {
+        start: startOfDay(new Date(today.getFullYear(), 0, 1)),
+        end: endOfDay(now),
+        label: "Year to date"
+      };
+    case "last-365-days":
+      return {
+        start: startOfDay(new Date(today.getTime() - 364 * 86400000)),
+        end: endOfDay(now),
+        label: "Last 365 days"
+      };
+    case "all-time":
+      return {
+        start: null,
+        end: null,
+        label: "All time"
+      };
+    case "custom": {
+      const start = parseOrderDate(customStart);
+      const end = parseOrderDate(customEnd);
+      if (start) start.setHours(0, 0, 0, 0);
+      if (end) end.setHours(23, 59, 59, 999);
+      const label = start && end
+        ? `${formatDateForInput(start)} – ${formatDateForInput(end)}`
+        : "Custom range";
+      return { start, end, label };
+    }
+    case "this-month":
+    default:
+      return {
+        start: startOfDay(new Date(today.getFullYear(), today.getMonth(), 1)),
+        end: endOfDay(now),
+        label: "This month"
+      };
+  }
+}
+
+function isDateInFinanceRange(date, range) {
+  if (!date) return false;
+  if (!range?.start && !range?.end) return true;
+  if (range.start && date < range.start) return false;
+  if (range.end && date > range.end) return false;
+  return true;
+}
+
+function isFinanceRangeReady(range, filterKey = financeFilterKey) {
+  if (filterKey !== "custom") return true;
+  return !!(range?.start && range?.end);
+}
+
 function computeDashboardStats(orders = allOrders) {
   const list = Array.isArray(orders) ? orders : [];
   const currentOrders = list.filter(isCurrentOrder);
   const completedThisMonth = list.filter(isCompletedThisMonth);
-  const paidCompletedThisMonth = completedThisMonth.filter(isPaid);
-  const revenueThisMonth = paidCompletedThisMonth.reduce((sum, order) => sum + moneyNumber(order.priceQuoted), 0);
-  const outstandingOrders = list.filter(isOutstandingUnpaidOrder);
-  const outstandingUnpaid = outstandingOrders.reduce((sum, order) => sum + moneyNumber(order.priceQuoted), 0);
   const turnaroundDays = list
     .filter(isCompletedOrder)
     .map(order => daysBetween(parseOrderDate(order.dateReceived), parseOrderDate(order.dateCompleted)))
     .filter(days => days !== null);
-
-  const averagePaidOrder = paidCompletedThisMonth.length
-    ? revenueThisMonth / paidCompletedThisMonth.length
-    : null;
 
   const averageTurnaround = turnaroundDays.length
     ? turnaroundDays.reduce((sum, days) => sum + days, 0) / turnaroundDays.length
@@ -676,12 +767,48 @@ function computeDashboardStats(orders = allOrders) {
     readyToGo: currentOrders.filter(isReadyToGo).length,
     inProgress: currentOrders.filter(isInProgressOrder).length,
     completedThisMonth: completedThisMonth.length,
-    revenueThisMonth,
-    outstandingUnpaid,
-    outstandingUnpaidCount: outstandingOrders.length,
+    averageTurnaround
+  };
+}
+
+function computeFinanceStats(
+  orders = allOrders,
+  filterKey = financeFilterKey,
+  customStart = financeFilterCustomStart,
+  customEnd = financeFilterCustomEnd
+) {
+  const list = Array.isArray(orders) ? orders : [];
+  const range = getFinanceDateRange(filterKey, customStart, customEnd);
+  const rangeReady = isFinanceRangeReady(range, filterKey);
+
+  const paidCompletedInRange = rangeReady
+    ? list.filter(order => {
+        if (!isCompletedOrder(order) || !isPaid(order)) return false;
+        return isDateInFinanceRange(getOrderFinanceCompletedDate(order), range);
+      })
+    : [];
+
+  const revenue = paidCompletedInRange.reduce((sum, order) => sum + moneyNumber(order.priceQuoted), 0);
+  const paidOrders = paidCompletedInRange.length;
+  const averagePaidOrder = paidOrders ? revenue / paidOrders : null;
+
+  const outstandingOrders = rangeReady
+    ? list.filter(order => {
+        if (!isOutstandingUnpaidOrder(order)) return false;
+        return isDateInFinanceRange(getOrderFinanceReceivedDate(order), range);
+      })
+    : [];
+
+  const outstandingUnpaid = outstandingOrders.reduce((sum, order) => sum + moneyNumber(order.priceQuoted), 0);
+
+  return {
+    range,
+    rangeReady,
+    revenue,
+    paidOrders,
     averagePaidOrder,
-    averageTurnaround,
-    paidOrdersThisMonth: paidCompletedThisMonth.length
+    outstandingUnpaid,
+    outstandingUnpaidCount: outstandingOrders.length
   };
 }
 
@@ -796,19 +923,46 @@ function renderDashboardMetricCard(label, value, { sub = "", view = "" } = {}) {
   `;
 }
 
+function renderFinanceFilterOptions(selectedKey) {
+  const options = [
+    ["this-month", "This Month"],
+    ["last-30-days", "Last 30 Days"],
+    ["last-60-days", "Last 60 Days"],
+    ["ytd", "Year to Date"],
+    ["last-365-days", "Last 365 Days"],
+    ["all-time", "All Time"],
+    ["custom", "Custom"]
+  ];
+
+  return options.map(([value, label]) => `
+    <option value="${escapeAttr(value)}" ${value === selectedKey ? "selected" : ""}>${escapeHtml(label)}</option>
+  `).join("");
+}
+
 function renderHomeDashboard() {
   if (!dashboardPanel) return;
 
   const stats = computeDashboardStats();
+  const financeStats = computeFinanceStats();
   const benchOrders = getBenchPreviewOrders();
   const onDeckOrders = getOnDeckOrders();
   const attentionItems = getDashboardAttentionItems();
   const avgTurnaroundDisplay = stats.averageTurnaround === null
     ? "—"
     : `${Math.round(stats.averageTurnaround)}d`;
-  const avgPaidOrderDisplay = stats.averagePaidOrder === null
+  const avgPaidOrderDisplay = !financeStats.rangeReady || financeStats.averagePaidOrder === null
     ? "—"
-    : formatCurrency(stats.averagePaidOrder);
+    : formatCurrency(financeStats.averagePaidOrder);
+  const revenueDisplay = financeStats.rangeReady
+    ? formatCurrency(financeStats.revenue)
+    : "—";
+  const outstandingDisplay = financeStats.rangeReady
+    ? formatCurrency(financeStats.outstandingUnpaid)
+    : "—";
+  const paidOrdersDisplay = financeStats.rangeReady
+    ? String(financeStats.paidOrders)
+    : "—";
+  const financeRangeLabel = financeStats.range.label;
 
   const metricsHtml = [
     renderDashboardMetricCard("Current Orders", stats.currentOrders, { view: "current" }),
@@ -825,15 +979,40 @@ function renderHomeDashboard() {
   ].join("");
 
   const financeHtml = [
-    renderDashboardMetricCard("Revenue This Month", formatCurrency(stats.revenueThisMonth)),
+    renderDashboardMetricCard("Revenue", revenueDisplay, { sub: financeRangeLabel }),
     renderDashboardMetricCard(
       "Outstanding Unpaid",
-      formatCurrency(stats.outstandingUnpaid),
-      { sub: `${stats.outstandingUnpaidCount} orders` }
+      outstandingDisplay,
+      { sub: financeStats.rangeReady ? `${financeStats.outstandingUnpaidCount} orders · ${financeRangeLabel}` : financeRangeLabel }
     ),
-    renderDashboardMetricCard("Average Paid Order", avgPaidOrderDisplay, { sub: "This month" }),
-    renderDashboardMetricCard("Paid Orders This Month", stats.paidOrdersThisMonth)
+    renderDashboardMetricCard("Average Paid Order", avgPaidOrderDisplay, { sub: financeRangeLabel }),
+    renderDashboardMetricCard("Paid Orders", paidOrdersDisplay, { sub: financeRangeLabel })
   ].join("");
+
+  const financeCustomHtml = financeFilterKey === "custom"
+    ? `
+      <div class="dashboard-finance-custom">
+        <label>
+          Start Date
+          <input
+            id="financeCustomStart"
+            type="date"
+            data-finance-custom-date
+            value="${escapeAttr(financeFilterCustomStart)}"
+          >
+        </label>
+        <label>
+          End Date
+          <input
+            id="financeCustomEnd"
+            type="date"
+            data-finance-custom-date
+            value="${escapeAttr(financeFilterCustomEnd)}"
+          >
+        </label>
+      </div>
+    `
+    : "";
 
   const benchHtml = renderDashboardOrderList(benchOrders, "No bench work queued.");
   const onDeckHtml = renderDashboardOrderList(onDeckOrders, "No orders on deck.");
@@ -855,19 +1034,37 @@ function renderHomeDashboard() {
         <div class="dashboard-grid">${metricsHtml}</div>
       </section>
 
-      <section class="dashboard-section">
-        <h2 class="dashboard-section-title">Finance Snapshot</h2>
+      <section class="dashboard-section dashboard-section-finance">
+        <div class="dashboard-section-heading">
+          <div class="dashboard-section-title-wrap">
+            <h2 class="dashboard-section-title">Finance Snapshot</h2>
+            <p class="dashboard-section-range muted">${escapeHtml(financeRangeLabel)}</p>
+          </div>
+          <div class="dashboard-finance-controls">
+            <label class="sr-only" for="financeFilterSelect">Finance date range</label>
+            <select id="financeFilterSelect" class="dashboard-finance-filter">
+              ${renderFinanceFilterOptions(financeFilterKey)}
+            </select>
+          </div>
+        </div>
+        ${financeCustomHtml}
         <div class="dashboard-grid dashboard-grid-finance">${financeHtml}</div>
       </section>
 
-      <section class="dashboard-section">
-        <h2 class="dashboard-section-title">Today's Bench</h2>
-        <div class="dashboard-card dashboard-bench-card">${benchHtml}</div>
+      <section class="dashboard-section dashboard-section-bench">
+        <div class="dashboard-section-heading-row">
+          <h2 class="dashboard-section-title">Today's Bench</h2>
+          <span class="dashboard-section-kicker dashboard-section-kicker-primary">Work now</span>
+        </div>
+        <div class="dashboard-card dashboard-bench-card dashboard-bench-card--primary">${benchHtml}</div>
       </section>
 
-      <section class="dashboard-section">
-        <h2 class="dashboard-section-title">On Deck</h2>
-        <div class="dashboard-card dashboard-bench-card">${onDeckHtml}</div>
+      <section class="dashboard-section dashboard-section-ondeck">
+        <div class="dashboard-section-heading-row">
+          <h2 class="dashboard-section-title">On Deck</h2>
+          <span class="dashboard-section-kicker">Coming up</span>
+        </div>
+        <div class="dashboard-card dashboard-bench-card dashboard-bench-card--secondary">${onDeckHtml}</div>
       </section>
 
       <section class="dashboard-section">
@@ -892,6 +1089,20 @@ function wireHomeDashboardActions() {
     const viewBtn = e.target.closest("[data-dashboard-view]");
     if (viewBtn) {
       setActiveView(viewBtn.dataset.dashboardView);
+    }
+  });
+
+  dashboardPanel.addEventListener("change", (e) => {
+    if (e.target.id === "financeFilterSelect") {
+      financeFilterKey = e.target.value || "this-month";
+      renderHomeDashboard();
+      return;
+    }
+
+    if (e.target.matches("[data-finance-custom-date]")) {
+      financeFilterCustomStart = document.getElementById("financeCustomStart")?.value || "";
+      financeFilterCustomEnd = document.getElementById("financeCustomEnd")?.value || "";
+      renderHomeDashboard();
     }
   });
 }
