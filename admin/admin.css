@@ -4548,6 +4548,38 @@ button.dashboard-metric:active{
   .detail-card{
     padding:10px;
   }
+
+  .dashboard-section-finance .dashboard-section-heading{
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  .dashboard-section-finance .dashboard-finance-controls{
+    width:100%;
+  }
+
+  .dashboard-section-finance .dashboard-finance-filter{
+    width:100%;
+    max-width:100%;
+  }
+
+  .dashboard-finance-custom{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:10px;
+    width:100%;
+  }
+
+  .dashboard-finance-custom label{
+    min-width:0;
+    width:100%;
+  }
+
+  .dashboard-finance-custom input[type="date"]{
+    width:100%;
+    max-width:100%;
+    box-sizing:border-box;
+  }
 }
 
 /* =========================
