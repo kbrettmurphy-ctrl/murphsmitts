@@ -794,15 +794,6 @@ button.secondary{
   color:#ffb8bf;
 }
 
-.gallery-manager-action-btn{
-  width:100%;
-  min-height:30px;
-  border-radius:10px;
-  padding:0 8px;
-  font-size:.74rem;
-  font-weight:700;
-}
-
 /* Gallery manager photo action select — compact sizing; theme below */
 .gallery-manager-action-select{
   width:100%;
@@ -1485,25 +1476,6 @@ button.dashboard-metric:active{
   background:rgba(218,202,177,.92);
   color:var(--navy);
   box-shadow:none;
-}
-
-.logout-action{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:8px;
-  white-space:nowrap;
-}
-
-.logout-action-icon{
-  display:none;
-  width:20px;
-  height:20px;
-  fill:none;
-  stroke:currentColor;
-  stroke-width:2;
-  stroke-linecap:round;
-  stroke-linejoin:round;
 }
 
 .topbar h1,
@@ -4149,25 +4121,6 @@ button.dashboard-metric:active{
   font-size:.9rem;
 }
 
-.checkbox-inline-other{
-  display:grid;
-  gap:10px;
-  align-items:start;
-}
-
-.checkbox-other-choice{
-  display:grid;
-  grid-template-columns:auto 1fr;
-  gap:12px;
-  align-items:center;
-  color:var(--cream);
-}
-
-.checkbox-inline-other input[type="text"]{
-  width:100%;
-  min-width:0;
-}
-
 .detail-block input[type="checkbox"]{
   width:18px;
   height:18px;
@@ -4557,22 +4510,6 @@ button.dashboard-metric:active{
     flex:0 0 auto;
     white-space:nowrap;
     font-size:.84rem;
-  }
-
-  .logout-action{
-    width:40px;
-    min-width:40px;
-    height:40px;
-    flex:0 0 auto;
-    padding:0;
-  }
-
-  .logout-action-text{
-    display:none;
-  }
-
-  .logout-action-icon{
-    display:block;
   }
 
   .detail-card{
@@ -5619,10 +5556,6 @@ button.secondary,
   .brand-logo{
     width:34px;
     height:34px;
-  }
-
-  .brand-main{
-    font-size:.95rem;
   }
 
   .brand-sub{
