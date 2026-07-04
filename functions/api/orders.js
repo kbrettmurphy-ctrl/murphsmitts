@@ -359,6 +359,28 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "listLaborSummary") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await fetchLaborSummary(env);
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Labor summary could not be loaded.",
+            details: result.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json({ ok: true, sessions: result.sessions }, 200, jsonHeaders);
+    }
+
     if (action === "pauseLaborSession") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -2099,6 +2121,24 @@ async function stopLaborSession(env, { sessionId, notes }) {
   };
 }
 
+async function fetchLaborSummary(env) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/order_labor_sessions?select=order_number,phase,duration_minutes&ended_at=not.is.null`
+  );
+
+  if (!resp.ok) return resp;
+
+  return {
+    ok: true,
+    sessions: (Array.isArray(resp.data) ? resp.data : []).map(row => ({
+      orderNumber: row.order_number,
+      phase: row.phase,
+      durationMinutes: row.duration_minutes != null ? Number(row.duration_minutes) : 0
+    }))
+  };
+}
+
 async function pauseLaborSession(env, { sessionId, notes }) {
   const existing = await fetchLaborSessionById(env, sessionId);
   if (!existing.ok) return existing;
@@ -3132,6 +3172,7 @@ function mapOrderFromDb(row) {
     dateReceived: row.date_received,
     estimatedCompletion: row.estimated_completion,
     priceQuoted: row.price_quoted,
+    lacePiecesUsed: row.lace_pieces_used != null ? Number(row.lace_pieces_used) : null,
     shippingCost: row.shipping_cost,
     paid: row.paid,
     allowShipWithoutPayment: row.allow_ship_without_payment,
@@ -3227,6 +3268,10 @@ function mapUpdatesToDb(updates) {
   if ("referralSource" in updates) out.referral_source = cleanText(updates.referralSource);
 
   if ("priceQuoted" in updates) out.price_quoted = cleanNumeric(updates.priceQuoted);
+  if ("lacePiecesUsed" in updates) {
+    const lacePieces = cleanNumeric(updates.lacePiecesUsed);
+    out.lace_pieces_used = lacePieces === null ? null : Math.round(lacePieces);
+  }
   if ("shippingCost" in updates) out.shipping_cost = cleanNumeric(updates.shippingCost);
   if ("paid" in updates) out.paid = cleanText(updates.paid);
 

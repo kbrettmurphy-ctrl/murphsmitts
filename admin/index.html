@@ -26,6 +26,7 @@
         <button class="nav-link nav-main active" data-view="dashboard">Clubhouse</button>
         <button class="nav-link nav-main" data-view="current">Orders</button>
         <button class="nav-link nav-main" data-view="map">Map</button>
+        <button class="nav-link nav-main" data-view="money">Money</button>
         <button class="nav-link nav-main" data-view="inventory">Lace Inventory</button>
         <button class="nav-link nav-main" data-view="upload">Gallery</button>
         <button class="nav-link nav-main" data-view="gloves-sale">Gloves For Sale</button>
@@ -317,6 +318,33 @@
         </header>
 
         <div id="saleGlovesList" class="orders-list"></div>
+      </section>
+
+      <section id="moneyView" class="view">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="moneyMenuBtn" class="icon-btn" aria-label="Open menu">☰</button>
+            <div>
+              <h1>Money</h1>
+              <p id="moneyCount" class="muted">Job costing &amp; effective rates</p>
+            </div>
+          </div>
+
+          <div class="topbar-actions">
+            <button id="moneyLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
+              <span class="logout-action-text">Log Out</span>
+              <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M10 6H6.8A2.8 2.8 0 0 0 4 8.8v6.4A2.8 2.8 0 0 0 6.8 18H10"></path>
+                <path d="M14 8l4 4-4 4"></path>
+                <path d="M8.8 12H18"></path>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="money-view">
+          <div id="moneyPanel" class="money-panel"></div>
+        </div>
       </section>
 
       <section id="detailView" class="view">

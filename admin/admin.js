@@ -18,6 +18,9 @@ const dashboardView = document.getElementById("dashboardView");
 const detailView = document.getElementById("detailView");
 const uploadView = document.getElementById("uploadView");
 const mapView = document.getElementById("mapView");
+const moneyView = document.getElementById("moneyView");
+const moneyMenuBtn = document.getElementById("moneyMenuBtn");
+const moneyLogoutBtn = document.getElementById("moneyLogoutBtn");
 const detailTitle = document.getElementById("detailTitle");
 const pinInput = document.getElementById("pinInput");
 const loginStatus = document.getElementById("loginStatus");
@@ -103,6 +106,8 @@ let orderActivityLoadToken = 0;
 let laborTimerLoadToken = 0;
 let laborTimerTickInterval = null;
 let laborTimerDelegated = false;
+let orderDetailLaborMinutes = null;
+let orderEconomicsDelegated = false;
 let orderDetailCollapseState = {};
 let orderDetailCollapseOrderNumber = null;
 let detailCollapseDelegated = false;
@@ -170,7 +175,7 @@ function isAdminActionSurface(target) {
    VIEW / MENU
 ========================= */
 function showView(view) {
-  [loginView, homeDashboardView, dashboardView, detailView, uploadView, mapView, saleGlovesView]
+  [loginView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, saleGlovesView]
     .filter(Boolean)
     .forEach(v => v.classList.remove("active"));
 
@@ -1478,6 +1483,7 @@ function getViewTitle(viewName) {
   switch (viewName) {
     case "dashboard": return "Clubhouse";
     case "map": return "Map";
+    case "money": return "Money";
     case "upload": return "Gallery";
     case "inventory": return "Lace Inventory";
     case "gloves-sale": return "Gloves For Sale";
@@ -2330,6 +2336,449 @@ const LABOR_TIMER_PHASES = [
   "Other"
 ];
 
+/* =========================
+   SHOP ECONOMICS V1
+   All job-costing and pricing constants live here — nothing inline.
+   Shipping is intentionally excluded from all economics math:
+   shipping_cost is what the customer pays for the label plus a small
+   rounded-up markup, charged on top of the quote at Ready to Go.
+   It is pure pass-through — neither revenue nor expense.
+========================= */
+const SHOP_ECONOMICS = {
+  laceCostPerPiece: 3.60,
+  lacePieceDefaults: { "Fielders Glove": 3, "Catchers Mitt": 4, "First Base Mitt": 5 },
+  lacePiecesTrapezeBonus: 1,
+  palmPadUnitCost: 1.25, // $25 ShockTec 5 sq ft sheet ÷ twenty 6"x6" pads
+  consumablesPerCleaning: 1.00
+};
+
+const SHOP_PRICING = {
+  relaceBase: { "Fielders Glove": 80, "Catchers Mitt": 100, "First Base Mitt": 100 },
+  trapezeUpcharge: 20, // fielders w/ Trapeze or Modified Trapeze web => 100
+  palmPadAddOn: 20
+};
+
+function getOrderSelectedServices(order) {
+  return parseServicesValue(order?.servicesRequested || "").selected;
+}
+
+function orderHasRelacingService(order) {
+  const services = getOrderSelectedServices(order);
+  return services.includes("Relacing") || services.includes("Cleaning + Conditioning + Relacing");
+}
+
+function orderHasCleaningService(order) {
+  const services = getOrderSelectedServices(order);
+  return services.includes("Cleaning + Conditioning") || services.includes("Cleaning + Conditioning + Relacing");
+}
+
+function orderHasPalmPadService(order) {
+  return getOrderSelectedServices(order).includes("ShockTec Air2Gel Palm Pad");
+}
+
+function orderHasTrapezeWeb(order) {
+  return String(order?.webType || "").toLowerCase().includes("trapeze");
+}
+
+function getDefaultLacePieces(order) {
+  const base = SHOP_ECONOMICS.lacePieceDefaults[String(order?.gloveType || "")] ?? 4;
+  const trapezeBonus = String(order?.gloveType || "") === "Fielders Glove" && orderHasTrapezeWeb(order)
+    ? SHOP_ECONOMICS.lacePiecesTrapezeBonus
+    : 0;
+  return base + trapezeBonus;
+}
+
+function getOrderMaterialsCost(order) {
+  const lacePieces = orderHasRelacingService(order)
+    ? (order?.lacePiecesUsed != null && Number.isFinite(Number(order.lacePiecesUsed))
+        ? Number(order.lacePiecesUsed)
+        : getDefaultLacePieces(order))
+    : 0;
+  const laceCost = lacePieces * SHOP_ECONOMICS.laceCostPerPiece;
+  const palmPadCost = orderHasPalmPadService(order) ? SHOP_ECONOMICS.palmPadUnitCost : 0;
+  const consumables = orderHasCleaningService(order) ? SHOP_ECONOMICS.consumablesPerCleaning : 0;
+
+  return {
+    lacePieces,
+    laceCost,
+    palmPadCost,
+    consumables,
+    total: laceCost + palmPadCost + consumables
+  };
+}
+
+function getOrderEconomics(order, laborMinutes) {
+  const materials = getOrderMaterialsCost(order);
+  const minutes = Number(laborMinutes);
+  const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
+  const price = Number(order?.priceQuoted);
+  const hasPrice = order?.priceQuoted != null && order?.priceQuoted !== "" && Number.isFinite(price);
+
+  const net = hasPrice ? price - materials.total : null;
+
+  let hourlyRate = null;
+  let reason = "";
+  if (!hasPrice) {
+    reason = "No price set";
+  } else if (safeMinutes <= 0) {
+    reason = "No labor logged";
+  } else {
+    hourlyRate = net / (safeMinutes / 60);
+  }
+
+  return { materials, net, laborMinutes: safeMinutes, hourlyRate, reason };
+}
+
+function getOrderEconomicsSummaryText(order) {
+  if (orderDetailLaborMinutes === null) return "";
+  const econ = getOrderEconomics(order, orderDetailLaborMinutes);
+  return econ.hourlyRate !== null ? `${formatCurrency(econ.hourlyRate)}/hr` : "";
+}
+
+function renderOrderEconomicsBody(order) {
+  const laborLoaded = orderDetailLaborMinutes !== null;
+  const econ = getOrderEconomics(order, laborLoaded ? orderDetailLaborMinutes : 0);
+  const m = econ.materials;
+  const hasPrice = econ.net !== null;
+  const suggestion = getSuggestedPrice(order);
+  const isOverride = order?.lacePiecesUsed != null;
+  const defaultPieces = getDefaultLacePieces(order);
+
+  let suggestionHtml = "";
+  if (suggestion) {
+    let deltaText = "";
+    if (hasPrice) {
+      const delta = Number(order.priceQuoted) - suggestion.price;
+      if (delta !== 0) {
+        const sign = delta > 0 ? "+" : "−";
+        deltaText = ` (quoted ${formatCurrency(Number(order.priceQuoted))}, ${sign}${formatCurrency(Math.abs(delta))} vs suggested)`;
+      }
+    }
+    suggestionHtml = `<div class="order-economics-suggestion muted">Suggested price: ${escapeHtml(formatCurrency(suggestion.price))}${escapeHtml(deltaText)}</div>`;
+  }
+
+  const rateDisplay = econ.hourlyRate !== null
+    ? escapeHtml(`${formatCurrency(econ.hourlyRate)}/hr`)
+    : `— <span class="order-economics-reason muted">${escapeHtml(laborLoaded ? econ.reason : "Loading labor…")}</span>`;
+
+  return `
+    <div class="order-economics">
+      <div class="order-economics-rate">
+        <span class="order-economics-rate-label">Effective rate</span>
+        <strong class="order-economics-rate-value">${rateDisplay}</strong>
+      </div>
+      ${suggestionHtml}
+      <div class="order-economics-lines">
+        <div class="order-economics-line"><span>Price</span><span>${hasPrice ? escapeHtml(formatCurrency(Number(order.priceQuoted))) : "—"}</span></div>
+        ${m.lacePieces > 0 ? `<div class="order-economics-line"><span>Lace</span><span>${m.lacePieces} × ${escapeHtml(formatCurrency(SHOP_ECONOMICS.laceCostPerPiece))} = ${escapeHtml(formatCurrency(m.laceCost))}</span></div>` : ""}
+        ${m.palmPadCost > 0 ? `<div class="order-economics-line"><span>Palm pad</span><span>${escapeHtml(formatCurrency(m.palmPadCost))}</span></div>` : ""}
+        ${m.consumables > 0 ? `<div class="order-economics-line"><span>Consumables</span><span>${escapeHtml(formatCurrency(m.consumables))}</span></div>` : ""}
+        <div class="order-economics-line order-economics-line--strong"><span>Materials</span><span>${escapeHtml(formatCurrency(m.total))}</span></div>
+        <div class="order-economics-line order-economics-line--strong"><span>Net</span><span>${econ.net !== null ? escapeHtml(formatCurrency(econ.net)) : "—"}</span></div>
+        <div class="order-economics-line"><span>Labor</span><span>${laborLoaded ? escapeHtml(formatLaborDuration(econ.laborMinutes)) : "—"}</span></div>
+      </div>
+      ${orderHasRelacingService(order) ? `
+        <div class="order-economics-pieces">
+          <label class="order-economics-pieces-label" for="economicsLacePieces">
+            Lace pieces <span class="muted">${isOverride ? `(override — default ${defaultPieces})` : `(default ${defaultPieces})`}</span>
+          </label>
+          <input
+            id="economicsLacePieces"
+            class="order-economics-pieces-input"
+            type="number"
+            min="0"
+            step="1"
+            inputmode="numeric"
+            value="${escapeAttr(String(isOverride ? order.lacePiecesUsed : defaultPieces))}"
+          >
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderOrderEconomicsSection(order) {
+  return renderCollapsibleDetailSection(
+    "economics",
+    "Economics",
+    getOrderEconomicsSummaryText(order),
+    renderOrderEconomicsBody(order),
+    {
+      defaultExpanded: getDefaultSectionExpanded("economics"),
+      sectionId: "economicsSection",
+      bodyId: "economicsSectionBody"
+    }
+  );
+}
+
+function updateOrderEconomicsSection(order = currentOrder) {
+  if (!order) return;
+
+  const body = document.getElementById("economicsSectionBody");
+  if (body) body.innerHTML = renderOrderEconomicsBody(order);
+
+  const summaryEl = orderDetail?.querySelector(`[data-section-summary="economics"]`);
+  if (summaryEl) {
+    const summary = getOrderEconomicsSummaryText(order);
+    summaryEl.textContent = summary ? `· ${summary}` : "";
+  }
+}
+
+/* Lace-pieces override has its own tiny save path — isolated from the
+   main Order Detail Save button and form collection. */
+function ensureOrderEconomicsDelegation() {
+  if (orderEconomicsDelegated || !orderDetail) return;
+  orderEconomicsDelegated = true;
+
+  orderDetail.addEventListener("change", async (e) => {
+    if (e.target?.id !== "economicsLacePieces") return;
+    const order = currentOrder;
+    if (!order?.orderNumber) return;
+
+    const raw = String(e.target.value || "").trim();
+    let nextValue = null;
+    if (raw !== "") {
+      const parsed = Math.round(Number(raw));
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        updateOrderEconomicsSection(order);
+        return;
+      }
+      nextValue = parsed;
+    }
+
+    e.target.disabled = true;
+    try {
+      await saveOrderUpdate(order.orderNumber, { lacePiecesUsed: nextValue }, true);
+    } catch (err) {
+      alert(err?.message || "Lace pieces could not be saved.");
+    }
+    updateOrderEconomicsSection();
+  });
+}
+
+/* Rule-based quote suggestion from SHOP_PRICING only — never derived
+   from historical quoted prices. The price table is swappable: a
+   future sprint will replace it with measured timer data. */
+function getSuggestedPrice(order) {
+  if (!orderHasRelacingService(order)) return null;
+
+  const gloveType = String(order?.gloveType || "");
+  const base = SHOP_PRICING.relaceBase[gloveType] ?? SHOP_PRICING.relaceBase["Fielders Glove"];
+  const parts = [`Relace: ${formatCurrency(base)}`];
+  let price = base;
+
+  if (gloveType === "Fielders Glove" && orderHasTrapezeWeb(order)) {
+    price += SHOP_PRICING.trapezeUpcharge;
+    parts.push(`Trapeze web: +${formatCurrency(SHOP_PRICING.trapezeUpcharge)}`);
+  }
+
+  if (orderHasPalmPadService(order)) {
+    price += SHOP_PRICING.palmPadAddOn;
+    parts.push(`Palm pad: +${formatCurrency(SHOP_PRICING.palmPadAddOn)}`);
+  }
+
+  return { price, parts };
+}
+
+/* =========================
+   MONEY VIEW
+========================= */
+let moneyLaborSummaryCache = null;
+let moneyViewDelegated = false;
+
+async function renderMoneyView() {
+  const panel = document.getElementById("moneyPanel");
+  if (!panel) return;
+
+  ensureMoneyViewDelegation();
+  panel.innerHTML = `<div class="dashboard-card money-empty muted">Loading job economics…</div>`;
+
+  let sessions = [];
+  let loadError = "";
+  try {
+    const data = await postJson({ action: "listLaborSummary" }, true);
+    sessions = data.sessions || [];
+    moneyLaborSummaryCache = sessions;
+  } catch (err) {
+    if (moneyLaborSummaryCache) {
+      sessions = moneyLaborSummaryCache;
+    } else {
+      loadError = err?.message || "Labor summary could not be loaded.";
+    }
+  }
+
+  if (activeView !== "money") return;
+  panel.innerHTML = renderMoneyViewContent(sessions, loadError);
+}
+
+function ensureMoneyViewDelegation() {
+  if (moneyViewDelegated) return;
+  const panel = document.getElementById("moneyPanel");
+  if (!panel) return;
+  moneyViewDelegated = true;
+
+  panel.addEventListener("click", (e) => {
+    const row = e.target.closest("[data-money-order]");
+    if (!row) return;
+    openOrder(row.dataset.moneyOrder, { returnView: "money" });
+  });
+}
+
+function buildMoneyRollup(items, keyFn, { sortByLabelDesc = false } = {}) {
+  const groups = new Map();
+  items.forEach(item => {
+    const label = keyFn(item) || "Other";
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(item);
+  });
+
+  const rows = Array.from(groups.entries()).map(([label, groupItems]) => {
+    const jobs = groupItems.length;
+    const priced = groupItems.filter(i => i.econ.net !== null);
+    const avgPrice = priced.length
+      ? priced.reduce((s, i) => s + Number(i.order.priceQuoted), 0) / priced.length
+      : null;
+    const avgMaterials = groupItems.reduce((s, i) => s + i.econ.materials.total, 0) / jobs;
+    const avgMinutes = groupItems.reduce((s, i) => s + i.econ.laborMinutes, 0) / jobs;
+    const netSum = priced.reduce((s, i) => s + i.econ.net, 0);
+    const pricedHours = priced.reduce((s, i) => s + i.econ.laborMinutes, 0) / 60;
+    const rate = pricedHours > 0 ? netSum / pricedHours : null;
+    return { label, jobs, avgPrice, avgMaterials, avgMinutes, rate };
+  });
+
+  rows.sort(sortByLabelDesc
+    ? (a, b) => String(b.label).localeCompare(String(a.label))
+    : (a, b) => b.jobs - a.jobs);
+  return rows;
+}
+
+function renderMoneyRollupTable(title, firstColumn, rows) {
+  if (!rows.length) return "";
+  return `
+    <div class="dashboard-card money-card">
+      <h3 class="money-card-title">${escapeHtml(title)}</h3>
+      <div class="money-table-wrap">
+        <table class="money-table">
+          <thead>
+            <tr><th>${escapeHtml(firstColumn)}</th><th>Jobs</th><th>Avg price</th><th>Avg materials</th><th>Avg hours</th><th>$/hr</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr>
+                <td>${escapeHtml(row.label)}</td>
+                <td>${row.jobs}</td>
+                <td>${row.avgPrice !== null ? escapeHtml(formatCurrency(row.avgPrice)) : "—"}</td>
+                <td>${escapeHtml(formatCurrency(row.avgMaterials))}</td>
+                <td>${escapeHtml(formatLaborDuration(row.avgMinutes))}</td>
+                <td>${row.rate !== null ? escapeHtml(`${formatCurrency(row.rate)}/hr`) : "—"}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function renderMoneyJobsTable(title, items) {
+  if (!items.length) return "";
+  return `
+    <div class="dashboard-card money-card">
+      <h3 class="money-card-title">${escapeHtml(title)}</h3>
+      <div class="money-table-wrap">
+        <table class="money-table">
+          <thead>
+            <tr><th>Customer</th><th>Order</th><th>Service</th><th>Price</th><th>Hours</th><th>$/hr</th></tr>
+          </thead>
+          <tbody>
+            ${items.map(item => {
+              const unpaid = String(item.order.paid || "").toLowerCase() !== "paid";
+              return `
+                <tr class="money-job-row" data-money-order="${escapeAttr(String(item.order.orderNumber || ""))}">
+                  <td>${escapeHtml(item.order.customerName || "Customer")}</td>
+                  <td>#${escapeHtml(String(item.order.orderNumber || ""))}</td>
+                  <td>${escapeHtml(getOrderSelectedServices(item.order).join(" + ") || "—")}</td>
+                  <td>${escapeHtml(formatCurrency(Number(item.order.priceQuoted)))}${unpaid ? ` <span class="money-unpaid muted">unpaid</span>` : ""}</td>
+                  <td>${escapeHtml(formatLaborDuration(item.econ.laborMinutes))}</td>
+                  <td>${escapeHtml(`${formatCurrency(item.econ.hourlyRate)}/hr`)}</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function renderMoneyViewContent(sessions, loadError) {
+  const laborByOrder = {};
+  (Array.isArray(sessions) ? sessions : []).forEach(session => {
+    const key = String(session.orderNumber || "");
+    if (!key) return;
+    laborByOrder[key] = (laborByOrder[key] || 0) + (Number(session.durationMinutes) || 0);
+  });
+
+  const rows = allOrders.map(order => {
+    const laborMinutes = laborByOrder[String(order.orderNumber)] || 0;
+    return { order, econ: getOrderEconomics(order, laborMinutes) };
+  });
+
+  /* Rollups only count orders with labor logged; the rest appear only
+     in the coverage stat. */
+  const withLabor = rows.filter(r => r.econ.laborMinutes > 0);
+  const rated = withLabor.filter(r => r.econ.hourlyRate !== null);
+
+  const totalNet = rated.reduce((sum, r) => sum + r.econ.net, 0);
+  const ratedHours = rated.reduce((sum, r) => sum + r.econ.laborMinutes, 0) / 60;
+  const overallRate = ratedHours > 0 ? totalNet / ratedHours : null;
+  const totalLaborMinutes = withLabor.reduce((sum, r) => sum + r.econ.laborMinutes, 0);
+  const totalMaterials = withLabor.reduce((sum, r) => sum + r.econ.materials.total, 0);
+
+  const errorHtml = loadError
+    ? `<div class="money-error">${escapeHtml(loadError)}</div>`
+    : "";
+
+  const statsHtml = `
+    <div class="dashboard-grid money-stat-grid">
+      ${renderDashboardMetricCard("Effective $/hr", overallRate !== null ? `${formatCurrency(overallRate)}/hr` : "—", { sub: "Jobs with labor + price" })}
+      ${renderDashboardMetricCard("Jobs with labor", `${withLabor.length} of ${rows.length}`)}
+      ${renderDashboardMetricCard("Total labor", formatLaborDuration(totalLaborMinutes))}
+      ${renderDashboardMetricCard("Materials cost", formatCurrency(totalMaterials), { sub: "Jobs with labor" })}
+    </div>
+  `;
+
+  if (!withLabor.length) {
+    return `
+      ${errorHtml}
+      ${statsHtml}
+      <div class="dashboard-card money-empty muted">No labor logged yet — run timers on your jobs and this page fills in.</div>
+    `;
+  }
+
+  const byService = buildMoneyRollup(withLabor, r => getOrderSelectedServices(r.order).join(" + ") || "Other");
+  const byGlove = buildMoneyRollup(withLabor, r => String(r.order.gloveType || "Unknown"));
+  const byMonth = buildMoneyRollup(
+    withLabor,
+    r => String(r.order.dateCompleted || r.order.createdAt || r.order.timestampSubmitted || "").slice(0, 7) || "Unknown",
+    { sortByLabelDesc: true }
+  );
+
+  const sortedByRate = rated.slice().sort((a, b) => b.econ.hourlyRate - a.econ.hourlyRate);
+  const best = sortedByRate.slice(0, 5);
+  const worst = sortedByRate.length > 5 ? sortedByRate.slice(-5).reverse() : [];
+
+  return `
+    ${errorHtml}
+    ${statsHtml}
+    ${renderMoneyRollupTable("By Service", "Service", byService)}
+    ${renderMoneyRollupTable("By Glove Type", "Glove type", byGlove)}
+    ${renderMoneyRollupTable("By Month", "Month", byMonth)}
+    ${renderMoneyJobsTable("Best Jobs ($/hr)", best)}
+    ${worst.length ? renderMoneyJobsTable("Worst Jobs ($/hr)", worst) : ""}
+  `;
+}
+
 function formatLaborDuration(minutes) {
   const totalMinutes = Number(minutes);
   if (!Number.isFinite(totalMinutes) || totalMinutes < 0) return "—";
@@ -2616,6 +3065,13 @@ async function loadLaborSessions(orderNumber, { preserveError = "" } = {}) {
     panel.innerHTML = renderLaborTimerPanel(sessions, { error: preserveError });
     updateLaborTimerSummary(sessions);
 
+    /* Economics counts stopped sessions only — open/paused sessions
+       don't contribute labor minutes until stopped. */
+    orderDetailLaborMinutes = sessions
+      .filter(session => session.endedAt)
+      .reduce((sum, session) => sum + Number(session.durationMinutes || 0), 0);
+    updateOrderEconomicsSection();
+
     const active = sessions.find(session => !session.endedAt);
     if (active) startLaborTimerTick(active);
   } catch (err) {
@@ -2624,6 +3080,8 @@ async function loadLaborSessions(orderNumber, { preserveError = "" } = {}) {
       error: err?.message || "Labor timer could not be loaded."
     });
     updateLaborTimerSummary([]);
+    orderDetailLaborMinutes = null;
+    updateOrderEconomicsSection();
   }
 }
 
@@ -3697,6 +4155,7 @@ function normalizeAdminView(viewName) {
   if (!view || view === "dashboard") return "dashboard";
   if (view === "orders" || view === "current") return "current";
   if (view === "map") return "map";
+  if (view === "money") return "money";
   if (view === "upload") return "upload";
   if (view === "inventory") return "inventory";
   if (view === "gloves-sale") return "gloves-sale";
@@ -3708,7 +4167,7 @@ function isKnownAdminView(viewName) {
   const view = String(viewName || "").trim().toLowerCase();
   if (!view || view === "dashboard") return true;
   if (view === "orders" || view === "current") return true;
-  return ["map", "upload", "inventory", "gloves-sale"].includes(view) || isOrderFilterView(view);
+  return ["map", "money", "upload", "inventory", "gloves-sale"].includes(view) || isOrderFilterView(view);
 }
 
 function syncAdminViewUrl(viewName) {
@@ -3725,6 +4184,9 @@ function syncAdminViewUrl(viewName) {
     } else {
       url.searchParams.delete("order");
     }
+  } else if (view === "money") {
+    url.searchParams.set("view", "money");
+    url.searchParams.delete("order");
   } else if (view === "upload") {
     url.searchParams.set("view", "upload");
     url.searchParams.delete("order");
@@ -3802,6 +4264,15 @@ function setActiveView(viewName) {
     closeMenu();
     resetViewScroll(saleGlovesView, { blurActive: true });
     loadPromise.finally(() => resetViewScroll(saleGlovesView));
+    return;
+  }
+
+  if (resolvedView === "money") {
+    syncAdminViewUrl(resolvedView);
+    showView(moneyView);
+    closeMenu();
+    resetViewScroll(moneyView, { blurActive: true });
+    renderMoneyView();
     return;
   }
 
@@ -4459,7 +4930,9 @@ function renderOrderDetail(order) {
     { defaultExpanded: getDefaultSectionExpanded("orderStatus") }
   );
 
+  orderDetailLaborMinutes = null;
   const laborTimerSection = renderLaborTimerSection(order);
+  const economicsSection = renderOrderEconomicsSection(order);
 
   const gloveDetailsSection = renderCollapsibleDetailSection(
     "gloveDetails",
@@ -4611,6 +5084,7 @@ function renderOrderDetail(order) {
       ${customerSection}
       ${orderStatusSection}
       ${laborTimerSection}
+      ${economicsSection}
       ${gloveDetailsSection}
       ${servicesSection}
       ${laceSection}
@@ -4681,6 +5155,7 @@ function renderOrderDetail(order) {
   wireDetailSectionSummaries();
   wireShowOnMapControl();
   ensureLaborTimerDelegation();
+  ensureOrderEconomicsDelegation();
   loadLaborSessions(order.orderNumber);
   loadOrderActivity(order.orderNumber);
 }
@@ -6657,10 +7132,12 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
   let inner = "";
 
   if (actionKey === "sendEstimate") {
+    const suggested = getSuggestedPrice(order);
     inner = `
       <div class="workflow-action-form">
         <label>Estimated amount</label>
         <input id="workflowPriceQuoted" type="text" inputmode="decimal" value="${escapeAttr(formatMoneyForInput(priceQuoted))}" />
+        ${suggested ? `<p class="muted workflow-price-hint">Suggested: ${escapeHtml(formatCurrency(suggested.price))}</p>` : ""}
       </div>
     `;
   } else if (actionKey === "customerApproved") {
@@ -9461,6 +9938,16 @@ mapUnmappedList?.addEventListener("click", (e) => {
 });
 
 mapLogoutBtn?.addEventListener("click", () => {
+  clearToken();
+  currentOrder = null;
+  closeMenu();
+  syncAuthUI();
+  showView(loginView);
+});
+
+moneyMenuBtn?.addEventListener("click", openMenu);
+
+moneyLogoutBtn?.addEventListener("click", () => {
   clearToken();
   currentOrder = null;
   closeMenu();

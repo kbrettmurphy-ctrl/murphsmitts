@@ -5921,3 +5921,181 @@ button.secondary,
 .labor-timer-status--paused{
   background:rgba(218,202,177,.45);
 }
+
+/* =========================
+   SHOP ECONOMICS V1
+   Money view + Order Detail economics card + estimate hint.
+   Scoped additions only — no existing rules modified.
+   ========================= */
+
+.money-view{
+  padding:12px;
+}
+
+.money-panel{
+  display:grid;
+  gap:12px;
+  max-width:1080px;
+  margin:0 auto;
+}
+
+.money-stat-grid{
+  grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.money-card{
+  display:grid;
+  gap:8px;
+  padding:12px;
+}
+
+.money-card-title{
+  margin:0;
+  color:var(--navy);
+  font-size:.82rem;
+  font-weight:600;
+  letter-spacing:-.01em;
+}
+
+.money-table-wrap{
+  width:100%;
+  max-width:100%;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+
+.money-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:.76rem;
+  color:var(--navy);
+  white-space:nowrap;
+}
+
+.money-table th{
+  padding:5px 10px 5px 0;
+  text-align:left;
+  color:rgba(9,47,77,.55);
+  font-size:.66rem;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  border-bottom:1px solid rgba(9,47,77,.10);
+}
+
+.money-table td{
+  padding:6px 10px 6px 0;
+  border-bottom:1px solid rgba(9,47,77,.06);
+}
+
+.money-table tbody tr:last-child td{
+  border-bottom:none;
+}
+
+.money-job-row{
+  cursor:pointer;
+}
+
+.money-job-row:active{
+  background:rgba(9,47,77,.05);
+}
+
+.money-unpaid{
+  font-size:.66rem;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+
+.money-empty{
+  padding:16px;
+  text-align:center;
+}
+
+.money-error{
+  padding:10px 12px;
+  border:1px solid rgba(146,26,36,.18);
+  border-radius:12px;
+  background:rgba(146,26,36,.08);
+  color:var(--red);
+  font-size:.8rem;
+}
+
+.order-economics{
+  display:grid;
+  gap:10px;
+}
+
+.order-economics-rate{
+  display:flex;
+  align-items:baseline;
+  gap:8px;
+}
+
+.order-economics-rate-label{
+  color:rgba(9,47,77,.55);
+  font-size:.68rem;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+
+.order-economics-rate-value{
+  color:var(--navy);
+  font-size:1.05rem;
+  font-weight:600;
+}
+
+.order-economics-suggestion{
+  font-size:.74rem;
+}
+
+.order-economics-reason{
+  font-size:.72rem;
+  font-weight:500;
+}
+
+.order-economics-lines{
+  display:grid;
+  gap:3px;
+}
+
+.order-economics-line{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  color:rgba(9,47,77,.72);
+  font-size:.78rem;
+}
+
+.order-economics-line--strong{
+  color:var(--navy);
+  font-weight:600;
+}
+
+.order-economics-pieces{
+  display:grid;
+  gap:4px;
+}
+
+.order-economics-pieces-label{
+  color:rgba(9,47,77,.62);
+  font-size:.7rem;
+  font-weight:600;
+}
+
+.order-economics-pieces-input{
+  box-sizing:border-box;
+  width:90px;
+  min-height:32px;
+  padding:4px 8px;
+  border:1px solid rgba(9,47,77,.16);
+  border-radius:10px;
+  background:#fffaf3;
+  color:var(--navy);
+  font-size:.82rem;
+}
+
+.workflow-price-hint{
+  margin:4px 0 0;
+  font-size:.74rem;
+}
