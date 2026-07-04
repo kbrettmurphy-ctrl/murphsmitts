@@ -4497,7 +4497,7 @@ button.dashboard-metric:active{
   #saleGlovesCount,
   #mapCount,
   #clubhouseCount{
-    font-size:.8rem;
+    font-size:.7rem;
   }
 
   .map-panel{
@@ -5574,7 +5574,7 @@ button.secondary,
   #mapCount,
   #clubhouseCount,
   .detail-topbar-actions .status{
-    font-size:.78rem;
+    font-size:.7rem;
   }
 
   .topbar-icon-action{
