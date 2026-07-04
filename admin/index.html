@@ -31,6 +31,8 @@
         <button class="nav-link nav-main" data-view="upload">Gallery</button>
         <button class="nav-link nav-main" data-view="gloves-sale">Gloves For Sale</button>
       </nav>
+
+      <button id="sideNavLogoutBtn" class="nav-link nav-logout" type="button">Log Out</button>
     </aside>
 
     <div id="menuBackdrop" class="menu-backdrop"></div>
@@ -48,22 +50,13 @@
       <section id="homeDashboardView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="homeMenuBtn" class="icon-btn" aria-label="Open menu">☰</button>
-            <div>
-              <h1>Clubhouse</h1>
-              <p id="clubhouseCount" class="muted">Here's what's on deck today.</p>
+            <button id="homeMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <div class="topbar-heading">
+              <h1 class="topbar-title">Clubhouse</h1>
+              <p id="clubhouseCount" class="topbar-subtitle muted">Here's what's on deck today.</p>
             </div>
           </div>
-          <div class="topbar-actions">
-            <button id="homeLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
-              <span class="logout-action-text">Log Out</span>
-              <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M10 6H6.8A2.8 2.8 0 0 0 4 8.8v6.4A2.8 2.8 0 0 0 6.8 18H10"></path>
-                <path d="M14 8l4 4-4 4"></path>
-                <path d="M8.8 12H18"></path>
-              </svg>
-            </button>
-          </div>
+          <div class="topbar-actions"></div>
         </header>
         <div id="dashboardPanel" class="dashboard-panel" aria-live="polite"></div>
       </section>
@@ -71,10 +64,10 @@
       <section id="dashboardView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="menuBtn" class="icon-btn" aria-label="Open menu">☰</button>
-            <div>
-              <h1 id="viewTitle">Orders</h1>
-              <p id="orderCount" class="muted"></p>
+            <button id="menuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <div class="topbar-heading">
+              <h1 id="viewTitle" class="topbar-title">Orders</h1>
+              <p id="orderCount" class="topbar-subtitle muted"></p>
             </div>
           </div>
           <div class="topbar-actions">
@@ -100,14 +93,6 @@
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <circle cx="11" cy="11" r="6"></circle>
                 <path d="m16 16 4 4"></path>
-              </svg>
-            </button>
-            <button id="logoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
-              <span class="logout-action-text">Log Out</span>
-              <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M10 6H6.8A2.8 2.8 0 0 0 4 8.8v6.4A2.8 2.8 0 0 0 6.8 18H10"></path>
-                <path d="M14 8l4 4-4 4"></path>
-                <path d="M8.8 12H18"></path>
               </svg>
             </button>
             <div id="inventoryFilterPopover" class="admin-filter-popover inventory-filter-popover" hidden>
@@ -155,23 +140,13 @@
       <section id="mapView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="mapMenuBtn" class="icon-btn" aria-label="Open menu">☰</button>
-            <div>
-              <h1>Map</h1>
-              <p id="mapCount" class="muted">Customer reach</p>
+            <button id="mapMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <div class="topbar-heading">
+              <h1 class="topbar-title">Map</h1>
+              <p id="mapCount" class="topbar-subtitle muted">Customer reach</p>
             </div>
           </div>
-
-          <div class="topbar-actions">
-            <button id="mapLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
-              <span class="logout-action-text">Log Out</span>
-              <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M10 6H6.8A2.8 2.8 0 0 0 4 8.8v6.4A2.8 2.8 0 0 0 6.8 18H10"></path>
-                <path d="M14 8l4 4-4 4"></path>
-                <path d="M8.8 12H18"></path>
-              </svg>
-            </button>
-          </div>
+          <div class="topbar-actions"></div>
         </header>
 
         <div class="map-panel">
@@ -191,23 +166,14 @@
       <section id="uploadView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="uploadMenuBtn" class="icon-btn" aria-label="Open menu">☰</button>
-            <div>
-              <h1>Gallery</h1>
-              <p id="uploadCount" class="muted">Photo Manager</p>
+            <button id="uploadMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <div class="topbar-heading">
+              <h1 class="topbar-title">Gallery</h1>
+              <p id="uploadCount" class="topbar-subtitle muted">Photo Manager</p>
             </div>
           </div>
-
           <div class="topbar-actions">
             <button id="galleryUploaderToggleBtn" class="secondary topbar-icon-action" type="button" aria-label="Show gallery uploader" aria-expanded="false">+</button>
-            <button id="uploadLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
-              <span class="logout-action-text">Log Out</span>
-              <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M10 6H6.8A2.8 2.8 0 0 0 4 8.8v6.4A2.8 2.8 0 0 0 6.8 18H10"></path>
-                <path d="M14 8l4 4-4 4"></path>
-                <path d="M8.8 12H18"></path>
-              </svg>
-            </button>
           </div>
         </header>
 
@@ -297,23 +263,14 @@
       <section id="saleGlovesView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="saleGlovesMenuBtn" class="icon-btn" aria-label="Open menu">☰</button>
-            <div>
-              <h1>Store</h1>
-              <p id="saleGlovesCount" class="muted">Manage glove listings</p>
+            <button id="saleGlovesMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <div class="topbar-heading">
+              <h1 class="topbar-title">Store</h1>
+              <p id="saleGlovesCount" class="topbar-subtitle muted">Manage glove listings</p>
             </div>
           </div>
-
           <div class="topbar-actions">
             <button id="addSaleGloveBtn" class="secondary sale-add-btn">+ Add</button>
-            <button id="saleGlovesLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
-              <span class="logout-action-text">Log Out</span>
-              <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M10 6H6.8A2.8 2.8 0 0 0 4 8.8v6.4A2.8 2.8 0 0 0 6.8 18H10"></path>
-                <path d="M14 8l4 4-4 4"></path>
-                <path d="M8.8 12H18"></path>
-              </svg>
-            </button>
           </div>
         </header>
 
@@ -323,23 +280,13 @@
       <section id="moneyView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="moneyMenuBtn" class="icon-btn" aria-label="Open menu">☰</button>
-            <div>
-              <h1>Money</h1>
-              <p id="moneyCount" class="muted">Job costing &amp; effective rates</p>
+            <button id="moneyMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <div class="topbar-heading">
+              <h1 class="topbar-title">Money</h1>
+              <p id="moneyCount" class="topbar-subtitle muted">Job costing &amp; effective rates</p>
             </div>
           </div>
-
-          <div class="topbar-actions">
-            <button id="moneyLogoutBtn" class="secondary logout-action" type="button" aria-label="Log out">
-              <span class="logout-action-text">Log Out</span>
-              <svg class="logout-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M10 6H6.8A2.8 2.8 0 0 0 4 8.8v6.4A2.8 2.8 0 0 0 6.8 18H10"></path>
-                <path d="M14 8l4 4-4 4"></path>
-                <path d="M8.8 12H18"></path>
-              </svg>
-            </button>
-          </div>
+          <div class="topbar-actions"></div>
         </header>
 
         <div class="money-view">

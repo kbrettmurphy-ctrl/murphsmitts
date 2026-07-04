@@ -1518,6 +1518,7 @@ button.dashboard-metric:active{
 #uploadCount,
 #saleGlovesCount,
 #mapCount,
+#moneyCount,
 #clubhouseCount{
   margin:4px 0 0;
   min-height:1.35em;
@@ -4496,6 +4497,7 @@ button.dashboard-metric:active{
   #uploadCount,
   #saleGlovesCount,
   #mapCount,
+  #moneyCount,
   #clubhouseCount{
     font-size:.7rem;
   }
@@ -4663,6 +4665,7 @@ body,
 #uploadCount,
 #saleGlovesCount,
 #mapCount,
+#moneyCount,
 #clubhouseCount,
 .detail-topbar-actions .status{
   margin:4px 0 0;
@@ -5572,6 +5575,7 @@ button.secondary,
   #uploadCount,
   #saleGlovesCount,
   #mapCount,
+  #moneyCount,
   #clubhouseCount,
   .detail-topbar-actions .status{
     font-size:.7rem;
@@ -6098,4 +6102,64 @@ button.secondary,
 .workflow-price-hint{
   margin:4px 0 0;
   font-size:.74rem;
+}
+
+/* =========================
+   CONSISTENCY PASS — MASTER TOPBAR + SIDE-NAV LOGOUT
+   Scoped additions only. The only intended visual changes are the
+   mobile topbar fixes below and the logout button moving to the nav.
+   ========================= */
+
+/* Pin Log Out to the bottom of the menu column. */
+.side-menu{
+  display:flex;
+  flex-direction:column;
+}
+
+.side-menu .side-menu-header,
+.side-menu .side-nav{
+  flex:0 0 auto;
+}
+
+.nav-logout{
+  margin-top:auto;
+  text-align:left;
+}
+
+.topbar-heading{
+  min-width:0;
+}
+
+@media (max-width: 899px){
+  .topbar{
+    flex-wrap:nowrap;
+  }
+
+  .topbar-left,
+  .topbar-heading{
+    min-width:0;
+  }
+
+  .topbar .topbar-title{
+    font-size:1.05rem;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .topbar .topbar-subtitle{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .topbar-actions{
+    flex:0 0 auto;
+    flex-wrap:nowrap;
+  }
+
+  .topbar-actions .topbar-icon-action,
+  .topbar-actions .sale-add-btn{
+    flex:0 0 auto;
+  }
 }

@@ -60,6 +60,7 @@ const homeMenuBtn = document.getElementById("homeMenuBtn");
 const homeLogoutBtn = document.getElementById("homeLogoutBtn");
 const closeMenuBtn = document.getElementById("closeMenuBtn");
 const navLinks = Array.from(document.querySelectorAll(".nav-link"));
+const sideNavLogoutBtn = document.getElementById("sideNavLogoutBtn");
 
 const saleGlovesView = document.getElementById("saleGlovesView");
 const saleGlovesList = document.getElementById("saleGlovesList");
@@ -9722,8 +9723,18 @@ pinInput.addEventListener("input", () => {
   }
 });
 
-logoutBtn.addEventListener("click", () => {
+/* Single logout entry point (side nav). Consolidates the six former
+   per-view topbar logout buttons. Gloves For Sale previously logged
+   out via location.reload() — preserved below to keep per-view
+   behavior identical. */
+sideNavLogoutBtn?.addEventListener("click", () => {
   clearToken();
+
+  if (activeView === "gloves-sale") {
+    location.reload();
+    return;
+  }
+
   currentOrder = null;
   clearSaveStatus();
   closeMenu();
@@ -9908,11 +9919,6 @@ saleGlovesMenuBtn?.addEventListener("click", openMenu);
 
 saleGlovesRefreshBtn?.addEventListener("click", loadSaleGloves);
 
-saleGlovesLogoutBtn?.addEventListener("click", () => {
-  clearToken();
-  location.reload();
-});
-
 addSaleGloveBtn?.addEventListener("click", () => {
   renderSaleGloveEditor(null);
 });
@@ -9937,23 +9943,7 @@ mapUnmappedList?.addEventListener("click", (e) => {
   openOrder(btn.dataset.mapOrder, { returnView: "map" });
 });
 
-mapLogoutBtn?.addEventListener("click", () => {
-  clearToken();
-  currentOrder = null;
-  closeMenu();
-  syncAuthUI();
-  showView(loginView);
-});
-
 moneyMenuBtn?.addEventListener("click", openMenu);
-
-moneyLogoutBtn?.addEventListener("click", () => {
-  clearToken();
-  currentOrder = null;
-  closeMenu();
-  syncAuthUI();
-  showView(loginView);
-});
 
 if (saveOrderBtn) {
   saveOrderBtn.addEventListener("click", async () => {
@@ -9971,14 +9961,6 @@ if (saveOrderBtn) {
 
 menuBtn.addEventListener("click", openMenu);
 homeMenuBtn?.addEventListener("click", openMenu);
-homeLogoutBtn?.addEventListener("click", () => {
-  clearToken();
-  currentOrder = null;
-  clearSaveStatus();
-  closeMenu();
-  syncAuthUI();
-  showView(loginView);
-});
 closeMenuBtn.addEventListener("click", closeMenu);
 menuBackdrop.addEventListener("click", closeMenu);
 
@@ -10014,15 +9996,6 @@ document.getElementById("refreshBtn")?.addEventListener("click", async () => {
 });
 
 document.getElementById("uploadMenuBtn")?.addEventListener("click", openMenu);
-
-document.getElementById("uploadLogoutBtn")?.addEventListener("click", () => {
-  clearToken();
-  currentOrder = null;
-  clearSaveStatus();
-  closeMenu();
-  syncAuthUI();
-  showView(loginView);
-});
 
 document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
   const input = document.getElementById("galleryUploadInput");
