@@ -2384,12 +2384,33 @@ function getDefaultLacePieces(order) {
   return base + trapezeBonus;
 }
 
+/* Actual lace consumption recorded at Ready to Go (these same numbers
+   decrement lace inventory). Returns null until any usage is recorded. */
+function getOrderActualLacePieces(order) {
+  const primary = Number(order?.primaryLaceUsed);
+  const secondary = Number(order?.secondaryLaceUsed);
+  const total = (Number.isFinite(primary) ? primary : 0)
+    + (Number.isFinite(secondary) ? secondary : 0);
+  return total > 0 ? total : null;
+}
+
+/* Lace pieces precedence: manual override > actual recorded usage >
+   glove-type estimate (estimate only applies to relacing orders). */
 function getOrderMaterialsCost(order) {
-  const lacePieces = orderHasRelacingService(order)
-    ? (order?.lacePiecesUsed != null && Number.isFinite(Number(order.lacePiecesUsed))
-        ? Number(order.lacePiecesUsed)
-        : getDefaultLacePieces(order))
-    : 0;
+  const override = order?.lacePiecesUsed != null && Number.isFinite(Number(order.lacePiecesUsed))
+    ? Number(order.lacePiecesUsed)
+    : null;
+  const actual = getOrderActualLacePieces(order);
+
+  let lacePieces;
+  if (override !== null) {
+    lacePieces = override;
+  } else if (actual !== null) {
+    lacePieces = actual;
+  } else {
+    lacePieces = orderHasRelacingService(order) ? getDefaultLacePieces(order) : 0;
+  }
+
   const laceCost = lacePieces * SHOP_ECONOMICS.laceCostPerPiece;
   const palmPadCost = orderHasPalmPadService(order) ? SHOP_ECONOMICS.palmPadUnitCost : 0;
   const consumables = orderHasCleaningService(order) ? SHOP_ECONOMICS.consumablesPerCleaning : 0;
@@ -2438,7 +2459,13 @@ function renderOrderEconomicsBody(order) {
   const hasPrice = econ.net !== null;
   const suggestion = getSuggestedPrice(order);
   const isOverride = order?.lacePiecesUsed != null;
+  const actualPieces = getOrderActualLacePieces(order);
   const defaultPieces = getDefaultLacePieces(order);
+  const piecesSourceLabel = isOverride
+    ? `(override${actualPieces !== null ? ` — actual used ${actualPieces}` : ` — estimate ${defaultPieces}`})`
+    : (actualPieces !== null
+        ? "(actual lace used)"
+        : `(estimate for glove type: ${defaultPieces})`);
 
   let suggestionHtml = "";
   if (suggestion) {
@@ -2476,7 +2503,7 @@ function renderOrderEconomicsBody(order) {
       ${orderHasRelacingService(order) ? `
         <div class="order-economics-pieces">
           <label class="order-economics-pieces-label" for="economicsLacePieces">
-            Lace pieces <span class="muted">${isOverride ? `(override — default ${defaultPieces})` : `(default ${defaultPieces})`}</span>
+            Lace pieces <span class="muted">${escapeHtml(piecesSourceLabel)}</span>
           </label>
           <input
             id="economicsLacePieces"
@@ -2485,7 +2512,7 @@ function renderOrderEconomicsBody(order) {
             min="0"
             step="1"
             inputmode="numeric"
-            value="${escapeAttr(String(isOverride ? order.lacePiecesUsed : defaultPieces))}"
+            value="${escapeAttr(String(m.lacePieces))}"
           >
         </div>
       ` : ""}
