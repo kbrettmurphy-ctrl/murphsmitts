@@ -6086,6 +6086,19 @@ button.secondary,
     text-overflow:ellipsis;
   }
 
+  /* The earlier mobile .7rem rule for these is overridden by the later
+     base cream-theme rule (.95rem), so subtitles rendered oversized and
+     truncated on phones. This last-in-file rule wins the cascade and
+     matches the desktop compact size. */
+  #orderCount,
+  #uploadCount,
+  #saleGlovesCount,
+  #mapCount,
+  #moneyCount,
+  #clubhouseCount{
+    font-size:.7rem;
+  }
+
   .topbar-actions{
     flex:0 0 auto;
     flex-wrap:nowrap;
