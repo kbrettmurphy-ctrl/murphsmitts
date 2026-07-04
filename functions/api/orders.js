@@ -1858,7 +1858,7 @@ function mapOrderActivityFromDb(row) {
 }
 
 const LABOR_TIMER_PHASES = [
-  "Inspection",
+  "Tear down",
   "Cleaning",
   "Relacing",
   "Conditioning",
