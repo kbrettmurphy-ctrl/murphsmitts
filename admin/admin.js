@@ -2707,6 +2707,12 @@ function renderMoneyJobsTable(title, items) {
   `;
 }
 
+/* Money view only counts finished work — in-progress orders have
+   partial labor logged and would skew every rate. */
+function isMoneyEligibleOrder(order) {
+  return normalizeStatus(order?.status) === "ready to go" || isCompletedOrder(order);
+}
+
 function renderMoneyViewContent(sessions, loadError) {
   const laborByOrder = {};
   (Array.isArray(sessions) ? sessions : []).forEach(session => {
@@ -2715,7 +2721,7 @@ function renderMoneyViewContent(sessions, loadError) {
     laborByOrder[key] = (laborByOrder[key] || 0) + (Number(session.durationMinutes) || 0);
   });
 
-  const rows = allOrders.map(order => {
+  const rows = allOrders.filter(isMoneyEligibleOrder).map(order => {
     const laborMinutes = laborByOrder[String(order.orderNumber)] || 0;
     return { order, econ: getOrderEconomics(order, laborMinutes) };
   });
@@ -2738,7 +2744,7 @@ function renderMoneyViewContent(sessions, loadError) {
   const statsHtml = `
     <div class="dashboard-grid money-stat-grid">
       ${renderDashboardMetricCard("Effective $/hr", overallRate !== null ? `${formatCurrency(overallRate)}/hr` : "—", { sub: "Jobs with labor + price" })}
-      ${renderDashboardMetricCard("Jobs with labor", `${withLabor.length} of ${rows.length}`)}
+      ${renderDashboardMetricCard("Jobs with labor", `${withLabor.length} of ${rows.length}`, { sub: "Ready to Go / Completed" })}
       ${renderDashboardMetricCard("Total labor", formatLaborDuration(totalLaborMinutes))}
       ${renderDashboardMetricCard("Materials cost", formatCurrency(totalMaterials), { sub: "Jobs with labor" })}
     </div>
