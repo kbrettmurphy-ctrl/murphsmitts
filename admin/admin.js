@@ -1178,11 +1178,24 @@ function getClubhouseGreetingText() {
   return `Evenin', ${CLUBHOUSE_GREETING_NAME}!`;
 }
 
+function getClubhouseGreetingDateLabel() {
+  return new Date().toLocaleDateString([], {
+    weekday: "long",
+    month: "short",
+    day: "numeric"
+  });
+}
+
 function renderClubhouseGreeting() {
+  const dateLabel = getClubhouseGreetingDateLabel();
   return `
     <div class="clubhouse-greeting">
       <p class="clubhouse-greeting-title">${escapeHtml(getClubhouseGreetingText())}</p>
-      <p class="clubhouse-greeting-sub muted">Here's the lineup for you</p>
+      <p class="clubhouse-greeting-sub muted">
+        <span class="clubhouse-greeting-date">${escapeHtml(dateLabel)}</span>
+        <span class="clubhouse-greeting-sub-sep" aria-hidden="true">·</span>
+        Here's your lineup card
+      </p>
     </div>
   `;
 }

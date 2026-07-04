@@ -979,6 +979,16 @@ button.secondary{
   line-height:1.35;
 }
 
+.clubhouse-greeting-date{
+  font-weight:550;
+  color:rgba(9,47,77,.72);
+}
+
+.clubhouse-greeting-sub-sep{
+  margin:0 .28em;
+  color:rgba(9,47,77,.34);
+}
+
 .dashboard-section{
   display:grid;
   gap:8px;
