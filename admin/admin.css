@@ -958,6 +958,27 @@ button.secondary{
   margin:0 auto;
 }
 
+.clubhouse-greeting{
+  display:grid;
+  gap:4px;
+  padding:2px 0 2px;
+  min-width:0;
+}
+
+.clubhouse-greeting-title{
+  margin:0;
+  color:var(--navy);
+  font-size:1.05rem;
+  font-weight:650;
+  line-height:1.25;
+}
+
+.clubhouse-greeting-sub{
+  margin:0;
+  font-size:.88rem;
+  line-height:1.35;
+}
+
 .dashboard-section{
   display:grid;
   gap:8px;

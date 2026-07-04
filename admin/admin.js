@@ -1169,6 +1169,24 @@ function setFinanceFilterMenuOpen(open) {
   }
 }
 
+const CLUBHOUSE_GREETING_NAME = "Brett";
+
+function getClubhouseGreetingText() {
+  const hour = new Date().getHours();
+  if (hour < 12) return `Mornin', ${CLUBHOUSE_GREETING_NAME}!`;
+  if (hour < 17) return `Afternoon, ${CLUBHOUSE_GREETING_NAME}!`;
+  return `Evenin', ${CLUBHOUSE_GREETING_NAME}!`;
+}
+
+function renderClubhouseGreeting() {
+  return `
+    <div class="clubhouse-greeting">
+      <p class="clubhouse-greeting-title">${escapeHtml(getClubhouseGreetingText())}</p>
+      <p class="clubhouse-greeting-sub muted">Here's the lineup for you</p>
+    </div>
+  `;
+}
+
 function renderHomeDashboard() {
   if (!dashboardPanel) return;
 
@@ -1242,6 +1260,7 @@ function renderHomeDashboard() {
 
   dashboardPanel.innerHTML = `
     <div class="dashboard-shell">
+      ${renderClubhouseGreeting()}
       <section class="dashboard-section dashboard-section-bench">
         <div class="dashboard-section-heading-row">
           <h2 class="dashboard-section-title">Today's Bench</h2>
