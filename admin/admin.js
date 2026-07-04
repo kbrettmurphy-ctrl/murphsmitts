@@ -930,16 +930,15 @@ function renderDashboardOrderRow(order, { timerControls = false } = {}) {
     ? `<span class="dashboard-bench-timer-state" data-bench-timer="${escapeAttr(orderKey)}">${escapeHtml(getDashboardTimerStateLabel(session))}</span>`
     : "";
 
-  const openButtonHtml = `
-      <button
-        class="secondary dashboard-bench-open"
-        type="button"
-        data-dashboard-order="${escapeAttr(order.orderNumber || "")}"
-      >Open</button>
-  `;
-
   return `
-    <div class="dashboard-bench-row" data-order-number="${escapeAttr(order.orderNumber || "")}">
+    <div
+      class="dashboard-bench-row"
+      data-order-number="${escapeAttr(order.orderNumber || "")}"
+      data-dashboard-order="${escapeAttr(order.orderNumber || "")}"
+      role="button"
+      tabindex="0"
+      aria-label="Open order for ${escapeAttr(order.customerName || "customer")}"
+    >
       <div class="dashboard-bench-main">
         <div class="dashboard-bench-title">${escapeHtml(order.customerName || "Customer")}</div>
         <div class="dashboard-bench-meta">
@@ -952,9 +951,8 @@ function renderDashboardOrderRow(order, { timerControls = false } = {}) {
       ${timerControls ? `
         <div class="dashboard-bench-actions">
           ${renderDashboardTimerButton(order, session)}
-          ${openButtonHtml}
         </div>
-      ` : openButtonHtml}
+      ` : ""}
     </div>
   `;
 }
@@ -1350,6 +1348,9 @@ function wireHomeDashboardActions() {
 
     const orderBtn = e.target.closest("[data-dashboard-order]");
     if (orderBtn) {
+      /* Whole row is clickable — swallow the click that follows a
+         long-press so the workflow sheet isn't immediately buried. */
+      if (shouldSuppressOrderCardClick(orderBtn)) return;
       openOrder(orderBtn.dataset.dashboardOrder, { returnView: "dashboard" });
       return;
     }
@@ -1358,6 +1359,15 @@ function wireHomeDashboardActions() {
     if (viewBtn) {
       setActiveView(viewBtn.dataset.dashboardView);
     }
+  });
+
+  /* Rows replaced their Open button — keep them keyboard-operable. */
+  dashboardPanel.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const row = e.target.closest?.(".dashboard-bench-row[data-dashboard-order]");
+    if (!row || e.target !== row) return;
+    e.preventDefault();
+    openOrder(row.dataset.dashboardOrder, { returnView: "dashboard" });
   });
 
   /* Right-click / long-press on a Clubhouse row opens the workflow
