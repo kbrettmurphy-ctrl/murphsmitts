@@ -167,6 +167,43 @@ function isAdminActionSurface(target) {
   );
 }
 
+/* iOS Safari keyboard dead-space fix: html/body are overflow:hidden and
+   .main-panel is the only scroller, so the window itself must always sit at
+   scroll 0. When the on-screen keyboard (or a select/date picker) opens,
+   WebKit shifts the layout viewport to keep the focused field visible, and
+   on dismiss it sometimes never shifts back — leaving keyboard-sized dead
+   space at the bottom that touch scrolling can't undo (the body isn't
+   scrollable). Snap the stranded window offset back to 0 once the keyboard
+   is gone. Never touches .main-panel scroll position, never re-renders. */
+function resetStrandedWindowScroll() {
+  const stranded =
+    (window.scrollY || 0) ||
+    (document.documentElement.scrollTop || 0) ||
+    (document.body.scrollTop || 0);
+  if (!stranded) return;
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+}
+
+if (window.visualViewport) {
+  /* Covers the keyboard's own dismiss button, which hides the keyboard
+     without blurring the field (no focusout fires). Skips while the
+     viewport is shrunk — keyboard open or pinch-zoomed in. */
+  window.visualViewport.addEventListener("resize", () => {
+    const keyboardOpen = window.innerHeight - window.visualViewport.height > 80;
+    if (!keyboardOpen) resetStrandedWindowScroll();
+  });
+}
+
+document.addEventListener("focusout", (e) => {
+  if (!isEditableAdminTarget(e.target)) return;
+  setTimeout(() => {
+    if (isEditableAdminTarget(document.activeElement)) return;
+    resetStrandedWindowScroll();
+  }, 250);
+});
+
 /* =========================
    VIEW / MENU
 ========================= */
