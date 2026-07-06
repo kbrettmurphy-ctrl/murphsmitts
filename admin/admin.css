@@ -993,7 +993,6 @@ button.secondary{
 }
 
 .nav-passkey{
-  margin-top:6px;
   color:rgba(218,202,177,.92);
 }
 
@@ -6142,8 +6141,14 @@ button.secondary,
   flex:0 0 auto;
 }
 
-.nav-logout{
+/* Footer group pins the passkey + logout buttons to the bottom of the menu. */
+.side-menu-footer{
   margin-top:auto;
+  display:grid;
+  gap:6px;
+}
+
+.nav-logout{
   text-align:left;
 }
 
