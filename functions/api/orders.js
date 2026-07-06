@@ -53,6 +53,26 @@ export async function onRequest(context) {
       );
     }
 
+    /* Hard safety guarantee: the demo role can never reach any real-data
+       action. Demo clients serve their sandbox entirely in the browser and
+       don't call these endpoints; this server-side block is the backstop, so
+       even a client bug or a crafted request can't read or write real data.
+       The token role is signed by us, so it can't be forged. */
+    const DEMO_ALLOWED_ACTIONS = new Set([
+      "login", "getInvite", "acceptInvite",
+      "webauthnLoginOptions", "webauthnLoginVerify"
+    ]);
+    if (!DEMO_ALLOWED_ACTIONS.has(action)) {
+      const demoAuth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (demoAuth.ok && demoAuth.payload && demoAuth.payload.role === "demo") {
+        return json(
+          { ok: false, error: "Demo mode: that action runs in your sandbox only.", demo: true },
+          200,
+          jsonHeaders
+        );
+      }
+    }
+
     if (action === "login") {
       const email = normalizeEmail(body.email);
       const password = String(body.password || body.pin || "").trim();

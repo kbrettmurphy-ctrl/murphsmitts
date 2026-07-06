@@ -447,7 +447,15 @@ function syncAuthUI() {
 /* =========================
    API
 ========================= */
+const DEMO_LIVE_ACTIONS = new Set(["login", "getInvite", "acceptInvite"]);
+
 async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
+  /* Demo users run entirely in a browser-side sandbox — no real-data call
+     ever leaves the page (the server also blocks demo as a backstop). */
+  if (body && body.action && !DEMO_LIVE_ACTIONS.has(body.action) && isDemoRole()) {
+    return demoApi(body);
+  }
+
   if (useAuth) body._token = getToken();
 
   const res = await fetch(endpoint, {
@@ -499,6 +507,213 @@ async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
   }
 
   return data;
+}
+
+/* =========================
+   DEMO SANDBOX (client-only)
+
+   For demo accounts every action is served from this in-memory store seeded
+   with masked sample data — nothing hits the server, so real data can't be
+   read or changed. Resets on reload (a clean demo every time). Shapes mirror
+   the real API responses so the app behaves normally.
+========================= */
+let demoStore = null;
+
+function demoNow() {
+  return new Date().toISOString();
+}
+
+function daysAgoIso(days) {
+  return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+}
+
+function seedDemoStore() {
+  const mkOrder = (n, over) => ({
+    orderNumber: n,
+    customerName: over.customerName,
+    phoneNumber: "(555) 010-" + n,
+    emailAddress: `${over.customerName.split(" ")[0].toLowerCase()}@example.com`,
+    brandModel: over.brandModel || "Rawlings Heart of the Hide",
+    gloveType: over.gloveType || "Fielders",
+    webType: over.webType || "I-Web",
+    servicesRequested: over.servicesRequested || "Relace, Clean & Condition",
+    primaryLaceColor: over.primaryLaceColor || "Tan",
+    secondaryLaceColor: over.secondaryLaceColor || "",
+    customColorRequest: "",
+    primaryLaceUsed: "",
+    secondaryLaceUsed: "",
+    status: over.status || "Received",
+    paid: over.paid || "Unpaid",
+    priceQuoted: over.priceQuoted ?? 80,
+    shippingCost: over.shippingCost ?? 0,
+    dropOffMethod: over.dropOffMethod || "Local drop-off",
+    streetAddress: "", city: "Sample City", state: "OH", zipCode: "",
+    dateReceived: over.dateReceived || daysAgoIso(over.age ?? 3),
+    estimatedCompletion: over.estimatedCompletion || daysAgoIso(-4),
+    dateCompleted: over.dateCompleted || "",
+    internalNotes: "", gloveNotes: over.gloveNotes || "",
+    trackingNumber: "", carrier: "",
+    createdAt: daysAgoIso(over.age ?? 3),
+    updatedAt: demoNow()
+  });
+
+  return {
+    orders: [
+      mkOrder("9001", { customerName: "Sample Slugger", status: "Received", age: 1, paid: "Unpaid" }),
+      mkOrder("9002", { customerName: "Demo Diaz", status: "In Progress", age: 4, paid: "Paid", brandModel: "Wilson A2000", gloveType: "Catchers" }),
+      mkOrder("9003", { customerName: "Test Tanaka", status: "Ready to Go", age: 6, paid: "Unpaid", priceQuoted: 100 }),
+      mkOrder("9004", { customerName: "Practice Park", status: "Pending Response", age: 8, gloveType: "First Base", priceQuoted: 100 }),
+      mkOrder("9005", { customerName: "Sandbox Singh", status: "Completed", age: 20, paid: "Paid", dateCompleted: daysAgoIso(2) }),
+      mkOrder("9006", { customerName: "Example Estrada", status: "In Transit to Me", age: 2, dropOffMethod: "Shipped", priceQuoted: 100, shippingCost: 12 })
+    ],
+    inventory: [
+      { id: "d1", color: "Tan", quantity: 12, reorderAt: 4, active: true, alertEnabled: true },
+      { id: "d2", color: "Black", quantity: 3, reorderAt: 4, active: true, alertEnabled: true },
+      { id: "d3", color: "Timberglaze", quantity: 7, reorderAt: 4, active: true, alertEnabled: true }
+    ],
+    gloves: [
+      { id: "g1", brandModel: "Rawlings Pro Preferred", gloveType: "Fielders", price: 220, status: "available", description: "Sample listing", photos: [] }
+    ],
+    sessions: [],
+    activity: {},
+    nextOrderNum: 9007,
+    seq: 1
+  };
+}
+
+function getDemoStore() {
+  if (!demoStore) demoStore = seedDemoStore();
+  return demoStore;
+}
+
+function demoResult(extra) {
+  return Promise.resolve(Object.assign({ ok: true }, extra || {}));
+}
+
+function demoApi(body) {
+  const store = getDemoStore();
+  const action = body.action;
+  const findOrder = (n) => store.orders.find(o => String(o.orderNumber) === String(n));
+
+  switch (action) {
+    case "listOrders":
+      return demoResult({ orders: store.orders });
+    case "getOrder":
+      return demoResult({ order: findOrder(body.orderNumber) || null });
+    case "updateOrder": {
+      const order = findOrder(body.orderNumber);
+      if (order) { Object.assign(order, body.updates || {}); order.updatedAt = demoNow(); }
+      return demoResult({ order });
+    }
+    case "createOrder": {
+      const n = String(store.nextOrderNum++);
+      const order = Object.assign(
+        seedDemoStore().orders[0],
+        { orderNumber: n, customerName: body.customerName || "New Sample", status: "Received", createdAt: demoNow(), updatedAt: demoNow() },
+        body.order || {}
+      );
+      store.orders.unshift(order);
+      return demoResult({ order });
+    }
+    case "deleteOrder":
+      store.orders = store.orders.filter(o => String(o.orderNumber) !== String(body.orderNumber));
+      return demoResult();
+
+    case "listOpenLaborSessions":
+      return demoResult({ sessions: store.sessions.filter(s => !s.endedAt) });
+    case "listLaborSessions":
+      return demoResult({ sessions: store.sessions.filter(s => String(s.orderNumber) === String(body.orderNumber)) });
+    case "listLaborSummary":
+      return demoResult({ sessions: store.sessions.filter(s => s.endedAt) });
+    case "startLaborSession": {
+      const session = {
+        id: "s" + (store.seq++),
+        orderNumber: String(body.orderNumber),
+        phase: body.phase || "Work",
+        status: "running",
+        startedAt: demoNow(),
+        pausedAt: null,
+        endedAt: null,
+        pauseAccumulatedSeconds: 0
+      };
+      store.sessions.push(session);
+      return demoResult({ session });
+    }
+    case "pauseLaborSession": {
+      const s = store.sessions.find(x => x.id === body.sessionId);
+      if (s) { s.status = "paused"; s.pausedAt = demoNow(); }
+      return demoResult();
+    }
+    case "resumeLaborSession": {
+      const s = store.sessions.find(x => x.id === body.sessionId);
+      if (s && s.pausedAt) {
+        s.pauseAccumulatedSeconds += Math.max(0, Math.round((Date.now() - new Date(s.pausedAt).getTime()) / 1000));
+        s.status = "running"; s.pausedAt = null;
+      }
+      return demoResult();
+    }
+    case "stopLaborSession": {
+      const s = store.sessions.find(x => x.id === body.sessionId);
+      if (s) { s.status = "stopped"; s.endedAt = demoNow(); }
+      return demoResult();
+    }
+    case "updateLaborSessionNotes":
+      return demoResult();
+
+    case "listOrdersWithActivity":
+      return demoResult({ orderNumbers: store.orders.filter(o => normalizeStatus(o.status) !== "received").map(o => o.orderNumber) });
+    case "listOrderActivity":
+      return demoResult({ activity: store.activity[body.orderNumber] || [] });
+
+    case "listInventory":
+      return demoResult({ inventory: store.inventory });
+    case "createInventoryItem":
+      store.inventory.push({ id: "d" + (store.seq++), color: body.color || "New Color", quantity: Number(body.quantity) || 0, reorderAt: Number(body.reorderAt) || 4, active: true, alertEnabled: true });
+      return demoResult();
+    case "updateInventoryItem": {
+      const item = store.inventory.find(i => String(i.id) === String(body.id) || i.color === body.color);
+      if (item) Object.assign(item, body.updates || body);
+      return demoResult();
+    }
+
+    case "listSaleGloves":
+      return demoResult({ gloves: store.gloves });
+    case "getSaleGlove":
+      return demoResult({ glove: store.gloves.find(g => String(g.id) === String(body.id)) || null });
+    case "createSaleGlove":
+      store.gloves.push({ id: "g" + (store.seq++), brandModel: body.brandModel || "New Glove", gloveType: body.gloveType || "Fielders", price: Number(body.price) || 0, status: "available", description: body.description || "", photos: [] });
+      return demoResult();
+    case "updateSaleGlove": {
+      const g = store.gloves.find(x => String(x.id) === String(body.id));
+      if (g) Object.assign(g, body.updates || body);
+      return demoResult();
+    }
+    case "deleteSaleGlove":
+      store.gloves = store.gloves.filter(g => String(g.id) !== String(body.id));
+      return demoResult();
+    case "listSaleGlovePhotos":
+      return demoResult({ photos: [] });
+    case "listGalleryPhotos":
+      return demoResult({ photos: [] });
+
+    case "resendStatusEmail":
+    case "resendStatusText":
+      return Promise.resolve({ ok: false, error: "Demo mode: emails and texts are disabled." });
+
+    case "geocodeAddresses":
+    case "geocodeMissingOrderAddresses":
+      return demoResult({ results: [], updated: 0 });
+
+    case "listUsers":
+    case "createUserInvite":
+    case "setUserPassword":
+    case "updateUser":
+    case "deleteUser":
+      return Promise.resolve({ ok: false, error: "Admins only." });
+
+    default:
+      return demoResult();
+  }
 }
 
 /* =========================
