@@ -306,7 +306,7 @@ export async function onRequest(context) {
       if (clientData.challenge !== chk.challenge) {
         return json({ ok: false, error: "Passkey challenge mismatch." }, 200, jsonHeaders);
       }
-      if (clientData.origin !== cfg.origin) {
+      if (!cfg.origins.includes(clientData.origin)) {
         return json({ ok: false, error: "Passkey origin mismatch." }, 200, jsonHeaders);
       }
 
@@ -404,7 +404,7 @@ export async function onRequest(context) {
       if (clientData.challenge !== chk.challenge) {
         return json({ ok: false, error: "Passkey challenge mismatch." }, 200, jsonHeaders);
       }
-      if (clientData.origin !== cfg.origin) {
+      if (!cfg.origins.includes(clientData.origin)) {
         return json({ ok: false, error: "Passkey origin mismatch." }, 200, jsonHeaders);
       }
 
@@ -3350,10 +3350,19 @@ function arrayBufferToBase64Url(buffer) {
    signature against the stored public key, which is done in full.
 ========================= */
 function getWebauthnConfig(env) {
+  /* The admin is served on both the apex and www, so accept either origin.
+     RP ID stays the apex (murphsmitts.com) — a passkey bound to it is valid
+     on the apex and any subdomain, so one passkey works across both hosts.
+     WEBAUTHN_ORIGIN may override with a comma-separated allowlist. */
+  const origins = String(env.WEBAUTHN_ORIGIN || "https://murphsmitts.com,https://www.murphsmitts.com")
+    .split(",")
+    .map(o => o.trim())
+    .filter(Boolean);
+
   return {
     rpId: String(env.WEBAUTHN_RP_ID || "murphsmitts.com").trim(),
     rpName: "Murph's Mitt Maintenance",
-    origin: String(env.WEBAUTHN_ORIGIN || "https://murphsmitts.com").trim(),
+    origins,
     userId: "murph-admin",
     userName: "murphsmitts",
     userDisplayName: "Murph's Mitts Admin"
