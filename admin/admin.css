@@ -3307,6 +3307,18 @@ button.dashboard-metric:active{
   color:var(--cream);
 }
 
+/* Detail title now shows "Customer Name - 0111"; truncate so a long name
+   never pushes the topbar into horizontal overflow on mobile. */
+#detailView .detail-topbar .topbar-left > div{
+  min-width:0;
+}
+
+#detailTitle{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
 #detailView .detail-topbar .secondary{
   background:#244866;
   color:var(--cream);
