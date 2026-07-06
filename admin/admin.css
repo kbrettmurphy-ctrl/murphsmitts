@@ -3307,16 +3307,18 @@ button.dashboard-metric:active{
   color:var(--cream);
 }
 
-/* Detail title now shows "Customer Name - 0111"; truncate so a long name
-   never pushes the topbar into horizontal overflow on mobile. */
+/* Detail title shows "Customer Name · 0111". It scales down to fit (see
+   fitDetailTitle) rather than truncating, so the whole name stays readable.
+   line-height gives descenders (g, y, q, j, p) room — with the topbar's
+   line-height:1 they were being clipped at the bottom. */
 #detailView .detail-topbar .topbar-left > div{
+  flex:1 1 auto;
   min-width:0;
 }
 
 #detailTitle{
-  overflow:hidden;
-  text-overflow:ellipsis;
   white-space:nowrap;
+  line-height:1.2;
 }
 
 #detailView .detail-topbar .secondary{
