@@ -938,10 +938,12 @@ button.secondary{
   margin-top:10px;
 }
 
-/* ---- Passkey / Face ID controls ----
-   Login button: primary navy pill on the cream login card. Menu entry:
-   inherits .nav-link. Both start hidden and are revealed by JS only when
-   the browser supports WebAuthn. */
+/* ---- Passcode + Passkey login controls ----
+   Shared pill shape on the cream login card. "Log In" (passcode) is the
+   primary solid-navy action; "Sign in with Face ID" is the outlined
+   secondary and is revealed by JS only where WebAuthn is supported. The
+   "Set up Face ID" menu entry inherits .nav-link. */
+.passcode-login-btn,
 .passkey-login-btn{
   display:flex;
   align-items:center;
@@ -952,14 +954,23 @@ button.secondary{
   padding:13px 12px;
   border-radius:22px;
   border:2px solid rgba(9,47,77,.48);
-  background:rgba(9,47,77,.92);
-  color:var(--cream);
   font-size:1rem;
   font-weight:600;
   cursor:pointer;
   min-height:32px;
 }
 
+.passcode-login-btn{
+  background:rgba(9,47,77,.92);
+  color:var(--cream);
+}
+
+.passkey-login-btn{
+  background:transparent;
+  color:var(--navy);
+}
+
+.passcode-login-btn:active,
 .passkey-login-btn:active{
   transform:scale(.99);
 }

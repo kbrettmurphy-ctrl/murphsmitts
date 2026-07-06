@@ -60,7 +60,7 @@ export async function onRequest(context) {
         return json(
           {
             ok: false,
-            error: "Invalid PIN."
+            error: "Invalid passcode."
           },
           200,
           jsonHeaders

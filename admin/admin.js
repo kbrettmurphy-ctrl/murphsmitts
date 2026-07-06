@@ -60,6 +60,7 @@ const navLinks = Array.from(document.querySelectorAll(".nav-link"));
 const sideNavLogoutBtn = document.getElementById("sideNavLogoutBtn");
 const sideNavPasskeyBtn = document.getElementById("sideNavPasskeyBtn");
 const passkeyLoginBtn = document.getElementById("passkeyLoginBtn");
+const passwordLoginBtn = document.getElementById("passwordLoginBtn");
 
 const saleGlovesView = document.getElementById("saleGlovesView");
 const saleGlovesList = document.getElementById("saleGlovesList");
@@ -8223,7 +8224,7 @@ async function signInWithPasskey() {
   try {
     const opt = await postJson({ action: "webauthnLoginOptions" });
     if (!opt.hasCredentials) {
-      loginStatus.textContent = "No passkey set up yet. Log in with your PIN, then choose “Set up Face ID.”";
+      loginStatus.textContent = "No passkey set up yet. Log in with your passcode, then choose “Set up Face ID.”";
       return;
     }
 
@@ -9964,13 +9965,25 @@ function openOrder(orderNumber, { returnView } = {}) {
 /* =========================
    EVENTS
 ========================= */
-pinInput.addEventListener("input", () => {
-  const digits = pinInput.value.replace(/\D/g, "").slice(0, 6);
-  pinInput.value = digits;
-
-  if (digits.length === 6) {
-    login(digits);
+/* Text passcode: submit on Enter or the Log In button (no fixed length). */
+function submitPasscodeLogin() {
+  const value = pinInput.value.trim();
+  if (!value) {
+    pinInput.focus();
+    return;
   }
+  login(value);
+}
+
+pinInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    submitPasscodeLogin();
+  }
+});
+
+passwordLoginBtn?.addEventListener("click", () => {
+  submitPasscodeLogin();
 });
 
 /* Reveal passkey affordances only where the browser supports WebAuthn.
