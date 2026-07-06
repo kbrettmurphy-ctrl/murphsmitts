@@ -5072,6 +5072,28 @@ function renderOrders(list) {
   });
 }
 
+/* Scale the Order Detail title down until it fits its available width, so a
+   long "Customer Name · 0111" shrinks instead of truncating. Resets to the
+   CSS base size each call, then steps down to a floor. */
+function fitDetailTitle() {
+  if (!detailTitle) return;
+
+  detailTitle.style.fontSize = "";
+  if (!detailView || !detailView.classList.contains("active")) return;
+
+  const available = detailTitle.clientWidth;
+  if (!available) return;
+
+  let size = parseFloat(getComputedStyle(detailTitle).fontSize) || 18;
+  const minSize = 12;
+  let guard = 0;
+  while (detailTitle.scrollWidth > available && size > minSize && guard < 40) {
+    size -= 0.5;
+    detailTitle.style.fontSize = `${size}px`;
+    guard += 1;
+  }
+}
+
 function renderOrderDetail(order) {
   detailMode = "edit";
   currentOrder = order;
@@ -5089,6 +5111,7 @@ function renderOrderDetail(order) {
     const titleNum = String(order.orderNumber || "").trim();
     const titleParts = [titleName, titleNum].filter(Boolean);
     detailTitle.textContent = titleParts.length ? titleParts.join(" · ") : "Order Detail";
+    requestAnimationFrame(fitDetailTitle);
   }
   if (saveOrderBtn) {
     saveOrderBtn.textContent = "Save";
@@ -10367,6 +10390,7 @@ window.addEventListener("resize", () => {
   syncOrderFilterUI();
   syncInventoryFilterUI();
   syncSearchUI();
+  fitDetailTitle();
 });
 
 window.addEventListener("scroll", closeDesktopOrderActionMenus, { passive: true, capture: true });
