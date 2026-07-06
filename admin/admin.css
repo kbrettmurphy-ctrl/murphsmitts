@@ -1003,6 +1003,59 @@ button.secondary{
   text-transform:uppercase;
 }
 
+/* ---- Collapsible dashboard sections (Shop Metrics / Finance Snapshot) ----
+   Reuses the Order Detail chevron/disclosure pattern, scoped and re-tinted
+   for the light dashboard surface. Toggling only adds/removes .is-collapsed. */
+.dashboard-section-toggle{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  width:100%;
+  min-height:32px;
+  padding:0;
+  border:0;
+  background:none;
+  text-align:left;
+  color:inherit;
+  cursor:pointer;
+}
+
+.dashboard-section-chevron{
+  flex:0 0 auto;
+  color:rgba(9,47,77,.5);
+  font-size:1.05rem;
+  line-height:1;
+  transition:transform var(--motion-base, .18s) ease;
+}
+
+.dashboard-section-collapsible:not(.is-collapsed) .dashboard-section-chevron{
+  transform:rotate(90deg);
+}
+
+.dashboard-section-collapsible.is-collapsed .dashboard-section-body{
+  display:none;
+}
+
+.dashboard-section-body{
+  display:grid;
+  gap:8px;
+}
+
+/* Finance heading keeps the date-range filter control beside the now-clickable
+   title; the toggle takes the remaining width, title + range stack inside it. */
+.dashboard-section-finance-toggle{
+  flex:1 1 auto;
+  min-width:0;
+}
+
+.dashboard-section-title-group{
+  display:grid;
+  gap:2px;
+  min-width:0;
+  text-align:left;
+}
+
 .dashboard-grid{
   display:grid;
   grid-template-columns:repeat(auto-fill, minmax(148px, 1fr));
