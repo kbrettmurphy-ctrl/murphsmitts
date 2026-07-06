@@ -8188,6 +8188,7 @@ async function finishLoginWithToken(token) {
   syncAuthUI();
   await loadOrders();
   setActiveView("dashboard");
+  refreshPasskeySetupVisibility();
 }
 
 /* =========================
@@ -8315,9 +8316,13 @@ async function enrollPasskey() {
     }, true);
 
     if (sideNavPasskeyBtn) sideNavPasskeyBtn.textContent = "Face ID is set up ✓";
+    /* It's registered now — retire the setup entry after a brief confirmation. */
     setTimeout(() => {
-      if (sideNavPasskeyBtn) sideNavPasskeyBtn.textContent = prevLabel;
-    }, 2500);
+      if (sideNavPasskeyBtn) {
+        sideNavPasskeyBtn.textContent = prevLabel;
+        sideNavPasskeyBtn.hidden = true;
+      }
+    }, 2000);
   } catch (err) {
     if (sideNavPasskeyBtn) sideNavPasskeyBtn.textContent = prevLabel;
     if (err && (err.name === "NotAllowedError" || err.name === "AbortError")) {
@@ -8325,11 +8330,32 @@ async function enrollPasskey() {
     }
     if (err && err.name === "InvalidStateError") {
       /* The device already holds a passkey for this site (it's the one
-         that's registered), so it won't create a duplicate. */
+         that's registered), so it won't create a duplicate — hide the entry. */
+      if (sideNavPasskeyBtn) sideNavPasskeyBtn.hidden = true;
       alert("Face ID is already set up on this device. Just use “Sign in with Face ID” on the login screen.");
       return;
     }
     alert(err && err.message ? err.message : "Could not set up Face ID.");
+  }
+}
+
+/* Show the "Set up Face ID" menu entry only when WebAuthn is supported and
+   no passkey is registered yet. Once one exists (they sync across the
+   owner's Apple devices via iCloud), the entry stays hidden. */
+async function refreshPasskeySetupVisibility() {
+  if (!sideNavPasskeyBtn) return;
+
+  if (!isPasskeySupported()) {
+    sideNavPasskeyBtn.hidden = true;
+    return;
+  }
+
+  try {
+    const opt = await postJson({ action: "webauthnLoginOptions" });
+    sideNavPasskeyBtn.hidden = !!opt.hasCredentials;
+  } catch {
+    /* If we can't tell, keep it hidden rather than clutter the menu. */
+    sideNavPasskeyBtn.hidden = true;
   }
 }
 
@@ -9993,12 +10019,11 @@ passwordLoginBtn?.addEventListener("click", () => {
   submitPasscodeLogin();
 });
 
-/* Reveal passkey affordances only where the browser supports WebAuthn.
-   The login button always shows on the login screen; the "Set up Face ID"
-   entry lives in the side menu, which is itself hidden until authenticated. */
-if (isPasskeySupported()) {
-  if (passkeyLoginBtn) passkeyLoginBtn.hidden = false;
-  if (sideNavPasskeyBtn) sideNavPasskeyBtn.hidden = false;
+/* The "Sign in with Face ID" login button always shows where WebAuthn is
+   supported. The "Set up Face ID" menu entry only appears once we've
+   confirmed no passkey is registered yet (see refreshPasskeySetupVisibility). */
+if (isPasskeySupported() && passkeyLoginBtn) {
+  passkeyLoginBtn.hidden = false;
 }
 
 passkeyLoginBtn?.addEventListener("click", () => {
@@ -10320,6 +10345,7 @@ document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
     await loadOrders();
     const deepLinkView = readAdminDeepLink();
     setActiveView(deepLinkView || "dashboard");
+    refreshPasskeySetupVisibility();
   } catch (err) {
     clearToken();
     closeMenu();
