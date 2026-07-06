@@ -1014,10 +1014,14 @@ function getDashboardTimerStateLabel(session) {
 function renderDashboardTimerButton(order, session) {
   const orderKey = String(order.orderNumber || "");
   const sessionStatus = session ? getLaborSessionStatus(session) : "";
-  const action = !session ? "start" : (sessionStatus === "paused" ? "resume" : "pause");
-  const ariaLabel = action === "start"
+  /* No session: the icon starts a timer (via the phase picker). Once a
+     timer exists, the same icon opens a small menu with Pause/Resume and
+     Stop. The icon still reflects state (pause = running, play = paused). */
+  const action = !session ? "start" : "menu";
+  const icon = !session ? "start" : (sessionStatus === "paused" ? "resume" : "pause");
+  const ariaLabel = !session
     ? `Start timer for ${order.customerName || "customer"}`
-    : (action === "pause" ? "Pause timer" : "Resume timer");
+    : "Timer options";
   const modifier = sessionStatus === "running"
     ? " dashboard-timer-btn--running"
     : (sessionStatus === "paused" ? " dashboard-timer-btn--paused" : "");
@@ -1028,8 +1032,9 @@ function renderDashboardTimerButton(order, session) {
       class="dashboard-timer-btn${modifier}"
       data-timer-action="${escapeAttr(action)}"
       data-timer-order="${escapeAttr(orderKey)}"
+      aria-haspopup="menu"
       aria-label="${escapeAttr(ariaLabel)}"
-    >${DASHBOARD_TIMER_ICONS[action]}</button>
+    >${DASHBOARD_TIMER_ICONS[icon]}</button>
   `;
 }
 
@@ -1142,6 +1147,38 @@ function openDashboardTimerPopover(button, orderKey) {
   actions.appendChild(popover);
 }
 
+/* Options menu shown once a timer is running/paused: Pause or Resume,
+   plus Stop. Reuses the phase popover styling. */
+function openDashboardTimerControlsPopover(button, orderKey, session) {
+  closeDashboardTimerPopover();
+
+  const actions = button.closest(".dashboard-bench-actions");
+  if (!actions) return;
+
+  const primary = getLaborSessionStatus(session) === "paused"
+    ? { control: "resume", label: "Resume" }
+    : { control: "pause", label: "Pause" };
+
+  dashboardTimerPopoverOrder = orderKey;
+  const popover = document.createElement("div");
+  popover.className = "dashboard-timer-popover";
+  popover.innerHTML = `
+    <button
+      type="button"
+      class="dashboard-timer-phase-option"
+      data-timer-control="${escapeAttr(primary.control)}"
+      data-timer-order="${escapeAttr(orderKey)}"
+    >${escapeHtml(primary.label)}</button>
+    <button
+      type="button"
+      class="dashboard-timer-phase-option dashboard-timer-stop-option"
+      data-timer-control="stop"
+      data-timer-order="${escapeAttr(orderKey)}"
+    >Stop</button>
+  `;
+  actions.appendChild(popover);
+}
+
 function hasRunningDashboardSessionOtherThan(orderKey) {
   return Object.values(dashboardLaborSessions).some(session =>
     String(session.orderNumber) !== String(orderKey) &&
@@ -1175,11 +1212,12 @@ async function handleDashboardTimerAction(button) {
   const action = button.dataset.timerAction;
   const session = dashboardLaborSessions[orderKey] || null;
 
+  if (dashboardTimerPopoverOrder === orderKey) {
+    closeDashboardTimerPopover();
+    return;
+  }
+
   if (action === "start") {
-    if (dashboardTimerPopoverOrder === orderKey) {
-      closeDashboardTimerPopover();
-      return;
-    }
     if (hasRunningDashboardSessionOtherThan(orderKey)) {
       alert("Pause or stop the current timer first.");
       return;
@@ -1188,18 +1226,33 @@ async function handleDashboardTimerAction(button) {
     return;
   }
 
+  if (action === "menu") {
+    if (!session?.id) return;
+    openDashboardTimerControlsPopover(button, orderKey, session);
+  }
+}
+
+async function handleDashboardTimerControl(orderKey, control) {
+  if (dashboardTimerBusy) return;
+
+  const session = dashboardLaborSessions[orderKey] || null;
   if (!session?.id) return;
 
+  if (control === "resume" && hasRunningDashboardSessionOtherThan(orderKey)) {
+    closeDashboardTimerPopover();
+    alert("Pause or stop the current timer first.");
+    return;
+  }
+
+  closeDashboardTimerPopover();
   dashboardTimerBusy = true;
   try {
-    if (action === "pause") {
+    if (control === "pause") {
       await postJson({ action: "pauseLaborSession", sessionId: session.id }, true);
-    } else if (action === "resume") {
-      if (hasRunningDashboardSessionOtherThan(orderKey)) {
-        alert("Pause or stop the current timer first.");
-        return;
-      }
+    } else if (control === "resume") {
       await postJson({ action: "resumeLaborSession", sessionId: session.id }, true);
+    } else if (control === "stop") {
+      await postJson({ action: "stopLaborSession", sessionId: session.id }, true);
     }
     await refreshDashboardLaborSessions();
   } catch (err) {
@@ -1551,6 +1604,15 @@ function wireHomeDashboardActions() {
       handleDashboardTimerPhaseSelect(
         timerPhaseBtn.dataset.timerOrder,
         timerPhaseBtn.dataset.timerPhase
+      );
+      return;
+    }
+
+    const timerControlBtn = e.target.closest("[data-timer-control]");
+    if (timerControlBtn) {
+      handleDashboardTimerControl(
+        timerControlBtn.dataset.timerOrder,
+        timerControlBtn.dataset.timerControl
       );
       return;
     }
