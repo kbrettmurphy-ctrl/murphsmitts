@@ -938,6 +938,47 @@ button.secondary{
   margin-top:10px;
 }
 
+/* ---- Passkey / Face ID controls ----
+   Login button: primary navy pill on the cream login card. Menu entry:
+   inherits .nav-link. Both start hidden and are revealed by JS only when
+   the browser supports WebAuthn. */
+.passkey-login-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  width:100%;
+  margin-top:12px;
+  padding:13px 12px;
+  border-radius:22px;
+  border:2px solid rgba(9,47,77,.48);
+  background:rgba(9,47,77,.92);
+  color:var(--cream);
+  font-size:1rem;
+  font-weight:600;
+  cursor:pointer;
+  min-height:32px;
+}
+
+.passkey-login-btn:active{
+  transform:scale(.99);
+}
+
+.passkey-login-icon{
+  font-size:1.05rem;
+  line-height:1;
+}
+
+.nav-passkey{
+  margin-top:6px;
+  color:rgba(218,202,177,.92);
+}
+
+.passkey-login-btn[hidden],
+.nav-passkey[hidden]{
+  display:none;
+}
+
 /* =========================
    DASHBOARD / ORDERS SHELL
    ========================= */

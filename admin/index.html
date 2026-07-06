@@ -32,6 +32,7 @@
         <button class="nav-link nav-main" data-view="gloves-sale">Gloves For Sale</button>
       </nav>
 
+      <button id="sideNavPasskeyBtn" class="nav-link nav-passkey" type="button" hidden>Set up Face ID</button>
       <button id="sideNavLogoutBtn" class="nav-link nav-logout" type="button">Log Out</button>
     </aside>
 
@@ -43,6 +44,10 @@
           <h1>Murph's Mitts Admin</h1>
           <p class="muted">Enter PIN.</p>
           <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="PIN" />
+          <button id="passkeyLoginBtn" class="passkey-login-btn" type="button" hidden>
+            <span class="passkey-login-icon" aria-hidden="true">&#128273;</span>
+            Sign in with Face ID
+          </button>
           <p id="loginStatus" class="status"></p>
         </div>
       </section>

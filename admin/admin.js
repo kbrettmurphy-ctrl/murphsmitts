@@ -58,6 +58,8 @@ const homeMenuBtn = document.getElementById("homeMenuBtn");
 const closeMenuBtn = document.getElementById("closeMenuBtn");
 const navLinks = Array.from(document.querySelectorAll(".nav-link"));
 const sideNavLogoutBtn = document.getElementById("sideNavLogoutBtn");
+const sideNavPasskeyBtn = document.getElementById("sideNavPasskeyBtn");
+const passkeyLoginBtn = document.getElementById("passkeyLoginBtn");
 
 const saleGlovesView = document.getElementById("saleGlovesView");
 const saleGlovesList = document.getElementById("saleGlovesList");
@@ -8167,18 +8169,159 @@ async function login(pinValue) {
       pin: pinValue
     });
 
-    setToken(data.token);
-    pinInput.value = "";
-    loginStatus.textContent = "";
-    syncAuthUI();
-    await loadOrders();
-    setActiveView("dashboard");
+    await finishLoginWithToken(data.token);
   } catch (err) {
     loginStatus.textContent = err.message;
     pinInput.value = "";
     pinInput.focus();
   } finally {
     loginInProgress = false;
+  }
+}
+
+/* Shared success path for both PIN and passkey login. */
+async function finishLoginWithToken(token) {
+  setToken(token);
+  pinInput.value = "";
+  loginStatus.textContent = "";
+  syncAuthUI();
+  await loadOrders();
+  setActiveView("dashboard");
+}
+
+/* =========================
+   PASSKEY / FACE ID
+========================= */
+function isPasskeySupported() {
+  return typeof window !== "undefined" &&
+    !!window.PublicKeyCredential &&
+    !!navigator.credentials &&
+    typeof navigator.credentials.get === "function";
+}
+
+function base64UrlToBuf(str) {
+  const input = String(str || "");
+  const base64 = input.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((input.length + 3) % 4);
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+function bufToBase64Url(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function signInWithPasskey() {
+  if (loginInProgress || !isPasskeySupported()) return;
+  loginInProgress = true;
+  loginStatus.textContent = "Waiting for Face ID…";
+
+  try {
+    const opt = await postJson({ action: "webauthnLoginOptions" });
+    if (!opt.hasCredentials) {
+      loginStatus.textContent = "No passkey set up yet. Log in with your PIN, then choose “Set up Face ID.”";
+      return;
+    }
+
+    const o = opt.options;
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: base64UrlToBuf(o.challenge),
+        rpId: o.rpId,
+        timeout: o.timeout,
+        userVerification: o.userVerification,
+        allowCredentials: (o.allowCredentials || []).map(cred => ({
+          id: base64UrlToBuf(cred.id),
+          type: "public-key"
+        }))
+      }
+    });
+
+    const res = await postJson({
+      action: "webauthnLoginVerify",
+      challengeToken: opt.challengeToken,
+      credential: {
+        id: assertion.id,
+        rawId: bufToBase64Url(assertion.rawId),
+        response: {
+          clientDataJSON: bufToBase64Url(assertion.response.clientDataJSON),
+          authenticatorData: bufToBase64Url(assertion.response.authenticatorData),
+          signature: bufToBase64Url(assertion.response.signature),
+          userHandle: assertion.response.userHandle ? bufToBase64Url(assertion.response.userHandle) : null
+        }
+      }
+    });
+
+    await finishLoginWithToken(res.token);
+  } catch (err) {
+    if (err && (err.name === "NotAllowedError" || err.name === "AbortError")) {
+      loginStatus.textContent = "";
+    } else {
+      loginStatus.textContent = err.message || "Face ID sign-in failed.";
+    }
+  } finally {
+    loginInProgress = false;
+  }
+}
+
+async function enrollPasskey() {
+  if (!isPasskeySupported()) return;
+
+  const prevLabel = sideNavPasskeyBtn ? sideNavPasskeyBtn.textContent : "";
+  if (sideNavPasskeyBtn) sideNavPasskeyBtn.textContent = "Setting up…";
+
+  try {
+    const opt = await postJson({ action: "webauthnRegisterOptions" }, true);
+    const o = opt.options;
+
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge: base64UrlToBuf(o.challenge),
+        rp: o.rp,
+        user: {
+          id: base64UrlToBuf(o.user.id),
+          name: o.user.name,
+          displayName: o.user.displayName
+        },
+        pubKeyCredParams: o.pubKeyCredParams,
+        authenticatorSelection: o.authenticatorSelection,
+        timeout: o.timeout,
+        attestation: o.attestation,
+        excludeCredentials: (o.excludeCredentials || []).map(c => ({
+          id: base64UrlToBuf(c.id),
+          type: "public-key"
+        }))
+      }
+    });
+
+    await postJson({
+      action: "webauthnRegisterVerify",
+      challengeToken: opt.challengeToken,
+      label: "Face ID",
+      credential: {
+        id: cred.id,
+        rawId: bufToBase64Url(cred.rawId),
+        transports: cred.response.getTransports ? cred.response.getTransports() : [],
+        response: {
+          clientDataJSON: bufToBase64Url(cred.response.clientDataJSON),
+          attestationObject: bufToBase64Url(cred.response.attestationObject)
+        }
+      }
+    }, true);
+
+    if (sideNavPasskeyBtn) sideNavPasskeyBtn.textContent = "Face ID is set up ✓";
+    setTimeout(() => {
+      if (sideNavPasskeyBtn) sideNavPasskeyBtn.textContent = prevLabel;
+    }, 2500);
+  } catch (err) {
+    if (sideNavPasskeyBtn) sideNavPasskeyBtn.textContent = prevLabel;
+    if (!err || (err.name !== "NotAllowedError" && err.name !== "AbortError")) {
+      alert(err && err.message ? err.message : "Could not set up Face ID.");
+    }
   }
 }
 
@@ -9828,6 +9971,23 @@ pinInput.addEventListener("input", () => {
   if (digits.length === 6) {
     login(digits);
   }
+});
+
+/* Reveal passkey affordances only where the browser supports WebAuthn.
+   The login button always shows on the login screen; the "Set up Face ID"
+   entry lives in the side menu, which is itself hidden until authenticated. */
+if (isPasskeySupported()) {
+  if (passkeyLoginBtn) passkeyLoginBtn.hidden = false;
+  if (sideNavPasskeyBtn) sideNavPasskeyBtn.hidden = false;
+}
+
+passkeyLoginBtn?.addEventListener("click", () => {
+  signInWithPasskey();
+});
+
+sideNavPasskeyBtn?.addEventListener("click", () => {
+  closeMenu();
+  enrollPasskey();
 });
 
 /* Single logout entry point (side nav). Consolidates the six former
