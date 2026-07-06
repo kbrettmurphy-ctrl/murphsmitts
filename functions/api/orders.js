@@ -238,6 +238,221 @@ export async function onRequest(context) {
       return json({ ok: true, activity: result.activity }, 200, jsonHeaders);
     }
 
+    if (action === "webauthnRegisterOptions") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const cfg = getWebauthnConfig(env);
+      const challenge = randomChallengeB64Url();
+      const challengeToken = await createChallengeToken("reg", challenge, env.ADMIN_SESSION_SECRET);
+
+      const existing = await listWebauthnCredentials(env);
+      const excludeCredentials = (existing.ok ? existing.credentials : []).map(cred => ({
+        id: cred.credential_id,
+        type: "public-key"
+      }));
+
+      return json(
+        {
+          ok: true,
+          challengeToken,
+          options: {
+            challenge,
+            rp: { id: cfg.rpId, name: cfg.rpName },
+            user: {
+              id: arrayBufferToBase64Url(new TextEncoder().encode(cfg.userId)),
+              name: cfg.userName,
+              displayName: cfg.userDisplayName
+            },
+            pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+            authenticatorSelection: { residentKey: "preferred", userVerification: "preferred" },
+            timeout: 60000,
+            attestation: "none",
+            excludeCredentials
+          }
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
+    if (action === "webauthnRegisterVerify") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const cfg = getWebauthnConfig(env);
+      const chk = await verifyChallengeToken(body.challengeToken, "reg", env.ADMIN_SESSION_SECRET);
+      if (!chk.ok) {
+        return json({ ok: false, error: chk.error }, 200, jsonHeaders);
+      }
+
+      const cred = body.credential || {};
+      const resp = cred.response || {};
+
+      let clientData;
+      try {
+        clientData = JSON.parse(new TextDecoder().decode(base64UrlToBytes(resp.clientDataJSON)));
+      } catch {
+        return json({ ok: false, error: "Could not read passkey response." }, 200, jsonHeaders);
+      }
+
+      if (clientData.type !== "webauthn.create") {
+        return json({ ok: false, error: "Unexpected passkey ceremony." }, 200, jsonHeaders);
+      }
+      if (clientData.challenge !== chk.challenge) {
+        return json({ ok: false, error: "Passkey challenge mismatch." }, 200, jsonHeaders);
+      }
+      if (clientData.origin !== cfg.origin) {
+        return json({ ok: false, error: "Passkey origin mismatch." }, 200, jsonHeaders);
+      }
+
+      let authDataInfo;
+      let keyInfo;
+      let credentialIdB64;
+      try {
+        const attestation = cborDecodeFirst(base64UrlToBytes(resp.attestationObject));
+        authDataInfo = parseAuthData(attestation.get("authData"));
+        if (!authDataInfo.at || !authDataInfo.credentialPublicKey) {
+          throw new Error("Passkey did not include a credential.");
+        }
+        const expectedRpIdHash = await sha256Bytes(cfg.rpId);
+        if (!bytesEqual(authDataInfo.rpIdHash, expectedRpIdHash)) {
+          throw new Error("Passkey domain mismatch.");
+        }
+        if (!authDataInfo.up) {
+          throw new Error("Passkey user presence missing.");
+        }
+        keyInfo = coseToKeyInfo(authDataInfo.credentialPublicKey);
+        credentialIdB64 = arrayBufferToBase64Url(authDataInfo.credentialId);
+      } catch (err) {
+        return json({ ok: false, error: err.message || "Passkey could not be verified." }, 200, jsonHeaders);
+      }
+
+      const stored = await insertWebauthnCredential(env, {
+        credential_id: credentialIdB64,
+        public_key: JSON.stringify(keyInfo),
+        sign_count: authDataInfo.signCount,
+        transports: Array.isArray(cred.transports) && cred.transports.length ? cred.transports.join(",") : null,
+        label: cleanText(body.label) || "Passkey"
+      });
+
+      if (!stored.ok) {
+        return json({ ok: false, error: "Could not save passkey.", details: stored.error }, 200, jsonHeaders);
+      }
+
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
+    if (action === "webauthnLoginOptions") {
+      const cfg = getWebauthnConfig(env);
+      const existing = await listWebauthnCredentials(env);
+      const creds = existing.ok ? existing.credentials : [];
+      const challenge = randomChallengeB64Url();
+      const challengeToken = await createChallengeToken("auth", challenge, env.ADMIN_SESSION_SECRET);
+
+      return json(
+        {
+          ok: true,
+          hasCredentials: creds.length > 0,
+          challengeToken,
+          options: {
+            challenge,
+            rpId: cfg.rpId,
+            timeout: 60000,
+            userVerification: "preferred",
+            allowCredentials: creds.map(cred => ({ id: cred.credential_id, type: "public-key" }))
+          }
+        },
+        200,
+        jsonHeaders
+      );
+    }
+
+    if (action === "webauthnLoginVerify") {
+      const cfg = getWebauthnConfig(env);
+      const chk = await verifyChallengeToken(body.challengeToken, "auth", env.ADMIN_SESSION_SECRET);
+      if (!chk.ok) {
+        return json({ ok: false, error: chk.error }, 200, jsonHeaders);
+      }
+
+      const cred = body.credential || {};
+      const resp = cred.response || {};
+      const credentialId = cleanText(cred.id) || cleanText(cred.rawId);
+      if (!credentialId) {
+        return json({ ok: false, error: "Missing passkey id." }, 200, jsonHeaders);
+      }
+
+      const record = await getWebauthnCredential(env, credentialId);
+      if (!record.ok || !record.credential) {
+        return json({ ok: false, error: "This passkey is not registered." }, 200, jsonHeaders);
+      }
+
+      let clientData;
+      try {
+        clientData = JSON.parse(new TextDecoder().decode(base64UrlToBytes(resp.clientDataJSON)));
+      } catch {
+        return json({ ok: false, error: "Could not read passkey response." }, 200, jsonHeaders);
+      }
+
+      if (clientData.type !== "webauthn.get") {
+        return json({ ok: false, error: "Unexpected passkey ceremony." }, 200, jsonHeaders);
+      }
+      if (clientData.challenge !== chk.challenge) {
+        return json({ ok: false, error: "Passkey challenge mismatch." }, 200, jsonHeaders);
+      }
+      if (clientData.origin !== cfg.origin) {
+        return json({ ok: false, error: "Passkey origin mismatch." }, 200, jsonHeaders);
+      }
+
+      let valid = false;
+      let newSignCount = 0;
+      try {
+        const authDataBytes = base64UrlToBytes(resp.authenticatorData);
+        const info = parseAuthData(authDataBytes);
+        const expectedRpIdHash = await sha256Bytes(cfg.rpId);
+        if (!bytesEqual(info.rpIdHash, expectedRpIdHash)) {
+          throw new Error("Passkey domain mismatch.");
+        }
+        if (!info.up) {
+          throw new Error("Passkey user presence missing.");
+        }
+        newSignCount = info.signCount;
+        const keyInfo = JSON.parse(record.credential.public_key);
+        valid = await verifyAssertionSignature(
+          keyInfo,
+          authDataBytes,
+          base64UrlToBytes(resp.clientDataJSON),
+          base64UrlToBytes(resp.signature)
+        );
+      } catch (err) {
+        return json({ ok: false, error: err.message || "Passkey could not be verified." }, 200, jsonHeaders);
+      }
+
+      if (!valid) {
+        return json({ ok: false, error: "Passkey signature was invalid." }, 200, jsonHeaders);
+      }
+
+      /* Counter is stored for the record but not hard-enforced: iCloud-synced
+         passkeys routinely report a sign count of 0, so a strict monotonic
+         check would lock out legitimate Face ID logins. */
+      const storedCount = Number(record.credential.sign_count) || 0;
+      await touchWebauthnCredential(env, credentialId, Math.max(storedCount, newSignCount));
+
+      const token = await createSignedToken(
+        {
+          role: "admin",
+          exp: Date.now() + 1000 * 60 * 60 * 24 * 14
+        },
+        env.ADMIN_SESSION_SECRET
+      );
+
+      return json({ ok: true, token }, 200, jsonHeaders);
+    }
+
     if (action === "listLaborSessions") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -3120,6 +3335,285 @@ function arrayBufferToBase64Url(buffer) {
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+/* =========================
+   WEBAUTHN / PASSKEYS
+
+   Dependency-free passkey auth on top of the existing signed-token session.
+   The challenge is stateless: it's HMAC-signed with ADMIN_SESSION_SECRET
+   (same primitive as createSignedToken) and echoed back, so there's no
+   challenge table to store or clean up. Only ES256 (P-256) is supported,
+   which covers Apple Face ID / Touch ID and platform passkeys on Android
+   and Chrome. Attestation is not chain-verified — for a single-operator
+   admin tool the security that matters is verifying the login assertion
+   signature against the stored public key, which is done in full.
+========================= */
+function getWebauthnConfig(env) {
+  return {
+    rpId: String(env.WEBAUTHN_RP_ID || "murphsmitts.com").trim(),
+    rpName: "Murph's Mitt Maintenance",
+    origin: String(env.WEBAUTHN_ORIGIN || "https://murphsmitts.com").trim(),
+    userId: "murph-admin",
+    userName: "murphsmitts",
+    userDisplayName: "Murph's Mitts Admin"
+  };
+}
+
+function base64UrlToBytes(str) {
+  const input = String(str || "");
+  const base64 = input.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((input.length + 3) % 4);
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function randomChallengeB64Url() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return arrayBufferToBase64Url(bytes);
+}
+
+async function createChallengeToken(kind, challengeB64, secret) {
+  return createSignedToken(
+    { k: kind, c: challengeB64, exp: Date.now() + 5 * 60 * 1000 },
+    secret
+  );
+}
+
+async function verifyChallengeToken(token, kind, secret) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 2) return { ok: false, error: "Invalid passkey challenge." };
+
+  const [payloadB64, signature] = parts;
+  const expected = await signString(payloadB64, secret);
+  if (signature !== expected) return { ok: false, error: "Invalid passkey challenge." };
+
+  let payload;
+  try {
+    payload = JSON.parse(fromBase64Url(payloadB64));
+  } catch {
+    return { ok: false, error: "Invalid passkey challenge." };
+  }
+
+  if (payload.k !== kind) return { ok: false, error: "Passkey challenge type mismatch." };
+  if (!payload.exp || Date.now() > Number(payload.exp)) return { ok: false, error: "Passkey challenge expired." };
+
+  return { ok: true, challenge: payload.c };
+}
+
+async function sha256Bytes(input) {
+  const data = typeof input === "string" ? new TextEncoder().encode(input) : input;
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", data));
+}
+
+function bytesEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
+/* Minimal CBOR reader — supports the subset WebAuthn emits (unsigned/negative
+   ints, byte/text strings, arrays, maps, and simple booleans/null). */
+function cborRead(bytes, offset) {
+  const first = bytes[offset];
+  const major = first >> 5;
+  const info = first & 0x1f;
+  offset += 1;
+
+  let length = info;
+  if (info === 24) { length = bytes[offset]; offset += 1; }
+  else if (info === 25) { length = (bytes[offset] << 8) | bytes[offset + 1]; offset += 2; }
+  else if (info === 26) {
+    length = ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
+    offset += 4;
+  } else if (info === 27) {
+    const hi = ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
+    const lo = ((bytes[offset + 4] << 24) | (bytes[offset + 5] << 16) | (bytes[offset + 6] << 8) | bytes[offset + 7]) >>> 0;
+    length = hi * 4294967296 + lo;
+    offset += 8;
+  } else if (info === 31) {
+    throw new Error("Unsupported CBOR (indefinite length).");
+  }
+
+  switch (major) {
+    case 0:
+      return { value: length, offset };
+    case 1:
+      return { value: -1 - length, offset };
+    case 2: {
+      const value = bytes.slice(offset, offset + length);
+      return { value, offset: offset + length };
+    }
+    case 3: {
+      const value = new TextDecoder().decode(bytes.slice(offset, offset + length));
+      return { value, offset: offset + length };
+    }
+    case 4: {
+      const arr = [];
+      let off = offset;
+      for (let i = 0; i < length; i++) {
+        const item = cborRead(bytes, off);
+        arr.push(item.value);
+        off = item.offset;
+      }
+      return { value: arr, offset: off };
+    }
+    case 5: {
+      const map = new Map();
+      let off = offset;
+      for (let i = 0; i < length; i++) {
+        const k = cborRead(bytes, off);
+        off = k.offset;
+        const v = cborRead(bytes, off);
+        off = v.offset;
+        map.set(k.value, v.value);
+      }
+      return { value: map, offset: off };
+    }
+    case 7: {
+      if (info === 20) return { value: false, offset };
+      if (info === 21) return { value: true, offset };
+      if (info === 22) return { value: null, offset };
+      return { value: null, offset };
+    }
+    default:
+      throw new Error("Unsupported CBOR type.");
+  }
+}
+
+function cborDecodeFirst(bytes) {
+  return cborRead(bytes, 0).value;
+}
+
+function parseAuthData(authData) {
+  const bytes = authData instanceof Uint8Array ? authData : new Uint8Array(authData);
+  const rpIdHash = bytes.slice(0, 32);
+  const flags = bytes[32];
+  const signCount = ((bytes[33] << 24) | (bytes[34] << 16) | (bytes[35] << 8) | bytes[36]) >>> 0;
+  const up = !!(flags & 0x01);
+  const uv = !!(flags & 0x04);
+  const at = !!(flags & 0x40);
+  const ed = !!(flags & 0x80);
+
+  let credentialId = null;
+  let credentialPublicKey = null;
+
+  if (at) {
+    let offset = 37 + 16; // skip aaguid
+    const credIdLen = (bytes[offset] << 8) | bytes[offset + 1];
+    offset += 2;
+    credentialId = bytes.slice(offset, offset + credIdLen);
+    offset += credIdLen;
+    credentialPublicKey = cborRead(bytes.slice(offset), 0).value;
+  }
+
+  return { rpIdHash, flags, signCount, up, uv, at, ed, credentialId, credentialPublicKey };
+}
+
+function coseToKeyInfo(coseMap) {
+  const kty = coseMap.get(1);
+  const alg = coseMap.get(3);
+  if (kty !== 2) throw new Error("Only EC2 passkeys are supported.");
+  if (alg !== -7) throw new Error("Only ES256 passkeys are supported.");
+  const crv = coseMap.get(-1);
+  if (crv !== 1) throw new Error("Only P-256 passkeys are supported.");
+  const x = coseMap.get(-2);
+  const y = coseMap.get(-3);
+  if (!x || !y) throw new Error("Passkey public key was incomplete.");
+  return { alg, x: arrayBufferToBase64Url(x), y: arrayBufferToBase64Url(y) };
+}
+
+async function importEs256Key(keyInfo) {
+  return crypto.subtle.importKey(
+    "jwk",
+    { kty: "EC", crv: "P-256", x: keyInfo.x, y: keyInfo.y, ext: true },
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["verify"]
+  );
+}
+
+/* WebAuthn signs with DER-encoded ECDSA; WebCrypto verifies raw r||s. */
+function derToRawEcdsaSignature(der) {
+  let offset = 0;
+  if (der[offset++] !== 0x30) throw new Error("Bad signature encoding.");
+  let seqLen = der[offset++];
+  if (seqLen & 0x80) {
+    const n = seqLen & 0x7f;
+    seqLen = 0;
+    for (let i = 0; i < n; i++) seqLen = (seqLen << 8) | der[offset++];
+  }
+
+  const readInt = () => {
+    if (der[offset++] !== 0x02) throw new Error("Bad signature encoding.");
+    const len = der[offset++];
+    let val = der.slice(offset, offset + len);
+    offset += len;
+    while (val.length > 0 && val[0] === 0x00) val = val.slice(1);
+    if (val.length > 32) throw new Error("Bad signature integer.");
+    const out = new Uint8Array(32);
+    out.set(val, 32 - val.length);
+    return out;
+  };
+
+  const r = readInt();
+  const s = readInt();
+  const raw = new Uint8Array(64);
+  raw.set(r, 0);
+  raw.set(s, 32);
+  return raw;
+}
+
+async function verifyAssertionSignature(keyInfo, authDataBytes, clientDataJSONBytes, derSignature) {
+  const key = await importEs256Key(keyInfo);
+  const clientHash = await sha256Bytes(clientDataJSONBytes);
+  const signedData = new Uint8Array(authDataBytes.length + clientHash.length);
+  signedData.set(authDataBytes, 0);
+  signedData.set(clientHash, authDataBytes.length);
+  const rawSig = derToRawEcdsaSignature(derSignature);
+  return crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, rawSig, signedData);
+}
+
+async function listWebauthnCredentials(env) {
+  const resp = await supabaseFetch(env, `/rest/v1/webauthn_credentials?select=*`);
+  if (!resp.ok) return resp;
+  return { ok: true, credentials: Array.isArray(resp.data) ? resp.data : [] };
+}
+
+async function getWebauthnCredential(env, credentialId) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/webauthn_credentials?select=*&credential_id=eq.${encodeURIComponent(credentialId)}&limit=1`
+  );
+  if (!resp.ok) return resp;
+  return { ok: true, credential: Array.isArray(resp.data) && resp.data[0] ? resp.data[0] : null };
+}
+
+async function insertWebauthnCredential(env, row) {
+  const resp = await supabaseFetch(env, `/rest/v1/webauthn_credentials`, {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify(row)
+  });
+  if (!resp.ok) return resp;
+  return { ok: true };
+}
+
+async function touchWebauthnCredential(env, credentialId, signCount) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/webauthn_credentials?credential_id=eq.${encodeURIComponent(credentialId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ sign_count: signCount, last_used_at: new Date().toISOString() })
+    }
+  );
+  if (!resp.ok) return resp;
+  return { ok: true };
 }
 
 /* =========================
