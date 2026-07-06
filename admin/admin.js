@@ -63,6 +63,9 @@ const sideNavLogoutBtn = document.getElementById("sideNavLogoutBtn");
 const sideNavPasskeyBtn = document.getElementById("sideNavPasskeyBtn");
 const passkeyLoginBtn = document.getElementById("passkeyLoginBtn");
 const passwordLoginBtn = document.getElementById("passwordLoginBtn");
+const usersView = document.getElementById("usersView");
+const usersPanel = document.getElementById("usersPanel");
+const inviteView = document.getElementById("inviteView");
 
 const saleGlovesView = document.getElementById("saleGlovesView");
 const saleGlovesList = document.getElementById("saleGlovesList");
@@ -251,7 +254,7 @@ document.addEventListener("focusout", (e) => {
    VIEW / MENU
 ========================= */
 function showView(view) {
-  [loginView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, saleGlovesView]
+  [loginView, inviteView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, saleGlovesView, usersView]
     .filter(Boolean)
     .forEach(v => v.classList.remove("active"));
 
@@ -1798,6 +1801,7 @@ function getViewTitle(viewName) {
     case "upload": return "Gallery";
     case "inventory": return "Lace Inventory";
     case "gloves-sale": return "Gloves For Sale";
+    case "users": return "Users";
     default: return "Orders";
   }
 }
@@ -4503,6 +4507,7 @@ function normalizeAdminView(viewName) {
   if (view === "upload") return "upload";
   if (view === "inventory") return "inventory";
   if (view === "gloves-sale") return "gloves-sale";
+  if (view === "users") return "users";
   if (isOrderFilterView(view)) return view;
   return "dashboard";
 }
@@ -4511,7 +4516,7 @@ function isKnownAdminView(viewName) {
   const view = String(viewName || "").trim().toLowerCase();
   if (!view || view === "dashboard") return true;
   if (view === "orders" || view === "current") return true;
-  return ["map", "money", "upload", "inventory", "gloves-sale"].includes(view) || isOrderFilterView(view);
+  return ["map", "money", "upload", "inventory", "gloves-sale", "users"].includes(view) || isOrderFilterView(view);
 }
 
 function syncAdminViewUrl(viewName) {
@@ -4609,6 +4614,19 @@ function setActiveView(viewName) {
     closeMenu();
     resetViewScroll(saleGlovesView, { blurActive: true });
     loadPromise.finally(() => resetViewScroll(saleGlovesView));
+    return;
+  }
+
+  if (resolvedView === "users") {
+    /* Admin-only. Demo/non-admin never see the nav entry, but guard anyway. */
+    if (getCurrentRole() !== "admin") {
+      setActiveView("dashboard");
+      return;
+    }
+    showView(usersView);
+    renderUsersView();
+    closeMenu();
+    resetViewScroll(usersView, { blurActive: true });
     return;
   }
 
@@ -8450,6 +8468,7 @@ async function finishLoginWithToken(token, role) {
   if (emailInput) emailInput.value = "";
   loginStatus.textContent = "";
   syncAuthUI();
+  syncRoleUI();
   await loadOrders();
   setActiveView("dashboard");
   refreshPasskeySetupVisibility();
@@ -8621,6 +8640,228 @@ async function refreshPasskeySetupVisibility() {
     /* If we can't tell, keep it hidden rather than clutter the menu. */
     sideNavPasskeyBtn.hidden = true;
   }
+}
+
+/* =========================
+   USERS / ROLES (client)
+========================= */
+/* Show admin-only nav (Users) only for admins; demo users get a reduced
+   menu. Called after login and on boot. */
+function syncRoleUI() {
+  const role = getCurrentRole();
+  const isAdmin = role === "admin";
+  document.querySelectorAll(".nav-admin-only").forEach(el => { el.hidden = !isAdmin; });
+  document.body.classList.toggle("is-demo", role === "demo");
+}
+
+async function renderUsersView() {
+  if (!usersPanel) return;
+  usersPanel.innerHTML = `<div class="dashboard-shell"><div class="dashboard-card users-loading muted">Loading users…</div></div>`;
+
+  let users = [];
+  try {
+    const data = await postJson({ action: "listUsers" }, true);
+    users = data.users || [];
+  } catch (err) {
+    usersPanel.innerHTML = `<div class="dashboard-shell"><div class="dashboard-card users-loading muted">${escapeHtml(err.message || "Could not load users.")}</div></div>`;
+    return;
+  }
+
+  usersPanel.innerHTML = renderUsersContent(users);
+  wireUsersPanel();
+}
+
+function renderUsersContent(users) {
+  const rows = users.map(u => {
+    const flags = [];
+    if (!u.active) flags.push(`<span class="user-flag user-flag--off">disabled</span>`);
+    if (u.invitePending) flags.push(`<span class="user-flag">invite pending</span>`);
+    else if (!u.hasPassword) flags.push(`<span class="user-flag">no password</span>`);
+
+    return `
+      <div class="user-row dashboard-card"
+        data-user-id="${escapeAttr(u.id)}"
+        data-user-email="${escapeAttr(u.email)}"
+        data-user-role="${escapeAttr(u.role)}"
+        data-user-active="${u.active ? "true" : "false"}">
+        <div class="user-row-main">
+          <div class="user-row-title">${escapeHtml(u.displayName || u.email)}</div>
+          <div class="user-row-meta">
+            <span>${escapeHtml(u.email)}</span>
+            <span class="user-role-badge user-role-${escapeAttr(u.role)}">${escapeHtml(u.role)}</span>
+            ${flags.join("")}
+          </div>
+        </div>
+        <div class="user-row-actions">
+          <button type="button" class="user-action-btn" data-user-action="role">${u.role === "admin" ? "Make demo" : "Make admin"}</button>
+          <button type="button" class="user-action-btn" data-user-action="password">Set password</button>
+          <button type="button" class="user-action-btn" data-user-action="toggle">${u.active ? "Disable" : "Enable"}</button>
+          <button type="button" class="user-action-btn user-action-danger" data-user-action="remove">Remove</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="dashboard-shell">
+      <section class="dashboard-section">
+        <h2 class="dashboard-section-title">Invite a user</h2>
+        <div class="dashboard-card user-invite-card">
+          <input id="userInviteEmail" type="email" placeholder="Email" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          <input id="userInviteName" type="text" placeholder="Name (optional)" autocomplete="off" />
+          <select id="userInviteRole">
+            <option value="demo">Demo — sandbox, can't touch real data</option>
+            <option value="admin">Admin — full access</option>
+          </select>
+          <button id="userInviteBtn" type="button" class="user-invite-btn">Send invite</button>
+          <p id="userInviteStatus" class="status muted"></p>
+        </div>
+      </section>
+      <section class="dashboard-section">
+        <h2 class="dashboard-section-title">Accounts</h2>
+        <div class="user-list">${rows || `<p class="dashboard-empty muted">No accounts yet.</p>`}</div>
+      </section>
+    </div>
+  `;
+}
+
+function wireUsersPanel() {
+  if (!usersPanel || usersPanel.dataset.wired === "true") return;
+  usersPanel.dataset.wired = "true";
+
+  usersPanel.addEventListener("click", async (e) => {
+    if (e.target.closest("#userInviteBtn")) {
+      await handleUserInvite();
+      return;
+    }
+    const actionBtn = e.target.closest("[data-user-action]");
+    if (!actionBtn) return;
+    const row = actionBtn.closest("[data-user-id]");
+    if (!row) return;
+    await handleUserRowAction(actionBtn.dataset.userAction, {
+      userId: row.dataset.userId,
+      email: row.dataset.userEmail,
+      role: row.dataset.userRole,
+      active: row.dataset.userActive === "true"
+    });
+  });
+}
+
+async function handleUserInvite() {
+  const emailEl = document.getElementById("userInviteEmail");
+  const nameEl = document.getElementById("userInviteName");
+  const roleEl = document.getElementById("userInviteRole");
+  const statusEl = document.getElementById("userInviteStatus");
+  const email = (emailEl?.value || "").trim();
+
+  if (!email) {
+    if (statusEl) statusEl.textContent = "Enter an email address.";
+    return;
+  }
+
+  if (statusEl) statusEl.textContent = "Sending invite…";
+  try {
+    const data = await postJson({
+      action: "createUserInvite",
+      email,
+      displayName: nameEl?.value || "",
+      role: roleEl?.value || "demo"
+    }, true);
+
+    if (data.emailed) {
+      if (statusEl) statusEl.textContent = `Invite emailed to ${email}.`;
+    } else if (data.inviteLink) {
+      prompt("Email wasn't sent — copy this invite link:", data.inviteLink);
+      if (statusEl) statusEl.textContent = "Invite created — link shown above.";
+    }
+    if (emailEl) emailEl.value = "";
+    if (nameEl) nameEl.value = "";
+    renderUsersView();
+  } catch (err) {
+    if (statusEl) statusEl.textContent = err.message || "Could not send the invite.";
+  }
+}
+
+async function handleUserRowAction(action, { userId, email, role, active }) {
+  try {
+    if (action === "role") {
+      const nextRole = role === "admin" ? "demo" : "admin";
+      if (!confirm(`Change ${email} to ${nextRole}?`)) return;
+      await postJson({ action: "updateUser", userId, role: nextRole }, true);
+    } else if (action === "toggle") {
+      await postJson({ action: "updateUser", userId, active: !active }, true);
+    } else if (action === "password") {
+      const pw = prompt(`Set a password for ${email} (at least 8 characters):`);
+      if (!pw) return;
+      await postJson({ action: "setUserPassword", userId, password: pw.trim() }, true);
+    } else if (action === "remove") {
+      if (!confirm(`Remove ${email}? This deletes their account.`)) return;
+      await postJson({ action: "deleteUser", userId }, true);
+    }
+    renderUsersView();
+  } catch (err) {
+    alert(err.message || "That action didn't work.");
+  }
+}
+
+/* Invite acceptance: when the URL carries ?invite=TOKEN, show the
+   set-password screen instead of the normal login/app. */
+function getInviteTokenFromUrl() {
+  try {
+    return new URL(window.location.href).searchParams.get("invite") || "";
+  } catch {
+    return "";
+  }
+}
+
+function clearInviteFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("invite");
+    window.history.replaceState({}, "", url);
+  } catch {
+    /* non-fatal */
+  }
+}
+
+async function startInviteFlow(token) {
+  const intro = document.getElementById("inviteIntro");
+  const form = document.getElementById("inviteForm");
+  const status = document.getElementById("inviteStatus");
+  const pw1 = document.getElementById("invitePassword");
+  const pw2 = document.getElementById("invitePassword2");
+  const submitBtn = document.getElementById("inviteSubmitBtn");
+
+  showView(inviteView);
+
+  let invite;
+  try {
+    invite = await postJson({ action: "getInvite", token });
+  } catch (err) {
+    if (intro) intro.textContent = err.message || "This invite is invalid or expired.";
+    return;
+  }
+
+  if (intro) intro.textContent = `Welcome${invite.displayName ? `, ${invite.displayName}` : ""}! Set a password for ${invite.email} (${invite.role}).`;
+  if (form) form.hidden = false;
+
+  const submit = async () => {
+    const p1 = (pw1?.value || "").trim();
+    const p2 = (pw2?.value || "").trim();
+    if (p1.length < 8) { if (status) status.textContent = "Password must be at least 8 characters."; return; }
+    if (p1 !== p2) { if (status) status.textContent = "Passwords don't match."; return; }
+    if (status) status.textContent = "Creating your account…";
+    try {
+      const data = await postJson({ action: "acceptInvite", token, password: p1 });
+      clearInviteFromUrl();
+      await finishLoginWithToken(data.token, data.role);
+    } catch (err) {
+      if (status) status.textContent = err.message || "Could not set your password.";
+    }
+  };
+
+  submitBtn?.addEventListener("click", submit);
+  pw2?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } });
 }
 
 async function loadOrders() {
@@ -10549,6 +10790,7 @@ if (saveOrderBtn) {
 
 menuBtn.addEventListener("click", openMenu);
 homeMenuBtn?.addEventListener("click", openMenu);
+document.getElementById("usersMenuBtn")?.addEventListener("click", openMenu);
 closeMenuBtn.addEventListener("click", closeMenu);
 menuBackdrop.addEventListener("click", closeMenu);
 
@@ -10612,10 +10854,18 @@ document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
   syncAuthUI();
   resetAdminScroll();
 
+  const inviteToken = getInviteTokenFromUrl();
+  if (inviteToken) {
+    startInviteFlow(inviteToken);
+    return;
+  }
+
   if (!getToken()) {
     showView(loginView);
     return;
   }
+
+  syncRoleUI();
 
   try {
     await loadOrders();

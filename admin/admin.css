@@ -6317,3 +6317,151 @@ button.secondary,
   outline:3px solid rgba(9,47,77,.14);
   outline-offset:2px;
 }
+
+/* =========================
+   USERS / ACCOUNTS SCREEN
+   ========================= */
+.users-loading{
+  padding:14px;
+}
+
+.user-invite-card{
+  display:grid;
+  gap:8px;
+  padding:12px;
+}
+
+.user-invite-card input,
+.user-invite-card select{
+  width:100%;
+  border:1px solid rgba(9,47,77,.28);
+  border-radius:10px;
+  padding:9px 10px;
+  font-size:.9rem;
+  color:var(--navy);
+  background:#fffdf8;
+  outline:none;
+}
+
+.user-invite-btn{
+  justify-self:start;
+  min-height:32px;
+  padding:8px 16px;
+  border:none;
+  border-radius:10px;
+  background:var(--navy);
+  color:var(--cream);
+  font-weight:600;
+  font-size:.9rem;
+  cursor:pointer;
+}
+
+.user-list{
+  display:grid;
+  gap:8px;
+}
+
+.user-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  padding:11px 12px;
+}
+
+.user-row-main{
+  min-width:0;
+}
+
+.user-row-title{
+  color:var(--navy);
+  font-weight:600;
+  font-size:.95rem;
+  line-height:1.2;
+}
+
+.user-row-meta{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:3px;
+  color:rgba(9,47,77,.66);
+  font-size:.78rem;
+}
+
+.user-role-badge{
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  font-size:.66rem;
+  font-weight:700;
+  padding:2px 7px;
+  border-radius:999px;
+}
+
+.user-role-admin{
+  background:rgba(9,47,77,.12);
+  color:var(--navy);
+}
+
+.user-role-demo{
+  background:rgba(179,110,30,.14);
+  color:#8a5316;
+}
+
+.user-flag{
+  font-size:.66rem;
+  font-weight:600;
+  color:#8a5316;
+}
+
+.user-flag--off{
+  color:#b3261e;
+}
+
+.user-row-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+
+.user-action-btn{
+  min-height:30px;
+  padding:5px 10px;
+  border:1px solid rgba(9,47,77,.22);
+  border-radius:9px;
+  background:#fffdf8;
+  color:var(--navy);
+  font-size:.78rem;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.user-action-btn:hover{
+  background:#fff;
+  border-color:rgba(9,47,77,.34);
+}
+
+.user-action-danger{
+  color:#b3261e;
+  border-color:rgba(179,38,30,.3);
+}
+
+/* Demo-mode banner (shown for demo role) */
+.demo-banner{
+  display:none;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:6px 12px;
+  background:#8a5316;
+  color:#fff;
+  font-size:.8rem;
+  font-weight:600;
+  text-align:center;
+}
+
+body.is-demo .demo-banner{
+  display:flex;
+}
