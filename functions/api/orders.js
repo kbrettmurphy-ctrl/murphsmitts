@@ -3889,7 +3889,8 @@ async function touchWebauthnCredential(env, credentialId, signCount) {
    user id (sub) and role. Roles: "admin" (full access) and "demo"
    (interactive sandbox, blocked from real data — enforced in the dispatch).
 ========================= */
-const PASSWORD_ITERATIONS = 210000;
+// Cloudflare Workers' WebCrypto caps PBKDF2 at 100000 iterations.
+const PASSWORD_ITERATIONS = 100000;
 
 async function hashPassword(password, saltInput = null, iterations = PASSWORD_ITERATIONS) {
   const salt = saltInput ? base64UrlToBytes(saltInput) : crypto.getRandomValues(new Uint8Array(16));
