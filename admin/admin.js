@@ -5085,7 +5085,10 @@ function renderOrderDetail(order) {
   }
 
   if (detailTitle) {
-    detailTitle.textContent = "Order Detail";
+    const titleName = String(order.customerName || "").trim();
+    const titleNum = String(order.orderNumber || "").trim();
+    const titleParts = [titleName, titleNum].filter(Boolean);
+    detailTitle.textContent = titleParts.length ? titleParts.join(" - ") : "Order Detail";
   }
   if (saveOrderBtn) {
     saveOrderBtn.textContent = "Save";
