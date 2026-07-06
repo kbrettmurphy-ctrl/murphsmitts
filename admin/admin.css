@@ -5996,6 +5996,16 @@ button.secondary,
   background:rgba(9,47,77,.07);
 }
 
+.dashboard-timer-stop-option{
+  color:#b3261e;
+  font-weight:600;
+}
+
+.dashboard-timer-stop-option:hover,
+.dashboard-timer-stop-option:focus-visible{
+  background:rgba(179,38,30,.08);
+}
+
 .dashboard-bench-timer-state{
   color:rgba(9,47,77,.72);
   font-weight:600;
