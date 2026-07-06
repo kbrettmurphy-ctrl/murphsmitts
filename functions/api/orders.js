@@ -238,6 +238,28 @@ export async function onRequest(context) {
       return json({ ok: true, activity: result.activity }, 200, jsonHeaders);
     }
 
+    if (action === "listOrdersWithActivity") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const result = await listOrdersWithActivity(env);
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            error: "Activity index could not be loaded.",
+            details: result.error
+          },
+          200,
+          jsonHeaders
+        );
+      }
+
+      return json({ ok: true, orderNumbers: result.orderNumbers }, 200, jsonHeaders);
+    }
+
     if (action === "listLaborSessions") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -1795,6 +1817,29 @@ async function listOrderActivity(env, orderNumber) {
     ok: true,
     activity: Array.isArray(resp.data) ? resp.data.map(mapOrderActivityFromDb) : []
   };
+}
+
+/* Distinct order numbers that carry at least one real activity-log entry.
+   order_created_manual is excluded so a freshly-created order (whether from
+   intake, which logs nothing, or the admin form, which logs a creation
+   event) counts as "new" until it picks up genuine activity. */
+async function listOrdersWithActivity(env) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/order_activity?select=order_number&event_type=neq.order_created_manual`
+  );
+
+  if (!resp.ok) return resp;
+
+  const seen = new Set();
+  if (Array.isArray(resp.data)) {
+    for (const row of resp.data) {
+      const orderNumber = cleanText(row?.order_number);
+      if (orderNumber) seen.add(orderNumber);
+    }
+  }
+
+  return { ok: true, orderNumbers: Array.from(seen) };
 }
 
 async function logOrderActivities(env, events) {

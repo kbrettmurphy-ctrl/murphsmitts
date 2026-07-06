@@ -141,6 +141,14 @@ let dashboardLaborSessions = {};
 let dashboardTimerPopoverOrder = null;
 let dashboardTimerBusy = false;
 
+/* Set of order numbers that have at least one real activity-log entry
+   (the manual-creation event is excluded server-side). Drives the New
+   Orders section: an order is "new" until it picks up activity. Loaded
+   async — dashboardActivityLoaded gates New so it doesn't flash every
+   order as new before the index arrives. */
+let dashboardActivityOrders = new Set();
+let dashboardActivityLoaded = false;
+
 /* Persisted collapse state for the Shop Metrics / Finance Snapshot
    dashboard sections. Kept in localStorage so a collapsed section stays
    collapsed across reloads. Toggling only flips a class (no re-render),
@@ -721,13 +729,15 @@ function isOnDeckOrder(order) {
   );
 }
 
-/* New order = freshly received and not yet worked. "Received" is the
-   status intake assigns and the workflow leaves untouched until Brett
-   advances it, so it's the reliable client-side proxy for "no activity
-   yet" (per-order activity isn't loaded on the dashboard list). */
+/* New order = an active order with nothing in its activity log yet
+   (manual-creation events don't count). Once any real activity lands —
+   status change, note, email/text, photo, timer — it drops out of New.
+   Gated on the activity index having loaded to avoid a false "everything
+   is new" flash. */
 function isNewOrder(order) {
   if (!isCurrentOrder(order)) return false;
-  return normalizeStatus(order?.status) === "received";
+  if (!dashboardActivityLoaded) return false;
+  return !dashboardActivityOrders.has(String(order?.orderNumber || ""));
 }
 
 function getOnDeckPriority(order) {
@@ -1084,6 +1094,26 @@ async function refreshDashboardLaborSessions({ rerender = true } = {}) {
   }
 }
 
+async function refreshDashboardActivityIndex({ rerender = true } = {}) {
+  try {
+    const data = await postJson({ action: "listOrdersWithActivity" }, true);
+    const nextSet = new Set((data.orderNumbers || []).map(n => String(n)));
+    const changed =
+      !dashboardActivityLoaded ||
+      nextSet.size !== dashboardActivityOrders.size ||
+      [...nextSet].some(n => !dashboardActivityOrders.has(n));
+
+    dashboardActivityOrders = nextSet;
+    dashboardActivityLoaded = true;
+
+    if (changed && rerender && activeView === "dashboard") {
+      renderHomeDashboard();
+    }
+  } catch {
+    /* New Orders is a dashboard extra — never block rendering on it. */
+  }
+}
+
 function closeDashboardTimerPopover() {
   dashboardTimerPopoverOrder = null;
   document.querySelectorAll(".dashboard-timer-popover").forEach(el => el.remove());
@@ -1408,15 +1438,18 @@ function renderHomeDashboard() {
       </section>
 
       <section class="dashboard-section dashboard-section-collapsible${metricsCollapsed ? " is-collapsed" : ""}" data-dashboard-collapse="metrics">
-        <button
-          type="button"
-          class="dashboard-section-toggle"
-          data-dashboard-collapse-toggle="metrics"
-          aria-expanded="${metricsCollapsed ? "false" : "true"}"
-        >
-          <span class="dashboard-section-title">Shop Metrics</span>
-          <span class="dashboard-section-chevron" aria-hidden="true">›</span>
-        </button>
+        <div class="dashboard-section-collapse-head">
+          <h2 class="dashboard-section-title">Shop Metrics</h2>
+          <button
+            type="button"
+            class="dashboard-section-collapse-btn"
+            data-dashboard-collapse-toggle="metrics"
+            aria-expanded="${metricsCollapsed ? "false" : "true"}"
+            aria-label="Toggle Shop Metrics"
+          >
+            <span class="dashboard-section-chevron" aria-hidden="true">›</span>
+          </button>
+        </div>
         <div class="dashboard-section-body">
           <div class="dashboard-grid">${metricsHtml}</div>
         </div>
@@ -1424,18 +1457,10 @@ function renderHomeDashboard() {
 
       <section class="dashboard-section dashboard-section-finance dashboard-section-collapsible${financeCollapsed ? " is-collapsed" : ""}" data-dashboard-collapse="finance">
         <div class="dashboard-section-heading">
-          <button
-            type="button"
-            class="dashboard-section-toggle dashboard-section-finance-toggle"
-            data-dashboard-collapse-toggle="finance"
-            aria-expanded="${financeCollapsed ? "false" : "true"}"
-          >
-            <span class="dashboard-section-title-group">
-              <span class="dashboard-section-title">Finance Snapshot</span>
-              <span class="dashboard-section-range muted">${escapeHtml(financeRangeLabel)}</span>
-            </span>
-            <span class="dashboard-section-chevron" aria-hidden="true">›</span>
-          </button>
+          <div class="dashboard-section-title-group">
+            <h2 class="dashboard-section-title">Finance Snapshot</h2>
+            <p class="dashboard-section-range muted">${escapeHtml(financeRangeLabel)}</p>
+          </div>
           <div class="dashboard-finance-controls">
             <button
               id="financeFilterToggleBtn"
@@ -1466,6 +1491,15 @@ function renderHomeDashboard() {
               </div>
             </div>
           </div>
+          <button
+            type="button"
+            class="dashboard-section-collapse-btn"
+            data-dashboard-collapse-toggle="finance"
+            aria-expanded="${financeCollapsed ? "false" : "true"}"
+            aria-label="Toggle Finance Snapshot"
+          >
+            <span class="dashboard-section-chevron" aria-hidden="true">›</span>
+          </button>
         </div>
         <div class="dashboard-section-body">
           ${financeCustomHtml}
@@ -4459,6 +4493,7 @@ function setActiveView(viewName) {
     syncAdminViewUrl(resolvedView);
     renderHomeDashboard();
     refreshDashboardLaborSessions();
+    refreshDashboardActivityIndex();
     showView(homeDashboardView);
     closeMenu();
     resetViewScroll(homeDashboardView, { blurActive: true });
@@ -7495,6 +7530,7 @@ async function submitWorkflowAction(order, actionKey) {
     if (activeView === "dashboard") {
       renderHomeDashboard();
       refreshDashboardLaborSessions();
+      refreshDashboardActivityIndex();
     }
     closeWorkflowSheet();
   } catch (err) {
@@ -8315,6 +8351,7 @@ async function loadOrders() {
   if (activeView === "dashboard") {
     renderHomeDashboard();
     refreshDashboardLaborSessions();
+    refreshDashboardActivityIndex();
   }
 }
 
