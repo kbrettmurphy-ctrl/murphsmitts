@@ -1,5 +1,6 @@
 const API_BASE_URL = window.MM_ADMIN_CONFIG.API_BASE_URL;
 const TOKEN_KEY = "mm_admin_token";
+const ROLE_KEY = "mm_admin_role";
 const ADMIN_PHOTO_ACTION_PLACEHOLDER_LABEL = "Action";
 const ADMIN_PHOTO_ACTION_PLACEHOLDER = `<option value="" disabled hidden>${ADMIN_PHOTO_ACTION_PLACEHOLDER_LABEL}</option>`;
 const ADMIN_PHOTO_PLACEHOLDER_VALUES = new Set(["", "action", "actions"]);
@@ -22,6 +23,7 @@ const moneyView = document.getElementById("moneyView");
 const moneyMenuBtn = document.getElementById("moneyMenuBtn");
 const detailTitle = document.getElementById("detailTitle");
 const pinInput = document.getElementById("pinInput");
+const emailInput = document.getElementById("emailInput");
 const loginStatus = document.getElementById("loginStatus");
 const mainPanel = document.querySelector(".main-panel");
 
@@ -378,6 +380,32 @@ function setToken(token) {
 
 function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(ROLE_KEY);
+}
+
+function setRole(role) {
+  if (role) localStorage.setItem(ROLE_KEY, role);
+}
+
+/* Current role, preferring the stored value, falling back to decoding the
+   (unencrypted) token payload so existing sessions resolve correctly. */
+function getCurrentRole() {
+  const stored = localStorage.getItem(ROLE_KEY);
+  if (stored) return stored;
+  try {
+    const token = getToken();
+    const payloadB64 = token.split(".")[0];
+    if (!payloadB64) return "admin";
+    const json = atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((payloadB64.length + 3) % 4));
+    const payload = JSON.parse(json);
+    return payload.role || "admin";
+  } catch {
+    return "admin";
+  }
+}
+
+function isDemoRole() {
+  return getCurrentRole() === "demo";
 }
 
 function openMenu() {
@@ -8392,18 +8420,19 @@ function getCustomLaceColor(customValue) {
 /* =========================
    AUTH / LOAD
 ========================= */
-async function login(pinValue) {
+async function login(email, password) {
   if (loginInProgress) return;
   loginInProgress = true;
-  loginStatus.textContent = "Logging in...";
+  loginStatus.textContent = "Signing in…";
 
   try {
     const data = await postJson({
       action: "login",
-      pin: pinValue
+      email,
+      password
     });
 
-    await finishLoginWithToken(data.token);
+    await finishLoginWithToken(data.token, data.role);
   } catch (err) {
     loginStatus.textContent = err.message;
     pinInput.value = "";
@@ -8413,10 +8442,12 @@ async function login(pinValue) {
   }
 }
 
-/* Shared success path for both PIN and passkey login. */
-async function finishLoginWithToken(token) {
+/* Shared success path for both password and passkey login. */
+async function finishLoginWithToken(token, role) {
   setToken(token);
+  setRole(role);
   pinInput.value = "";
+  if (emailInput) emailInput.value = "";
   loginStatus.textContent = "";
   syncAuthUI();
   await loadOrders();
@@ -8491,7 +8522,7 @@ async function signInWithPasskey() {
       }
     });
 
-    await finishLoginWithToken(res.token);
+    await finishLoginWithToken(res.token, res.role);
   } catch (err) {
     if (err && (err.name === "NotAllowedError" || err.name === "AbortError")) {
       loginStatus.textContent = "";
@@ -10232,20 +10263,30 @@ function openOrder(orderNumber, { returnView } = {}) {
 /* =========================
    EVENTS
 ========================= */
-/* Text passcode: submit on Enter or the Log In button (no fixed length). */
+/* Submit on Enter or the Log In button. Email + password; the owner can
+   also leave email blank and enter the owner PIN as the password. */
 function submitPasscodeLogin() {
-  const value = pinInput.value.trim();
-  if (!value) {
+  const email = emailInput ? emailInput.value.trim() : "";
+  const password = pinInput.value.trim();
+  if (!password) {
     pinInput.focus();
     return;
   }
-  login(value);
+  login(email, password);
 }
 
 pinInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
     submitPasscodeLogin();
+  }
+});
+
+emailInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    if (pinInput.value.trim()) submitPasscodeLogin();
+    else pinInput.focus();
   }
 });
 

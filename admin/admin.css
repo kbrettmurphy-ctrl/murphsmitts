@@ -923,6 +923,10 @@ button.secondary{
   outline:none;
 }
 
+.login-card input + input{
+  margin-top:10px;
+}
+
 .login-card input::placeholder{
   color:rgba(9,47,77,.62);
   font-size:.92rem;
