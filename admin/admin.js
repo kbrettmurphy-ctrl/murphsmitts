@@ -8320,9 +8320,16 @@ async function enrollPasskey() {
     }, 2500);
   } catch (err) {
     if (sideNavPasskeyBtn) sideNavPasskeyBtn.textContent = prevLabel;
-    if (!err || (err.name !== "NotAllowedError" && err.name !== "AbortError")) {
-      alert(err && err.message ? err.message : "Could not set up Face ID.");
+    if (err && (err.name === "NotAllowedError" || err.name === "AbortError")) {
+      return; // user dismissed the prompt
     }
+    if (err && err.name === "InvalidStateError") {
+      /* The device already holds a passkey for this site (it's the one
+         that's registered), so it won't create a duplicate. */
+      alert("Face ID is already set up on this device. Just use “Sign in with Face ID” on the login screen.");
+      return;
+    }
+    alert(err && err.message ? err.message : "Could not set up Face ID.");
   }
 }
 
