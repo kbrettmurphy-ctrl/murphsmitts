@@ -144,6 +144,44 @@ let dashboardLaborSessions = {};
 let dashboardTimerPopoverOrder = null;
 let dashboardTimerBusy = false;
 
+/* Set of order numbers that have at least one real activity-log entry
+   (the manual-creation event is excluded server-side). Drives the New
+   Orders section: an order is "new" until it picks up activity. Loaded
+   async — dashboardActivityLoaded gates New so it doesn't flash every
+   order as new before the index arrives. */
+let dashboardActivityOrders = new Set();
+let dashboardActivityLoaded = false;
+
+/* Persisted collapse state for the Shop Metrics / Finance Snapshot
+   dashboard sections. Kept in localStorage so a collapsed section stays
+   collapsed across reloads. Toggling only flips a class (no re-render),
+   so it never trips the focused-finance-date-input hazard. */
+const DASHBOARD_COLLAPSE_KEY = "mm_dashboard_collapsed";
+
+function readDashboardCollapseState() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DASHBOARD_COLLAPSE_KEY) || "null");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+let dashboardCollapseState = readDashboardCollapseState();
+
+function isDashboardSectionCollapsed(key) {
+  return dashboardCollapseState[key] === true;
+}
+
+function setDashboardSectionCollapsed(key, collapsed) {
+  dashboardCollapseState[key] = collapsed;
+  try {
+    localStorage.setItem(DASHBOARD_COLLAPSE_KEY, JSON.stringify(dashboardCollapseState));
+  } catch {
+    /* Non-fatal — collapse just won't persist across reloads. */
+  }
+}
+
 window.inventoryViewMode = "active";
 
 document.addEventListener("selectstart", (e) => {
@@ -671,8 +709,7 @@ function formatCurrency(value) {
 
 const ON_DECK_STATUS_PRIORITY = {
   "in transit to me": 1,
-  "customer approved": 2,
-  "received": 3
+  "customer approved": 2
 };
 
 const OUTSTANDING_UNPAID_STATUSES = new Set([
@@ -693,6 +730,17 @@ function isOnDeckOrder(order) {
     ON_DECK_STATUS_PRIORITY,
     normalizeStatus(order?.status)
   );
+}
+
+/* New order = an active order with nothing in its activity log yet
+   (manual-creation events don't count). Once any real activity lands —
+   status change, note, email/text, photo, timer — it drops out of New.
+   Gated on the activity index having loaded to avoid a false "everything
+   is new" flash. */
+function isNewOrder(order) {
+  if (!isCurrentOrder(order)) return false;
+  if (!dashboardActivityLoaded) return false;
+  return !dashboardActivityOrders.has(String(order?.orderNumber || ""));
 }
 
 function getOnDeckPriority(order) {
@@ -883,11 +931,17 @@ function getOnDeckOrders(orders = allOrders, limit = 5) {
   return sortDashboardOrders(list.filter(isOnDeckOrder), getOnDeckPriority).slice(0, limit);
 }
 
+function getNewOrders(orders = allOrders, limit = 5) {
+  const list = Array.isArray(orders) ? orders : [];
+  return sortDashboardOrders(list.filter(isNewOrder)).slice(0, limit);
+}
+
 function getDashboardAttentionItems(orders = allOrders) {
   const list = Array.isArray(orders) ? orders : [];
   const items = [];
   const now = Date.now();
   const staleMs = 48 * 60 * 60 * 1000;
+  const followUpMs = 3 * 24 * 60 * 60 * 1000;
   const eligible = list.filter(isCurrentOrder);
 
   const readyUnpaid = eligible.filter(order => isReadyToGo(order) && !isPaid(order));
@@ -909,7 +963,9 @@ function getDashboardAttentionItems(orders = allOrders) {
   }
 
   const staleCustomer = eligible.filter(order => {
-    if (!isWaitingOnCustomer(order)) return false;
+    /* Pending-response orders get their own follow-up reminder below,
+       so this line stays scoped to estimate-sent to avoid double-counting. */
+    if (normalizeStatus(order?.status) !== "estimate sent") return false;
     const updated = parseOrderDate(order.updatedAt);
     if (!updated) return false;
     return now - updated.getTime() >= staleMs;
@@ -920,6 +976,23 @@ function getDashboardAttentionItems(orders = allOrders) {
       key: "stale-customer",
       label: `${staleCustomer.length} estimates pending over 48 hours`,
       view: "estimate"
+    });
+  }
+
+  /* Follow up on orders sitting in "Pending Response" — nudge Brett to
+     chase customers who've gone quiet after the estimate conversation. */
+  const followUpResponse = eligible.filter(order => {
+    if (!isWaitingForCustomerResponse(order)) return false;
+    const updated = parseOrderDate(order.updatedAt);
+    if (!updated) return false;
+    return now - updated.getTime() >= followUpMs;
+  });
+
+  if (followUpResponse.length) {
+    items.push({
+      key: "pending-response",
+      label: `${followUpResponse.length} pending response — follow up`,
+      view: "customer-response"
     });
   }
 
@@ -1021,6 +1094,26 @@ async function refreshDashboardLaborSessions({ rerender = true } = {}) {
   } catch {
     /* Timer state is a dashboard extra — keep the old map and never
        block orders or dashboard rendering on it. */
+  }
+}
+
+async function refreshDashboardActivityIndex({ rerender = true } = {}) {
+  try {
+    const data = await postJson({ action: "listOrdersWithActivity" }, true);
+    const nextSet = new Set((data.orderNumbers || []).map(n => String(n)));
+    const changed =
+      !dashboardActivityLoaded ||
+      nextSet.size !== dashboardActivityOrders.size ||
+      [...nextSet].some(n => !dashboardActivityOrders.has(n));
+
+    dashboardActivityOrders = nextSet;
+    dashboardActivityLoaded = true;
+
+    if (changed && rerender && activeView === "dashboard") {
+      renderHomeDashboard();
+    }
+  } catch {
+    /* New Orders is a dashboard extra — never block rendering on it. */
   }
 }
 
@@ -1247,7 +1340,10 @@ function renderHomeDashboard() {
   const financeStats = computeFinanceStats();
   const benchOrders = getBenchPreviewOrders();
   const onDeckOrders = getOnDeckOrders();
+  const newOrders = getNewOrders();
   const attentionItems = getDashboardAttentionItems();
+  const metricsCollapsed = isDashboardSectionCollapsed("metrics");
+  const financeCollapsed = isDashboardSectionCollapsed("finance");
   const avgTurnaroundDisplay = stats.averageTurnaround === null
     ? "—"
     : `${Math.round(stats.averageTurnaround)}d`;
@@ -1300,6 +1396,7 @@ function renderHomeDashboard() {
 
   const benchHtml = renderDashboardOrderList(benchOrders, "No bench work queued.", { timerControls: true });
   const onDeckHtml = renderDashboardOrderList(onDeckOrders, "No orders on deck.");
+  const newHtml = renderDashboardOrderList(newOrders, "No new orders.");
 
   const attentionHtml = attentionItems.length
     ? attentionItems.map(item => `
@@ -1330,19 +1427,40 @@ function renderHomeDashboard() {
         <div class="dashboard-card dashboard-bench-card dashboard-bench-card--secondary">${onDeckHtml}</div>
       </section>
 
+      <section class="dashboard-section dashboard-section-neworders">
+        <div class="dashboard-section-heading-row">
+          <h2 class="dashboard-section-title">New Orders</h2>
+          <span class="dashboard-section-kicker">No activity yet</span>
+        </div>
+        <div class="dashboard-card dashboard-bench-card dashboard-bench-card--secondary">${newHtml}</div>
+      </section>
+
       <section class="dashboard-section">
         <h2 class="dashboard-section-title">Needs Attention</h2>
         <div class="dashboard-card dashboard-attention-card">${attentionHtml}</div>
       </section>
 
-      <section class="dashboard-section">
-        <h2 class="dashboard-section-title">Shop Metrics</h2>
-        <div class="dashboard-grid">${metricsHtml}</div>
+      <section class="dashboard-section dashboard-section-collapsible${metricsCollapsed ? " is-collapsed" : ""}" data-dashboard-collapse="metrics">
+        <div class="dashboard-section-collapse-head">
+          <h2 class="dashboard-section-title">Shop Metrics</h2>
+          <button
+            type="button"
+            class="dashboard-section-collapse-btn"
+            data-dashboard-collapse-toggle="metrics"
+            aria-expanded="${metricsCollapsed ? "false" : "true"}"
+            aria-label="Toggle Shop Metrics"
+          >
+            <span class="dashboard-section-chevron" aria-hidden="true">›</span>
+          </button>
+        </div>
+        <div class="dashboard-section-body">
+          <div class="dashboard-grid">${metricsHtml}</div>
+        </div>
       </section>
 
-      <section class="dashboard-section dashboard-section-finance">
+      <section class="dashboard-section dashboard-section-finance dashboard-section-collapsible${financeCollapsed ? " is-collapsed" : ""}" data-dashboard-collapse="finance">
         <div class="dashboard-section-heading">
-          <div class="dashboard-section-title-wrap">
+          <div class="dashboard-section-title-group">
             <h2 class="dashboard-section-title">Finance Snapshot</h2>
             <p class="dashboard-section-range muted">${escapeHtml(financeRangeLabel)}</p>
           </div>
@@ -1376,9 +1494,20 @@ function renderHomeDashboard() {
               </div>
             </div>
           </div>
+          <button
+            type="button"
+            class="dashboard-section-collapse-btn"
+            data-dashboard-collapse-toggle="finance"
+            aria-expanded="${financeCollapsed ? "false" : "true"}"
+            aria-label="Toggle Finance Snapshot"
+          >
+            <span class="dashboard-section-chevron" aria-hidden="true">›</span>
+          </button>
         </div>
-        ${financeCustomHtml}
-        <div class="dashboard-grid dashboard-grid-finance">${financeHtml}</div>
+        <div class="dashboard-section-body">
+          ${financeCustomHtml}
+          <div class="dashboard-grid dashboard-grid-finance">${financeHtml}</div>
+        </div>
       </section>
     </div>
   `;
@@ -1389,6 +1518,20 @@ function wireHomeDashboardActions() {
   dashboardPanel.dataset.wired = "true";
 
   dashboardPanel.addEventListener("click", (e) => {
+    const collapseToggle = e.target.closest("[data-dashboard-collapse-toggle]");
+    if (collapseToggle) {
+      const key = collapseToggle.dataset.dashboardCollapseToggle;
+      const section = collapseToggle.closest("[data-dashboard-collapse]");
+      if (section) {
+        /* Class-only toggle — never re-renders, so focused finance date
+           inputs are safe. */
+        const collapsed = section.classList.toggle("is-collapsed");
+        setDashboardSectionCollapsed(key, collapsed);
+        collapseToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      }
+      return;
+    }
+
     const financeToggle = e.target.closest("#financeFilterToggleBtn");
     if (financeToggle) {
       setFinanceFilterMenuOpen(!financeFilterMenuOpen);
@@ -4353,6 +4496,7 @@ function setActiveView(viewName) {
     syncAdminViewUrl(resolvedView);
     renderHomeDashboard();
     refreshDashboardLaborSessions();
+    refreshDashboardActivityIndex();
     showView(homeDashboardView);
     closeMenu();
     resetViewScroll(homeDashboardView, { blurActive: true });
@@ -7389,6 +7533,7 @@ async function submitWorkflowAction(order, actionKey) {
     if (activeView === "dashboard") {
       renderHomeDashboard();
       refreshDashboardLaborSessions();
+      refreshDashboardActivityIndex();
     }
     closeWorkflowSheet();
   } catch (err) {
@@ -8383,6 +8528,7 @@ async function loadOrders() {
   if (activeView === "dashboard") {
     renderHomeDashboard();
     refreshDashboardLaborSessions();
+    refreshDashboardActivityIndex();
   }
 }
 
