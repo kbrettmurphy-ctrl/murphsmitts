@@ -567,9 +567,9 @@ function seedDemoStore() {
       mkOrder("9006", { customerName: "Example Estrada", status: "In Transit to Me", age: 2, dropOffMethod: "Shipped", priceQuoted: 100, shippingCost: 12 })
     ],
     inventory: [
-      { id: "d1", color: "Tan", quantity: 12, reorderAt: 4, active: true, alertEnabled: true },
-      { id: "d2", color: "Black", quantity: 3, reorderAt: 4, active: true, alertEnabled: true },
-      { id: "d3", color: "Timberglaze", quantity: 7, reorderAt: 4, active: true, alertEnabled: true }
+      { id: "d1", color: "Tan", quantity_on_hand: 12, reorder_at: 4, active: true, reorder_alert_enabled: true },
+      { id: "d2", color: "Black", quantity_on_hand: 3, reorder_at: 4, active: true, reorder_alert_enabled: true },
+      { id: "d3", color: "Timberglaze", quantity_on_hand: 7, reorder_at: 4, active: true, reorder_alert_enabled: true }
     ],
     gloves: [
       { id: "g1", brandModel: "Rawlings Pro Preferred", gloveType: "Fielders", price: 220, status: "available", description: "Sample listing", photos: [] }
@@ -668,11 +668,25 @@ function demoApi(body) {
     case "listInventory":
       return demoResult({ inventory: store.inventory });
     case "createInventoryItem":
-      store.inventory.push({ id: "d" + (store.seq++), color: body.color || "New Color", quantity: Number(body.quantity) || 0, reorderAt: Number(body.reorderAt) || 4, active: true, alertEnabled: true });
+      store.inventory.push({
+        id: "d" + (store.seq++),
+        color: body.color || "New Color",
+        quantity_on_hand: Number(body.quantityOnHand) || 0,
+        reorder_at: Number(body.reorderAt) || 4,
+        active: body.active !== false,
+        reorder_alert_enabled: body.reorderAlertEnabled !== false
+      });
       return demoResult();
     case "updateInventoryItem": {
-      const item = store.inventory.find(i => String(i.id) === String(body.id) || i.color === body.color);
-      if (item) Object.assign(item, body.updates || body);
+      const item = store.inventory.find(i => i.color === body.color || String(i.id) === String(body.id));
+      const u = body.updates || {};
+      if (item) {
+        if ("quantityOnHand" in u) item.quantity_on_hand = Number(u.quantityOnHand) || 0;
+        if ("reorderAt" in u) item.reorder_at = Number(u.reorderAt) || 0;
+        if ("reorderAlertEnabled" in u) item.reorder_alert_enabled = !!u.reorderAlertEnabled;
+        if ("color" in u) item.color = u.color;
+        if ("active" in u) item.active = !!u.active;
+      }
       return demoResult();
     }
 
