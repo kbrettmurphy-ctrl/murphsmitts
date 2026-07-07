@@ -1640,7 +1640,8 @@ button.dashboard-metric:active{
 #saleGlovesCount,
 #mapCount,
 #moneyCount,
-#clubhouseCount{
+#clubhouseCount,
+#usersCount{
   margin:4px 0 0;
   min-height:1.35em;
   color:rgba(218,202,177,.76);
@@ -4614,7 +4615,8 @@ button.dashboard-metric:active{
   #saleGlovesCount,
   #mapCount,
   #moneyCount,
-  #clubhouseCount{
+  #clubhouseCount,
+  #usersCount{
     font-size:.7rem;
   }
 
@@ -4767,6 +4769,7 @@ body,
 #mapCount,
 #moneyCount,
 #clubhouseCount,
+#usersCount,
 .detail-topbar-actions .status{
   margin:4px 0 0;
   min-height:1.35em;
@@ -5677,6 +5680,7 @@ button.secondary,
   #mapCount,
   #moneyCount,
   #clubhouseCount,
+  #usersCount,
   .detail-topbar-actions .status{
     font-size:.7rem;
   }
@@ -6274,7 +6278,8 @@ button.secondary,
   #saleGlovesCount,
   #mapCount,
   #moneyCount,
-  #clubhouseCount{
+  #clubhouseCount,
+  #usersCount{
     font-size:.7rem;
   }
 
