@@ -8920,6 +8920,9 @@ async function renderUsersView() {
     return;
   }
 
+  const countEl = document.getElementById("usersCount");
+  if (countEl) countEl.textContent = `${users.length} ${users.length === 1 ? "account" : "accounts"}`;
+
   usersPanel.innerHTML = renderUsersContent(users);
   wireUsersPanel();
 }
