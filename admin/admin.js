@@ -586,6 +586,14 @@ function getDemoStore() {
   return demoStore;
 }
 
+function demoAdjustLaceInventory(store, color, delta) {
+  const c = String(color || "").trim();
+  const d = Number(delta || 0);
+  if (!c || !d) return;
+  const item = store.inventory.find(i => i.color === c);
+  if (item) item.quantity_on_hand = Number(item.quantity_on_hand || 0) + d;
+}
+
 function demoResult(extra) {
   return Promise.resolve(Object.assign({ ok: true }, extra || {}));
 }
@@ -602,7 +610,23 @@ function demoApi(body) {
       return demoResult({ order: findOrder(body.orderNumber) || null });
     case "updateOrder": {
       const order = findOrder(body.orderNumber);
-      if (order) { Object.assign(order, body.updates || {}); order.updatedAt = demoNow(); }
+      if (order) {
+        /* Mirror the server: credit back the old lace used, deduct the new,
+           per color — so recording lace used at Ready to Go decrements the
+           matching demo inventory color (net delta = oldUsed - newUsed). */
+        const oldPrimaryColor = order.primaryLaceColor;
+        const oldSecondaryColor = order.secondaryLaceColor;
+        const oldPrimaryUsed = Number(order.primaryLaceUsed || 0);
+        const oldSecondaryUsed = Number(order.secondaryLaceUsed || 0);
+
+        Object.assign(order, body.updates || {});
+        order.updatedAt = demoNow();
+
+        demoAdjustLaceInventory(store, oldPrimaryColor, oldPrimaryUsed);
+        demoAdjustLaceInventory(store, oldSecondaryColor, oldSecondaryUsed);
+        demoAdjustLaceInventory(store, order.primaryLaceColor, -Number(order.primaryLaceUsed || 0));
+        demoAdjustLaceInventory(store, order.secondaryLaceColor, -Number(order.secondaryLaceUsed || 0));
+      }
       return demoResult({ order });
     }
     case "createOrder": {
