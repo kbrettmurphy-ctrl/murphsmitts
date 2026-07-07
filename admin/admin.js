@@ -8956,7 +8956,7 @@ function renderUsersContent(users) {
   }).join("");
 
   return `
-    <div class="dashboard-shell">
+    <div class="dashboard-shell users-shell">
       <section class="dashboard-section">
         <h2 class="dashboard-section-title">Invite a user</h2>
         <div class="dashboard-card user-invite-card">

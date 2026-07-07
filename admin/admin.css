@@ -6321,39 +6321,68 @@ button.secondary,
 /* =========================
    USERS / ACCOUNTS SCREEN
    ========================= */
+/* Settings-style page: keep the column narrow so it doesn't stretch. */
+.users-shell{
+  max-width:720px;
+}
+
 .users-loading{
   padding:14px;
 }
 
 .user-invite-card{
   display:grid;
-  gap:8px;
-  padding:12px;
+  gap:10px;
+  padding:14px;
 }
 
 .user-invite-card input,
 .user-invite-card select{
   width:100%;
-  border:1px solid rgba(9,47,77,.28);
+  min-height:38px;
+  border:1px solid rgba(9,47,77,.22);
   border-radius:10px;
-  padding:9px 10px;
+  padding:8px 11px;
   font-size:.9rem;
   color:var(--navy);
   background:#fffdf8;
   outline:none;
 }
 
+.user-invite-card input:focus,
+.user-invite-card select:focus{
+  border-color:rgba(9,47,77,.4);
+}
+
+/* Custom caret so the role select matches the app's other dropdowns. */
+.user-invite-card select{
+  appearance:none;
+  -webkit-appearance:none;
+  -moz-appearance:none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(9,47,77,.7) 50%),
+    linear-gradient(135deg, rgba(9,47,77,.7) 50%, transparent 50%);
+  background-position:calc(100% - 16px) 16px, calc(100% - 11px) 16px;
+  background-size:6px 6px, 6px 6px;
+  background-repeat:no-repeat;
+  padding-right:32px;
+}
+
 .user-invite-btn{
   justify-self:start;
   min-height:32px;
-  padding:8px 16px;
+  padding:0 16px;
   border:none;
   border-radius:10px;
   background:var(--navy);
   color:var(--cream);
   font-weight:600;
-  font-size:.9rem;
+  font-size:.85rem;
   cursor:pointer;
+}
+
+.user-invite-btn:active{
+  transform:scale(.99);
 }
 
 .user-list{
@@ -6367,7 +6396,7 @@ button.secondary,
   justify-content:space-between;
   gap:12px;
   flex-wrap:wrap;
-  padding:11px 12px;
+  padding:11px 14px;
 }
 
 .user-row-main{
@@ -6377,7 +6406,7 @@ button.secondary,
 .user-row-title{
   color:var(--navy);
   font-weight:600;
-  font-size:.95rem;
+  font-size:.92rem;
   line-height:1.2;
 }
 
@@ -6387,14 +6416,14 @@ button.secondary,
   flex-wrap:wrap;
   gap:8px;
   margin-top:3px;
-  color:rgba(9,47,77,.66);
-  font-size:.78rem;
+  color:rgba(9,47,77,.6);
+  font-size:.76rem;
 }
 
 .user-role-badge{
   text-transform:uppercase;
   letter-spacing:.04em;
-  font-size:.66rem;
+  font-size:.62rem;
   font-weight:700;
   padding:2px 7px;
   border-radius:999px;
@@ -6406,12 +6435,12 @@ button.secondary,
 }
 
 .user-role-demo{
-  background:rgba(179,110,30,.14);
+  background:rgba(138,83,22,.14);
   color:#8a5316;
 }
 
 .user-flag{
-  font-size:.66rem;
+  font-size:.68rem;
   font-weight:600;
   color:#8a5316;
 }
@@ -6426,26 +6455,30 @@ button.secondary,
   gap:6px;
 }
 
+/* Compact ghost buttons, in keeping with the app's other row actions. */
 .user-action-btn{
-  min-height:30px;
-  padding:5px 10px;
-  border:1px solid rgba(9,47,77,.22);
-  border-radius:9px;
-  background:#fffdf8;
+  min-height:28px;
+  padding:0 10px;
+  border:1px solid rgba(9,47,77,.16);
+  border-radius:8px;
+  background:transparent;
   color:var(--navy);
-  font-size:.78rem;
+  font-size:.74rem;
   font-weight:600;
   cursor:pointer;
 }
 
 .user-action-btn:hover{
-  background:#fff;
-  border-color:rgba(9,47,77,.34);
+  background:rgba(9,47,77,.06);
 }
 
 .user-action-danger{
   color:#b3261e;
-  border-color:rgba(179,38,30,.3);
+  border-color:rgba(179,38,30,.24);
+}
+
+.user-action-danger:hover{
+  background:rgba(179,38,30,.06);
 }
 
 /* Demo-mode banner — a fixed pill so it never disturbs layout. */
