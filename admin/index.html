@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
+  <div class="demo-banner" aria-hidden="true">Demo mode — sandbox data. Your changes aren't saved.</div>
   <div class="app-shell">
     <aside id="sideMenu" class="side-menu">
       <div class="side-menu-header">
@@ -30,6 +31,7 @@
         <button class="nav-link nav-main" data-view="inventory">Lace Inventory</button>
         <button class="nav-link nav-main" data-view="upload">Gallery</button>
         <button class="nav-link nav-main" data-view="gloves-sale">Gloves For Sale</button>
+        <button class="nav-link nav-main nav-admin-only" data-view="users" hidden>Users</button>
       </nav>
 
       <div class="side-menu-footer">
@@ -44,14 +46,28 @@
       <section id="loginView" class="view active">
         <div class="card login-card">
           <h1>Murph's Mitts Admin</h1>
-          <p class="muted">Enter your passcode.</p>
-          <input id="pinInput" type="password" autocomplete="current-password" placeholder="Passcode" />
+          <p class="muted">Sign in to your account.</p>
+          <input id="emailInput" type="email" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Email" />
+          <input id="pinInput" type="password" autocomplete="current-password" placeholder="Password" />
           <button id="passwordLoginBtn" class="passcode-login-btn" type="button">Log In</button>
           <button id="passkeyLoginBtn" class="passkey-login-btn" type="button" hidden>
             <span class="passkey-login-icon" aria-hidden="true">&#128273;</span>
             Sign in with Face ID
           </button>
           <p id="loginStatus" class="status"></p>
+        </div>
+      </section>
+
+      <section id="inviteView" class="view">
+        <div class="card login-card">
+          <h1>Set your password</h1>
+          <p id="inviteIntro" class="muted">Checking your invite…</p>
+          <div id="inviteForm" hidden>
+            <input id="invitePassword" type="password" autocomplete="new-password" placeholder="New password (8+ characters)" />
+            <input id="invitePassword2" type="password" autocomplete="new-password" placeholder="Confirm password" />
+            <button id="inviteSubmitBtn" class="passcode-login-btn" type="button">Create account</button>
+          </div>
+          <p id="inviteStatus" class="status"></p>
         </div>
       </section>
 
@@ -319,6 +335,21 @@
 
         <div id="orderDetail" class="detail-card"></div>
       </section>
+
+      <section id="usersView" class="view">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="usersMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <div class="topbar-heading">
+              <h1 class="topbar-title">Users</h1>
+              <p id="usersCount" class="topbar-subtitle muted">Accounts &amp; roles</p>
+            </div>
+          </div>
+          <div class="topbar-actions"></div>
+        </header>
+        <div id="usersPanel" class="dashboard-panel" aria-live="polite"></div>
+      </section>
+
       <div id="pullRefreshIndicator" class="pull-refresh-indicator" aria-hidden="true">
         <span class="pull-refresh-spinner" aria-hidden="true"></span>
         <span id="pullRefreshText">Pull to refresh</span>

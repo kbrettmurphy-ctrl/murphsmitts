@@ -53,36 +53,246 @@ export async function onRequest(context) {
       );
     }
 
-    if (action === "login") {
-      const pin = String(body.pin || "").trim();
-
-      if (!pin || pin !== String(env.ADMIN_PIN).trim()) {
+    /* Hard safety guarantee: the demo role can never reach any real-data
+       action. Demo clients serve their sandbox entirely in the browser and
+       don't call these endpoints; this server-side block is the backstop, so
+       even a client bug or a crafted request can't read or write real data.
+       The token role is signed by us, so it can't be forged. */
+    const DEMO_ALLOWED_ACTIONS = new Set([
+      "login", "getInvite", "acceptInvite",
+      "webauthnLoginOptions", "webauthnLoginVerify"
+    ]);
+    if (!DEMO_ALLOWED_ACTIONS.has(action)) {
+      const demoAuth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (demoAuth.ok && demoAuth.payload && demoAuth.payload.role === "demo") {
         return json(
-          {
-            ok: false,
-            error: "Invalid passcode."
-          },
+          { ok: false, error: "Demo mode: that action runs in your sandbox only.", demo: true },
           200,
           jsonHeaders
         );
       }
+    }
+
+    if (action === "login") {
+      const email = normalizeEmail(body.email);
+      const password = String(body.password || body.pin || "").trim();
+      const sessionMs = 1000 * 60 * 60 * 24 * 14;
+
+      /* Owner escape hatch: blank email + the ADMIN_PIN. Keeps the owner able
+         to sign in anywhere (including preview URLs where the passkey's domain
+         binding doesn't apply) with zero lockout risk. */
+      if (!email && password && env.ADMIN_PIN && password === String(env.ADMIN_PIN).trim()) {
+        const token = await createSignedToken(
+          { sub: "owner", role: "admin", exp: Date.now() + sessionMs },
+          env.ADMIN_SESSION_SECRET
+        );
+        return json({ ok: true, token, role: "admin" }, 200, jsonHeaders);
+      }
+
+      if (!email || !password) {
+        return json({ ok: false, error: "Enter your email and password." }, 200, jsonHeaders);
+      }
+
+      const found = await getUserByEmail(env, email);
+      if (!found.ok) {
+        return json({ ok: false, error: "Could not sign in." }, 200, jsonHeaders);
+      }
+
+      const user = found.user;
+      const passwordOk = user && user.active !== false && await verifyPassword(password, {
+        hash: user.password_hash,
+        salt: user.password_salt,
+        iterations: user.password_iterations
+      });
+
+      if (!passwordOk) {
+        return json({ ok: false, error: "Invalid email or password." }, 200, jsonHeaders);
+      }
+
+      await touchUserLogin(env, user.id);
 
       const token = await createSignedToken(
-        {
-          role: "admin",
-          exp: Date.now() + 1000 * 60 * 60 * 24 * 14
-        },
+        { sub: user.id, email: user.email, role: user.role, exp: Date.now() + sessionMs },
         env.ADMIN_SESSION_SECRET
       );
 
-      return json(
+      return json({ ok: true, token, role: user.role }, 200, jsonHeaders);
+    }
+
+    if (action === "getInvite") {
+      const found = await getUserByInviteToken(env, body.token);
+      const user = found.ok ? found.user : null;
+      if (!user || !user.invite_token) {
+        return json({ ok: false, error: "This invite is invalid or already used." }, 200, jsonHeaders);
+      }
+      if (user.invite_expires_at && Date.now() > new Date(user.invite_expires_at).getTime()) {
+        return json({ ok: false, error: "This invite has expired." }, 200, jsonHeaders);
+      }
+      return json({ ok: true, email: user.email, displayName: user.display_name, role: user.role }, 200, jsonHeaders);
+    }
+
+    if (action === "acceptInvite") {
+      const password = String(body.password || "").trim();
+      if (password.length < 8) {
+        return json({ ok: false, error: "Password must be at least 8 characters." }, 200, jsonHeaders);
+      }
+      const found = await getUserByInviteToken(env, body.token);
+      const user = found.ok ? found.user : null;
+      if (!user || !user.invite_token) {
+        return json({ ok: false, error: "This invite is invalid or already used." }, 200, jsonHeaders);
+      }
+      if (user.invite_expires_at && Date.now() > new Date(user.invite_expires_at).getTime()) {
+        return json({ ok: false, error: "This invite has expired." }, 200, jsonHeaders);
+      }
+
+      const hashed = await hashPassword(password);
+      const resp = await supabaseFetch(
+        env,
+        `/rest/v1/admin_users?id=eq.${encodeURIComponent(user.id)}`,
         {
-          ok: true,
-          token
-        },
-        200,
-        jsonHeaders
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({
+            password_hash: hashed.hash,
+            password_salt: hashed.salt,
+            password_iterations: hashed.iterations,
+            invite_token: null,
+            invite_expires_at: null,
+            active: true,
+            last_login_at: new Date().toISOString()
+          })
+        }
       );
+      if (!resp.ok) {
+        return json({ ok: false, error: "Could not set your password." }, 200, jsonHeaders);
+      }
+
+      const token = await createSignedToken(
+        { sub: user.id, email: user.email, role: user.role, exp: Date.now() + 1000 * 60 * 60 * 24 * 14 },
+        env.ADMIN_SESSION_SECRET
+      );
+      return json({ ok: true, token, role: user.role }, 200, jsonHeaders);
+    }
+
+    if (action === "listUsers") {
+      const gate = await requireAdmin(env, body);
+      if (!gate.ok) return json(gate, 200, jsonHeaders);
+      const resp = await supabaseFetch(env, `/rest/v1/admin_users?select=*&order=created_at.asc`);
+      if (!resp.ok) return json({ ok: false, error: "Could not load users." }, 200, jsonHeaders);
+      return json({ ok: true, users: (resp.data || []).map(mapUserFromDb) }, 200, jsonHeaders);
+    }
+
+    if (action === "createUserInvite") {
+      const gate = await requireAdmin(env, body);
+      if (!gate.ok) return json(gate, 200, jsonHeaders);
+
+      const email = normalizeEmail(body.email);
+      const displayName = cleanText(body.displayName);
+      const role = body.role === "admin" ? "admin" : "demo";
+      if (!email || !email.includes("@")) {
+        return json({ ok: false, error: "Enter a valid email address." }, 200, jsonHeaders);
+      }
+      const existing = await getUserByEmail(env, email);
+      if (existing.ok && existing.user) {
+        return json({ ok: false, error: "That email already has an account." }, 200, jsonHeaders);
+      }
+
+      const token = randomChallengeB64Url();
+      const insert = await supabaseFetch(env, `/rest/v1/admin_users`, {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          email,
+          display_name: displayName,
+          role,
+          active: true,
+          invite_token: token,
+          invite_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        })
+      });
+      if (!insert.ok) {
+        return json({ ok: false, error: "Could not create the account." }, 200, jsonHeaders);
+      }
+
+      const link = `${getInviteBaseUrl(env)}/admin/?invite=${encodeURIComponent(token)}`;
+      let emailed = false;
+      if (env.RESEND_API_KEY) {
+        const send = await sendBrandedEmail(env, {
+          to: email,
+          subject: "Your Murph's Mitts admin invite",
+          plainBody: `You've been invited to the Murph's Mitts admin as a ${role} user.\n\nSet your password to get started:\n${link}\n\nThis link expires in 7 days.`,
+          htmlBody: `<p>You've been invited to the Murph's Mitts admin as a <strong>${role}</strong> user.</p><p><a href="${link}">Set your password to get started</a></p><p>This link expires in 7 days.</p>`
+        });
+        emailed = !!send.ok;
+      }
+
+      return json({ ok: true, inviteLink: link, emailed }, 200, jsonHeaders);
+    }
+
+    if (action === "setUserPassword") {
+      const gate = await requireAdmin(env, body);
+      if (!gate.ok) return json(gate, 200, jsonHeaders);
+      const userId = cleanText(body.userId);
+      const password = String(body.password || "").trim();
+      if (!userId || password.length < 8) {
+        return json({ ok: false, error: "Password must be at least 8 characters." }, 200, jsonHeaders);
+      }
+      const hashed = await hashPassword(password);
+      const resp = await supabaseFetch(
+        env,
+        `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
+        {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({
+            password_hash: hashed.hash,
+            password_salt: hashed.salt,
+            password_iterations: hashed.iterations,
+            invite_token: null,
+            invite_expires_at: null,
+            active: true
+          })
+        }
+      );
+      if (!resp.ok) return json({ ok: false, error: "Could not set the password." }, 200, jsonHeaders);
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
+    if (action === "updateUser") {
+      const gate = await requireAdmin(env, body);
+      if (!gate.ok) return json(gate, 200, jsonHeaders);
+      const userId = cleanText(body.userId);
+      if (!userId) return json({ ok: false, error: "Missing user." }, 200, jsonHeaders);
+
+      const updates = {};
+      if ("role" in body) updates.role = body.role === "admin" ? "admin" : "demo";
+      if ("active" in body) updates.active = !!body.active;
+      if ("displayName" in body) updates.display_name = cleanText(body.displayName);
+      if (!Object.keys(updates).length) {
+        return json({ ok: false, error: "Nothing to update." }, 200, jsonHeaders);
+      }
+
+      const resp = await supabaseFetch(
+        env,
+        `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
+        { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(updates) }
+      );
+      if (!resp.ok) return json({ ok: false, error: "Could not update the user." }, 200, jsonHeaders);
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
+    if (action === "deleteUser") {
+      const gate = await requireAdmin(env, body);
+      if (!gate.ok) return json(gate, 200, jsonHeaders);
+      const userId = cleanText(body.userId);
+      if (!userId) return json({ ok: false, error: "Missing user." }, 200, jsonHeaders);
+      const resp = await supabaseFetch(
+        env,
+        `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
+        { method: "DELETE", headers: { Prefer: "return=minimal" } }
+      );
+      if (!resp.ok) return json({ ok: false, error: "Could not remove the user." }, 200, jsonHeaders);
+      return json({ ok: true }, 200, jsonHeaders);
     }
 
     if (action === "listOrders") {
@@ -466,13 +676,14 @@ export async function onRequest(context) {
 
       const token = await createSignedToken(
         {
+          sub: "owner",
           role: "admin",
           exp: Date.now() + 1000 * 60 * 60 * 24 * 14
         },
         env.ADMIN_SESSION_SECRET
       );
 
-      return json({ ok: true, token }, 200, jsonHeaders);
+      return json({ ok: true, token, role: "admin" }, 200, jsonHeaders);
     }
 
     if (action === "listLaborSessions") {
@@ -3668,6 +3879,136 @@ async function touchWebauthnCredential(env, credentialId, signCount) {
   );
   if (!resp.ok) return resp;
   return { ok: true };
+}
+
+/* =========================
+   ACCOUNTS / PASSWORDS / ROLES
+
+   Multi-user accounts with hashed passwords (PBKDF2-HMAC-SHA256, per-user
+   salt, dependency-free via WebCrypto). The signed session token carries the
+   user id (sub) and role. Roles: "admin" (full access) and "demo"
+   (interactive sandbox, blocked from real data — enforced in the dispatch).
+========================= */
+// Cloudflare Workers' WebCrypto caps PBKDF2 at 100000 iterations.
+const PASSWORD_ITERATIONS = 100000;
+
+async function hashPassword(password, saltInput = null, iterations = PASSWORD_ITERATIONS) {
+  const salt = saltInput ? base64UrlToBytes(saltInput) : crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(String(password)),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    keyMaterial,
+    256
+  );
+  return {
+    hash: arrayBufferToBase64Url(bits),
+    salt: arrayBufferToBase64Url(salt),
+    iterations
+  };
+}
+
+async function verifyPassword(password, stored) {
+  if (!stored?.hash || !stored?.salt) return false;
+  const { hash } = await hashPassword(password, stored.salt, Number(stored.iterations) || PASSWORD_ITERATIONS);
+  return constantTimeEqual(hash, stored.hash);
+}
+
+function constantTimeEqual(a, b) {
+  const sa = String(a);
+  const sb = String(b);
+  if (sa.length !== sb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < sa.length; i++) diff |= sa.charCodeAt(i) ^ sb.charCodeAt(i);
+  return diff === 0;
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function mapUserFromDb(row) {
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name,
+    role: row.role,
+    active: row.active !== false,
+    hasPassword: !!row.password_hash,
+    invitePending: !!row.invite_token,
+    inviteExpiresAt: row.invite_expires_at,
+    createdAt: row.created_at,
+    lastLoginAt: row.last_login_at
+  };
+}
+
+async function getUserByEmail(env, email) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return { ok: true, user: null };
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/admin_users?select=*&email=eq.${encodeURIComponent(normalized)}&limit=1`
+  );
+  if (!resp.ok) return resp;
+  return { ok: true, user: Array.isArray(resp.data) && resp.data[0] ? resp.data[0] : null };
+}
+
+async function getUserByInviteToken(env, token) {
+  const clean = cleanText(token);
+  if (!clean) return { ok: true, user: null };
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/admin_users?select=*&invite_token=eq.${encodeURIComponent(clean)}&limit=1`
+  );
+  if (!resp.ok) return resp;
+  return { ok: true, user: Array.isArray(resp.data) && resp.data[0] ? resp.data[0] : null };
+}
+
+async function touchUserLogin(env, userId) {
+  await supabaseFetch(
+    env,
+    `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ last_login_at: new Date().toISOString() })
+    }
+  );
+}
+
+/* Returns the resolved role for a validated token: the account's current
+   role (so a role change or deactivation takes effect immediately), or the
+   token's role for the owner/passkey escape hatches (sub === "owner"). */
+async function resolveAuthRole(env, payload) {
+  if (!payload) return null;
+  if (payload.sub === "owner") return "admin";
+  if (!payload.sub) return payload.role || null;
+
+  const found = await getUserByEmail(env, payload.email || "");
+  const user = found.ok ? found.user : null;
+  if (!user || user.active === false) return null;
+  return user.role || null;
+}
+
+/* Gate for admin-only actions: valid token AND resolved role === "admin". */
+async function requireAdmin(env, body) {
+  const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const role = await resolveAuthRole(env, auth.payload);
+  if (role !== "admin") return { ok: false, error: "Admins only." };
+  return { ok: true, payload: auth.payload, role };
+}
+
+function getInviteBaseUrl(env) {
+  return String(env.WEBAUTHN_ORIGIN || "https://murphsmitts.com")
+    .split(",")[0]
+    .trim()
+    .replace(/\/+$/, "");
 }
 
 /* =========================

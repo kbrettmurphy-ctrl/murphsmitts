@@ -1,5 +1,6 @@
 const API_BASE_URL = window.MM_ADMIN_CONFIG.API_BASE_URL;
 const TOKEN_KEY = "mm_admin_token";
+const ROLE_KEY = "mm_admin_role";
 const ADMIN_PHOTO_ACTION_PLACEHOLDER_LABEL = "Action";
 const ADMIN_PHOTO_ACTION_PLACEHOLDER = `<option value="" disabled hidden>${ADMIN_PHOTO_ACTION_PLACEHOLDER_LABEL}</option>`;
 const ADMIN_PHOTO_PLACEHOLDER_VALUES = new Set(["", "action", "actions"]);
@@ -22,6 +23,7 @@ const moneyView = document.getElementById("moneyView");
 const moneyMenuBtn = document.getElementById("moneyMenuBtn");
 const detailTitle = document.getElementById("detailTitle");
 const pinInput = document.getElementById("pinInput");
+const emailInput = document.getElementById("emailInput");
 const loginStatus = document.getElementById("loginStatus");
 const mainPanel = document.querySelector(".main-panel");
 
@@ -61,6 +63,9 @@ const sideNavLogoutBtn = document.getElementById("sideNavLogoutBtn");
 const sideNavPasskeyBtn = document.getElementById("sideNavPasskeyBtn");
 const passkeyLoginBtn = document.getElementById("passkeyLoginBtn");
 const passwordLoginBtn = document.getElementById("passwordLoginBtn");
+const usersView = document.getElementById("usersView");
+const usersPanel = document.getElementById("usersPanel");
+const inviteView = document.getElementById("inviteView");
 
 const saleGlovesView = document.getElementById("saleGlovesView");
 const saleGlovesList = document.getElementById("saleGlovesList");
@@ -249,7 +254,7 @@ document.addEventListener("focusout", (e) => {
    VIEW / MENU
 ========================= */
 function showView(view) {
-  [loginView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, saleGlovesView]
+  [loginView, inviteView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, saleGlovesView, usersView]
     .filter(Boolean)
     .forEach(v => v.classList.remove("active"));
 
@@ -378,6 +383,32 @@ function setToken(token) {
 
 function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(ROLE_KEY);
+}
+
+function setRole(role) {
+  if (role) localStorage.setItem(ROLE_KEY, role);
+}
+
+/* Current role, preferring the stored value, falling back to decoding the
+   (unencrypted) token payload so existing sessions resolve correctly. */
+function getCurrentRole() {
+  const stored = localStorage.getItem(ROLE_KEY);
+  if (stored) return stored;
+  try {
+    const token = getToken();
+    const payloadB64 = token.split(".")[0];
+    if (!payloadB64) return "admin";
+    const json = atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((payloadB64.length + 3) % 4));
+    const payload = JSON.parse(json);
+    return payload.role || "admin";
+  } catch {
+    return "admin";
+  }
+}
+
+function isDemoRole() {
+  return getCurrentRole() === "demo";
 }
 
 function openMenu() {
@@ -416,7 +447,15 @@ function syncAuthUI() {
 /* =========================
    API
 ========================= */
+const DEMO_LIVE_ACTIONS = new Set(["login", "getInvite", "acceptInvite"]);
+
 async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
+  /* Demo users run entirely in a browser-side sandbox — no real-data call
+     ever leaves the page (the server also blocks demo as a backstop). */
+  if (body && body.action && !DEMO_LIVE_ACTIONS.has(body.action) && isDemoRole()) {
+    return demoApi(body);
+  }
+
   if (useAuth) body._token = getToken();
 
   const res = await fetch(endpoint, {
@@ -468,6 +507,251 @@ async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
   }
 
   return data;
+}
+
+/* =========================
+   DEMO SANDBOX (client-only)
+
+   For demo accounts every action is served from this in-memory store seeded
+   with masked sample data — nothing hits the server, so real data can't be
+   read or changed. Resets on reload (a clean demo every time). Shapes mirror
+   the real API responses so the app behaves normally.
+========================= */
+let demoStore = null;
+
+function demoNow() {
+  return new Date().toISOString();
+}
+
+function daysAgoIso(days) {
+  return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+}
+
+function seedDemoStore() {
+  const mkOrder = (n, over) => ({
+    orderNumber: n,
+    customerName: over.customerName,
+    phoneNumber: "(555) 010-" + n,
+    emailAddress: `${over.customerName.split(" ")[0].toLowerCase()}@example.com`,
+    brandModel: over.brandModel || "Rawlings Heart of the Hide",
+    gloveType: over.gloveType || "Fielders",
+    webType: over.webType || "I-Web",
+    servicesRequested: over.servicesRequested || "Relace, Clean & Condition",
+    primaryLaceColor: over.primaryLaceColor || "Tan",
+    secondaryLaceColor: over.secondaryLaceColor || "",
+    customColorRequest: "",
+    primaryLaceUsed: "",
+    secondaryLaceUsed: "",
+    status: over.status || "Received",
+    paid: over.paid || "Unpaid",
+    priceQuoted: over.priceQuoted ?? 80,
+    shippingCost: over.shippingCost ?? 0,
+    dropOffMethod: over.dropOffMethod || "Local drop-off",
+    streetAddress: "", city: "Sample City", state: "OH", zipCode: "",
+    dateReceived: over.dateReceived || daysAgoIso(over.age ?? 3),
+    estimatedCompletion: over.estimatedCompletion || daysAgoIso(-4),
+    dateCompleted: over.dateCompleted || "",
+    internalNotes: "", gloveNotes: over.gloveNotes || "",
+    trackingNumber: "", carrier: "",
+    createdAt: daysAgoIso(over.age ?? 3),
+    updatedAt: demoNow()
+  });
+
+  return {
+    orders: [
+      mkOrder("9001", { customerName: "Sample Slugger", status: "Received", age: 1, paid: "Unpaid" }),
+      mkOrder("9002", { customerName: "Demo Diaz", status: "In Progress", age: 4, paid: "Paid", brandModel: "Wilson A2000", gloveType: "Catchers" }),
+      mkOrder("9003", { customerName: "Test Tanaka", status: "Ready to Go", age: 6, paid: "Unpaid", priceQuoted: 100 }),
+      mkOrder("9004", { customerName: "Practice Park", status: "Pending Response", age: 8, gloveType: "First Base", priceQuoted: 100 }),
+      mkOrder("9005", { customerName: "Sandbox Singh", status: "Completed", age: 20, paid: "Paid", dateCompleted: daysAgoIso(2) }),
+      mkOrder("9006", { customerName: "Example Estrada", status: "In Transit to Me", age: 2, dropOffMethod: "Shipped", priceQuoted: 100, shippingCost: 12 })
+    ],
+    inventory: [
+      { id: "d1", color: "Tan", quantity_on_hand: 12, reorder_at: 4, active: true, reorder_alert_enabled: true },
+      { id: "d2", color: "Black", quantity_on_hand: 3, reorder_at: 4, active: true, reorder_alert_enabled: true },
+      { id: "d3", color: "Timberglaze", quantity_on_hand: 7, reorder_at: 4, active: true, reorder_alert_enabled: true }
+    ],
+    gloves: [
+      { id: "g1", brandModel: "Rawlings Pro Preferred", gloveType: "Fielders", price: 220, status: "available", description: "Sample listing", photos: [] }
+    ],
+    sessions: [],
+    activity: {},
+    nextOrderNum: 9007,
+    seq: 1
+  };
+}
+
+function getDemoStore() {
+  if (!demoStore) demoStore = seedDemoStore();
+  return demoStore;
+}
+
+function demoAdjustLaceInventory(store, color, delta) {
+  const c = String(color || "").trim();
+  const d = Number(delta || 0);
+  if (!c || !d) return;
+  const item = store.inventory.find(i => i.color === c);
+  if (item) item.quantity_on_hand = Number(item.quantity_on_hand || 0) + d;
+}
+
+function demoResult(extra) {
+  return Promise.resolve(Object.assign({ ok: true }, extra || {}));
+}
+
+function demoApi(body) {
+  const store = getDemoStore();
+  const action = body.action;
+  const findOrder = (n) => store.orders.find(o => String(o.orderNumber) === String(n));
+
+  switch (action) {
+    case "listOrders":
+      return demoResult({ orders: store.orders });
+    case "getOrder":
+      return demoResult({ order: findOrder(body.orderNumber) || null });
+    case "updateOrder": {
+      const order = findOrder(body.orderNumber);
+      if (order) {
+        /* Mirror the server: credit back the old lace used, deduct the new,
+           per color — so recording lace used at Ready to Go decrements the
+           matching demo inventory color (net delta = oldUsed - newUsed). */
+        const oldPrimaryColor = order.primaryLaceColor;
+        const oldSecondaryColor = order.secondaryLaceColor;
+        const oldPrimaryUsed = Number(order.primaryLaceUsed || 0);
+        const oldSecondaryUsed = Number(order.secondaryLaceUsed || 0);
+
+        Object.assign(order, body.updates || {});
+        order.updatedAt = demoNow();
+
+        demoAdjustLaceInventory(store, oldPrimaryColor, oldPrimaryUsed);
+        demoAdjustLaceInventory(store, oldSecondaryColor, oldSecondaryUsed);
+        demoAdjustLaceInventory(store, order.primaryLaceColor, -Number(order.primaryLaceUsed || 0));
+        demoAdjustLaceInventory(store, order.secondaryLaceColor, -Number(order.secondaryLaceUsed || 0));
+      }
+      return demoResult({ order });
+    }
+    case "createOrder": {
+      const n = String(store.nextOrderNum++);
+      const order = Object.assign(
+        seedDemoStore().orders[0],
+        { orderNumber: n, customerName: body.customerName || "New Sample", status: "Received", createdAt: demoNow(), updatedAt: demoNow() },
+        body.order || {}
+      );
+      store.orders.unshift(order);
+      return demoResult({ order });
+    }
+    case "deleteOrder":
+      store.orders = store.orders.filter(o => String(o.orderNumber) !== String(body.orderNumber));
+      return demoResult();
+
+    case "listOpenLaborSessions":
+      return demoResult({ sessions: store.sessions.filter(s => !s.endedAt) });
+    case "listLaborSessions":
+      return demoResult({ sessions: store.sessions.filter(s => String(s.orderNumber) === String(body.orderNumber)) });
+    case "listLaborSummary":
+      return demoResult({ sessions: store.sessions.filter(s => s.endedAt) });
+    case "startLaborSession": {
+      const session = {
+        id: "s" + (store.seq++),
+        orderNumber: String(body.orderNumber),
+        phase: body.phase || "Work",
+        status: "running",
+        startedAt: demoNow(),
+        pausedAt: null,
+        endedAt: null,
+        pauseAccumulatedSeconds: 0
+      };
+      store.sessions.push(session);
+      return demoResult({ session });
+    }
+    case "pauseLaborSession": {
+      const s = store.sessions.find(x => x.id === body.sessionId);
+      if (s) { s.status = "paused"; s.pausedAt = demoNow(); }
+      return demoResult();
+    }
+    case "resumeLaborSession": {
+      const s = store.sessions.find(x => x.id === body.sessionId);
+      if (s && s.pausedAt) {
+        s.pauseAccumulatedSeconds += Math.max(0, Math.round((Date.now() - new Date(s.pausedAt).getTime()) / 1000));
+        s.status = "running"; s.pausedAt = null;
+      }
+      return demoResult();
+    }
+    case "stopLaborSession": {
+      const s = store.sessions.find(x => x.id === body.sessionId);
+      if (s) { s.status = "stopped"; s.endedAt = demoNow(); }
+      return demoResult();
+    }
+    case "updateLaborSessionNotes":
+      return demoResult();
+
+    case "listOrdersWithActivity":
+      return demoResult({ orderNumbers: store.orders.filter(o => normalizeStatus(o.status) !== "received").map(o => o.orderNumber) });
+    case "listOrderActivity":
+      return demoResult({ activity: store.activity[body.orderNumber] || [] });
+
+    case "listInventory":
+      return demoResult({ inventory: store.inventory });
+    case "createInventoryItem":
+      store.inventory.push({
+        id: "d" + (store.seq++),
+        color: body.color || "New Color",
+        quantity_on_hand: Number(body.quantityOnHand) || 0,
+        reorder_at: Number(body.reorderAt) || 4,
+        active: body.active !== false,
+        reorder_alert_enabled: body.reorderAlertEnabled !== false
+      });
+      return demoResult();
+    case "updateInventoryItem": {
+      const item = store.inventory.find(i => i.color === body.color || String(i.id) === String(body.id));
+      const u = body.updates || {};
+      if (item) {
+        if ("quantityOnHand" in u) item.quantity_on_hand = Number(u.quantityOnHand) || 0;
+        if ("reorderAt" in u) item.reorder_at = Number(u.reorderAt) || 0;
+        if ("reorderAlertEnabled" in u) item.reorder_alert_enabled = !!u.reorderAlertEnabled;
+        if ("color" in u) item.color = u.color;
+        if ("active" in u) item.active = !!u.active;
+      }
+      return demoResult();
+    }
+
+    case "listSaleGloves":
+      return demoResult({ gloves: store.gloves });
+    case "getSaleGlove":
+      return demoResult({ glove: store.gloves.find(g => String(g.id) === String(body.id)) || null });
+    case "createSaleGlove":
+      store.gloves.push({ id: "g" + (store.seq++), brandModel: body.brandModel || "New Glove", gloveType: body.gloveType || "Fielders", price: Number(body.price) || 0, status: "available", description: body.description || "", photos: [] });
+      return demoResult();
+    case "updateSaleGlove": {
+      const g = store.gloves.find(x => String(x.id) === String(body.id));
+      if (g) Object.assign(g, body.updates || body);
+      return demoResult();
+    }
+    case "deleteSaleGlove":
+      store.gloves = store.gloves.filter(g => String(g.id) !== String(body.id));
+      return demoResult();
+    case "listSaleGlovePhotos":
+      return demoResult({ photos: [] });
+    case "listGalleryPhotos":
+      return demoResult({ photos: [] });
+
+    case "resendStatusEmail":
+    case "resendStatusText":
+      return Promise.resolve({ ok: false, error: "Demo mode: emails and texts are disabled." });
+
+    case "geocodeAddresses":
+    case "geocodeMissingOrderAddresses":
+      return demoResult({ results: [], updated: 0 });
+
+    case "listUsers":
+    case "createUserInvite":
+    case "setUserPassword":
+    case "updateUser":
+    case "deleteUser":
+      return Promise.resolve({ ok: false, error: "Admins only." });
+
+    default:
+      return demoResult();
+  }
 }
 
 /* =========================
@@ -1770,6 +2054,7 @@ function getViewTitle(viewName) {
     case "upload": return "Gallery";
     case "inventory": return "Lace Inventory";
     case "gloves-sale": return "Gloves For Sale";
+    case "users": return "Users";
     default: return "Orders";
   }
 }
@@ -4475,6 +4760,7 @@ function normalizeAdminView(viewName) {
   if (view === "upload") return "upload";
   if (view === "inventory") return "inventory";
   if (view === "gloves-sale") return "gloves-sale";
+  if (view === "users") return "users";
   if (isOrderFilterView(view)) return view;
   return "dashboard";
 }
@@ -4483,7 +4769,7 @@ function isKnownAdminView(viewName) {
   const view = String(viewName || "").trim().toLowerCase();
   if (!view || view === "dashboard") return true;
   if (view === "orders" || view === "current") return true;
-  return ["map", "money", "upload", "inventory", "gloves-sale"].includes(view) || isOrderFilterView(view);
+  return ["map", "money", "upload", "inventory", "gloves-sale", "users"].includes(view) || isOrderFilterView(view);
 }
 
 function syncAdminViewUrl(viewName) {
@@ -4581,6 +4867,19 @@ function setActiveView(viewName) {
     closeMenu();
     resetViewScroll(saleGlovesView, { blurActive: true });
     loadPromise.finally(() => resetViewScroll(saleGlovesView));
+    return;
+  }
+
+  if (resolvedView === "users") {
+    /* Admin-only. Demo/non-admin never see the nav entry, but guard anyway. */
+    if (getCurrentRole() !== "admin") {
+      setActiveView("dashboard");
+      return;
+    }
+    showView(usersView);
+    renderUsersView();
+    closeMenu();
+    resetViewScroll(usersView, { blurActive: true });
     return;
   }
 
@@ -8392,18 +8691,19 @@ function getCustomLaceColor(customValue) {
 /* =========================
    AUTH / LOAD
 ========================= */
-async function login(pinValue) {
+async function login(email, password) {
   if (loginInProgress) return;
   loginInProgress = true;
-  loginStatus.textContent = "Logging in...";
+  loginStatus.textContent = "Signing in…";
 
   try {
     const data = await postJson({
       action: "login",
-      pin: pinValue
+      email,
+      password
     });
 
-    await finishLoginWithToken(data.token);
+    await finishLoginWithToken(data.token, data.role);
   } catch (err) {
     loginStatus.textContent = err.message;
     pinInput.value = "";
@@ -8413,12 +8713,15 @@ async function login(pinValue) {
   }
 }
 
-/* Shared success path for both PIN and passkey login. */
-async function finishLoginWithToken(token) {
+/* Shared success path for both password and passkey login. */
+async function finishLoginWithToken(token, role) {
   setToken(token);
+  setRole(role);
   pinInput.value = "";
+  if (emailInput) emailInput.value = "";
   loginStatus.textContent = "";
   syncAuthUI();
+  syncRoleUI();
   await loadOrders();
   setActiveView("dashboard");
   refreshPasskeySetupVisibility();
@@ -8491,7 +8794,7 @@ async function signInWithPasskey() {
       }
     });
 
-    await finishLoginWithToken(res.token);
+    await finishLoginWithToken(res.token, res.role);
   } catch (err) {
     if (err && (err.name === "NotAllowedError" || err.name === "AbortError")) {
       loginStatus.textContent = "";
@@ -8590,6 +8893,231 @@ async function refreshPasskeySetupVisibility() {
     /* If we can't tell, keep it hidden rather than clutter the menu. */
     sideNavPasskeyBtn.hidden = true;
   }
+}
+
+/* =========================
+   USERS / ROLES (client)
+========================= */
+/* Show admin-only nav (Users) only for admins; demo users get a reduced
+   menu. Called after login and on boot. */
+function syncRoleUI() {
+  const role = getCurrentRole();
+  const isAdmin = role === "admin";
+  document.querySelectorAll(".nav-admin-only").forEach(el => { el.hidden = !isAdmin; });
+  document.body.classList.toggle("is-demo", role === "demo");
+}
+
+async function renderUsersView() {
+  if (!usersPanel) return;
+  usersPanel.innerHTML = `<div class="dashboard-shell"><div class="dashboard-card users-loading muted">Loading users…</div></div>`;
+
+  let users = [];
+  try {
+    const data = await postJson({ action: "listUsers" }, true);
+    users = data.users || [];
+  } catch (err) {
+    usersPanel.innerHTML = `<div class="dashboard-shell"><div class="dashboard-card users-loading muted">${escapeHtml(err.message || "Could not load users.")}</div></div>`;
+    return;
+  }
+
+  const countEl = document.getElementById("usersCount");
+  if (countEl) countEl.textContent = `${users.length} ${users.length === 1 ? "account" : "accounts"}`;
+
+  usersPanel.innerHTML = renderUsersContent(users);
+  wireUsersPanel();
+}
+
+function renderUsersContent(users) {
+  const rows = users.map(u => {
+    const flags = [];
+    if (!u.active) flags.push(`<span class="user-flag user-flag--off">disabled</span>`);
+    if (u.invitePending) flags.push(`<span class="user-flag">invite pending</span>`);
+    else if (!u.hasPassword) flags.push(`<span class="user-flag">no password</span>`);
+
+    return `
+      <div class="user-row dashboard-card"
+        data-user-id="${escapeAttr(u.id)}"
+        data-user-email="${escapeAttr(u.email)}"
+        data-user-role="${escapeAttr(u.role)}"
+        data-user-active="${u.active ? "true" : "false"}">
+        <div class="user-row-main">
+          <div class="user-row-title">${escapeHtml(u.displayName || u.email)}</div>
+          <div class="user-row-meta">
+            <span>${escapeHtml(u.email)}</span>
+            <span class="user-role-badge user-role-${escapeAttr(u.role)}">${escapeHtml(u.role)}</span>
+            ${flags.join("")}
+          </div>
+        </div>
+        <div class="user-row-actions">
+          <button type="button" class="user-action-btn" data-user-action="role">${u.role === "admin" ? "Make demo" : "Make admin"}</button>
+          <button type="button" class="user-action-btn" data-user-action="password">Set password</button>
+          <button type="button" class="user-action-btn" data-user-action="toggle">${u.active ? "Disable" : "Enable"}</button>
+          <button type="button" class="user-action-btn user-action-danger" data-user-action="remove">Remove</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="dashboard-shell users-shell">
+      <section class="dashboard-section">
+        <h2 class="dashboard-section-title">Invite a user</h2>
+        <div class="dashboard-card user-invite-card">
+          <input id="userInviteEmail" type="email" placeholder="Email" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          <input id="userInviteName" type="text" placeholder="Name (optional)" autocomplete="off" />
+          <select id="userInviteRole">
+            <option value="demo">Demo — sandbox, can't touch real data</option>
+            <option value="admin">Admin — full access</option>
+          </select>
+          <button id="userInviteBtn" type="button" class="user-invite-btn">Send invite</button>
+          <p id="userInviteStatus" class="status muted"></p>
+        </div>
+      </section>
+      <section class="dashboard-section">
+        <h2 class="dashboard-section-title">Accounts</h2>
+        <div class="user-list">${rows || `<p class="dashboard-empty muted">No accounts yet.</p>`}</div>
+      </section>
+    </div>
+  `;
+}
+
+function wireUsersPanel() {
+  if (!usersPanel || usersPanel.dataset.wired === "true") return;
+  usersPanel.dataset.wired = "true";
+
+  usersPanel.addEventListener("click", async (e) => {
+    if (e.target.closest("#userInviteBtn")) {
+      await handleUserInvite();
+      return;
+    }
+    const actionBtn = e.target.closest("[data-user-action]");
+    if (!actionBtn) return;
+    const row = actionBtn.closest("[data-user-id]");
+    if (!row) return;
+    await handleUserRowAction(actionBtn.dataset.userAction, {
+      userId: row.dataset.userId,
+      email: row.dataset.userEmail,
+      role: row.dataset.userRole,
+      active: row.dataset.userActive === "true"
+    });
+  });
+}
+
+async function handleUserInvite() {
+  const emailEl = document.getElementById("userInviteEmail");
+  const nameEl = document.getElementById("userInviteName");
+  const roleEl = document.getElementById("userInviteRole");
+  const statusEl = document.getElementById("userInviteStatus");
+  const email = (emailEl?.value || "").trim();
+
+  if (!email) {
+    if (statusEl) statusEl.textContent = "Enter an email address.";
+    return;
+  }
+
+  if (statusEl) statusEl.textContent = "Sending invite…";
+  try {
+    const data = await postJson({
+      action: "createUserInvite",
+      email,
+      displayName: nameEl?.value || "",
+      role: roleEl?.value || "demo"
+    }, true);
+
+    if (data.emailed) {
+      if (statusEl) statusEl.textContent = `Invite emailed to ${email}.`;
+    } else if (data.inviteLink) {
+      prompt("Email wasn't sent — copy this invite link:", data.inviteLink);
+      if (statusEl) statusEl.textContent = "Invite created — link shown above.";
+    }
+    if (emailEl) emailEl.value = "";
+    if (nameEl) nameEl.value = "";
+    renderUsersView();
+  } catch (err) {
+    if (statusEl) statusEl.textContent = err.message || "Could not send the invite.";
+  }
+}
+
+async function handleUserRowAction(action, { userId, email, role, active }) {
+  try {
+    if (action === "role") {
+      const nextRole = role === "admin" ? "demo" : "admin";
+      if (!confirm(`Change ${email} to ${nextRole}?`)) return;
+      await postJson({ action: "updateUser", userId, role: nextRole }, true);
+    } else if (action === "toggle") {
+      await postJson({ action: "updateUser", userId, active: !active }, true);
+    } else if (action === "password") {
+      const pw = prompt(`Set a password for ${email} (at least 8 characters):`);
+      if (!pw) return;
+      await postJson({ action: "setUserPassword", userId, password: pw.trim() }, true);
+    } else if (action === "remove") {
+      if (!confirm(`Remove ${email}? This deletes their account.`)) return;
+      await postJson({ action: "deleteUser", userId }, true);
+    }
+    renderUsersView();
+  } catch (err) {
+    alert(err.message || "That action didn't work.");
+  }
+}
+
+/* Invite acceptance: when the URL carries ?invite=TOKEN, show the
+   set-password screen instead of the normal login/app. */
+function getInviteTokenFromUrl() {
+  try {
+    return new URL(window.location.href).searchParams.get("invite") || "";
+  } catch {
+    return "";
+  }
+}
+
+function clearInviteFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("invite");
+    window.history.replaceState({}, "", url);
+  } catch {
+    /* non-fatal */
+  }
+}
+
+async function startInviteFlow(token) {
+  const intro = document.getElementById("inviteIntro");
+  const form = document.getElementById("inviteForm");
+  const status = document.getElementById("inviteStatus");
+  const pw1 = document.getElementById("invitePassword");
+  const pw2 = document.getElementById("invitePassword2");
+  const submitBtn = document.getElementById("inviteSubmitBtn");
+
+  showView(inviteView);
+
+  let invite;
+  try {
+    invite = await postJson({ action: "getInvite", token });
+  } catch (err) {
+    if (intro) intro.textContent = err.message || "This invite is invalid or expired.";
+    return;
+  }
+
+  if (intro) intro.textContent = `Welcome${invite.displayName ? `, ${invite.displayName}` : ""}! Set a password for ${invite.email} (${invite.role}).`;
+  if (form) form.hidden = false;
+
+  const submit = async () => {
+    const p1 = (pw1?.value || "").trim();
+    const p2 = (pw2?.value || "").trim();
+    if (p1.length < 8) { if (status) status.textContent = "Password must be at least 8 characters."; return; }
+    if (p1 !== p2) { if (status) status.textContent = "Passwords don't match."; return; }
+    if (status) status.textContent = "Creating your account…";
+    try {
+      const data = await postJson({ action: "acceptInvite", token, password: p1 });
+      clearInviteFromUrl();
+      await finishLoginWithToken(data.token, data.role);
+    } catch (err) {
+      if (status) status.textContent = err.message || "Could not set your password.";
+    }
+  };
+
+  submitBtn?.addEventListener("click", submit);
+  pw2?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } });
 }
 
 async function loadOrders() {
@@ -10232,20 +10760,30 @@ function openOrder(orderNumber, { returnView } = {}) {
 /* =========================
    EVENTS
 ========================= */
-/* Text passcode: submit on Enter or the Log In button (no fixed length). */
+/* Submit on Enter or the Log In button. Email + password; the owner can
+   also leave email blank and enter the owner PIN as the password. */
 function submitPasscodeLogin() {
-  const value = pinInput.value.trim();
-  if (!value) {
+  const email = emailInput ? emailInput.value.trim() : "";
+  const password = pinInput.value.trim();
+  if (!password) {
     pinInput.focus();
     return;
   }
-  login(value);
+  login(email, password);
 }
 
 pinInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
     submitPasscodeLogin();
+  }
+});
+
+emailInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    if (pinInput.value.trim()) submitPasscodeLogin();
+    else pinInput.focus();
   }
 });
 
@@ -10508,6 +11046,7 @@ if (saveOrderBtn) {
 
 menuBtn.addEventListener("click", openMenu);
 homeMenuBtn?.addEventListener("click", openMenu);
+document.getElementById("usersMenuBtn")?.addEventListener("click", openMenu);
 closeMenuBtn.addEventListener("click", closeMenu);
 menuBackdrop.addEventListener("click", closeMenu);
 
@@ -10571,10 +11110,18 @@ document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
   syncAuthUI();
   resetAdminScroll();
 
+  const inviteToken = getInviteTokenFromUrl();
+  if (inviteToken) {
+    startInviteFlow(inviteToken);
+    return;
+  }
+
   if (!getToken()) {
     showView(loginView);
     return;
   }
+
+  syncRoleUI();
 
   try {
     await loadOrders();
