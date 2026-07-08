@@ -7218,3 +7218,29 @@ body.has-notifications .topbar-menu-btn::after{
   background:rgba(9,47,77,.06);
   border:none;
 }
+
+/* ---- Invite form: compact to match the list below ---- */
+.user-invite-card{
+  gap:8px;
+  padding:12px;
+}
+
+.user-invite-card input,
+.user-invite-card select{
+  min-height:32px;
+  padding:6px 10px;
+  font-size:.82rem;
+  border-radius:9px;
+}
+
+.user-invite-card select{
+  background-position:calc(100% - 15px) 13px, calc(100% - 10px) 13px;
+  background-size:5px 5px, 5px 5px;
+  padding-right:28px;
+}
+
+.user-invite-btn{
+  min-height:30px;
+  padding:0 14px;
+  font-size:.8rem;
+}
