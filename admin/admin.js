@@ -9308,8 +9308,11 @@ function renderThreadRow(t) {
   const title = t.customerName || formatPhone(t.phoneNumber);
   const preview = (t.last.direction === "out" ? "You: " : "") +
     (t.last.body || (t.last.mediaUrls.length ? "[Photo]" : ""));
+  const initials = (t.customerName || "")
+    .split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "#";
   return `
     <button type="button" class="dashboard-card msg-thread" data-thread="${escapeAttr(t.key)}">
+      <span class="msg-avatar" aria-hidden="true">${escapeHtml(initials)}</span>
       <div class="msg-thread-main">
         <div class="msg-thread-title">${escapeHtml(title)}${t.orderNumber ? ` <span class="msg-thread-order">#${escapeHtml(t.orderNumber)}</span>` : ""}</div>
         <div class="msg-thread-preview muted">${escapeHtml(preview.slice(0, 90))}</div>
@@ -9325,15 +9328,30 @@ function openMessageThread(key) {
   const t = groupMessageThreads(allMessages).find(x => x.key === key);
   if (!t || !messagesPanel) return;
 
-  const bubbles = t.messages.map(m => {
+  let prevDay = "";
+  let bubbles = "";
+  t.messages.forEach((m, i) => {
     const dir = m.direction === "out" ? "out" : "in";
+    const d = new Date(m.createdAt);
+    const day = d.toDateString();
+    if (day !== prevDay) {
+      prevDay = day;
+      const label = day === new Date().toDateString()
+        ? "Today"
+        : d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+      bubbles += `<div class="msg-day">${escapeHtml(label)}</div>`;
+    }
+    /* Tail only on the last bubble of a same-direction run (iMessage-style). */
+    const next = t.messages[i + 1];
+    const tail = !next || (next.direction === "out" ? "out" : "in") !== dir ||
+      new Date(next.createdAt).toDateString() !== day;
     const media = m.mediaUrls.map(u => `<a href="${escapeAttr(u)}" target="_blank" rel="noopener"><img class="msg-media-img" src="${escapeAttr(u)}" alt="Photo" loading="lazy"></a>`).join("");
-    return `
-    <div class="msg-line msg-line-${dir}">
+    bubbles += `
+    <div class="msg-line msg-line-${dir}${tail ? " msg-tail" : ""}">
       <div class="msg-bubble msg-${dir}">${m.body ? escapeHtml(m.body) : ""}${media}</div>
       <span class="msg-time">${escapeHtml(formatMessageTime(m.createdAt))}</span>
     </div>`;
-  }).join("");
+  });
 
   messagesPanel.innerHTML = `
     <div class="dashboard-shell messages-shell">
@@ -9346,13 +9364,13 @@ function openMessageThread(key) {
       </div>
       <div class="msg-convo">${bubbles}</div>
       ${t.phoneNumber ? `
-        <div class="msg-reply">
-          <textarea id="msgReplyInput" rows="2" placeholder="Reply to ${escapeAttr(formatPhone(t.phoneNumber))}…"></textarea>
-          <button type="button" id="msgReplyBtn" class="msg-reply-btn"
+        <div class="msg-reply msg-replybar">
+          <textarea id="msgReplyInput" rows="1" placeholder="Text Message"></textarea>
+          <button type="button" id="msgReplyBtn" class="msg-send-btn" aria-label="Send"
             data-thread="${escapeAttr(key)}" data-phone="${escapeAttr(t.phoneNumber)}"
-            data-order="${escapeAttr(t.orderNumber)}" data-name="${escapeAttr(t.customerName)}">Send</button>
-          <p id="msgReplyStatus" class="status muted"></p>
-        </div>` : ""}
+            data-order="${escapeAttr(t.orderNumber)}" data-name="${escapeAttr(t.customerName)}">↑</button>
+        </div>
+        <p id="msgReplyStatus" class="status muted"></p>` : ""}
     </div>`;
 
   if (t.unread) markThreadRead(t.phoneNumber);

@@ -6786,3 +6786,85 @@ body.has-notifications .topbar-menu-btn::after{
   background:#fffdf8;
   outline:none;
 }
+
+/* ---- Native-messaging feel ---- */
+.msg-avatar{
+  flex:0 0 auto;
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(9,47,77,.14);
+  color:var(--navy);
+  font-size:.74rem;
+  font-weight:700;
+  letter-spacing:.02em;
+}
+
+.msg-day{
+  align-self:center;
+  margin:10px 0 2px;
+  color:rgba(9,47,77,.45);
+  font-size:.66rem;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+
+.msg-bubble{
+  border-radius:18px;
+  padding:8px 12px;
+}
+
+.msg-line{ margin-bottom:2px; }
+.msg-line.msg-tail{ margin-bottom:8px; }
+
+/* iMessage-style tail on the last bubble of a run. */
+.msg-line.msg-tail .msg-in{ border-bottom-left-radius:5px; }
+.msg-line.msg-tail .msg-out{ border-bottom-right-radius:5px; }
+
+/* Hide per-bubble time except on the tail bubble — cleaner runs. */
+.msg-line:not(.msg-tail) .msg-time{ display:none; }
+
+/* Sticky pill reply bar with circular send, like Messages. */
+.msg-replybar{
+  display:flex;
+  align-items:flex-end;
+  gap:8px;
+  margin-top:10px;
+  position:sticky;
+  bottom:10px;
+  background:var(--bg);
+  padding:4px 0;
+}
+
+.msg-replybar textarea{
+  flex:1 1 auto;
+  border-radius:18px;
+  min-height:36px;
+  max-height:120px;
+  padding:8px 14px;
+  resize:none;
+}
+
+.msg-send-btn{
+  flex:0 0 auto;
+  width:34px;
+  height:34px;
+  border:none;
+  border-radius:50%;
+  background:var(--navy);
+  color:var(--cream);
+  font-size:1.05rem;
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+}
+
+.msg-send-btn:active{ transform:scale(.94); }
