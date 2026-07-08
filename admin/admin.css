@@ -6965,3 +6965,51 @@ body.has-notifications .topbar-menu-btn::after{
     min-height:100dvh;
   }
 }
+
+/* ---- Messages swipe: match the orders-list pattern (hidden until swiped,
+   solid row bg so nothing bleeds through) ---- */
+.msg-swipe .msg-thread{
+  background:#fffaf3;
+}
+
+.msg-swipe-del{
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transition:opacity 120ms ease, visibility 0s linear 120ms;
+}
+
+.msg-swipe.is-open .msg-swipe-del{
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+  transition:opacity 120ms ease, visibility 0s;
+}
+
+/* Desktop has no swipe — delete lives in the conversation header. */
+@media (hover: hover) and (pointer: fine){
+  .msg-swipe-del{ display:none; }
+}
+
+/* ---- iMessage-like inbox polish ---- */
+.msg-thread{ padding:12px 14px; }
+.msg-avatar{ width:40px; height:40px; font-size:.8rem; }
+.msg-thread-title{ font-size:.95rem; }
+.msg-thread-preview{ margin-top:3px; }
+.msg-unread-dot{ background:#0a84ff; }
+
+/* ---- PWA standalone: pin the shell to the real viewport so there is
+   never dead space at the bottom (100% / dvh under-measure on iOS). ---- */
+@media (display-mode: standalone){
+  .app-shell{
+    position:fixed;
+    inset:0;
+    height:auto;
+    min-height:0;
+  }
+
+  .main-panel{
+    height:100%;
+    min-height:100%;
+  }
+}
