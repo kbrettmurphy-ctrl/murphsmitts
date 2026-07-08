@@ -9351,7 +9351,8 @@ function openMessageThread(key) {
       const label = day === new Date().toDateString()
         ? "Today"
         : d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
-      bubbles += `<div class="msg-day">${escapeHtml(label)}</div>`;
+      const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      bubbles += `<div class="msg-day"><strong>${escapeHtml(label)}</strong> ${escapeHtml(time)}</div>`;
     }
     /* Tail only on the last bubble of a same-direction run (iMessage-style). */
     const next = t.messages[i + 1];
@@ -9361,7 +9362,6 @@ function openMessageThread(key) {
     bubbles += `
     <div class="msg-line msg-line-${dir}${tail ? " msg-tail" : ""}">
       <div class="msg-bubble msg-${dir}">${m.body ? escapeHtml(m.body) : ""}${media}</div>
-      <span class="msg-time">${escapeHtml(formatMessageTime(m.createdAt))}</span>
     </div>`;
   });
 
