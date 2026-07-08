@@ -7401,3 +7401,13 @@ body.has-notifications .topbar-menu-btn::after{
   justify-content:center;
   padding:0;
 }
+
+/* Tighter gap between messages and the reply bar */
+.msg-replybar{
+  margin-top:4px;
+  padding:2px 0;
+}
+
+.msg-convo{
+  padding-bottom:2px;
+}

@@ -9659,7 +9659,7 @@ function fitConvoToViewport() {
   const topbar = messagesView?.querySelector(".topbar");
   const head = messagesPanel.querySelector(".msg-convo-head");
   const bar = messagesPanel.querySelector(".msg-replybar");
-  const used = (topbar?.offsetHeight || 0) + (head?.offsetHeight || 0) + (bar?.offsetHeight || 0) + 66;
+  const used = (topbar?.offsetHeight || 0) + (head?.offsetHeight || 0) + (bar?.offsetHeight || 0) + 40;
   convo.style.maxHeight = Math.max(120, vvH - used) + "px";
   convo.scrollTop = convo.scrollHeight;
 }
