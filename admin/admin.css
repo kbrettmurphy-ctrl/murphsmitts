@@ -6868,3 +6868,26 @@ body.has-notifications .topbar-menu-btn::after{
 }
 
 .msg-send-btn:active{ transform:scale(.94); }
+
+/* ---- iOS PWA (standalone) safe areas ----
+   black-translucent makes the webview cover the full screen, so content
+   slid under the Dynamic Island and left matching dead space at the bottom.
+   Pad the fixed chrome by the safe-area insets. */
+@media (display-mode: standalone){
+  .topbar,
+  #detailView .detail-topbar{
+    padding-top:calc(14px + env(safe-area-inset-top));
+  }
+
+  .side-menu{
+    padding-top:calc(18px + env(safe-area-inset-top));
+  }
+
+  .main-panel{
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+
+  #loginView.active{
+    padding-top:calc(16px + env(safe-area-inset-top));
+  }
+}
