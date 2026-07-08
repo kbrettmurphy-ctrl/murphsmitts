@@ -9296,6 +9296,8 @@ async function refreshMessages({ rerender = false } = {}) {
     allMessages = data.messages || [];
     syncNotificationBadges();
     if (rerender && messagesView && messagesView.classList.contains("active")) {
+      /* Never yank the DOM out from under an active draft/keyboard. */
+      if (document.activeElement && document.activeElement.id === "msgReplyInput") return;
       if (openThreadKey) openMessageThread(openThreadKey);
       else renderMessagesView();
     }
@@ -9358,6 +9360,7 @@ function renderThreadRow(t) {
 function openMessageThread(key) {
   const t = groupMessageThreads(allMessages).find(x => x.key === key);
   if (!t || !messagesPanel) return;
+  const prevDraft = (openThreadKey === key && document.getElementById("msgReplyInput")?.value) || "";
   openThreadKey = key;
 
   let prevDay = "";
@@ -9414,6 +9417,10 @@ function openMessageThread(key) {
     </div>`;
 
   if (t.unread) markThreadRead(t.phoneNumber);
+  if (prevDraft) {
+    const input = document.getElementById("msgReplyInput");
+    if (input) input.value = prevDraft;
+  }
   const convo = messagesPanel.querySelector(".msg-convo");
   if (convo) convo.scrollTop = convo.scrollHeight;
 }

@@ -7256,3 +7256,17 @@ body.has-notifications .topbar-menu-btn::after{
 .msg-reply input{
   font-size:.85rem;
 }
+
+/* ---- Mobile browser: the conversation flows in the document (no inner
+   scroller, no sticky reply bar) so tapping the input gets normal iOS
+   keyboard behavior — no over-scroll past the keyboard, no dead space. ---- */
+@media (max-width: 899px) and (display-mode: browser){
+  .msg-convo{
+    max-height:none;
+    overflow:visible;
+  }
+
+  .msg-replybar{
+    position:static;
+  }
+}
