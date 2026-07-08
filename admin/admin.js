@@ -9304,10 +9304,10 @@ async function renderMessagesView() {
 
   messagesPanel.innerHTML = `
     <div class="dashboard-shell messages-shell">
-      <div class="msg-thread-list">
+      <div class="dashboard-card msg-inbox-card">
         ${threads.length
           ? threads.map(renderThreadRow).join("")
-          : `<div class="dashboard-card msg-empty muted">No text messages yet. Incoming texts to your Twilio number will show up here.</div>`}
+          : `<div class="msg-empty muted">No text messages yet. Incoming texts to your Twilio number will show up here.</div>`}
       </div>
     </div>`;
   wireMessagesPanel();
@@ -9322,7 +9322,7 @@ function renderThreadRow(t) {
   return `
     <div class="msg-swipe">
       <button type="button" class="msg-swipe-del" data-del-thread="${escapeAttr(t.key)}">Delete</button>
-    <button type="button" class="dashboard-card msg-thread" data-thread="${escapeAttr(t.key)}">
+    <button type="button" class="msg-thread" data-thread="${escapeAttr(t.key)}">
       <span class="msg-avatar" aria-hidden="true">${escapeHtml(initials)}</span>
       <div class="msg-thread-main">
         <div class="msg-thread-title">${escapeHtml(title)}${t.orderNumber ? ` <span class="msg-thread-order">#${escapeHtml(t.orderNumber)}</span>` : ""}</div>

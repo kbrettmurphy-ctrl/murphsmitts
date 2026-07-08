@@ -7076,3 +7076,39 @@ body.has-notifications .topbar-menu-btn::after{
     overflow:visible;
   }
 }
+
+/* ---- Inbox restyle: one card, flat divided rows (matches Today's Bench) ---- */
+.msg-inbox-card{
+  padding:4px 12px;
+}
+
+.msg-swipe{
+  border-radius:0;
+  border-top:1px solid rgba(9,47,77,.08);
+}
+
+.msg-swipe:first-child{
+  border-top:none;
+}
+
+.msg-thread{
+  border:none;
+  border-radius:0;
+  box-shadow:none;
+  background:#fffaf3;
+  padding:9px 2px;
+}
+
+.msg-avatar{
+  width:34px;
+  height:34px;
+  font-size:.72rem;
+}
+
+.msg-thread-title{
+  font-size:.88rem;
+}
+
+.msg-thread-preview{
+  font-size:.78rem;
+}
