@@ -65,6 +65,8 @@ const passkeyLoginBtn = document.getElementById("passkeyLoginBtn");
 const passwordLoginBtn = document.getElementById("passwordLoginBtn");
 const usersView = document.getElementById("usersView");
 const usersPanel = document.getElementById("usersPanel");
+const messagesView = document.getElementById("messagesView");
+const messagesPanel = document.getElementById("messagesPanel");
 const inviteView = document.getElementById("inviteView");
 
 const saleGlovesView = document.getElementById("saleGlovesView");
@@ -254,7 +256,7 @@ document.addEventListener("focusout", (e) => {
    VIEW / MENU
 ========================= */
 function showView(view) {
-  [loginView, inviteView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, saleGlovesView, usersView]
+  [loginView, inviteView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, saleGlovesView, messagesView, usersView]
     .filter(Boolean)
     .forEach(v => v.classList.remove("active"));
 
@@ -626,8 +628,13 @@ function seedDemoStore() {
     ],
     sessions: [],
     activity,
+    messages: [
+      { id: "m1", direction: "in", phoneNumber: "(555) 010-9004", customerName: "Practice Park", orderNumber: "9004", body: "Yes — approved! Go ahead.", mediaUrls: [], read: false, createdAt: new Date(Date.now() - 5400000).toISOString() },
+      { id: "m2", direction: "in", phoneNumber: "(555) 010-9002", customerName: "Demo Diaz", orderNumber: "9002", body: "Any update on my A2000?", mediaUrls: [], read: false, createdAt: new Date(Date.now() - 3600000).toISOString() },
+      { id: "m3", direction: "out", phoneNumber: "(555) 010-9002", customerName: "Demo Diaz", orderNumber: "9002", body: "Relacing it now — should be ready in a couple days!", mediaUrls: [], read: true, createdAt: new Date(Date.now() - 3000000).toISOString() }
+    ],
     nextOrderNum: 9007,
-    seq: 1
+    seq: 10
   };
 }
 
@@ -790,6 +797,21 @@ function demoApi(body) {
       return demoResult({ photos: [] });
     case "listGalleryPhotos":
       return demoResult({ photos: [] });
+
+    case "listMessages":
+      return demoResult({ messages: store.messages });
+    case "markMessagesRead":
+      store.messages.forEach(m => {
+        if (m.direction === "in" && (!body.phoneNumber || m.phoneNumber === body.phoneNumber)) m.read = true;
+      });
+      return demoResult();
+    case "sendMessageReply":
+      store.messages.push({
+        id: "m" + (store.seq++), direction: "out", phoneNumber: body.phoneNumber,
+        customerName: body.customerName || "", orderNumber: body.orderNumber || "",
+        body: body.body, mediaUrls: [], read: true, createdAt: demoNow()
+      });
+      return demoResult();
 
     case "resendStatusEmail":
     case "resendStatusText":
@@ -2112,6 +2134,7 @@ function getViewTitle(viewName) {
     case "inventory": return "Lace Inventory";
     case "gloves-sale": return "Gloves For Sale";
     case "users": return "Users";
+    case "messages": return "Messages";
     default: return "Orders";
   }
 }
@@ -4818,6 +4841,7 @@ function normalizeAdminView(viewName) {
   if (view === "inventory") return "inventory";
   if (view === "gloves-sale") return "gloves-sale";
   if (view === "users") return "users";
+  if (view === "messages") return "messages";
   if (isOrderFilterView(view)) return view;
   return "dashboard";
 }
@@ -4826,7 +4850,7 @@ function isKnownAdminView(viewName) {
   const view = String(viewName || "").trim().toLowerCase();
   if (!view || view === "dashboard") return true;
   if (view === "orders" || view === "current") return true;
-  return ["map", "money", "upload", "inventory", "gloves-sale", "users"].includes(view) || isOrderFilterView(view);
+  return ["map", "money", "upload", "inventory", "gloves-sale", "users", "messages"].includes(view) || isOrderFilterView(view);
 }
 
 function syncAdminViewUrl(viewName) {
@@ -4902,6 +4926,7 @@ function setActiveView(viewName) {
     renderHomeDashboard();
     refreshDashboardLaborSessions();
     refreshDashboardActivityIndex();
+    markOrdersSeen();
     showView(homeDashboardView);
     closeMenu();
     resetViewScroll(homeDashboardView, { blurActive: true });
@@ -4937,6 +4962,14 @@ function setActiveView(viewName) {
     renderUsersView();
     closeMenu();
     resetViewScroll(usersView, { blurActive: true });
+    return;
+  }
+
+  if (resolvedView === "messages") {
+    showView(messagesView);
+    renderMessagesView();
+    closeMenu();
+    resetViewScroll(messagesView, { blurActive: true });
     return;
   }
 
@@ -8782,6 +8815,7 @@ async function finishLoginWithToken(token, role) {
   await loadOrders();
   setActiveView("dashboard");
   refreshPasskeySetupVisibility();
+  refreshMessages();
 }
 
 /* =========================
@@ -9175,6 +9209,236 @@ async function startInviteFlow(token) {
 
   submitBtn?.addEventListener("click", submit);
   pw2?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } });
+}
+
+/* =========================
+   MESSAGES / TWILIO INBOX + NOTIFICATIONS
+========================= */
+let allMessages = [];
+const ORDERS_SEEN_KEY = "mm_orders_seen_ts";
+
+function msgThreadKey(m) {
+  const d = String(m.phoneNumber || "").replace(/\D/g, "").slice(-10);
+  return d || String(m.phoneNumber || "");
+}
+
+function formatPhone(v) {
+  const d = String(v || "").replace(/\D/g, "").slice(-10);
+  return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : String(v || "");
+}
+
+function formatMessageTime(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const sameDay = date.toDateString() === new Date().toDateString();
+  return sameDay
+    ? date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+function groupMessageThreads(messages) {
+  const map = new Map();
+  messages.forEach(m => {
+    const key = msgThreadKey(m);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(m);
+  });
+
+  const threads = [];
+  for (const [key, msgs] of map.entries()) {
+    msgs.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const last = msgs[msgs.length - 1];
+    const named = [...msgs].reverse().find(x => x.customerName);
+    const ordered = [...msgs].reverse().find(x => x.orderNumber);
+    threads.push({
+      key,
+      phoneNumber: last.phoneNumber,
+      customerName: named ? named.customerName : "",
+      orderNumber: ordered ? ordered.orderNumber : "",
+      messages: msgs,
+      last,
+      unread: msgs.filter(x => x.direction === "in" && !x.read).length
+    });
+  }
+  threads.sort((a, b) => new Date(b.last.createdAt) - new Date(a.last.createdAt));
+  return threads;
+}
+
+async function refreshMessages({ rerender = false } = {}) {
+  try {
+    const data = await postJson({ action: "listMessages" }, true);
+    allMessages = data.messages || [];
+    syncNotificationBadges();
+    if (rerender && messagesView && messagesView.classList.contains("active")) {
+      renderMessagesView();
+    }
+  } catch {
+    /* Inbox is a background extra — never block the app. */
+  }
+}
+
+async function renderMessagesView() {
+  if (!messagesPanel) return;
+  if (!allMessages.length) {
+    messagesPanel.innerHTML = `<div class="dashboard-shell messages-shell"><div class="dashboard-card msg-empty muted">Loading messages…</div></div>`;
+    await refreshMessages();
+  }
+
+  const threads = groupMessageThreads(allMessages);
+  const totalUnread = threads.reduce((n, t) => n + t.unread, 0);
+  const countEl = document.getElementById("messagesCount");
+  if (countEl) {
+    countEl.textContent = totalUnread
+      ? `${totalUnread} unread`
+      : `${threads.length} ${threads.length === 1 ? "conversation" : "conversations"}`;
+  }
+
+  messagesPanel.innerHTML = `
+    <div class="dashboard-shell messages-shell">
+      <div class="msg-thread-list">
+        ${threads.length
+          ? threads.map(renderThreadRow).join("")
+          : `<div class="dashboard-card msg-empty muted">No text messages yet. Incoming texts to your Twilio number will show up here.</div>`}
+      </div>
+    </div>`;
+  wireMessagesPanel();
+}
+
+function renderThreadRow(t) {
+  const title = t.customerName || formatPhone(t.phoneNumber);
+  const preview = (t.last.direction === "out" ? "You: " : "") +
+    (t.last.body || (t.last.mediaUrls.length ? "[Photo]" : ""));
+  return `
+    <button type="button" class="dashboard-card msg-thread" data-thread="${escapeAttr(t.key)}">
+      <div class="msg-thread-main">
+        <div class="msg-thread-title">${escapeHtml(title)}${t.orderNumber ? ` <span class="msg-thread-order">#${escapeHtml(t.orderNumber)}</span>` : ""}</div>
+        <div class="msg-thread-preview muted">${escapeHtml(preview.slice(0, 90))}</div>
+      </div>
+      <div class="msg-thread-meta">
+        <span class="msg-thread-time muted">${escapeHtml(formatMessageTime(t.last.createdAt))}</span>
+        ${t.unread ? `<span class="msg-unread-dot" aria-label="${t.unread} unread"></span>` : ""}
+      </div>
+    </button>`;
+}
+
+function openMessageThread(key) {
+  const t = groupMessageThreads(allMessages).find(x => x.key === key);
+  if (!t || !messagesPanel) return;
+
+  const bubbles = t.messages.map(m => `
+    <div class="msg-bubble msg-${m.direction === "out" ? "out" : "in"}">
+      ${m.body ? escapeHtml(m.body) : ""}
+      ${m.mediaUrls.map(u => `<a href="${escapeAttr(u)}" target="_blank" rel="noopener" class="msg-media">Photo</a>`).join("")}
+      <span class="msg-time">${escapeHtml(formatMessageTime(m.createdAt))}</span>
+    </div>`).join("");
+
+  messagesPanel.innerHTML = `
+    <div class="dashboard-shell messages-shell">
+      <div class="msg-convo-head">
+        <button type="button" class="msg-back" data-msg-back>‹ Inbox</button>
+        <div class="msg-convo-who">
+          <div class="msg-thread-title">${escapeHtml(t.customerName || formatPhone(t.phoneNumber))}</div>
+          <div class="muted msg-convo-sub">${escapeHtml(formatPhone(t.phoneNumber))}${t.orderNumber ? ` · Order #${escapeHtml(t.orderNumber)}` : ""}</div>
+        </div>
+      </div>
+      <div class="msg-convo">${bubbles}</div>
+      ${t.phoneNumber ? `
+        <div class="msg-reply">
+          <textarea id="msgReplyInput" rows="2" placeholder="Reply to ${escapeAttr(formatPhone(t.phoneNumber))}…"></textarea>
+          <button type="button" id="msgReplyBtn" class="msg-reply-btn"
+            data-thread="${escapeAttr(key)}" data-phone="${escapeAttr(t.phoneNumber)}"
+            data-order="${escapeAttr(t.orderNumber)}" data-name="${escapeAttr(t.customerName)}">Send</button>
+          <p id="msgReplyStatus" class="status muted"></p>
+        </div>` : ""}
+    </div>`;
+
+  if (t.unread) markThreadRead(t.phoneNumber);
+  const convo = messagesPanel.querySelector(".msg-convo");
+  if (convo) convo.scrollTop = convo.scrollHeight;
+}
+
+async function markThreadRead(phoneNumber) {
+  const key = String(phoneNumber || "").replace(/\D/g, "").slice(-10);
+  allMessages.forEach(m => {
+    if (m.direction === "in" && msgThreadKey(m) === key) m.read = true;
+  });
+  syncNotificationBadges();
+  try { await postJson({ action: "markMessagesRead", phoneNumber }, true); } catch {}
+}
+
+async function handleMessageReply(btn) {
+  const input = document.getElementById("msgReplyInput");
+  const statusEl = document.getElementById("msgReplyStatus");
+  const text = (input?.value || "").trim();
+  if (!text) return;
+
+  btn.disabled = true;
+  if (statusEl) statusEl.textContent = "Sending…";
+  try {
+    await postJson({
+      action: "sendMessageReply",
+      phoneNumber: btn.dataset.phone,
+      body: text,
+      orderNumber: btn.dataset.order,
+      customerName: btn.dataset.name
+    }, true);
+    if (input) input.value = "";
+    await refreshMessages();
+    openMessageThread(btn.dataset.thread);
+  } catch (err) {
+    if (statusEl) statusEl.textContent = err.message || "Could not send the message.";
+    btn.disabled = false;
+  }
+}
+
+function wireMessagesPanel() {
+  if (!messagesPanel || messagesPanel.dataset.wired === "true") return;
+  messagesPanel.dataset.wired = "true";
+  messagesPanel.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-msg-back]")) { renderMessagesView(); return; }
+    const sendBtn = e.target.closest("#msgReplyBtn");
+    if (sendBtn) { await handleMessageReply(sendBtn); return; }
+    const thread = e.target.closest("[data-thread]");
+    if (thread) { openMessageThread(thread.dataset.thread); return; }
+  });
+}
+
+/* ---- In-app notification badges (unread texts + new orders) ---- */
+function getUnreadMessageCount() {
+  return (allMessages || []).filter(m => m.direction === "in" && !m.read).length;
+}
+
+function getNewOrdersCount() {
+  const seen = Number(localStorage.getItem(ORDERS_SEEN_KEY) || 0);
+  if (!seen) return 0;
+  return (allOrders || []).filter(o => {
+    if (!isCurrentOrder(o)) return false;
+    const t = new Date(o.createdAt || o.dateReceived || 0).getTime();
+    return t && t > seen;
+  }).length;
+}
+
+function markOrdersSeen() {
+  localStorage.setItem(ORDERS_SEEN_KEY, String(Date.now()));
+  syncNotificationBadges();
+}
+
+function setNavBadge(el, count) {
+  if (!el) return;
+  if (count > 0) {
+    el.textContent = count > 99 ? "99+" : String(count);
+    el.hidden = false;
+  } else {
+    el.hidden = true;
+  }
+}
+
+function syncNotificationBadges() {
+  const unread = getUnreadMessageCount();
+  const newOrders = getNewOrdersCount();
+  setNavBadge(document.getElementById("messagesNavBadge"), unread);
+  setNavBadge(document.getElementById("clubhouseNavBadge"), newOrders);
+  document.body.classList.toggle("has-notifications", (unread + newOrders) > 0);
 }
 
 async function loadOrders() {
@@ -11104,6 +11368,10 @@ if (saveOrderBtn) {
 menuBtn.addEventListener("click", openMenu);
 homeMenuBtn?.addEventListener("click", openMenu);
 document.getElementById("usersMenuBtn")?.addEventListener("click", openMenu);
+document.getElementById("messagesMenuBtn")?.addEventListener("click", openMenu);
+
+/* Poll the Twilio inbox so new-text and new-order badges stay live. */
+setInterval(() => { if (getToken()) refreshMessages(); }, 60000);
 closeMenuBtn.addEventListener("click", closeMenu);
 menuBackdrop.addEventListener("click", closeMenu);
 
@@ -11185,6 +11453,7 @@ document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
     const deepLinkView = readAdminDeepLink();
     setActiveView(deepLinkView || "dashboard");
     refreshPasskeySetupVisibility();
+    refreshMessages();
   } catch (err) {
     clearToken();
     closeMenu();

@@ -24,13 +24,14 @@
       </div>
 
       <nav class="side-nav">
-        <button class="nav-link nav-main active" data-view="dashboard">Clubhouse</button>
+        <button class="nav-link nav-main active" data-view="dashboard">Clubhouse<span id="clubhouseNavBadge" class="nav-badge" hidden></span></button>
         <button class="nav-link nav-main" data-view="current">Orders</button>
         <button class="nav-link nav-main" data-view="map">Map</button>
         <button class="nav-link nav-main" data-view="money">Money</button>
         <button class="nav-link nav-main" data-view="inventory">Lace Inventory</button>
         <button class="nav-link nav-main" data-view="upload">Gallery</button>
         <button class="nav-link nav-main" data-view="gloves-sale">Gloves For Sale</button>
+        <button class="nav-link nav-main" data-view="messages">Messages<span id="messagesNavBadge" class="nav-badge" hidden></span></button>
         <button class="nav-link nav-main nav-admin-only" data-view="users" hidden>Users</button>
       </nav>
 
@@ -334,6 +335,20 @@
         </header>
 
         <div id="orderDetail" class="detail-card"></div>
+      </section>
+
+      <section id="messagesView" class="view">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="messagesMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <div class="topbar-heading">
+              <h1 class="topbar-title">Messages</h1>
+              <p id="messagesCount" class="topbar-subtitle muted">Text inbox</p>
+            </div>
+          </div>
+          <div class="topbar-actions"></div>
+        </header>
+        <div id="messagesPanel" class="dashboard-panel" aria-live="polite"></div>
       </section>
 
       <section id="usersView" class="view">
