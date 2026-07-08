@@ -11691,3 +11691,37 @@ checkForNewBuild();
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") checkForNewBuild();
 });
+
+/* =========================
+   EDGE SWIPE -> OPEN MENU (mobile)
+   Right-swipe from the left screen edge pulls the side menu out, like
+   native apps. Edge-start only (≤20px) so it never fights the order-card
+   or message swipe gestures, the map, or pull-to-refresh.
+========================= */
+(function initEdgeSwipeMenu() {
+  let tracking = false, startX = 0, startY = 0;
+
+  document.addEventListener("touchstart", (e) => {
+    tracking = false;
+    if (!window.matchMedia("(max-width: 899px)").matches) return;
+    if (!isAuthenticated() || sideMenu.classList.contains("open")) return;
+    if (e.touches.length !== 1 || e.touches[0].clientX > 20) return;
+    if (e.target.closest?.(".swipe-row, .msg-swipe, .leaflet-container, input, textarea, select")) return;
+    tracking = true;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener("touchmove", (e) => {
+    if (!tracking) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (Math.abs(dy) > 40 && Math.abs(dy) > Math.abs(dx)) { tracking = false; return; }
+    if (dx > 60 && Math.abs(dx) > 1.5 * Math.abs(dy)) {
+      tracking = false;
+      openMenu();
+    }
+  }, { passive: true });
+
+  document.addEventListener("touchend", () => { tracking = false; });
+})();
