@@ -9342,7 +9342,7 @@ function renderThreadRow(t) {
       <span class="msg-avatar" aria-hidden="true">${escapeHtml(initials)}</span>
       <div class="msg-thread-main">
         <div class="msg-thread-title">${escapeHtml(title)}${t.orderNumber ? ` <span class="msg-thread-order">#${escapeHtml(t.orderNumber)}</span>` : ""}</div>
-        <div class="msg-thread-preview muted">${escapeHtml(preview.slice(0, 90))}</div>
+        <div class="msg-thread-preview muted">${escapeHtml(preview.slice(0, 70))}</div>
       </div>
       <div class="msg-thread-meta">
         <span class="msg-thread-time muted">${escapeHtml(formatMessageTime(t.last.createdAt))}</span>
@@ -11494,7 +11494,14 @@ document.getElementById("messagesMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("msgComposeBtn")?.addEventListener("click", renderComposeView);
 
 /* Poll the Twilio inbox so new-text and new-order badges stay live. */
-setInterval(() => { if (getToken()) refreshMessages(); }, 60000);
+setInterval(() => { if (getToken()) refreshMessages({ rerender: true }); }, 30000);
+
+/* Instant inbox update: the service worker pings us when a push arrives. */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", (e) => {
+    if (e.data && e.data.type === "push" && getToken()) refreshMessages({ rerender: true });
+  });
+}
 closeMenuBtn.addEventListener("click", closeMenu);
 menuBackdrop.addEventListener("click", closeMenu);
 

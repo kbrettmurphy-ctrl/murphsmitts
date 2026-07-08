@@ -7,6 +7,10 @@ self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data && event.data.text() }; }
   const title = data.title || "MurphOS";
+  event.waitUntil((async () => {
+    const list = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    list.forEach(c => c.postMessage({ type: "push" }));
+  })());
   event.waitUntil(self.registration.showNotification(title, {
     body: data.body || "",
     icon: "/admin/icon-180.png",

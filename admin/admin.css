@@ -7244,3 +7244,15 @@ body.has-notifications .topbar-menu-btn::after{
   padding:0 14px;
   font-size:.8rem;
 }
+
+/* ---- Inbox: previews always truncate (never push the row wide) ---- */
+.msg-swipe{ min-width:0; }
+.msg-thread{ min-width:0; }
+.msg-thread-main{ min-width:0; overflow:hidden; }
+.msg-thread-preview{ display:block; }
+
+/* Reply/compose input matches bubble text size */
+.msg-reply textarea,
+.msg-reply input{
+  font-size:.85rem;
+}
