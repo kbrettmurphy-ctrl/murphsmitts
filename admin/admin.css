@@ -7270,3 +7270,17 @@ body.has-notifications .topbar-menu-btn::after{
     position:static;
   }
 }
+
+/* ---- Root cause of inbox overflow: .dashboard-shell is a grid, and grid
+   children default to min-width:auto, so the inbox card stretched past the
+   viewport regardless of the preview's own truncation (dragging the page
+   into horizontal scroll — the "scroll chaos"). Clamp the chain. ---- */
+.messages-shell{
+  min-width:0;
+  max-width:100%;
+}
+
+.messages-shell > *{
+  min-width:0;
+  max-width:100%;
+}
