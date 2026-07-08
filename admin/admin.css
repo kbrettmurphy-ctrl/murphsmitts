@@ -7184,3 +7184,37 @@ body.has-notifications .topbar-menu-btn::after{
 .user-menu-pop{
   top:calc(100% + 4px);
 }
+
+/* ---- Account rows: badge/flags inline with the name; plain ••• glyph ---- */
+.user-row{
+  flex-wrap:nowrap;
+}
+
+.user-row-title{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-width:0;
+}
+
+.user-row-name{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.user-menu-btn{
+  border:none;
+  background:transparent;
+  box-shadow:none;
+  color:rgba(9,47,77,.55);
+  font-size:1.2rem;
+  padding:0 4px;
+  min-width:28px;
+  min-height:28px;
+}
+
+.user-menu-btn:hover{
+  background:rgba(9,47,77,.06);
+  border:none;
+}

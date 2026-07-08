@@ -9041,12 +9041,12 @@ function renderUsersContent(users) {
         data-user-role="${escapeAttr(u.role)}"
         data-user-active="${u.active ? "true" : "false"}">
         <div class="user-row-main">
-          <div class="user-row-title">${escapeHtml(u.displayName || u.email)}</div>
-          <div class="user-row-meta">
-            <span>${escapeHtml(u.email)}</span>
+          <div class="user-row-title">
+            <span class="user-row-name">${escapeHtml(u.displayName || u.email)}</span>
             <span class="user-role-badge user-role-${escapeAttr(u.role)}">${escapeHtml(u.role)}</span>
             ${flags.join("")}
           </div>
+          <div class="user-row-meta"><span>${escapeHtml(u.email)}</span></div>
         </div>
         <div class="user-row-actions user-menu-wrap">
           <button type="button" class="user-action-btn user-menu-btn" data-user-menu aria-haspopup="menu" aria-label="Account actions">&#8943;</button>
