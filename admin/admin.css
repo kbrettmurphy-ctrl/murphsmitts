@@ -7406,6 +7406,7 @@ body.has-notifications .topbar-menu-btn::after{
 .msg-replybar{
   margin-top:4px;
   padding:2px 0;
+  bottom:6px;
 }
 
 .msg-convo{
