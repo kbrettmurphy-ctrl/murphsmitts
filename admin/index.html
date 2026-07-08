@@ -6,6 +6,12 @@
   <title>Murph's Mitts Admin</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="admin.css" />
+  <link rel="manifest" href="/admin/manifest.webmanifest" />
+  <meta name="theme-color" content="#092f4d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MurphOS" />
+  <link rel="apple-touch-icon" href="/admin/icon-180.png" />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -36,6 +42,7 @@
       </nav>
 
       <div class="side-menu-footer">
+        <button id="sideNavPushBtn" class="nav-link nav-passkey" type="button" hidden>Enable Notifications</button>
         <button id="sideNavPasskeyBtn" class="nav-link nav-passkey" type="button" hidden>Set up Face ID</button>
         <button id="sideNavLogoutBtn" class="nav-link nav-logout" type="button">Log Out</button>
       </div>
