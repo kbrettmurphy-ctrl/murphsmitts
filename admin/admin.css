@@ -7146,3 +7146,26 @@ body.has-notifications .topbar-menu-btn::after{
 .msg-line.msg-tail{
   margin-bottom:10px;
 }
+
+/* ---- Accounts list: flat divided rows in one card (matches Messages/Bench) ---- */
+.user-list{
+  display:block;
+  padding:4px 12px;
+}
+
+.user-row{
+  border:none;
+  border-radius:0;
+  box-shadow:none;
+  background:transparent;
+  border-top:1px solid rgba(9,47,77,.08);
+  padding:10px 2px;
+}
+
+.user-row:first-child{
+  border-top:none;
+}
+
+.user-row-title{
+  font-size:.88rem;
+}

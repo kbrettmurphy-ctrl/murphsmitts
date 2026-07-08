@@ -9035,7 +9035,7 @@ function renderUsersContent(users) {
     else if (!u.hasPassword) flags.push(`<span class="user-flag">no password</span>`);
 
     return `
-      <div class="user-row dashboard-card"
+      <div class="user-row"
         data-user-id="${escapeAttr(u.id)}"
         data-user-email="${escapeAttr(u.email)}"
         data-user-role="${escapeAttr(u.role)}"
@@ -9075,7 +9075,7 @@ function renderUsersContent(users) {
       </section>
       <section class="dashboard-section">
         <h2 class="dashboard-section-title">Accounts</h2>
-        <div class="user-list">${rows || `<p class="dashboard-empty muted">No accounts yet.</p>`}</div>
+        <div class="dashboard-card user-list">${rows || `<p class="dashboard-empty muted">No accounts yet.</p>`}</div>
       </section>
     </div>
   `;
