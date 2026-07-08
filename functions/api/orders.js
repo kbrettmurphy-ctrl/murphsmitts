@@ -355,6 +355,21 @@ export async function onRequest(context) {
       return json({ ok: true }, 200, jsonHeaders);
     }
 
+    if (action === "deleteMessageThread") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const phones = Array.isArray(body.phoneNumbers) ? body.phoneNumbers.filter(Boolean).slice(0, 20) : [];
+      if (!phones.length) return json({ ok: false, error: "Missing phone numbers." }, 200, jsonHeaders);
+      const inList = phones.map(pn => `"${String(pn).replace(/"/g, "")}"`).join(",");
+      const resp = await supabaseFetch(
+        env,
+        `/rest/v1/sms_messages?phone_number=in.(${encodeURIComponent(inList)})`,
+        { method: "DELETE", headers: { Prefer: "return=minimal" } }
+      );
+      if (!resp.ok) return json({ ok: false, error: "Could not delete the conversation." }, 200, jsonHeaders);
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
     if (action === "sendMessageReply") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) return json(auth, 200, jsonHeaders);

@@ -6887,3 +6887,81 @@ body.has-notifications .topbar-menu-btn::after{
     padding-top:calc(16px + env(safe-area-inset-top));
   }
 }
+
+/* ---- Messages: left-align rows, swipe-to-delete, thread delete ---- */
+.msg-thread-main{
+  flex:1 1 auto;
+  text-align:left;
+}
+
+.msg-swipe{
+  position:relative;
+  overflow:hidden;
+  border-radius:14px;
+}
+
+.msg-swipe .msg-thread{
+  position:relative;
+  z-index:1;
+  width:100%;
+  transition:transform .18s ease;
+}
+
+.msg-swipe.is-open .msg-thread{
+  transform:translateX(-88px);
+}
+
+.msg-swipe-del{
+  position:absolute;
+  top:0; right:0; bottom:0;
+  width:88px;
+  border:none;
+  background:#b3261e;
+  color:#fff;
+  font-weight:600;
+  font-size:.82rem;
+  cursor:pointer;
+}
+
+.msg-convo-head{
+  justify-content:flex-start;
+}
+
+.msg-convo-who{
+  flex:1 1 auto;
+  min-width:0;
+}
+
+.msg-del-btn{
+  flex:0 0 auto;
+  width:32px;
+  height:32px;
+  border:1px solid rgba(9,47,77,.16);
+  border-radius:8px;
+  background:transparent;
+  color:#b3261e;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+}
+
+.msg-del-btn svg{
+  width:16px;
+  height:16px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+/* PWA standalone: html/body height:100% under-measures the full screen on
+   iOS, leaving a gap below. Use 100dvh so the shell truly fills it. */
+@media (display-mode: standalone){
+  html, body, .app-shell{
+    height:100dvh;
+    min-height:100dvh;
+  }
+}

@@ -805,6 +805,11 @@ function demoApi(body) {
         if (m.direction === "in" && (!body.phoneNumber || m.phoneNumber === body.phoneNumber)) m.read = true;
       });
       return demoResult();
+    case "deleteMessageThread": {
+      const keys = new Set((body.phoneNumbers || []).map(pn => String(pn).replace(/\D/g, "").slice(-10)));
+      store.messages = store.messages.filter(m => !keys.has(String(m.phoneNumber).replace(/\D/g, "").slice(-10)));
+      return demoResult();
+    }
     case "sendMessageReply":
       store.messages.push({
         id: "m" + (store.seq++), direction: "out", phoneNumber: body.phoneNumber,
@@ -9312,6 +9317,8 @@ function renderThreadRow(t) {
   const initials = (t.customerName || "")
     .split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "#";
   return `
+    <div class="msg-swipe">
+      <button type="button" class="msg-swipe-del" data-del-thread="${escapeAttr(t.key)}">Delete</button>
     <button type="button" class="dashboard-card msg-thread" data-thread="${escapeAttr(t.key)}">
       <span class="msg-avatar" aria-hidden="true">${escapeHtml(initials)}</span>
       <div class="msg-thread-main">
@@ -9322,7 +9329,8 @@ function renderThreadRow(t) {
         <span class="msg-thread-time muted">${escapeHtml(formatMessageTime(t.last.createdAt))}</span>
         ${t.unread ? `<span class="msg-unread-dot" aria-label="${t.unread} unread"></span>` : ""}
       </div>
-    </button>`;
+    </button>
+    </div>`;
 }
 
 function openMessageThread(key) {
@@ -9360,8 +9368,16 @@ function openMessageThread(key) {
         <button type="button" class="msg-back" data-msg-back>‹ Inbox</button>
         <div class="msg-convo-who">
           <div class="msg-thread-title">${escapeHtml(t.customerName || formatPhone(t.phoneNumber))}</div>
-          <div class="muted msg-convo-sub">${escapeHtml(formatPhone(t.phoneNumber))}${t.orderNumber ? ` · Order #${escapeHtml(t.orderNumber)}` : ""}</div>
+          ${(() => {
+            const parts = [];
+            if (t.customerName) parts.push(formatPhone(t.phoneNumber));
+            if (t.orderNumber) parts.push(`Order #${t.orderNumber}`);
+            return parts.length ? `<div class="muted msg-convo-sub">${escapeHtml(parts.join(" · "))}</div>` : "";
+          })()}
         </div>
+        <button type="button" class="msg-del-btn" data-del-thread="${escapeAttr(key)}" aria-label="Delete conversation">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14"></path><path d="M9 7V5h6v2"></path><path d="M7 7l1 13h8l1-13"></path></svg>
+        </button>
       </div>
       <div class="msg-convo">${bubbles}</div>
       ${t.phoneNumber ? `
@@ -9442,11 +9458,52 @@ function wireMessagesPanel() {
   messagesPanel.dataset.wired = "true";
   messagesPanel.addEventListener("click", async (e) => {
     if (e.target.closest("[data-msg-back]")) { renderMessagesView(); return; }
+    const del = e.target.closest("[data-del-thread]");
+    if (del) { await deleteMessageThread(del.dataset.delThread); return; }
     const sendBtn = e.target.closest("#msgReplyBtn");
     if (sendBtn) { await handleMessageReply(sendBtn); return; }
     const thread = e.target.closest("[data-thread]");
-    if (thread) { openMessageThread(thread.dataset.thread); return; }
+    if (thread) {
+      const wrap = thread.closest(".msg-swipe");
+      if (wrap && wrap.classList.contains("is-open")) { wrap.classList.remove("is-open"); return; }
+      openMessageThread(thread.dataset.thread);
+      return;
+    }
   });
+
+  /* Apple-style swipe-to-delete on inbox rows. */
+  let swipeEl = null, swipeX = 0, swipeY = 0, swiping = false;
+  messagesPanel.addEventListener("touchstart", (e) => {
+    const wrap = e.target.closest?.(".msg-swipe");
+    if (!wrap) return;
+    swipeEl = wrap; swipeX = e.touches[0].clientX; swipeY = e.touches[0].clientY; swiping = false;
+    messagesPanel.querySelectorAll(".msg-swipe.is-open").forEach(el => { if (el !== wrap) el.classList.remove("is-open"); });
+  }, { passive: true });
+  messagesPanel.addEventListener("touchmove", (e) => {
+    if (!swipeEl) return;
+    const dx = e.touches[0].clientX - swipeX;
+    const dy = e.touches[0].clientY - swipeY;
+    if (!swiping && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy)) swiping = true;
+    if (swiping && dx < -30) swipeEl.classList.add("is-open");
+    if (swiping && dx > 30) swipeEl.classList.remove("is-open");
+  }, { passive: true });
+  messagesPanel.addEventListener("touchend", () => { swipeEl = null; swiping = false; });
+}
+
+async function deleteMessageThread(key) {
+  const t = groupMessageThreads(allMessages).find(x => x.key === key);
+  if (!t) return;
+  const who = t.customerName || formatPhone(t.phoneNumber);
+  if (!confirm(`Delete the conversation with ${who}? This can't be undone.`)) return;
+  const phones = [...new Set(t.messages.map(m => m.phoneNumber).filter(Boolean))];
+  try {
+    await postJson({ action: "deleteMessageThread", phoneNumbers: phones }, true);
+    allMessages = allMessages.filter(m => msgThreadKey(m) !== key);
+    syncNotificationBadges();
+    renderMessagesView();
+  } catch (err) {
+    alert(err.message || "Could not delete the conversation.");
+  }
 }
 
 /* ---- In-app notification badges (unread texts + new orders) ---- */
