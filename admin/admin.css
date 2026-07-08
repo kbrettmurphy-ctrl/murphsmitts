@@ -7040,3 +7040,21 @@ body.has-notifications .topbar-menu-btn::after{
     overflow:hidden;
   }
 }
+
+/* ---- Standalone gap, root cause: in an installed PWA iOS under-reports
+   dvh/% by the status-bar inset, so the 100dvh panel came up short at the
+   bottom. There's no browser chrome in standalone, so plain 100vh is exact.
+   Force vh for every layer of the height chain. ---- */
+@media (display-mode: standalone){
+  html,
+  body,
+  .app-shell{
+    height:100vh;
+    min-height:100vh;
+  }
+
+  .main-panel{
+    height:100vh;
+    min-height:100vh;
+  }
+}
