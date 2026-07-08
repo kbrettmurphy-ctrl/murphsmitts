@@ -9323,6 +9323,7 @@ async function renderMessagesView() {
   }
 
   openThreadKey = null;
+  releaseConvoViewport();
   messagesPanel.innerHTML = `
     <div class="dashboard-shell messages-shell">
       <div class="dashboard-card msg-inbox-card">
@@ -9538,23 +9539,75 @@ async function deleteMessageThread(key) {
 }
 
 /* Size the open conversation to the visual viewport so the keyboard never
-   scrolls the page: header/reply bar stay put, only messages scroll. */
+   scrolls the page: header/reply bar stay put, only messages scroll.
+
+   Browser mode: iOS scrolls the layout viewport — pin it back with
+   window.scrollTo(0,0).
+   Standalone PWA: the body is fixed, so iOS instead PANS the visual
+   viewport (vv.offsetTop) — fixed/sticky chrome slides out of view. Follow
+   the pan by translating the app shell and capping its height to vv.height,
+   which keeps header + reply bar glued to the visible screen. */
+function isStandaloneMode() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function convoIsOpen() {
+  return !!openThreadKey && !!messagesView?.classList.contains("active");
+}
+
 function fitConvoToViewport() {
   const convo = messagesPanel?.querySelector(".msg-convo");
   if (!convo || !openThreadKey) return;
   const vv = window.visualViewport;
+  const vvH = vv ? vv.height : window.innerHeight;
+
+  const shell = document.querySelector(".app-shell");
+  if (shell && isStandaloneMode()) {
+    const offset = vv ? vv.offsetTop : 0;
+    if (offset > 2 || (vv && vvH < window.innerHeight - 40)) {
+      shell.style.transform = `translateY(${offset}px)`;
+      shell.style.height = vvH + "px";
+    } else {
+      shell.style.transform = "";
+      shell.style.height = "";
+    }
+  } else {
+    window.scrollTo(0, 0);
+  }
+
   const topbar = messagesView?.querySelector(".topbar");
   const head = messagesPanel.querySelector(".msg-convo-head");
   const bar = messagesPanel.querySelector(".msg-replybar");
-  const vvH = vv ? vv.height : window.innerHeight;
   const used = (topbar?.offsetHeight || 0) + (head?.offsetHeight || 0) + (bar?.offsetHeight || 0) + 66;
   convo.style.maxHeight = Math.max(120, vvH - used) + "px";
-  window.scrollTo(0, 0);
   convo.scrollTop = convo.scrollHeight;
 }
 
-window.visualViewport?.addEventListener("resize", () => {
-  if (openThreadKey && messagesView?.classList.contains("active")) fitConvoToViewport();
+function releaseConvoViewport() {
+  const shell = document.querySelector(".app-shell");
+  if (shell) { shell.style.transform = ""; shell.style.height = ""; }
+}
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", () => {
+    if (convoIsOpen()) fitConvoToViewport();
+    else releaseConvoViewport();
+  });
+  /* iOS fires vv "scroll" (pan) without resize while the keyboard is up. */
+  window.visualViewport.addEventListener("scroll", () => {
+    if (convoIsOpen()) fitConvoToViewport();
+  });
+}
+
+/* Focus/blur settle after iOS animations — refit on both edges. */
+document.addEventListener("focusin", (e) => {
+  if (e.target?.id === "msgReplyInput") setTimeout(fitConvoToViewport, 350);
+});
+document.addEventListener("focusout", (e) => {
+  if (e.target?.id === "msgReplyInput") setTimeout(() => {
+    if (convoIsOpen()) fitConvoToViewport();
+    else releaseConvoViewport();
+  }, 350);
 });
 
 /* ---- In-app notification badges (unread texts + new orders) ---- */
