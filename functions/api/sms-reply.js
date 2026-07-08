@@ -22,7 +22,7 @@ export async function onRequest(context) {
     const mediaCount = Number(form.get("NumMedia") || 0);
 
     if (!from || (!message && mediaCount === 0)) {
-      return twiml("Thanks. I received your message.");
+      return twiml("");
     }
 
     const digits = from.replace(/\D/g, "");
@@ -35,7 +35,7 @@ export async function onRequest(context) {
 
     if (!found.ok || !Array.isArray(found.data)) {
       await notifyOwner(env, `Incoming text lookup failed from ${from}`, message);
-      return twiml("Thanks for the message. Brett will follow up with you.");
+      return twiml("");
     }
 
     const order = found.data.find(row => {
@@ -47,7 +47,7 @@ export async function onRequest(context) {
       await storeInboundMessage(env, { from, body: message, orderNumber: null, customerName: null, mediaUrls: [] });
       await sendWebPushToAll(env, { title: "New text", body: `${from}: ${message}`.slice(0, 140), url: "/admin/?view=messages" });
       await notifyOwner(env, `Incoming text from unknown number ${from}`, message);
-      return twiml("Thanks for the message. Brett will follow up with you.");
+      return twiml("");
     }
 
     const orderNumber = order.order_number;
@@ -64,9 +64,9 @@ export async function onRequest(context) {
       updates.glove_photos = [...existingPhotos, ...mediaUrls];
     }
 
-    let reply = mediaUrls.length
-      ? "Thanks, I received the photo(s). Brett will review them and follow up if needed."
-      : "Thanks for the message. Brett will follow up with you.";
+    /* No auto-reply by default — Brett answers from the Messages inbox.
+       Only the YES/NO estimate flows below send a confirmation. */
+    let reply = "";
 
     if (normalized === "yes" || normalized === "y") {
       if (normalizeStatus(order.status) === "estimate sent") {
@@ -102,7 +102,7 @@ export async function onRequest(context) {
 
     if (!patch.ok) {
       await notifyOwner(env, `Incoming text failed to save for Order #${orderNumber}`, message);
-      return twiml("Thanks for the message. Brett will follow up with you.");
+      return twiml("");
     }
 
     await storeInboundMessage(env, {
@@ -127,13 +127,14 @@ export async function onRequest(context) {
 
     return twiml(reply);
   } catch (err) {
-    return twiml("Thanks for the message. Brett will follow up with you.");
+    return twiml("");
   }
 }
 
 function twiml(message) {
   const safe = escapeXml(message || "");
-  return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response><Message>${safe}</Message></Response>`, {
+  const inner = safe ? `<Message>${safe}</Message>` : "";
+  return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response>${inner}</Response>`, {
     status: 200,
     headers: {
       "Content-Type": "text/xml; charset=utf-8",

@@ -7058,3 +7058,21 @@ body.has-notifications .topbar-menu-btn::after{
     min-height:100vh;
   }
 }
+
+/* ---- Mobile browser: scroll the document (not the inner panel) so
+   Safari's toolbar minimizes on scroll like every normal page. Standalone
+   PWA and desktop keep the inner scroller. ---- */
+@media (max-width: 899px) and (display-mode: browser){
+  html,
+  body{
+    height:auto;
+    min-height:100%;
+    overflow:visible;
+  }
+
+  .main-panel{
+    height:auto;
+    min-height:100dvh;
+    overflow:visible;
+  }
+}

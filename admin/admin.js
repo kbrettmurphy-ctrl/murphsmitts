@@ -224,6 +224,9 @@ function isAdminActionSurface(target) {
    scrollable). Snap the stranded window offset back to 0 once the keyboard
    is gone. Never touches .main-panel scroll position, never re-renders. */
 function resetStrandedWindowScroll() {
+  /* Mobile browser mode scrolls the document itself (so Safari's toolbar
+     can collapse) — window scroll is legitimate there, never reset it. */
+  if (window.matchMedia("(max-width: 899px) and (display-mode: browser)").matches) return;
   const stranded =
     (window.scrollY || 0) ||
     (document.documentElement.scrollTop || 0) ||
