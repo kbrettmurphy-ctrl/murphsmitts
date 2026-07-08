@@ -9048,11 +9048,14 @@ function renderUsersContent(users) {
             ${flags.join("")}
           </div>
         </div>
-        <div class="user-row-actions">
-          <button type="button" class="user-action-btn" data-user-action="role">${u.role === "admin" ? "Make demo" : "Make admin"}</button>
-          <button type="button" class="user-action-btn" data-user-action="password">Set password</button>
-          <button type="button" class="user-action-btn" data-user-action="toggle">${u.active ? "Disable" : "Enable"}</button>
-          <button type="button" class="user-action-btn user-action-danger" data-user-action="remove">Remove</button>
+        <div class="user-row-actions user-menu-wrap">
+          <button type="button" class="user-action-btn user-menu-btn" data-user-menu aria-haspopup="menu" aria-label="Account actions">&#8943;</button>
+          <div class="dashboard-timer-popover user-menu-pop" hidden>
+            <button type="button" class="dashboard-timer-phase-option" data-user-action="role">${u.role === "admin" ? "Make demo" : "Make admin"}</button>
+            <button type="button" class="dashboard-timer-phase-option" data-user-action="password">Set password</button>
+            <button type="button" class="dashboard-timer-phase-option" data-user-action="toggle">${u.active ? "Disable" : "Enable"}</button>
+            <button type="button" class="dashboard-timer-phase-option dashboard-timer-stop-option" data-user-action="remove">Remove</button>
+          </div>
         </div>
       </div>
     `;
@@ -9090,6 +9093,14 @@ function wireUsersPanel() {
       await handleUserInvite();
       return;
     }
+    const menuBtn = e.target.closest("[data-user-menu]");
+    if (menuBtn) {
+      const pop = menuBtn.parentElement.querySelector(".user-menu-pop");
+      const wasHidden = pop.hidden;
+      usersPanel.querySelectorAll(".user-menu-pop").forEach(el => { el.hidden = true; });
+      pop.hidden = !wasHidden;
+      return;
+    }
     const actionBtn = e.target.closest("[data-user-action]");
     if (!actionBtn) return;
     const row = actionBtn.closest("[data-user-id]");
@@ -9102,6 +9113,11 @@ function wireUsersPanel() {
     });
   });
 }
+
+document.addEventListener("click", (e) => {
+  if (e.target.closest?.(".user-menu-wrap")) return;
+  usersPanel?.querySelectorAll(".user-menu-pop").forEach(el => { el.hidden = true; });
+});
 
 async function handleUserInvite() {
   const emailEl = document.getElementById("userInviteEmail");

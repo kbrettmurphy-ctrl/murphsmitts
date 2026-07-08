@@ -7169,3 +7169,18 @@ body.has-notifications .topbar-menu-btn::after{
 .user-row-title{
   font-size:.88rem;
 }
+
+/* ---- Account row ••• menu ---- */
+.user-menu-wrap{
+  position:relative;
+}
+
+.user-menu-btn{
+  min-width:32px;
+  font-size:1rem;
+  line-height:1;
+}
+
+.user-menu-pop{
+  top:calc(100% + 4px);
+}
