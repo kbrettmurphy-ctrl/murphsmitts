@@ -9395,7 +9395,7 @@ function openMessageThread(key) {
   });
 
   messagesPanel.innerHTML = `
-    <div class="dashboard-shell messages-shell">
+    <div class="dashboard-shell messages-shell msg-convo-shell">
       <div class="msg-convo-head">
         <button type="button" class="msg-back" data-msg-back>‹ Inbox</button>
         <div class="msg-convo-who">
@@ -9656,14 +9656,13 @@ function fitConvoToViewport() {
     window.scrollTo(0, 0);
   }
 
+  /* Flex layout: size only the screen shell; the convo flex-fills whatever
+     is left after header/reply bar/status — no per-element math to drift. */
   const topbar = messagesView?.querySelector(".topbar");
-  const head = messagesPanel.querySelector(".msg-convo-head");
-  const bar = messagesPanel.querySelector(".msg-replybar");
-  const used = (topbar?.offsetHeight || 0) + (head?.offsetHeight || 0) + (bar?.offsetHeight || 0)
-    + (messagesPanel.querySelector("#msgReplyStatus")?.offsetHeight || 0)
-    + (document.getElementById("msgAttachPreview")?.offsetHeight || 0)
-    + 44; /* panel padding + replybar margins + sticky offset */
-  convo.style.maxHeight = Math.max(120, vvH - used) + "px";
+  const shellEl = messagesPanel.querySelector(".msg-convo-shell");
+  if (shellEl) {
+    shellEl.style.height = Math.max(220, vvH - (topbar?.offsetHeight || 0) - 24) + "px";
+  }
   convo.scrollTop = convo.scrollHeight;
 }
 

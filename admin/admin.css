@@ -7412,3 +7412,30 @@ body.has-notifications .topbar-menu-btn::after{
 .msg-convo{
   padding-bottom:2px;
 }
+
+/* ---- Conversation screen: flex column pinned to the visual viewport.
+   The message list flex-fills between header and reply bar, so the input
+   is always exactly above the keyboard — no height arithmetic. ---- */
+.msg-convo-shell{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  min-height:0;
+}
+
+.msg-convo-shell .msg-convo{
+  flex:1 1 auto;
+  min-height:0;
+  max-height:none;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+
+.msg-convo-shell .msg-replybar{
+  position:static;
+  margin-top:0;
+}
+
+.msg-convo-shell .msg-convo-head{
+  margin-bottom:0;
+}
