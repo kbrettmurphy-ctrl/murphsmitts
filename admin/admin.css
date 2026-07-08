@@ -7343,3 +7343,61 @@ body.has-notifications .topbar-menu-btn::after{
   background:var(--navy);
   color:var(--cream);
 }
+
+/* ---- iOS-style media messages ---- */
+.msg-bubble.msg-media-only{
+  background:transparent;
+  border:none;
+  padding:0;
+}
+
+.msg-media-img{
+  max-width:220px;
+  max-height:280px;
+  border-radius:16px;
+  margin-top:0;
+  display:block;
+}
+
+.msg-bubble:not(.msg-media-only) .msg-media-img{
+  margin-top:6px;
+  border-radius:12px;
+}
+
+/* Attachment preview above the input, thumbnail with ✕ (like iOS) */
+.msg-attach-preview{
+  display:flex;
+  padding:6px 2px 0;
+}
+
+.msg-attach-thumb{
+  position:relative;
+  display:inline-block;
+}
+
+.msg-attach-thumb img{
+  width:64px;
+  height:64px;
+  object-fit:cover;
+  border-radius:12px;
+  display:block;
+}
+
+.msg-attach-remove{
+  position:absolute;
+  top:-6px;
+  right:-6px;
+  width:20px;
+  height:20px;
+  border:none;
+  border-radius:50%;
+  background:rgba(9,47,77,.85);
+  color:#fff;
+  font-size:.6rem;
+  line-height:1;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+}

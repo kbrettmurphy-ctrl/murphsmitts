@@ -361,6 +361,20 @@ export async function onRequest(context) {
       return json({ ok: true }, 200, jsonHeaders);
     }
 
+    if (action === "deleteMessage") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const id = cleanText(body.id);
+      if (!id) return json({ ok: false, error: "Missing message id." }, 200, jsonHeaders);
+      const resp = await supabaseFetch(
+        env,
+        `/rest/v1/sms_messages?id=eq.${encodeURIComponent(id)}`,
+        { method: "DELETE", headers: { Prefer: "return=minimal" } }
+      );
+      if (!resp.ok) return json({ ok: false, error: "Could not delete the message." }, 200, jsonHeaders);
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
     if (action === "deleteMessageThread") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) return json(auth, 200, jsonHeaders);

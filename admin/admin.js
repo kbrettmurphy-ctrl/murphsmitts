@@ -808,6 +808,9 @@ function demoApi(body) {
         if (m.direction === "in" && (!body.phoneNumber || m.phoneNumber === body.phoneNumber)) m.read = true;
       });
       return demoResult();
+    case "deleteMessage":
+      store.messages = store.messages.filter(m => String(m.id) !== String(body.id));
+      return demoResult();
     case "deleteMessageThread": {
       const keys = new Set((body.phoneNumbers || []).map(pn => String(pn).replace(/\D/g, "").slice(-10)));
       store.messages = store.messages.filter(m => !keys.has(String(m.phoneNumber).replace(/\D/g, "").slice(-10)));
@@ -9384,9 +9387,10 @@ function openMessageThread(key) {
     const tail = !next || (next.direction === "out" ? "out" : "in") !== dir ||
       new Date(next.createdAt).toDateString() !== day;
     const media = m.mediaUrls.map(u => `<a href="${escapeAttr(u)}" target="_blank" rel="noopener"><img class="msg-media-img" src="${escapeAttr(u)}" alt="Photo" loading="lazy"></a>`).join("");
+    const mediaOnly = !m.body && m.mediaUrls.length ? " msg-media-only" : "";
     bubbles += `
-    <div class="msg-line msg-line-${dir}${tail ? " msg-tail" : ""}">
-      <div class="msg-bubble msg-${dir}">${m.body ? escapeHtml(m.body) : ""}${media}</div>
+    <div class="msg-line msg-line-${dir}${tail ? " msg-tail" : ""}" data-mid="${escapeAttr(m.id)}">
+      <div class="msg-bubble msg-${dir}${mediaOnly}">${m.body ? escapeHtml(m.body) : ""}${media}</div>
     </div>`;
   });
 
@@ -9409,6 +9413,7 @@ function openMessageThread(key) {
       </div>
       <div class="msg-convo">${bubbles}</div>
       ${t.phoneNumber ? `
+        <div id="msgAttachPreview" class="msg-attach-preview" hidden></div>
         <div class="msg-reply msg-replybar">
           <button type="button" id="msgAttachBtn" class="msg-attach-btn" aria-label="Attach photo">
             <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"></rect><circle cx="12" cy="13" r="4"></circle><path d="M9 6l1.2-2h3.6L15 6"></path></svg>
@@ -9481,7 +9486,7 @@ async function handleMessageReply(btn) {
       orderNumber: btn.dataset.order || "",
       customerName: btn.dataset.name || ""
     }, true);
-    pendingMsgPhoto = "";
+    clearPendingMsgPhoto();
     if (input) input.value = "";
     await refreshMessages();
     if (isCompose) renderMessagesView();
@@ -9503,6 +9508,10 @@ function wireMessagesPanel() {
       document.getElementById("msgAttachInput")?.click();
       return;
     }
+    if (e.target.closest("[data-attach-remove]")) {
+      clearPendingMsgPhoto();
+      return;
+    }
     const sendBtn = e.target.closest("#msgReplyBtn");
     if (sendBtn) { await handleMessageReply(sendBtn); return; }
     const thread = e.target.closest("[data-thread]");
@@ -9516,6 +9525,8 @@ function wireMessagesPanel() {
 
   /* Apple-style swipe-to-delete on inbox rows. */
   let swipeEl = null, swipeX = 0, swipeY = 0, swiping = false;
+  armMessageDelete(messagesPanel);
+
   messagesPanel.addEventListener("change", (e) => {
     if (e.target?.id !== "msgAttachInput") return;
     const file = e.target.files && e.target.files[0];
@@ -9523,10 +9534,12 @@ function wireMessagesPanel() {
     const reader = new FileReader();
     reader.onload = () => {
       pendingMsgPhoto = String(reader.result || "");
-      const btn = document.getElementById("msgAttachBtn");
-      if (btn) btn.classList.add("has-photo");
-      const input = document.getElementById("msgReplyInput");
-      if (input && !input.value) input.placeholder = "Photo attached — add a note or send";
+      const prev = document.getElementById("msgAttachPreview");
+      if (prev) {
+        prev.hidden = false;
+        prev.innerHTML = `<span class="msg-attach-thumb"><img src="${pendingMsgPhoto}" alt="Attached photo"><button type="button" class="msg-attach-remove" data-attach-remove aria-label="Remove photo">&#10005;</button></span>`;
+      }
+      fitConvoToViewport();
     };
     reader.readAsDataURL(file);
   });
@@ -9546,6 +9559,48 @@ function wireMessagesPanel() {
     if (swiping && dx > 30) swipeEl.classList.remove("is-open");
   }, { passive: true });
   messagesPanel.addEventListener("touchend", () => { swipeEl = null; swiping = false; });
+}
+
+function clearPendingMsgPhoto() {
+  pendingMsgPhoto = "";
+  const prev = document.getElementById("msgAttachPreview");
+  if (prev) { prev.hidden = true; prev.innerHTML = ""; }
+  const fileInput = document.getElementById("msgAttachInput");
+  if (fileInput) fileInput.value = "";
+  fitConvoToViewport();
+}
+
+/* Long-press (or right-click) a bubble to delete it, iOS-style. */
+let msgPressTimer = null;
+function armMessageDelete(panel) {
+  const start = (e, mid) => {
+    msgPressTimer = setTimeout(() => confirmDeleteMessage(mid), 550);
+  };
+  panel.addEventListener("touchstart", (e) => {
+    const line = e.target.closest?.(".msg-line[data-mid]");
+    if (line) start(e, line.dataset.mid);
+  }, { passive: true });
+  ["touchmove", "touchend", "touchcancel"].forEach(ev =>
+    panel.addEventListener(ev, () => clearTimeout(msgPressTimer), { passive: true }));
+  panel.addEventListener("contextmenu", (e) => {
+    const line = e.target.closest?.(".msg-line[data-mid]");
+    if (!line) return;
+    e.preventDefault();
+    confirmDeleteMessage(line.dataset.mid);
+  });
+}
+
+async function confirmDeleteMessage(mid) {
+  if (!mid) return;
+  if (!confirm("Delete this message?")) return;
+  try {
+    await postJson({ action: "deleteMessage", id: mid }, true);
+    allMessages = allMessages.filter(m => String(m.id) !== String(mid));
+    if (openThreadKey) openMessageThread(openThreadKey);
+    syncNotificationBadges();
+  } catch (err) {
+    alert(err.message || "Could not delete the message.");
+  }
 }
 
 async function deleteMessageThread(key) {
