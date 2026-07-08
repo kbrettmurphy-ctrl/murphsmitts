@@ -9240,6 +9240,7 @@ async function startInviteFlow(token) {
    MESSAGES / TWILIO INBOX + NOTIFICATIONS
 ========================= */
 let allMessages = [];
+let openThreadKey = null;
 const ORDERS_SEEN_KEY = "mm_orders_seen_ts";
 
 function msgThreadKey(m) {
@@ -9295,7 +9296,8 @@ async function refreshMessages({ rerender = false } = {}) {
     allMessages = data.messages || [];
     syncNotificationBadges();
     if (rerender && messagesView && messagesView.classList.contains("active")) {
-      renderMessagesView();
+      if (openThreadKey) openMessageThread(openThreadKey);
+      else renderMessagesView();
     }
   } catch {
     /* Inbox is a background extra — never block the app. */
@@ -9318,6 +9320,7 @@ async function renderMessagesView() {
       : `${threads.length} ${threads.length === 1 ? "conversation" : "conversations"}`;
   }
 
+  openThreadKey = null;
   messagesPanel.innerHTML = `
     <div class="dashboard-shell messages-shell">
       <div class="dashboard-card msg-inbox-card">
@@ -9355,6 +9358,7 @@ function renderThreadRow(t) {
 function openMessageThread(key) {
   const t = groupMessageThreads(allMessages).find(x => x.key === key);
   if (!t || !messagesPanel) return;
+  openThreadKey = key;
 
   let prevDay = "";
   let bubbles = "";
