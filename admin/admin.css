@@ -6883,10 +6883,6 @@ body.has-notifications .topbar-menu-btn::after{
     padding-top:calc(18px + env(safe-area-inset-top));
   }
 
-  .main-panel{
-    padding-bottom:env(safe-area-inset-bottom);
-  }
-
   #loginView.active{
     padding-top:calc(16px + env(safe-area-inset-top));
   }
