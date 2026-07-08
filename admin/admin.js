@@ -11653,9 +11653,18 @@ async function checkForNewBuild() {
   if (now - lastBuildCheck < 5 * 60 * 1000) return;
   lastBuildCheck = now;
   try {
-    const res = await fetch("/admin/index.html", { cache: "no-store" });
-    if (!res.ok) return;
-    const hash = hashStr(await res.text());
+    /* Watch the deployed assets' ETags, not index.html (which rarely
+       changes) — JS/CSS-only deploys must trigger the refresh too. */
+    const heads = await Promise.all(
+      ["/admin/index.html", "/admin/admin.js", "/admin/admin.css"].map(u =>
+        fetch(u, { method: "HEAD", cache: "no-store" })
+      )
+    );
+    if (heads.some(r => !r.ok)) return;
+    const sig = heads.map(r =>
+      (r.headers.get("etag") || "") + (r.headers.get("last-modified") || "")
+    ).join("|");
+    const hash = hashStr(sig);
     const stored = localStorage.getItem(BUILD_HASH_KEY);
     localStorage.setItem(BUILD_HASH_KEY, hash);
     if (stored && stored !== hash) location.reload();
