@@ -6734,3 +6734,55 @@ body.has-notifications .topbar-menu-btn::after{
   font-size:.85rem;
   cursor:pointer;
 }
+
+/* ---- Messages/notification refinements ---- */
+.nav-badge{
+  min-width:15px;
+  height:15px;
+  padding:0 4px;
+  font-size:.56rem;
+  line-height:1;
+}
+
+/* Mobile menu dot: no outline, just the dot. */
+body.has-notifications .topbar-menu-btn::after{
+  border:none;
+}
+
+/* Timestamp sits outside the bubble, toward the center of the viewer. */
+.msg-line{
+  display:flex;
+  align-items:flex-end;
+  gap:8px;
+  max-width:90%;
+}
+.msg-line-in{ align-self:flex-start; }
+.msg-line-out{ align-self:flex-end; flex-direction:row-reverse; }
+.msg-line .msg-bubble{ max-width:100%; }
+.msg-time{
+  flex:0 0 auto;
+  display:inline-block;
+  margin:0;
+  font-size:.6rem;
+  opacity:.5;
+  white-space:nowrap;
+  color:var(--navy);
+}
+
+.msg-media-img{
+  display:block;
+  max-width:180px;
+  border-radius:10px;
+  margin-top:4px;
+}
+
+.msg-reply input{
+  width:100%;
+  border:1px solid rgba(9,47,77,.22);
+  border-radius:10px;
+  padding:9px 11px;
+  font-size:.9rem;
+  color:var(--navy);
+  background:#fffdf8;
+  outline:none;
+}

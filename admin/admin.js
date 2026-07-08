@@ -9325,12 +9325,15 @@ function openMessageThread(key) {
   const t = groupMessageThreads(allMessages).find(x => x.key === key);
   if (!t || !messagesPanel) return;
 
-  const bubbles = t.messages.map(m => `
-    <div class="msg-bubble msg-${m.direction === "out" ? "out" : "in"}">
-      ${m.body ? escapeHtml(m.body) : ""}
-      ${m.mediaUrls.map(u => `<a href="${escapeAttr(u)}" target="_blank" rel="noopener" class="msg-media">Photo</a>`).join("")}
+  const bubbles = t.messages.map(m => {
+    const dir = m.direction === "out" ? "out" : "in";
+    const media = m.mediaUrls.map(u => `<a href="${escapeAttr(u)}" target="_blank" rel="noopener"><img class="msg-media-img" src="${escapeAttr(u)}" alt="Photo" loading="lazy"></a>`).join("");
+    return `
+    <div class="msg-line msg-line-${dir}">
+      <div class="msg-bubble msg-${dir}">${m.body ? escapeHtml(m.body) : ""}${media}</div>
       <span class="msg-time">${escapeHtml(formatMessageTime(m.createdAt))}</span>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   messagesPanel.innerHTML = `
     <div class="dashboard-shell messages-shell">
@@ -9366,25 +9369,49 @@ async function markThreadRead(phoneNumber) {
   try { await postJson({ action: "markMessagesRead", phoneNumber }, true); } catch {}
 }
 
+function renderComposeView() {
+  if (!messagesPanel) return;
+  showView(messagesView);
+  messagesPanel.innerHTML = `
+    <div class="dashboard-shell messages-shell">
+      <div class="msg-convo-head">
+        <button type="button" class="msg-back" data-msg-back>‹ Inbox</button>
+        <div class="msg-thread-title">New message</div>
+      </div>
+      <div class="msg-reply msg-compose">
+        <input id="msgComposeTo" type="tel" inputmode="tel" placeholder="Phone number" autocomplete="off">
+        <textarea id="msgReplyInput" rows="3" placeholder="Message…"></textarea>
+        <button type="button" id="msgReplyBtn" class="msg-reply-btn" data-compose="1">Send</button>
+        <p id="msgReplyStatus" class="status muted"></p>
+      </div>
+    </div>`;
+  wireMessagesPanel();
+  document.getElementById("msgComposeTo")?.focus();
+}
+
 async function handleMessageReply(btn) {
   const input = document.getElementById("msgReplyInput");
   const statusEl = document.getElementById("msgReplyStatus");
   const text = (input?.value || "").trim();
+  const isCompose = btn.dataset.compose === "1";
+  const phone = isCompose ? (document.getElementById("msgComposeTo")?.value || "").trim() : btn.dataset.phone;
   if (!text) return;
+  if (!phone) { if (statusEl) statusEl.textContent = "Enter a phone number."; return; }
 
   btn.disabled = true;
   if (statusEl) statusEl.textContent = "Sending…";
   try {
     await postJson({
       action: "sendMessageReply",
-      phoneNumber: btn.dataset.phone,
+      phoneNumber: phone,
       body: text,
-      orderNumber: btn.dataset.order,
-      customerName: btn.dataset.name
+      orderNumber: btn.dataset.order || "",
+      customerName: btn.dataset.name || ""
     }, true);
     if (input) input.value = "";
     await refreshMessages();
-    openMessageThread(btn.dataset.thread);
+    if (isCompose) renderMessagesView();
+    else openMessageThread(btn.dataset.thread);
   } catch (err) {
     if (statusEl) statusEl.textContent = err.message || "Could not send the message.";
     btn.disabled = false;
@@ -11369,6 +11396,7 @@ menuBtn.addEventListener("click", openMenu);
 homeMenuBtn?.addEventListener("click", openMenu);
 document.getElementById("usersMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("messagesMenuBtn")?.addEventListener("click", openMenu);
+document.getElementById("msgComposeBtn")?.addEventListener("click", renderComposeView);
 
 /* Poll the Twilio inbox so new-text and new-order badges stay live. */
 setInterval(() => { if (getToken()) refreshMessages(); }, 60000);
