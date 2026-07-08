@@ -8816,6 +8816,7 @@ async function finishLoginWithToken(token, role) {
   setActiveView("dashboard");
   refreshPasskeySetupVisibility();
   refreshMessages();
+  refreshPushButtonVisibility();
 }
 
 /* =========================
@@ -11507,3 +11508,66 @@ document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
     showView(loginView);
   }
 })();
+
+/* =========================
+   WEB PUSH (PWA notifications)
+========================= */
+const sideNavPushBtn = document.getElementById("sideNavPushBtn");
+
+function isPushSupported() {
+  return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+}
+
+function pushKeyToBytes(s) {
+  const b = s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4);
+  return Uint8Array.from(atob(b), c => c.charCodeAt(0));
+}
+
+async function getPushRegistration() {
+  return navigator.serviceWorker.register("/admin/sw.js", { scope: "/admin/" });
+}
+
+async function refreshPushButtonVisibility() {
+  if (!sideNavPushBtn) return;
+  if (!isPushSupported() || !getToken() || isDemoRole()) { sideNavPushBtn.hidden = true; return; }
+  try {
+    const reg = await getPushRegistration();
+    const sub = await reg.pushManager.getSubscription();
+    sideNavPushBtn.hidden = !!sub && Notification.permission === "granted";
+  } catch {
+    sideNavPushBtn.hidden = true;
+  }
+}
+
+async function enablePushNotifications() {
+  const prev = sideNavPushBtn ? sideNavPushBtn.textContent : "";
+  try {
+    if (sideNavPushBtn) sideNavPushBtn.textContent = "Enabling…";
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") throw new Error("Notifications were not allowed.");
+
+    const cfg = await postJson({ action: "getPushPublicKey" });
+    if (!cfg.publicKey) throw new Error("Push is not configured on the server.");
+
+    const reg = await getPushRegistration();
+    await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: pushKeyToBytes(cfg.publicKey)
+    });
+
+    await postJson({ action: "savePushSubscription", subscription: sub.toJSON(), label: navigator.userAgent.slice(0, 80) }, true);
+    await postJson({ action: "sendTestPush" }, true);
+
+    if (sideNavPushBtn) {
+      sideNavPushBtn.textContent = "Notifications on ✓";
+      setTimeout(() => { sideNavPushBtn.textContent = prev; sideNavPushBtn.hidden = true; }, 2000);
+    }
+  } catch (err) {
+    if (sideNavPushBtn) sideNavPushBtn.textContent = prev;
+    alert(err && err.message ? err.message : "Could not enable notifications.");
+  }
+}
+
+sideNavPushBtn?.addEventListener("click", () => { closeMenu(); enablePushNotifications(); });
+if (isPushSupported() && getToken()) refreshPushButtonVisibility();

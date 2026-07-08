@@ -1,3 +1,5 @@
+import { sendWebPushToAll } from "./_webpush.js";
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -196,6 +198,11 @@ export async function onRequest(context) {
         );
       }
 
+      await sendWebPushToAll(env, {
+        title: "New order",
+        body: `#${inserted.order_number} — ${inserted.customer_name || "Customer"} (${inserted.glove_type || "glove"})`,
+        url: "/admin/"
+      });
       await sendPushoverNotification(env, {
         orderNumber: inserted.order_number,
         name: inserted.customer_name,

@@ -1,3 +1,5 @@
+import { sendWebPushToAll } from "./_webpush.js";
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -292,6 +294,37 @@ export async function onRequest(context) {
         { method: "DELETE", headers: { Prefer: "return=minimal" } }
       );
       if (!resp.ok) return json({ ok: false, error: "Could not remove the user." }, 200, jsonHeaders);
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
+    if (action === "getPushPublicKey") {
+      return json({ ok: true, publicKey: env.VAPID_PUBLIC_KEY || "" }, 200, jsonHeaders);
+    }
+
+    if (action === "savePushSubscription") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const sub = body.subscription || {};
+      const keys = sub.keys || {};
+      if (!sub.endpoint || !keys.p256dh || !keys.auth) {
+        return json({ ok: false, error: "Invalid subscription." }, 200, jsonHeaders);
+      }
+      const resp = await supabaseFetch(env, `/rest/v1/push_subscriptions?on_conflict=endpoint`, {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({
+          endpoint: sub.endpoint, p256dh: keys.p256dh, auth: keys.auth,
+          label: cleanText(body.label) || null, last_used_at: new Date().toISOString()
+        })
+      });
+      if (!resp.ok) return json({ ok: false, error: "Could not save subscription." }, 200, jsonHeaders);
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
+    if (action === "sendTestPush") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      await sendWebPushToAll(env, { title: "MurphOS", body: "Push notifications are working.", url: "/admin/" });
       return json({ ok: true }, 200, jsonHeaders);
     }
 
