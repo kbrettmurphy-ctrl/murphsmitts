@@ -169,6 +169,12 @@ export async function onRequest(context) {
         return json({ ok: false, error: "Could not set your password." }, 200, jsonHeaders);
       }
 
+      await sendWebPushToAll(env, {
+        title: "Invite accepted",
+        body: `${user.display_name || user.email} set their password (${user.role}).`,
+        url: "/admin/?view=users"
+      });
+
       const token = await createSignedToken(
         { sub: user.id, email: user.email, role: user.role, exp: Date.now() + 1000 * 60 * 60 * 24 * 14 },
         env.ADMIN_SESSION_SECRET
