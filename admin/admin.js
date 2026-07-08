@@ -527,6 +527,45 @@ function daysAgoIso(days) {
   return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
 }
 
+/* Canonical status progression for seeded demo activity. */
+const DEMO_STATUS_FLOW = [
+  "Received",
+  "Estimate Sent",
+  "Pending Response",
+  "Customer Approved",
+  "In Progress",
+  "Ready to Go",
+  "Completed"
+];
+
+/* Build the status-change activity an order would have accumulated to reach
+   its current status (newest first, one step per day from the received date).
+   Received orders get none, so they still read as "new / no activity yet". */
+function demoStatusActivity(status, receivedIso) {
+  const base = new Date(`${receivedIso || daysAgoIso(3)}T09:15:00`).getTime();
+  const dayMs = 86400000;
+  const idx = DEMO_STATUS_FLOW.indexOf(status);
+  const events = [];
+
+  if (idx > 0) {
+    for (let i = 1; i <= idx; i++) {
+      events.push({
+        createdAt: new Date(base + i * dayMs).toISOString(),
+        eventLabel: "Status changed",
+        eventDetail: DEMO_STATUS_FLOW[i]
+      });
+    }
+  } else if (status && status !== "Received") {
+    events.push({
+      createdAt: new Date(base + dayMs).toISOString(),
+      eventLabel: "Status changed",
+      eventDetail: status
+    });
+  }
+
+  return events.reverse();
+}
+
 function seedDemoStore() {
   const mkOrder = (n, over) => ({
     orderNumber: n,
@@ -536,46 +575,57 @@ function seedDemoStore() {
     brandModel: over.brandModel || "Rawlings Heart of the Hide",
     gloveType: over.gloveType || "Fielders",
     webType: over.webType || "I-Web",
-    servicesRequested: over.servicesRequested || "Relace, Clean & Condition",
-    primaryLaceColor: over.primaryLaceColor || "Tan",
-    secondaryLaceColor: over.secondaryLaceColor || "",
+    servicesRequested: over.services,
+    primaryLaceColor: over.lace,
+    secondaryLaceColor: over.secondaryLace || "",
     customColorRequest: "",
     primaryLaceUsed: "",
     secondaryLaceUsed: "",
-    status: over.status || "Received",
+    status: over.status,
     paid: over.paid || "Unpaid",
-    priceQuoted: over.priceQuoted ?? 80,
+    /* Price is set when the estimate is sent; completion date when work
+       starts — so earlier statuses leave them blank. */
+    priceQuoted: over.price ?? "",
     shippingCost: over.shippingCost ?? 0,
     dropOffMethod: over.dropOffMethod || "Local drop-off",
     streetAddress: "", city: "Sample City", state: "OH", zipCode: "",
-    dateReceived: over.dateReceived || daysAgoIso(over.age ?? 3),
-    estimatedCompletion: over.estimatedCompletion || daysAgoIso(-4),
+    dateReceived: daysAgoIso(over.age),
+    estimatedCompletion: over.estCompletion || "",
     dateCompleted: over.dateCompleted || "",
     internalNotes: "", gloveNotes: over.gloveNotes || "",
     trackingNumber: "", carrier: "",
-    createdAt: daysAgoIso(over.age ?? 3),
+    createdAt: daysAgoIso(over.age),
     updatedAt: demoNow()
   });
 
+  const orders = [
+    mkOrder("9001", { customerName: "Sample Slugger", status: "Received", age: 1, services: "Cleaning + Conditioning + Relacing", lace: "Tan – Camel" }),
+    mkOrder("9002", { customerName: "Demo Diaz", status: "In Progress", age: 5, paid: "Paid", price: 100, estCompletion: daysAgoIso(-3), brandModel: "Wilson A2000", gloveType: "Catchers", services: "Relacing", lace: "Black" }),
+    mkOrder("9003", { customerName: "Test Tanaka", status: "Ready to Go", age: 7, price: 80, estCompletion: daysAgoIso(-1), services: "Cleaning + Conditioning + Relacing", lace: "Brown – Chestnut" }),
+    mkOrder("9004", { customerName: "Practice Park", status: "Pending Response", age: 9, price: 100, gloveType: "First Base", services: "Cleaning + Conditioning", lace: "Blue – Navy" }),
+    mkOrder("9005", { customerName: "Sandbox Singh", status: "Completed", age: 22, paid: "Paid", price: 80, estCompletion: daysAgoIso(4), dateCompleted: daysAgoIso(2), services: "Relacing", lace: "Tan – Camel" }),
+    mkOrder("9006", { customerName: "Example Estrada", status: "In Transit to Me", age: 2, dropOffMethod: "Shipped", shippingCost: 12, services: "ShockTec Air2Gel Palm Pad", lace: "Black" })
+  ];
+
+  const activity = {};
+  orders.forEach(o => {
+    const events = demoStatusActivity(o.status, o.dateReceived);
+    if (events.length) activity[o.orderNumber] = events;
+  });
+
   return {
-    orders: [
-      mkOrder("9001", { customerName: "Sample Slugger", status: "Received", age: 1, paid: "Unpaid" }),
-      mkOrder("9002", { customerName: "Demo Diaz", status: "In Progress", age: 4, paid: "Paid", brandModel: "Wilson A2000", gloveType: "Catchers" }),
-      mkOrder("9003", { customerName: "Test Tanaka", status: "Ready to Go", age: 6, paid: "Unpaid", priceQuoted: 100 }),
-      mkOrder("9004", { customerName: "Practice Park", status: "Pending Response", age: 8, gloveType: "First Base", priceQuoted: 100 }),
-      mkOrder("9005", { customerName: "Sandbox Singh", status: "Completed", age: 20, paid: "Paid", dateCompleted: daysAgoIso(2) }),
-      mkOrder("9006", { customerName: "Example Estrada", status: "In Transit to Me", age: 2, dropOffMethod: "Shipped", priceQuoted: 100, shippingCost: 12 })
-    ],
+    orders,
     inventory: [
-      { id: "d1", color: "Tan", quantity_on_hand: 12, reorder_at: 4, active: true, reorder_alert_enabled: true },
-      { id: "d2", color: "Black", quantity_on_hand: 3, reorder_at: 4, active: true, reorder_alert_enabled: true },
-      { id: "d3", color: "Timberglaze", quantity_on_hand: 7, reorder_at: 4, active: true, reorder_alert_enabled: true }
+      { id: "d1", color: "Black", quantity_on_hand: 3, reorder_at: 4, active: true, reorder_alert_enabled: true },
+      { id: "d2", color: "Tan – Camel", quantity_on_hand: 12, reorder_at: 4, active: true, reorder_alert_enabled: true },
+      { id: "d3", color: "Brown – Chestnut", quantity_on_hand: 7, reorder_at: 4, active: true, reorder_alert_enabled: true },
+      { id: "d4", color: "Blue – Navy", quantity_on_hand: 5, reorder_at: 4, active: true, reorder_alert_enabled: true }
     ],
     gloves: [
       { id: "g1", brandModel: "Rawlings Pro Preferred", gloveType: "Fielders", price: 220, status: "available", description: "Sample listing", photos: [] }
     ],
     sessions: [],
-    activity: {},
+    activity,
     nextOrderNum: 9007,
     seq: 1
   };
@@ -631,11 +681,18 @@ function demoApi(body) {
     }
     case "createOrder": {
       const n = String(store.nextOrderNum++);
-      const order = Object.assign(
-        seedDemoStore().orders[0],
-        { orderNumber: n, customerName: body.customerName || "New Sample", status: "Received", createdAt: demoNow(), updatedAt: demoNow() },
-        body.order || {}
-      );
+      const order = Object.assign({
+        orderNumber: n,
+        customerName: body.customerName || "New Sample",
+        phoneNumber: "", emailAddress: "",
+        brandModel: "", gloveType: "Fielders", webType: "",
+        servicesRequested: "", primaryLaceColor: "", secondaryLaceColor: "",
+        primaryLaceUsed: "", secondaryLaceUsed: "",
+        status: "Received", paid: "Unpaid", priceQuoted: "", shippingCost: 0,
+        dropOffMethod: "Local drop-off", streetAddress: "", city: "", state: "", zipCode: "",
+        dateReceived: daysAgoIso(0), estimatedCompletion: "", dateCompleted: "",
+        internalNotes: "", gloveNotes: "", createdAt: demoNow(), updatedAt: demoNow()
+      }, body.order || {});
       store.orders.unshift(order);
       return demoResult({ order });
     }
