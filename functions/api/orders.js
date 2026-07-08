@@ -382,13 +382,37 @@ export async function onRequest(context) {
 
       const to = toE164US(body.phoneNumber);
       const text = cleanText(body.body);
+      const mediaDataUrl = String(body.mediaDataUrl || "");
       if (!to) return json({ ok: false, error: "Invalid phone number." }, 200, jsonHeaders);
-      if (!text) return json({ ok: false, error: "Enter a message." }, 200, jsonHeaders);
+      if (!text && !mediaDataUrl) return json({ ok: false, error: "Enter a message." }, 200, jsonHeaders);
       if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
         return json({ ok: false, error: "Twilio is not configured." }, 200, jsonHeaders);
       }
 
-      const sent = await sendTwilioSms(env, to, text);
+      let mediaUrl = null;
+      if (mediaDataUrl.startsWith("data:image/")) {
+        const contentType = mediaDataUrl.slice(5, mediaDataUrl.indexOf(";"));
+        const b64 = mediaDataUrl.slice(mediaDataUrl.indexOf(",") + 1);
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const ext = contentType.includes("png") ? "png" : "jpg";
+        const path = `sms-out/${Date.now()}.${ext}`;
+        const up = await fetch(`${env.SUPABASE_URL}/storage/v1/object/order-photos/${path}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+            "Content-Type": contentType,
+            "x-upsert": "true"
+          },
+          body: bytes
+        });
+        if (!up.ok) return json({ ok: false, error: "Photo upload failed." }, 200, jsonHeaders);
+        mediaUrl = `${env.SUPABASE_URL}/storage/v1/object/public/order-photos/${path}`;
+      }
+
+      const sent = await sendTwilioSms(env, to, text, mediaUrl);
       if (!sent.ok) {
         return json({ ok: false, error: "Message failed to send.", details: sent.error }, 200, jsonHeaders);
       }
@@ -402,6 +426,7 @@ export async function onRequest(context) {
           customer_name: cleanText(body.customerName) || null,
           order_number: cleanText(body.orderNumber) || null,
           body: text,
+          media_urls: mediaUrl ? [mediaUrl] : null,
           twilio_sid: sent.sid || null,
           read: true
         })
@@ -5177,12 +5202,13 @@ function mapSmsMessage(row) {
   };
 }
 
-async function sendTwilioSms(env, to, body) {
+async function sendTwilioSms(env, to, body, mediaUrl = null) {
   const accountSid = env.TWILIO_ACCOUNT_SID;
   const form = new URLSearchParams();
   form.set("To", to);
   form.set("MessagingServiceSid", env.TWILIO_MESSAGING_SERVICE_SID);
-  form.set("Body", body);
+  if (body) form.set("Body", body);
+  if (mediaUrl) form.set("MediaUrl", mediaUrl);
 
   const resp = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
@@ -5255,6 +5281,23 @@ async function sendStatusText(env, row, statusDisplay) {
   if (!resp.ok) {
     return { ok: false, error: data || `Twilio HTTP ${resp.status}` };
   }
+
+  /* Mirror every status text into the Messages inbox. Best-effort. */
+  try {
+    await supabaseFetch(env, `/rest/v1/sms_messages`, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        direction: "out",
+        phone_number: to,
+        customer_name: order.customerName || null,
+        order_number: orderNum,
+        body,
+        twilio_sid: (data && data.sid) || null,
+        read: true
+      })
+    });
+  } catch { /* never block the status text on inbox logging */ }
 
   return { ok: true, data };
 }

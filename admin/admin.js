@@ -9241,6 +9241,7 @@ async function startInviteFlow(token) {
 ========================= */
 let allMessages = [];
 let openThreadKey = null;
+let pendingMsgPhoto = "";
 const ORDERS_SEEN_KEY = "mm_orders_seen_ts";
 
 function msgThreadKey(m) {
@@ -9409,6 +9410,10 @@ function openMessageThread(key) {
       <div class="msg-convo">${bubbles}</div>
       ${t.phoneNumber ? `
         <div class="msg-reply msg-replybar">
+          <button type="button" id="msgAttachBtn" class="msg-attach-btn" aria-label="Attach photo">
+            <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"></rect><circle cx="12" cy="13" r="4"></circle><path d="M9 6l1.2-2h3.6L15 6"></path></svg>
+          </button>
+          <input type="file" id="msgAttachInput" accept="image/*" hidden>
           <textarea id="msgReplyInput" rows="1" placeholder="Text Message"></textarea>
           <button type="button" id="msgReplyBtn" class="msg-send-btn" aria-label="Send"
             data-thread="${escapeAttr(key)}" data-phone="${escapeAttr(t.phoneNumber)}"
@@ -9462,7 +9467,7 @@ async function handleMessageReply(btn) {
   const text = (input?.value || "").trim();
   const isCompose = btn.dataset.compose === "1";
   const phone = isCompose ? (document.getElementById("msgComposeTo")?.value || "").trim() : btn.dataset.phone;
-  if (!text) return;
+  if (!text && !pendingMsgPhoto) return;
   if (!phone) { if (statusEl) statusEl.textContent = "Enter a phone number."; return; }
 
   btn.disabled = true;
@@ -9472,9 +9477,11 @@ async function handleMessageReply(btn) {
       action: "sendMessageReply",
       phoneNumber: phone,
       body: text,
+      mediaDataUrl: pendingMsgPhoto || "",
       orderNumber: btn.dataset.order || "",
       customerName: btn.dataset.name || ""
     }, true);
+    pendingMsgPhoto = "";
     if (input) input.value = "";
     await refreshMessages();
     if (isCompose) renderMessagesView();
@@ -9492,6 +9499,10 @@ function wireMessagesPanel() {
     if (e.target.closest("[data-msg-back]")) { renderMessagesView(); return; }
     const del = e.target.closest("[data-del-thread]");
     if (del) { await deleteMessageThread(del.dataset.delThread); return; }
+    if (e.target.closest("#msgAttachBtn")) {
+      document.getElementById("msgAttachInput")?.click();
+      return;
+    }
     const sendBtn = e.target.closest("#msgReplyBtn");
     if (sendBtn) { await handleMessageReply(sendBtn); return; }
     const thread = e.target.closest("[data-thread]");
@@ -9505,6 +9516,21 @@ function wireMessagesPanel() {
 
   /* Apple-style swipe-to-delete on inbox rows. */
   let swipeEl = null, swipeX = 0, swipeY = 0, swiping = false;
+  messagesPanel.addEventListener("change", (e) => {
+    if (e.target?.id !== "msgAttachInput") return;
+    const file = e.target.files && e.target.files[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingMsgPhoto = String(reader.result || "");
+      const btn = document.getElementById("msgAttachBtn");
+      if (btn) btn.classList.add("has-photo");
+      const input = document.getElementById("msgReplyInput");
+      if (input && !input.value) input.placeholder = "Photo attached — add a note or send";
+    };
+    reader.readAsDataURL(file);
+  });
+
   messagesPanel.addEventListener("touchstart", (e) => {
     const wrap = e.target.closest?.(".msg-swipe");
     if (!wrap) return;
