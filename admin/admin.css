@@ -7132,10 +7132,10 @@ body.has-notifications .topbar-menu-btn::after{
 }
 
 .msg-bubble{
-  font-size:.95rem;
+  font-size:.85rem;
   line-height:1.35;
-  padding:9px 13px;
-  border-radius:20px;
+  padding:8px 12px;
+  border-radius:18px;
 }
 
 .msg-in{
