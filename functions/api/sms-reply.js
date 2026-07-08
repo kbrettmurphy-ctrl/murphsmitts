@@ -42,6 +42,7 @@ export async function onRequest(context) {
     });
 
     if (!order) {
+      await storeInboundMessage(env, { from, body: message, orderNumber: null, customerName: null, mediaUrls: [] });
       await notifyOwner(env, `Incoming text from unknown number ${from}`, message);
       return twiml("Thanks for the message. Brett will follow up with you.");
     }
@@ -101,6 +102,14 @@ export async function onRequest(context) {
       return twiml("Thanks for the message. Brett will follow up with you.");
     }
 
+    await storeInboundMessage(env, {
+      from,
+      body: message,
+      orderNumber,
+      customerName: order.customer_name || null,
+      mediaUrls
+    });
+
     await notifyOwner(
       env,
       `Text from Order #${orderNumber}`,
@@ -156,6 +165,26 @@ async function supabaseFetch(env, path, options = {}) {
   }
 
   return { ok: true, status: resp.status, data };
+}
+
+async function storeInboundMessage(env, { from, body, orderNumber, customerName, mediaUrls }) {
+  try {
+    await supabaseFetch(env, `/rest/v1/sms_messages`, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        direction: "in",
+        phone_number: from,
+        customer_name: customerName || null,
+        order_number: orderNumber || null,
+        body: body || "",
+        media_urls: mediaUrls && mediaUrls.length ? mediaUrls : null,
+        read: false
+      })
+    });
+  } catch {
+    /* The reply flow must never fail because logging the message failed. */
+  }
 }
 
 async function notifyOwner(env, title, message) {

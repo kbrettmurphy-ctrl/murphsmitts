@@ -295,6 +295,67 @@ export async function onRequest(context) {
       return json({ ok: true }, 200, jsonHeaders);
     }
 
+    if (action === "listMessages") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const resp = await supabaseFetch(
+        env,
+        `/rest/v1/sms_messages?select=*&order=created_at.desc&limit=300`
+      );
+      if (!resp.ok) return json({ ok: false, error: "Could not load messages." }, 200, jsonHeaders);
+      return json({ ok: true, messages: (resp.data || []).map(mapSmsMessage) }, 200, jsonHeaders);
+    }
+
+    if (action === "markMessagesRead") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const phone = cleanText(body.phoneNumber);
+      const path = phone
+        ? `/rest/v1/sms_messages?phone_number=eq.${encodeURIComponent(phone)}&read=eq.false`
+        : `/rest/v1/sms_messages?read=eq.false`;
+      const resp = await supabaseFetch(env, path, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ read: true })
+      });
+      if (!resp.ok) return json({ ok: false, error: "Could not update messages." }, 200, jsonHeaders);
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
+    if (action === "sendMessageReply") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+
+      const to = toE164US(body.phoneNumber);
+      const text = cleanText(body.body);
+      if (!to) return json({ ok: false, error: "Invalid phone number." }, 200, jsonHeaders);
+      if (!text) return json({ ok: false, error: "Enter a message." }, 200, jsonHeaders);
+      if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
+        return json({ ok: false, error: "Twilio is not configured." }, 200, jsonHeaders);
+      }
+
+      const sent = await sendTwilioSms(env, to, text);
+      if (!sent.ok) {
+        return json({ ok: false, error: "Message failed to send.", details: sent.error }, 200, jsonHeaders);
+      }
+
+      await supabaseFetch(env, `/rest/v1/sms_messages`, {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          direction: "out",
+          phone_number: to,
+          customer_name: cleanText(body.customerName) || null,
+          order_number: cleanText(body.orderNumber) || null,
+          body: text,
+          twilio_sid: sent.sid || null,
+          read: true
+        })
+      });
+
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
     if (action === "listOrders") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -5046,6 +5107,46 @@ async function sendBrandedEmail(env, { to, subject, plainBody, htmlBody }) {
     ok: true,
     data
   };
+}
+
+function mapSmsMessage(row) {
+  return {
+    id: row.id,
+    direction: row.direction || "in",
+    phoneNumber: row.phone_number,
+    customerName: row.customer_name,
+    orderNumber: row.order_number,
+    body: row.body,
+    mediaUrls: Array.isArray(row.media_urls) ? row.media_urls : [],
+    read: row.read === true,
+    createdAt: row.created_at
+  };
+}
+
+async function sendTwilioSms(env, to, body) {
+  const accountSid = env.TWILIO_ACCOUNT_SID;
+  const form = new URLSearchParams();
+  form.set("To", to);
+  form.set("MessagingServiceSid", env.TWILIO_MESSAGING_SERVICE_SID);
+  form.set("Body", body);
+
+  const resp = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Basic " + btoa(`${accountSid}:${env.TWILIO_AUTH_TOKEN}`),
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: form.toString()
+    }
+  );
+
+  const text = await resp.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  if (!resp.ok) return { ok: false, error: data };
+  return { ok: true, sid: data && data.sid };
 }
 
 async function sendStatusText(env, row, statusDisplay) {

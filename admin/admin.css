@@ -6515,3 +6515,222 @@ button.secondary,
 body.is-demo .demo-banner{
   display:block;
 }
+
+/* =========================
+   NOTIFICATION BADGES
+   ========================= */
+.nav-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:18px;
+  height:18px;
+  margin-left:6px;
+  padding:0 5px;
+  border-radius:999px;
+  background:#b3261e;
+  color:#fff;
+  font-size:.64rem;
+  font-weight:700;
+  line-height:1;
+  vertical-align:middle;
+}
+
+.nav-badge[hidden]{
+  display:none;
+}
+
+.topbar-menu-btn{
+  position:relative;
+}
+
+body.has-notifications .topbar-menu-btn::after{
+  content:"";
+  position:absolute;
+  top:7px;
+  right:7px;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#b3261e;
+  border:1.5px solid var(--navy);
+}
+
+/* =========================
+   MESSAGES / TWILIO INBOX
+   ========================= */
+#messagesCount{
+  margin:4px 0 0;
+  min-height:1.35em;
+  font-size:.7rem;
+}
+
+.messages-shell{
+  max-width:720px;
+}
+
+.msg-empty{
+  padding:16px;
+}
+
+.msg-thread-list{
+  display:grid;
+  gap:8px;
+}
+
+.msg-thread{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  width:100%;
+  text-align:left;
+  padding:11px 14px;
+  cursor:pointer;
+}
+
+.msg-thread-main{
+  min-width:0;
+}
+
+.msg-thread-title{
+  color:var(--navy);
+  font-weight:600;
+  font-size:.92rem;
+  line-height:1.2;
+}
+
+.msg-thread-order{
+  color:rgba(9,47,77,.5);
+  font-weight:600;
+  font-size:.8rem;
+}
+
+.msg-thread-preview{
+  font-size:.8rem;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  max-width:100%;
+  margin-top:2px;
+}
+
+.msg-thread-meta{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:5px;
+  flex:0 0 auto;
+}
+
+.msg-thread-time{
+  font-size:.72rem;
+}
+
+.msg-unread-dot{
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#b3261e;
+}
+
+.msg-convo-head{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:8px;
+}
+
+.msg-back{
+  border:none;
+  background:none;
+  color:var(--navy);
+  font-weight:600;
+  font-size:.9rem;
+  cursor:pointer;
+  padding:4px 2px;
+  flex:0 0 auto;
+}
+
+.msg-convo-sub{
+  font-size:.76rem;
+  margin-top:2px;
+}
+
+.msg-convo{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  max-height:calc(100dvh - 320px);
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:6px 2px;
+}
+
+.msg-bubble{
+  max-width:80%;
+  padding:8px 11px;
+  border-radius:14px;
+  font-size:.9rem;
+  line-height:1.3;
+  word-break:break-word;
+}
+
+.msg-in{
+  align-self:flex-start;
+  background:#fffdf8;
+  border:1px solid rgba(9,47,77,.12);
+  color:var(--navy);
+}
+
+.msg-out{
+  align-self:flex-end;
+  background:var(--navy);
+  color:var(--cream);
+}
+
+.msg-time{
+  display:block;
+  font-size:.6rem;
+  opacity:.62;
+  margin-top:3px;
+}
+
+.msg-media{
+  display:inline-block;
+  margin-top:4px;
+  font-size:.8rem;
+  text-decoration:underline;
+}
+
+.msg-reply{
+  display:grid;
+  gap:8px;
+  margin-top:12px;
+  max-width:720px;
+}
+
+.msg-reply textarea{
+  width:100%;
+  border:1px solid rgba(9,47,77,.22);
+  border-radius:10px;
+  padding:9px 11px;
+  font-size:.9rem;
+  color:var(--navy);
+  background:#fffdf8;
+  outline:none;
+  resize:vertical;
+}
+
+.msg-reply-btn{
+  justify-self:end;
+  min-height:32px;
+  padding:0 18px;
+  border:none;
+  border-radius:10px;
+  background:var(--navy);
+  color:var(--cream);
+  font-weight:600;
+  font-size:.85rem;
+  cursor:pointer;
+}
