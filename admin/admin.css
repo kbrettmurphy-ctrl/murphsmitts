@@ -7284,3 +7284,19 @@ body.has-notifications .topbar-menu-btn::after{
   min-width:0;
   max-width:100%;
 }
+
+/* ---- Conversation viewport-fit: the earlier document-flow experiment let
+   the keyboard scroll the page (header lost). Back to an inner scroller in
+   every mode; JS sizes it to the visual viewport so the input sits right
+   above the keyboard and the header never moves. ---- */
+@media (max-width: 899px) and (display-mode: browser){
+  .msg-convo{
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  .msg-replybar{
+    position:sticky;
+    bottom:10px;
+  }
+}

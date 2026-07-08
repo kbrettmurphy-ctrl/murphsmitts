@@ -9423,6 +9423,7 @@ function openMessageThread(key) {
   }
   const convo = messagesPanel.querySelector(".msg-convo");
   if (convo) convo.scrollTop = convo.scrollHeight;
+  requestAnimationFrame(fitConvoToViewport);
 }
 
 async function markThreadRead(phoneNumber) {
@@ -9535,6 +9536,26 @@ async function deleteMessageThread(key) {
     alert(err.message || "Could not delete the conversation.");
   }
 }
+
+/* Size the open conversation to the visual viewport so the keyboard never
+   scrolls the page: header/reply bar stay put, only messages scroll. */
+function fitConvoToViewport() {
+  const convo = messagesPanel?.querySelector(".msg-convo");
+  if (!convo || !openThreadKey) return;
+  const vv = window.visualViewport;
+  const topbar = messagesView?.querySelector(".topbar");
+  const head = messagesPanel.querySelector(".msg-convo-head");
+  const bar = messagesPanel.querySelector(".msg-replybar");
+  const vvH = vv ? vv.height : window.innerHeight;
+  const used = (topbar?.offsetHeight || 0) + (head?.offsetHeight || 0) + (bar?.offsetHeight || 0) + 66;
+  convo.style.maxHeight = Math.max(120, vvH - used) + "px";
+  window.scrollTo(0, 0);
+  convo.scrollTop = convo.scrollHeight;
+}
+
+window.visualViewport?.addEventListener("resize", () => {
+  if (openThreadKey && messagesView?.classList.contains("active")) fitConvoToViewport();
+});
 
 /* ---- In-app notification badges (unread texts + new orders) ---- */
 function getUnreadMessageCount() {
