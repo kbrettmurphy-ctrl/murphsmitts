@@ -11631,3 +11631,38 @@ async function enablePushNotifications() {
 
 sideNavPushBtn?.addEventListener("click", () => { closeMenu(); enablePushNotifications(); });
 if (isPushSupported() && getToken()) refreshPushButtonVisibility();
+
+/* =========================
+   AUTO-UPDATE (PWA)
+   iOS keeps the installed app's HTML/JS cached across cold launches, so
+   deploys weren't picked up without a delete/re-add. Compare a hash of the
+   live index.html on launch and when returning to the app; when it changes,
+   reload once to pull the new build.
+========================= */
+const BUILD_HASH_KEY = "mm_build_hash";
+let lastBuildCheck = 0;
+
+function hashStr(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return String(h);
+}
+
+async function checkForNewBuild() {
+  const now = Date.now();
+  if (now - lastBuildCheck < 5 * 60 * 1000) return;
+  lastBuildCheck = now;
+  try {
+    const res = await fetch("/admin/index.html", { cache: "no-store" });
+    if (!res.ok) return;
+    const hash = hashStr(await res.text());
+    const stored = localStorage.getItem(BUILD_HASH_KEY);
+    localStorage.setItem(BUILD_HASH_KEY, hash);
+    if (stored && stored !== hash) location.reload();
+  } catch { /* offline — try again later */ }
+}
+
+checkForNewBuild();
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") checkForNewBuild();
+});
