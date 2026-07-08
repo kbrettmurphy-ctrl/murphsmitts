@@ -44,7 +44,8 @@ export async function onRequest(context) {
     });
 
     if (!order) {
-      await storeInboundMessage(env, { from, body: message, orderNumber: null, customerName: null, mediaUrls: [] });
+      const unknownMedia = await saveIncomingMedia(env, form, "sms-unknown");
+      await storeInboundMessage(env, { from, body: message, orderNumber: null, customerName: null, mediaUrls: unknownMedia });
       await sendWebPushToAll(env, { title: "New text", body: `${from}: ${message}`.slice(0, 140), url: "/admin/?view=messages" });
       await notifyOwner(env, `Incoming text from unknown number ${from}`, message);
       return twiml("");
