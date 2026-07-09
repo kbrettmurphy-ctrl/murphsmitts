@@ -1540,6 +1540,34 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "setGalleryPhotoOrder") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const url = cleanText(body.url);
+      const orderNumber = cleanText(body.orderNumber);
+      if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
+
+      if (!orderNumber) {
+        await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}`, {
+          method: "DELETE", headers: { Prefer: "return=minimal" }
+        });
+        return json({ ok: true, cleared: true }, 200, jsonHeaders);
+      }
+
+      const found = await fetchOrderByNumber(env, orderNumber);
+      if (!found.ok || !found.data) {
+        return json({ ok: false, error: `Order #${orderNumber} not found.` }, 200, jsonHeaders);
+      }
+
+      const resp = await supabaseFetch(env, `/rest/v1/gallery_photo_links?on_conflict=photo_url`, {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ photo_url: url, photo_path: cleanText(body.path) || null, order_number: orderNumber })
+      });
+      if (!resp.ok) return json({ ok: false, error: "Could not save the link." }, 200, jsonHeaders);
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
     if (action === "hideGalleryPhoto" || action === "restoreGalleryPhoto" || action === "deleteGalleryPhoto") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -2234,14 +2262,48 @@ export async function onRequest(context) {
       const q = String(body.q || "").trim().toLowerCase();
       if (q.length < 2) return json({ ok: true, gloves: [] }, 200, jsonHeaders);
 
+      const terms = q.split(/\s+/).filter(Boolean);
+      const gloves = [];
+
+      /* Preferred source: curated gallery photos linked to orders. */
+      const links = await supabaseFetch(env, `/rest/v1/gallery_photo_links?select=photo_url,order_number&limit=1000`);
+      const byOrder = new Map();
+      for (const l of (links.ok && Array.isArray(links.data)) ? links.data : []) {
+        if (!byOrder.has(l.order_number)) byOrder.set(l.order_number, []);
+        byOrder.get(l.order_number).push(l.photo_url);
+      }
+
+      if (byOrder.size) {
+        const nums = [...byOrder.keys()].map(n => `"${String(n).replace(/"/g, "")}"`).join(",");
+        const ordersResp = await supabaseFetch(
+          env,
+          `/rest/v1/orders?select=order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color,services_requested&order_number=in.(${encodeURIComponent(nums)})`
+        );
+        for (const row of (ordersResp.ok && Array.isArray(ordersResp.data)) ? ordersResp.data : []) {
+          const hay = [
+            row.brand_model, row.glove_type, row.web_type,
+            row.primary_lace_color, row.secondary_lace_color, row.services_requested
+          ].map(v => String(v || "").toLowerCase()).join(" ");
+          if (!terms.every(t => hay.includes(t))) continue;
+          gloves.push({
+            brandModel: row.brand_model || "",
+            gloveType: row.glove_type || "",
+            webType: row.web_type || "",
+            laceColors: [row.primary_lace_color, row.secondary_lace_color].filter(Boolean),
+            photos: (byOrder.get(row.order_number) || []).slice(0, 4)
+          });
+          if (gloves.length >= 24) break;
+        }
+        if (gloves.length) return json({ ok: true, gloves, source: "gallery" }, 200, jsonHeaders);
+      }
+
+      /* Fallback while few links exist: search order photos directly. */
       const resp = await supabaseFetch(
         env,
         `/rest/v1/orders?select=brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color,services_requested,glove_photos&order=order_number.desc&limit=500`
       );
       if (!resp.ok) return json({ ok: false, error: "Search failed." }, 200, jsonHeaders);
 
-      const terms = q.split(/\s+/).filter(Boolean);
-      const gloves = [];
       for (const row of resp.data || []) {
         const photos = parsePhotoArray(row.glove_photos);
         if (!photos.length) continue;
@@ -2283,6 +2345,14 @@ export async function onRequest(context) {
       const gallery = {};
       const hiddenGallery = {};
 
+      let photoLinks = {};
+      if (includeHidden) {
+        const links = await supabaseFetch(env, `/rest/v1/gallery_photo_links?select=photo_url,order_number&limit=1000`);
+        if (links.ok && Array.isArray(links.data)) {
+          for (const l of links.data) photoLinks[l.photo_url] = l.order_number;
+        }
+      }
+
       for (const section of sections) {
         const listed = await listGallerySection(env, section);
 
@@ -2323,6 +2393,7 @@ export async function onRequest(context) {
         {
           ok: true,
           gallery,
+          photoLinks,
           hiddenGallery
         },
         200,

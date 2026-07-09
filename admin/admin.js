@@ -11059,6 +11059,8 @@ async function loadGalleryManagerPhotos() {
     }, true);
 
     galleryPhotos = flattenGalleryPhotos(data.gallery || {}, data.hiddenGallery || {});
+    const glinks = data.photoLinks || {};
+    galleryPhotos.forEach(ph => { ph.linkedOrder = glinks[ph.url] || ""; });
     renderGalleryManagerPhotos();
   } catch (err) {
     galleryPhotos = [];
@@ -11137,6 +11139,7 @@ function renderGalleryManagerPhotos() {
             <div class="gallery-manager-subrow">
               <span>${escapeHtml(photo.sectionLabel)}</span>
               <span class="gallery-manager-pill">${photo.hidden ? "Hidden" : "Visible"}</span>
+              ${photo.linkedOrder ? `<span class="gallery-manager-pill gallery-linked-pill">#${escapeHtml(photo.linkedOrder)}</span>` : ""}
             </div>
           </div>
           <label class="sr-only" for="galleryActionSelect${index}">Gallery photo actions</label>
@@ -11264,6 +11267,7 @@ function openGalleryPhotoActionMenu(photo, source) {
     ${photo.hidden
       ? `<button class="workflow-action-btn" type="button" data-gallery-menu-action="restore">Restore / Show in Gallery</button>`
       : `<button class="workflow-action-btn" type="button" data-gallery-menu-action="hide">Hide from Gallery</button>`}
+    <button class="workflow-action-btn" type="button" data-gallery-menu-action="link">${photo.linkedOrder ? `Linked to #${escapeHtml(photo.linkedOrder)} — change…` : "Link to Order…"}</button>
     <button class="workflow-action-btn danger" type="button" data-gallery-menu-action="delete">Delete Photo</button>
   `;
 
@@ -11292,6 +11296,23 @@ async function runGalleryPhotoAction(photo, action) {
 
   if (action === "view") {
     if (photo.url) window.open(photo.url, "_blank", "noopener");
+    return;
+  }
+
+  if (action === "link") {
+    const entered = prompt(
+      "Link this gallery photo to an order number (blank to remove the link):",
+      photo.linkedOrder || ""
+    );
+    if (entered === null) return;
+    const orderNumber = entered.trim();
+    try {
+      await postJson({ action: "setGalleryPhotoOrder", url: photo.url, path: photo.path, orderNumber }, true);
+      if (status) status.textContent = orderNumber ? `Linked to order #${orderNumber}.` : "Link removed.";
+      await loadGalleryManagerPhotos();
+    } catch (err) {
+      if (status) status.textContent = err.message || "Could not save the link.";
+    }
     return;
   }
 

@@ -7457,3 +7457,9 @@ body.has-notifications .topbar-menu-btn::after{
   html{ font-size:90%; }
   body{ font-size:0.875rem; }
 }
+
+/* Linked-order pill in the gallery manager */
+.gallery-linked-pill{
+  background:rgba(9,47,77,.12);
+  color:var(--navy);
+}
