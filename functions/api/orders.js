@@ -2228,6 +2228,40 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "searchPublicGloves") {
+      /* Public glove search for the website gallery. Returns ONLY glove
+         fields + photos — never customer name/contact/address. */
+      const q = String(body.q || "").trim().toLowerCase();
+      if (q.length < 2) return json({ ok: true, gloves: [] }, 200, jsonHeaders);
+
+      const resp = await supabaseFetch(
+        env,
+        `/rest/v1/orders?select=brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color,services_requested,glove_photos&order=order_number.desc&limit=500`
+      );
+      if (!resp.ok) return json({ ok: false, error: "Search failed." }, 200, jsonHeaders);
+
+      const terms = q.split(/\s+/).filter(Boolean);
+      const gloves = [];
+      for (const row of resp.data || []) {
+        const photos = parsePhotoArray(row.glove_photos);
+        if (!photos.length) continue;
+        const hay = [
+          row.brand_model, row.glove_type, row.web_type,
+          row.primary_lace_color, row.secondary_lace_color, row.services_requested
+        ].map(v => String(v || "").toLowerCase()).join(" ");
+        if (!terms.every(t => hay.includes(t))) continue;
+        gloves.push({
+          brandModel: row.brand_model || "",
+          gloveType: row.glove_type || "",
+          webType: row.web_type || "",
+          laceColors: [row.primary_lace_color, row.secondary_lace_color].filter(Boolean),
+          photos: photos.slice(0, 4)
+        });
+        if (gloves.length >= 24) break;
+      }
+      return json({ ok: true, gloves }, 200, jsonHeaders);
+    }
+
     if (action === "listGalleryPhotos") {
       const includeHidden = body.includeHidden === true;
 
@@ -5200,6 +5234,14 @@ async function sendBrandedEmail(env, { to, subject, plainBody, htmlBody }) {
     ok: true,
     data
   };
+}
+
+function parsePhotoArray(value) {
+  if (Array.isArray(value)) return value.filter(u => typeof u === "string" && u.startsWith("http"));
+  if (typeof value === "string") {
+    try { const p = JSON.parse(value); return Array.isArray(p) ? p.filter(u => typeof u === "string" && u.startsWith("http")) : []; } catch { return []; }
+  }
+  return [];
 }
 
 function mapSmsMessage(row) {
