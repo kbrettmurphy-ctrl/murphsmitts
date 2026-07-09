@@ -7439,3 +7439,13 @@ body.has-notifications .topbar-menu-btn::after{
 .msg-convo-shell .msg-convo-head{
   margin-bottom:0;
 }
+
+/* Bubbles render exactly what was sent: preserve the SMS line breaks. */
+.msg-bubble{
+  white-space:pre-wrap;
+}
+
+/* Desktop: cap bubble width like a real messenger instead of 78% of a wide panel */
+@media (min-width: 900px){
+  .msg-line{ max-width:480px; }
+}
