@@ -101,8 +101,9 @@ button{ font-family: inherit; }
   padding-inline: var(--container-pad);
 }
 
-/* Anchors land below the fixed header */
-[id]{ scroll-margin-top: calc(var(--headerH) + 24px); }
+/* Anchors land below the fixed header with breathing room for eyebrows,
+   so in-page links (e.g. FAQ) keep a consistent gap under the header bar */
+[id]{ scroll-margin-top: calc(var(--headerH) + 64px); }
 .legacy-anchor{ display: block; height: 0; }
 
 .is-hidden{ display: none !important; }
@@ -353,13 +354,14 @@ body.menu-open{ overflow: hidden; }
   color: var(--faint);
 }
 
-.footer-col-right{
+.footer-meta{
   display: flex;
-  align-items: center;
-  gap: 24px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
 }
 .footer-badge img{
-  height: 58px;
+  height: 44px;
   width: auto;
 }
 
@@ -775,18 +777,24 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
   margin-top: 7px;
   line-height: 1.3;
 }
+/* Availability sits ON the swatch photo, not under the color name */
 .mm-availability-badge{
-  display: inline-block;
-  margin-top: 3px;
-  font-size: 10.5px;
-  font-weight: 600;
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  font-size: 10px;
+  font-weight: 640;
   letter-spacing: .03em;
-  padding: 1px 8px;
+  padding: 2px 8px;
   border-radius: var(--radius-pill);
+  background: rgba(255,255,255,.92);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 1px 3px rgba(9,47,77,.2);
 }
-.mm-availability-badge--in{ background: var(--ok-bg); color: var(--ok-text); }
-.mm-availability-badge--out{ background: var(--err-bg); color: var(--red); }
-.mm-availability-badge--unknown{ background: var(--tint); color: var(--muted); }
+.mm-availability-badge--in{ color: var(--ok-text); }
+.mm-availability-badge--out{ color: var(--red); }
+.mm-availability-badge--unknown{ color: var(--muted); }
 .lace-loading{ grid-column: 1 / -1; }
 
 /* Certification aside */
@@ -915,10 +923,10 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 .lb-slide img.is-panning,
 .lb-slide img.is-zooming{ cursor: grabbing; transition: none; }
 
-.lb-close,
-.lb-prev,
-.lb-next{
+.lb-close{
   position: absolute;
+  top: 16px;
+  right: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -934,10 +942,11 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
   transition: background-color .15s ease;
   z-index: 3;
 }
-.lb-close:hover, .lb-prev:hover, .lb-next:hover{ background: rgba(255,255,255,.28); }
-.lb-close{ top: 16px; right: 16px; }
-.lb-prev{ left: 12px; top: 50%; transform: translateY(-50%); }
-.lb-next{ right: 12px; top: 50%; transform: translateY(-50%); }
+.lb-close:hover{ background: rgba(255,255,255,.28); }
+
+/* No arrows: swipe / tap left-right halves / arrow keys navigate instead */
+.lb-prev,
+.lb-next{ display: none; }
 
 .lb-hint{
   position: absolute;
@@ -1123,8 +1132,8 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 }
 .sale-grid{
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: clamp(20px, 3vw, 32px);
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(16px, 3vw, 32px);
 }
 .sale-card{ position: relative; }
 .sale-card-link{ display: block; }
@@ -1475,12 +1484,10 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
   border-top: 1px solid var(--hairline);
 }
 .service-section-title{
-  font-family: var(--font-brand);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--faint);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--navy);
   margin-bottom: 16px;
 }
 .service-section-body{
@@ -1498,6 +1505,16 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
   background: var(--tint);
   border-radius: var(--radius-md);
   padding: 18px;
+}
+/* A single glove reads as plain form fields — no "Glove 1" label, no panel box.
+   Both appear only once "Add another glove" creates a second card. */
+.glove-information-section:not(.is-multi-glove) [data-primary-glove-card]{
+  background: none;
+  border-radius: 0;
+  padding: 0;
+}
+.glove-information-section:not(.is-multi-glove) [data-primary-glove-card] .glove-section-heading{
+  display: none;
 }
 .glove-section-heading{
   display: flex;
@@ -1529,9 +1546,12 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
   gap: 10px;
 }
 .glove-subgroup-title{
-  font-size: 13px;
-  font-weight: 620;
-  color: var(--navy);
+  font-family: var(--font-brand);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--faint);
   margin: 0;
 }
 .additional-gloves{
@@ -1759,13 +1779,19 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
     font-size: 16px;
   }
 
-  .footer-top{ flex-direction: column; gap: 24px; }
-  .footer-col-right{ width: 100%; justify-content: space-between; }
-  .footer-bottom{ flex-direction: column; align-items: flex-start; gap: 10px; }
+  /* Mobile footer: everything centered and deliberately stacked */
+  .footer-top{ flex-direction: column; align-items: center; text-align: center; gap: 22px; }
+  .footer-meta{ align-items: center; gap: 18px; }
+  .footer-bottom{
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+  }
+  .footer-legal{ justify-content: center; flex-wrap: wrap; }
 }
 
 @media (max-width: 480px){
-  .sale-grid{ grid-template-columns: 1fr; }
   .gallery-thumb{ width: 62vw; }
   .process-shot{ width: 56vw; }
   .brand-text{ font-size: 11.5px; }
