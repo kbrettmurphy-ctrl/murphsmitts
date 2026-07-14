@@ -1175,8 +1175,11 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 }
 .sale-card.is-sold .sale-card-img{ filter: grayscale(.55); opacity: .75; }
 .sale-card-body{ padding-top: 12px; }
+/* for-sale.js renders the card title as an h2 */
+.sale-card-body h2,
 .sale-card-body h3{
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.3;
   margin-bottom: 2px;
 }
 .sale-price{
