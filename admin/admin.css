@@ -7449,3 +7449,11 @@ body.has-notifications .topbar-menu-btn::after{
 @media (min-width: 900px){
   .msg-line{ max-width:480px; }
 }
+
+/* Desktop text scale: 10% smaller everywhere — the "Safari 90% zoom" look.
+   All admin font-sizes are rem-based, so shrinking the root does the whole job.
+   body was 14px on desktop; 0.875rem keeps the same ratio (12.6px effective). */
+@media (min-width: 900px){
+  html{ font-size:90%; }
+  body{ font-size:0.875rem; }
+}
