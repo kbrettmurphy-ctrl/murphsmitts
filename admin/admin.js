@@ -4065,6 +4065,9 @@ function refreshAdminLaceSelects() {
   document.querySelectorAll("select[data-lace-color-select]").forEach(select => {
     const current = select.value || select.dataset.current || "";
     select.innerHTML = adminLaceOptionMarkup(current, select.dataset.placeholder || "Choose");
+    if ("allowCustom" in select.dataset) {
+      select.insertAdjacentHTML("beforeend", `<option value="__custom__">Custom color…</option>`);
+    }
   });
 }
 
@@ -11375,8 +11378,8 @@ function openGalleryDescribeDialog(photo) {
       <label>Brand / Model<input type="text" data-describe-field="brandModel" value="${escapeHtml(meta.brandModel || "")}" placeholder="Wilson A2000 1786"></label>
       <label>Glove Type<select data-describe-field="gloveType">${renderSelectOptions(meta.gloveType || "", GLOVE_TYPE_OPTIONS, "Select glove type")}</select></label>
       <label>Web Type<select data-describe-field="webType">${renderSelectOptions(meta.webType || "", WEB_TYPE_OPTIONS, "Select web type")}</select></label>
-      <label>Primary Lace<select data-describe-field="primaryLaceColor" data-lace-color-select data-current="${escapeAttr(meta.primaryLaceColor || "")}" data-placeholder="Choose">${adminLaceOptionMarkup(meta.primaryLaceColor || "", "Choose")}</select></label>
-      <label>Secondary Lace<select data-describe-field="secondaryLaceColor" data-lace-color-select data-current="${escapeAttr(meta.secondaryLaceColor || "")}" data-placeholder="None">${adminLaceOptionMarkup(meta.secondaryLaceColor || "", "None")}</select></label>
+      <label>Primary Lace<select data-describe-field="primaryLaceColor" data-lace-color-select data-allow-custom data-current="${escapeAttr(meta.primaryLaceColor || "")}" data-placeholder="Choose">${adminLaceOptionMarkup(meta.primaryLaceColor || "", "Choose")}<option value="__custom__">Custom color…</option></select></label>
+      <label>Secondary Lace<select data-describe-field="secondaryLaceColor" data-lace-color-select data-allow-custom data-current="${escapeAttr(meta.secondaryLaceColor || "")}" data-placeholder="None">${adminLaceOptionMarkup(meta.secondaryLaceColor || "", "None")}<option value="__custom__">Custom color…</option></select></label>
       <div class="gallery-describe-actions">
         ${photo.gloveMeta ? `<button type="button" class="gallery-describe-remove" data-describe-remove>Remove</button>` : ""}
         <span class="gallery-describe-spacer"></span>
@@ -11402,6 +11405,19 @@ function openGalleryDescribeDialog(photo) {
       });
       saveGalleryDescribe(photo, descriptors);
     }
+  });
+
+  /* One-off colors bought per order and never stocked: "Custom color…"
+     swaps the dropdown for a free-text field. */
+  overlay.addEventListener("change", (e) => {
+    const select = e.target.closest("select[data-describe-field]");
+    if (!select || select.value !== "__custom__") return;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.dataset.describeField = select.dataset.describeField;
+    input.placeholder = "Type the color";
+    select.replaceWith(input);
+    input.focus();
   });
 
   document.body.appendChild(overlay);
