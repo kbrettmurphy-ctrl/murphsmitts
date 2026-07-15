@@ -2731,6 +2731,7 @@ function wireDetailSectionSummaries() {
 function renderPhotoGallery(order) {
   const photos = Array.isArray(order.glovePhotos) ? order.glovePhotos : [];
   const photoBody = `
+    <div data-photo-drop="orderPhotoInput" class="order-photo-drop">
     <input id="orderPhotoInput" class="order-photo-input" type="file" accept="image/*" multiple>
     <p id="orderPhotoStatus" class="upload-status order-photo-status" aria-live="polite"></p>
     ${photos.length ? `
@@ -2752,6 +2753,7 @@ function renderPhotoGallery(order) {
     `}
     <div class="detail-photo-actions">
       <button id="orderPhotoAddBtn" class="detail-show-on-map-link detail-photo-add-link" type="button">Add Photo</button>
+    </div>
     </div>
   `;
 
@@ -9514,7 +9516,7 @@ function openMessageThread(key) {
       <div class="msg-convo">${bubbles}</div>
       ${t.phoneNumber ? `
         <div id="msgAttachPreview" class="msg-attach-preview" hidden></div>
-        <div class="msg-reply msg-replybar">
+        <div class="msg-reply msg-replybar" data-photo-drop="msgAttachInput">
           <button type="button" id="msgAttachBtn" class="msg-attach-btn" aria-label="Attach photo">
             <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"></rect><circle cx="12" cy="13" r="4"></circle><path d="M9 6l1.2-2h3.6L15 6"></path></svg>
           </button>
@@ -10087,7 +10089,7 @@ function renderSaleGloveEditor(glove) {
                </div>
              </div>
 
-             <label class="upload-drop" for="saleGlovePhotoInput">
+             <label class="upload-drop" for="saleGlovePhotoInput" data-photo-drop="saleGlovePhotoInput">
                <span class="upload-drop-icon" aria-hidden="true">
                  <svg viewBox="0 0 24 24" focusable="false">
                    <rect x="4" y="5" width="16" height="14" rx="3"></rect>
@@ -12222,4 +12224,56 @@ document.addEventListener("visibilitychange", () => {
   }, { passive: true });
 
   document.addEventListener("touchend", () => { tracking = false; });
+})();
+
+// =========================
+// Drag & drop onto photo uploaders
+// Zones carry data-photo-drop="<input id>". A drop assigns the files to that
+// input and fires its change event, so every existing upload flow (preview,
+// validation, upload button) runs exactly as if the files were picked.
+// =========================
+(function initAdminPhotoDrops() {
+  function zoneInput(zone) {
+    return document.getElementById(zone.dataset.photoDrop || "");
+  }
+
+  function clearActive(except) {
+    document.querySelectorAll(".photo-drop-active").forEach(el => {
+      if (el !== except) el.classList.remove("photo-drop-active");
+    });
+  }
+
+  document.addEventListener("dragover", (e) => {
+    if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes("Files")) return;
+    e.preventDefault();
+    const zone = e.target.closest?.("[data-photo-drop]") || null;
+    clearActive(zone);
+    if (zone) {
+      e.dataTransfer.dropEffect = "copy";
+      zone.classList.add("photo-drop-active");
+    } else {
+      e.dataTransfer.dropEffect = "none";
+    }
+  });
+
+  document.addEventListener("dragleave", (e) => {
+    if (!e.relatedTarget) clearActive(null);
+  });
+
+  document.addEventListener("drop", (e) => {
+    e.preventDefault(); // never let the browser navigate to a dropped image
+    clearActive(null);
+
+    const zone = e.target.closest?.("[data-photo-drop]");
+    if (!zone) return;
+
+    const input = zoneInput(zone);
+    const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith("image/"));
+    if (!input || !files.length) return;
+
+    const dt = new DataTransfer();
+    (input.multiple ? files : files.slice(0, 1)).forEach(f => dt.items.add(f));
+    input.files = dt.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
 })();

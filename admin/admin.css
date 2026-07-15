@@ -7578,3 +7578,11 @@ body.has-notifications .topbar-menu-btn::after{
   font-size:.7rem;
   color:rgba(2,11,18,.55);
 }
+
+/* Drag & drop over photo uploaders: highlight the active drop zone */
+.photo-drop-active{
+  outline:2px dashed var(--navy);
+  outline-offset:3px;
+  border-radius:12px;
+  background:rgba(9,47,77,.06);
+}
