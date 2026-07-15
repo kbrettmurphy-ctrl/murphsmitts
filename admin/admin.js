@@ -11375,7 +11375,7 @@ function openGalleryDescribeDialog(photo) {
     <div class="gallery-describe-card" role="dialog" aria-modal="true" aria-label="Describe glove">
       <h3>Shop glove details</h3>
       <p>Makes this photo searchable without an order (your gloves, sold gloves). Saving replaces any order link on this photo.</p>
-      <label>Brand / Model<input type="text" data-describe-field="brandModel" value="${escapeHtml(meta.brandModel || "")}" placeholder="Wilson A2000 1786"></label>
+      <label>Brand / Model<span class="gallery-describe-suggest-wrap"><input type="text" data-describe-field="brandModel" value="${escapeHtml(meta.brandModel || "")}" placeholder="Wilson A2000 1786" autocomplete="off"><div class="gallery-describe-suggest" data-describe-suggest hidden></div></span></label>
       <label>Glove Type<select data-describe-field="gloveType">${renderSelectOptions(meta.gloveType || "", GLOVE_TYPE_OPTIONS, "Select glove type")}</select></label>
       <label>Web Type<select data-describe-field="webType">${renderSelectOptions(meta.webType || "", WEB_TYPE_OPTIONS, "Select web type")}</select></label>
       <label>Primary Lace<select data-describe-field="primaryLaceColor" data-lace-color-select data-allow-custom data-current="${escapeAttr(meta.primaryLaceColor || "")}" data-placeholder="Choose">${adminLaceOptionMarkup(meta.primaryLaceColor || "", "Choose")}<option value="__custom__">Custom color…</option></select></label>
@@ -11407,6 +11407,41 @@ function openGalleryDescribeDialog(photo) {
     }
   });
 
+  /* Autofill from past work: typing in Brand/Model suggests glove combos
+     already in the database (orders + described shop gloves); picking one
+     fills the whole form. */
+  const brandInput = overlay.querySelector('[data-describe-field="brandModel"]');
+  const suggestEl = overlay.querySelector("[data-describe-suggest]");
+  const suggestionPool = buildDescribeSuggestionPool();
+
+  function hideDescribeSuggest() {
+    if (!suggestEl) return;
+    suggestEl.hidden = true;
+    suggestEl.innerHTML = "";
+  }
+
+  brandInput?.addEventListener("input", () => {
+    const q = brandInput.value.trim().toLowerCase();
+    if (q.length < 2) { hideDescribeSuggest(); return; }
+    const terms = q.split(/\s+/).filter(Boolean);
+    const matches = suggestionPool.filter(g => terms.every(t => g.hay.includes(t))).slice(0, 6);
+    if (!matches.length) { hideDescribeSuggest(); return; }
+
+    suggestEl.innerHTML = matches.map((g, i) => `
+      <button type="button" data-suggest-index="${i}">
+        <strong>${escapeHtml(g.brandModel)}</strong>
+        <span>${escapeHtml([g.gloveType, g.webType, [g.primaryLaceColor, g.secondaryLaceColor].filter(Boolean).join("/")].filter(Boolean).join(" · "))}</span>
+      </button>
+    `).join("");
+    suggestEl.hidden = false;
+    suggestEl.querySelectorAll("[data-suggest-index]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        applyDescribeSuggestion(overlay, matches[Number(btn.dataset.suggestIndex)]);
+        hideDescribeSuggest();
+      });
+    });
+  });
+
   /* One-off colors bought per order and never stocked: "Custom color…"
      swaps the dropdown for a free-text field. */
   overlay.addEventListener("change", (e) => {
@@ -11425,6 +11460,51 @@ function openGalleryDescribeDialog(photo) {
   document.addEventListener("keydown", handleGalleryDescribeKeydown);
   loadAdminLaceOptions();
   overlay.querySelector("[data-describe-field]")?.focus();
+}
+
+function buildDescribeSuggestionPool() {
+  const seen = new Set();
+  const pool = [];
+  const addCombo = (source) => {
+    const brandModel = String(source.brandModel || "").trim();
+    if (!brandModel) return;
+    const combo = {
+      brandModel,
+      gloveType: String(source.gloveType || "").trim(),
+      webType: String(source.webType || "").trim(),
+      primaryLaceColor: String(source.primaryLaceColor || "").trim(),
+      secondaryLaceColor: String(source.secondaryLaceColor || "").trim()
+    };
+    const key = [combo.brandModel, combo.gloveType, combo.webType, combo.primaryLaceColor, combo.secondaryLaceColor]
+      .join("|").toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    combo.hay = key.replace(/\|/g, " ");
+    pool.push(combo);
+  };
+  (Array.isArray(allOrders) ? allOrders : []).forEach(addCombo);
+  (Array.isArray(galleryPhotos) ? galleryPhotos : []).forEach(ph => { if (ph.gloveMeta) addCombo(ph.gloveMeta); });
+  return pool;
+}
+
+function setDescribeFieldValue(overlay, field, value) {
+  const el = overlay.querySelector(`[data-describe-field="${field}"]`);
+  if (!el) return;
+  const v = String(value || "").trim();
+  if (el.tagName === "INPUT") { el.value = v; return; }
+  if (!v) { el.value = ""; return; }
+  if (!Array.from(el.options).some(o => o.value === v)) {
+    el.insertAdjacentHTML("afterbegin", `<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`);
+  }
+  el.value = v;
+}
+
+function applyDescribeSuggestion(overlay, combo) {
+  setDescribeFieldValue(overlay, "brandModel", combo.brandModel);
+  setDescribeFieldValue(overlay, "gloveType", combo.gloveType);
+  setDescribeFieldValue(overlay, "webType", combo.webType);
+  setDescribeFieldValue(overlay, "primaryLaceColor", combo.primaryLaceColor);
+  setDescribeFieldValue(overlay, "secondaryLaceColor", combo.secondaryLaceColor);
 }
 
 function closeGalleryDescribeDialog() {
