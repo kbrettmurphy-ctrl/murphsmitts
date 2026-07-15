@@ -2307,7 +2307,9 @@ export async function onRequest(context) {
       const linkRows = (links.ok && Array.isArray(links.data)) ? links.data : [];
 
       const byOrder = new Map();
-      const orderless = new Map(); // descriptor-tuple -> { fields, photos }
+      /* Shop gloves described directly on the photo link. No grouping: two
+         distinct gloves can share identical descriptors, so every described
+         photo is its own result. */
       for (const l of linkRows) {
         if (l.order_number) {
           if (!byOrder.has(l.order_number)) byOrder.set(l.order_number, []);
@@ -2316,26 +2318,16 @@ export async function onRequest(context) {
         }
         const fields = [l.brand_model, l.glove_type, l.web_type, l.primary_lace_color, l.secondary_lace_color];
         if (!fields.some(Boolean)) continue;
-        const key = fields.map(v => String(v || "").toLowerCase()).join("|");
-        if (!orderless.has(key)) {
-          orderless.set(key, {
-            brandModel: l.brand_model || "",
-            gloveType: l.glove_type || "",
-            webType: l.web_type || "",
-            laceColors: [l.primary_lace_color, l.secondary_lace_color].filter(Boolean),
-            photos: []
-          });
-        }
-        orderless.get(key).photos.push(l.photo_url);
-      }
-
-      /* Shop gloves described directly on the photo link. */
-      for (const glove of orderless.values()) {
-        const hay = [glove.brandModel, glove.gloveType, glove.webType, ...glove.laceColors]
-          .map(v => String(v || "").toLowerCase()).join(" ");
+        if (gloves.length >= 24) continue;
+        const hay = fields.map(v => String(v || "").toLowerCase()).join(" ");
         if (!terms.every(t => hay.includes(t))) continue;
-        gloves.push({ ...glove, photos: glove.photos.slice(0, 4) });
-        if (gloves.length >= 24) break;
+        gloves.push({
+          brandModel: l.brand_model || "",
+          gloveType: l.glove_type || "",
+          webType: l.web_type || "",
+          laceColors: [l.primary_lace_color, l.secondary_lace_color].filter(Boolean),
+          photos: [l.photo_url]
+        });
       }
 
       if (byOrder.size && gloves.length < 24) {
