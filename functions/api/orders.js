@@ -2342,12 +2342,13 @@ export async function onRequest(context) {
         const nums = [...byOrder.keys()].map(n => `"${String(n).replace(/"/g, "")}"`).join(",");
         const ordersResp = await supabaseFetch(
           env,
-          `/rest/v1/orders?select=order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color,services_requested&order_number=in.(${encodeURIComponent(nums)})`
+          `/rest/v1/orders?select=order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color,custom_color_request,services_requested&order_number=in.(${encodeURIComponent(nums)})`
         );
         for (const row of (ordersResp.ok && Array.isArray(ordersResp.data)) ? ordersResp.data : []) {
           const hay = [
             row.brand_model, row.glove_type, row.web_type,
-            row.primary_lace_color, row.secondary_lace_color, row.services_requested
+            row.primary_lace_color, row.secondary_lace_color,
+            row.custom_color_request, row.services_requested
           ].map(v => String(v || "").toLowerCase()).join(" ");
           if (!terms.every(t => hay.includes(t))) continue;
           gloves.push({

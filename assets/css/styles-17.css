@@ -869,7 +869,7 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
   padding: clamp(28px, 4vw, 44px) 0;
   border-top: 1px solid var(--hairline-soft);
 }
-.gallery-group:first-child{ border-top: 0; }
+.gallery-group:first-child{ border-top: 0; padding-top: 0; }
 .gallery-group .mm-section-title{ font-size: 20px; }
 .gallery-group .mm-section-intro{ margin-bottom: 18px; }
 
@@ -917,6 +917,7 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 }
 
 .gallery-status{ padding: 20px 0; }
+.gallery-status:empty{ display: none; }
 
 /* Glove search (gallery page) — quiet pill field, results reuse the strip */
 .glove-search-wrap{ margin: 0 0 24px; }
