@@ -42,6 +42,8 @@ function initGalleryLightbox() {
     panStartPanY: 0,
     pinchStartDistance: 0,
     pinchStartScale: MIN_SCALE,
+    pinchFocalX: 0,
+    pinchFocalY: 0,
     lastTapTime: 0,
     lastTapX: 0,
     lastTapY: 0,
@@ -74,6 +76,35 @@ function initGalleryLightbox() {
     const x = touches[0].clientX - touches[1].clientX;
     const y = touches[0].clientY - touches[1].clientY;
     return Math.hypot(x, y);
+  }
+
+  function getTouchMidpoint(touches) {
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2
+    };
+  }
+
+  function getViewportCenter() {
+    const rect = viewport.getBoundingClientRect();
+    return {
+      x: rect.left + (rect.width / 2),
+      y: rect.top + (rect.height / 2)
+    };
+  }
+
+  // The untransformed image is always centered in the viewport, so the viewport
+  // center is the fixed reference point for focal-zoom math.
+  function beginPinch(touches) {
+    const mid = getTouchMidpoint(touches);
+    const center = getViewportCenter();
+
+    state.pinchStartDistance = getTouchDistance(touches);
+    state.pinchStartScale = state.scale;
+    // Content offset (unscaled px from image center) under the pinch midpoint —
+    // this exact point must stay under the fingers while the scale changes.
+    state.pinchFocalX = (mid.x - center.x - state.panX) / state.scale;
+    state.pinchFocalY = (mid.y - center.y - state.panY) / state.scale;
   }
 
   function clearPendingTap() {
@@ -378,8 +409,7 @@ function initGalleryLightbox() {
       if (e.cancelable) e.preventDefault();
       state.startedMultiTouch = true;
       state.gesture = "pinch";
-      state.pinchStartDistance = getTouchDistance(e.touches);
-      state.pinchStartScale = state.scale;
+      beginPinch(e.touches);
       suppressSyntheticClick();
       return;
     }
@@ -415,17 +445,23 @@ function initGalleryLightbox() {
       suppressSyntheticClick();
 
       if (!state.pinchStartDistance) {
-        state.pinchStartDistance = getTouchDistance(e.touches);
-        state.pinchStartScale = state.scale;
+        beginPinch(e.touches);
       }
 
       const currentDistance = getTouchDistance(e.touches);
       if (state.pinchStartDistance && currentDistance) {
+        const mid = getTouchMidpoint(e.touches);
+        const center = getViewportCenter();
+
         state.scale = clamp(
           state.pinchStartScale * (currentDistance / state.pinchStartDistance),
           MIN_SCALE,
           MAX_SCALE
         );
+        // Anchor the focal content point under the (possibly moving) midpoint,
+        // which makes the pinch zoom at the fingers and pan with them.
+        state.panX = mid.x - center.x - (state.pinchFocalX * state.scale);
+        state.panY = mid.y - center.y - (state.pinchFocalY * state.scale);
         applyImageTransform();
       }
       return;
