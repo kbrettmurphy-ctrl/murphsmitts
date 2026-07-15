@@ -3961,23 +3961,112 @@ const SERVICE_OPTIONS = [
   "ShockTec Air2Gel Palm Pad"
 ];
 
-const LACE_COLOR_OPTIONS = [
-  "Black",
-  "Gray",
-  "Tan – Camel",
-  "Tan – Indian",
-  "Brown – Chestnut",
-  "Brown – Chocolate",
-  "Vintage Chestnut",
-  "Blue – Royal",
-  "Blue – Navy",
-  "Blue – Carolina",
-  "Red",
-  "Red - Dark",
-  "Orange",
-  "Yellow",
-  "Other (Special Order)"
-];
+/* Lace color options come from the live lace inventory — same source, labels,
+   and sort as the public services page and service request form, so an order's
+   stored value always round-trips through the Order Detail selects. */
+const ADMIN_LACE_LABEL_OVERRIDES = new Map([
+  ["blue - carolina", "Carolina Blue"],
+  ["blue - navy", "Navy Blue"],
+  ["blue - royal", "Royal Blue"],
+  ["brown - chocolate", "Chocolate"],
+  ["red - dark", "Dark Red"],
+  ["tan - camel", "Camel"],
+  ["tan - indian", "Indian Tan"],
+  ["tan - japan", "Japan Tan"]
+]);
+const ADMIN_LACE_SORT_ORDER = new Map([
+  ["black", 10],
+  ["gray", 20],
+  ["tan - camel", 30],
+  ["tan - indian", 40],
+  ["tan - japan", 50],
+  ["brown - chocolate", 60],
+  ["blue - carolina", 80],
+  ["blue - royal", 90],
+  ["blue - navy", 100],
+  ["red", 110],
+  ["red - dark", 120],
+  ["orange", 130],
+  ["yellow", 140]
+]);
+
+let adminLaceOptionsCache = null;
+let adminLaceOptionsPromise = null;
+
+function normalizeAdminLaceColor(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/–|—/g, "-")
+    .replace(/\s*-\s*/g, " - ")
+    .replace(/\s+/g, " ");
+}
+
+function adminLaceLabel(color) {
+  const normalized = normalizeAdminLaceColor(color);
+  if (ADMIN_LACE_LABEL_OVERRIDES.has(normalized)) return ADMIN_LACE_LABEL_OVERRIDES.get(normalized);
+  const titled = normalized.split(/\s+/).filter(Boolean)
+    .map(word => `${word.charAt(0).toUpperCase()}${word.slice(1)}`).join(" ");
+  const parts = titled.split(" - ");
+  if (parts.length === 2) return `${parts[1]} ${parts[0]}`;
+  return titled;
+}
+
+function loadAdminLaceOptions() {
+  if (adminLaceOptionsCache) return Promise.resolve(adminLaceOptionsCache);
+  if (!adminLaceOptionsPromise) {
+    adminLaceOptionsPromise = fetch("/api/lace-inventory", { cache: "no-store" })
+      .then(res => res.json())
+      .then(data => {
+        if (!data?.ok || !Array.isArray(data.inventory)) throw new Error("Lace inventory unavailable.");
+        const seen = new Set();
+        const items = [];
+        for (const item of data.inventory) {
+          const value = String(item.color || "").trim();
+          const normalized = normalizeAdminLaceColor(value);
+          if (!value || seen.has(normalized) || item.active === false) continue;
+          if (normalized.includes("pink") || normalized.includes("vintage")) continue;
+          seen.add(normalized);
+          items.push({ value, normalized, label: adminLaceLabel(value) });
+        }
+        items.sort((a, b) => {
+          const ao = ADMIN_LACE_SORT_ORDER.get(a.normalized) ?? 1000;
+          const bo = ADMIN_LACE_SORT_ORDER.get(b.normalized) ?? 1000;
+          if (ao !== bo) return ao - bo;
+          return a.label.localeCompare(b.label);
+        });
+        adminLaceOptionsCache = items;
+        refreshAdminLaceSelects();
+        return items;
+      })
+      .catch(() => {
+        adminLaceOptionsPromise = null;
+        return null;
+      });
+  }
+  return adminLaceOptionsPromise;
+}
+
+function adminLaceOptionMarkup(current, placeholder = "Choose") {
+  const items = adminLaceOptionsCache || [];
+  const cur = String(current || "").trim();
+  const curNormalized = normalizeAdminLaceColor(cur);
+  const inList = !cur || items.some(i => i.normalized === curNormalized);
+  return `<option value=""${!cur ? " selected" : ""}>${escapeHtml(placeholder)}</option>`
+    + (inList ? "" : `<option value="${escapeAttr(cur)}" selected>${escapeHtml(cur)}</option>`)
+    + items.map(i =>
+        `<option value="${escapeAttr(i.value)}"${i.normalized === curNormalized ? " selected" : ""}>${escapeHtml(i.label)}</option>`
+      ).join("");
+}
+
+/* Re-populate any rendered lace selects once the inventory arrives — options
+   only; never re-renders the surrounding detail form. */
+function refreshAdminLaceSelects() {
+  document.querySelectorAll("select[data-lace-color-select]").forEach(select => {
+    const current = select.value || select.dataset.current || "";
+    select.innerHTML = adminLaceOptionMarkup(current, select.dataset.placeholder || "Choose");
+  });
+}
 
 const STATE_OPTIONS = [
   { value: "AL", label: "Alabama" },
@@ -4103,7 +4192,15 @@ function renderPhoneInput(label, id, value) {
 }
 
 function renderLaceInput(label, id, value, placeholder = "Choose") {
-  return renderSelectInput(label, id, value, LACE_COLOR_OPTIONS, placeholder);
+  loadAdminLaceOptions();
+  return `
+    <div class="detail-block">
+      <div class="label">${escapeHtml(label)}</div>
+      <select id="${escapeAttr(id)}" data-lace-color-select data-current="${escapeAttr(String(value || "").trim())}" data-placeholder="${escapeAttr(placeholder)}">
+        ${adminLaceOptionMarkup(value, placeholder)}
+      </select>
+    </div>
+  `;
 }
 
 function gloveTypeOptions(current) {
@@ -11059,6 +11156,12 @@ async function loadGalleryManagerPhotos() {
     }, true);
 
     galleryPhotos = flattenGalleryPhotos(data.gallery || {}, data.hiddenGallery || {});
+    const glinks = data.photoLinks || {};
+    const gmeta = data.photoGloveMeta || {};
+    galleryPhotos.forEach(ph => {
+      ph.linkedOrder = glinks[ph.url] || "";
+      ph.gloveMeta = gmeta[ph.url] || null;
+    });
     renderGalleryManagerPhotos();
   } catch (err) {
     galleryPhotos = [];
@@ -11137,6 +11240,8 @@ function renderGalleryManagerPhotos() {
             <div class="gallery-manager-subrow">
               <span>${escapeHtml(photo.sectionLabel)}</span>
               <span class="gallery-manager-pill">${photo.hidden ? "Hidden" : "Visible"}</span>
+              ${photo.linkedOrder ? `<span class="gallery-manager-pill gallery-linked-pill">#${escapeHtml(photo.linkedOrder)}</span>` : ""}
+              ${photo.gloveMeta ? `<span class="gallery-manager-pill gallery-linked-pill">Shop glove</span>` : ""}
             </div>
           </div>
           <label class="sr-only" for="galleryActionSelect${index}">Gallery photo actions</label>
@@ -11252,6 +11357,91 @@ function ensureGalleryPhotoActionMenu() {
   return galleryPhotoActionMenuEl;
 }
 
+/* Shop-glove describe dialog: descriptors make a gallery photo searchable
+   on the public site without an order number. Saving replaces any order link. */
+let galleryDescribeDialogEl = null;
+
+function openGalleryDescribeDialog(photo) {
+  if (!photo) return;
+  closeGalleryDescribeDialog();
+
+  const meta = photo.gloveMeta || {};
+  const overlay = document.createElement("div");
+  overlay.className = "gallery-describe-overlay";
+  overlay.innerHTML = `
+    <div class="gallery-describe-card" role="dialog" aria-modal="true" aria-label="Describe glove">
+      <h3>Shop glove details</h3>
+      <p>Makes this photo searchable without an order (your gloves, sold gloves). Saving replaces any order link on this photo.</p>
+      <label>Brand / Model<input type="text" data-describe-field="brandModel" value="${escapeHtml(meta.brandModel || "")}" placeholder="Wilson A2000 1786"></label>
+      <label>Glove Type<select data-describe-field="gloveType">${renderSelectOptions(meta.gloveType || "", GLOVE_TYPE_OPTIONS, "Select glove type")}</select></label>
+      <label>Web Type<select data-describe-field="webType">${renderSelectOptions(meta.webType || "", WEB_TYPE_OPTIONS, "Select web type")}</select></label>
+      <label>Primary Lace<select data-describe-field="primaryLaceColor" data-lace-color-select data-current="${escapeAttr(meta.primaryLaceColor || "")}" data-placeholder="Choose">${adminLaceOptionMarkup(meta.primaryLaceColor || "", "Choose")}</select></label>
+      <label>Secondary Lace<select data-describe-field="secondaryLaceColor" data-lace-color-select data-current="${escapeAttr(meta.secondaryLaceColor || "")}" data-placeholder="None">${adminLaceOptionMarkup(meta.secondaryLaceColor || "", "None")}</select></label>
+      <div class="gallery-describe-actions">
+        ${photo.gloveMeta ? `<button type="button" class="gallery-describe-remove" data-describe-remove>Remove</button>` : ""}
+        <span class="gallery-describe-spacer"></span>
+        <button type="button" data-describe-cancel>Cancel</button>
+        <button type="button" class="gallery-describe-save" data-describe-save>Save</button>
+      </div>
+    </div>
+  `;
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay || e.target.closest("[data-describe-cancel]")) {
+      closeGalleryDescribeDialog();
+      return;
+    }
+    if (e.target.closest("[data-describe-remove]")) {
+      saveGalleryDescribe(photo, null);
+      return;
+    }
+    if (e.target.closest("[data-describe-save]")) {
+      const descriptors = {};
+      overlay.querySelectorAll("[data-describe-field]").forEach(input => {
+        descriptors[input.dataset.describeField] = input.value.trim();
+      });
+      saveGalleryDescribe(photo, descriptors);
+    }
+  });
+
+  document.body.appendChild(overlay);
+  galleryDescribeDialogEl = overlay;
+  document.addEventListener("keydown", handleGalleryDescribeKeydown);
+  loadAdminLaceOptions();
+  overlay.querySelector("[data-describe-field]")?.focus();
+}
+
+function closeGalleryDescribeDialog() {
+  if (!galleryDescribeDialogEl) return;
+  galleryDescribeDialogEl.remove();
+  galleryDescribeDialogEl = null;
+  document.removeEventListener("keydown", handleGalleryDescribeKeydown);
+}
+
+function handleGalleryDescribeKeydown(e) {
+  if (e.key !== "Escape") return;
+  closeGalleryDescribeDialog();
+}
+
+async function saveGalleryDescribe(photo, descriptors) {
+  const status = document.getElementById("galleryManagerStatus");
+  const clearing = !descriptors || !Object.values(descriptors).some(Boolean);
+  try {
+    await postJson({
+      action: "setGalleryPhotoOrder",
+      url: photo.url,
+      path: photo.path,
+      orderNumber: "",
+      descriptors: clearing ? null : descriptors
+    }, true);
+    closeGalleryDescribeDialog();
+    if (status) status.textContent = clearing ? "Shop glove details removed." : "Shop glove details saved.";
+    await loadGalleryManagerPhotos();
+  } catch (err) {
+    if (status) status.textContent = err.message || "Could not save glove details.";
+  }
+}
+
 function openGalleryPhotoActionMenu(photo, source) {
   if (!photo) return;
   const root = ensureGalleryPhotoActionMenu();
@@ -11264,6 +11454,8 @@ function openGalleryPhotoActionMenu(photo, source) {
     ${photo.hidden
       ? `<button class="workflow-action-btn" type="button" data-gallery-menu-action="restore">Restore / Show in Gallery</button>`
       : `<button class="workflow-action-btn" type="button" data-gallery-menu-action="hide">Hide from Gallery</button>`}
+    <button class="workflow-action-btn" type="button" data-gallery-menu-action="link">${photo.linkedOrder ? `Linked to #${escapeHtml(photo.linkedOrder)} — change…` : "Link to Order…"}</button>
+    <button class="workflow-action-btn" type="button" data-gallery-menu-action="describe">${photo.gloveMeta ? "Shop glove details — edit…" : "Describe Glove (no order)…"}</button>
     <button class="workflow-action-btn danger" type="button" data-gallery-menu-action="delete">Delete Photo</button>
   `;
 
@@ -11292,6 +11484,28 @@ async function runGalleryPhotoAction(photo, action) {
 
   if (action === "view") {
     if (photo.url) window.open(photo.url, "_blank", "noopener");
+    return;
+  }
+
+  if (action === "describe") {
+    openGalleryDescribeDialog(photo);
+    return;
+  }
+
+  if (action === "link") {
+    const entered = prompt(
+      "Link this gallery photo to an order number (blank to remove the link):",
+      photo.linkedOrder || ""
+    );
+    if (entered === null) return;
+    const orderNumber = entered.trim();
+    try {
+      await postJson({ action: "setGalleryPhotoOrder", url: photo.url, path: photo.path, orderNumber }, true);
+      if (status) status.textContent = orderNumber ? `Linked to order #${orderNumber}.` : "Link removed.";
+      await loadGalleryManagerPhotos();
+    } catch (err) {
+      if (status) status.textContent = err.message || "Could not save the link.";
+    }
     return;
   }
 

@@ -13,6 +13,12 @@ body_class: inner
     <p class="mm-section-copy">A look at baseball and softball gloves that came in for relacing, cleaning, conditioning, color changes, and targeted repair work.</p>
   </header>
 
+  <div class="glove-search-wrap">
+    <input id="gloveSearchInput" class="glove-search-input" type="search"
+      placeholder="Search gloves — brand, model, web, lace color…" autocomplete="off" />
+  </div>
+  <div id="gloveSearchResults" class="glove-search-results" hidden></div>
+
   <div id="galleryStatus" class="mm-status-message gallery-status">Loading gallery...</div>
   <div id="dynamicGallery"></div>
 
@@ -144,5 +150,67 @@ body_class: inner
   }
 
   loadGallery();
+
+  /* ---- Glove search (subtle): filters real past work by brand/model/web/
+     lace. Results replace the sections while active; clearing restores. ---- */
+  const searchInput = document.getElementById("gloveSearchInput");
+  const resultsEl = document.getElementById("gloveSearchResults");
+  let searchTimer = null;
+
+  function renderSearchResults(gloves, q) {
+    if (!gloves.length) {
+      resultsEl.innerHTML = `<p class="glove-search-empty">No matches for “${escapeHtml(q)}” yet — try a brand, web type, or lace color.</p>`;
+      return;
+    }
+    resultsEl.innerHTML = `
+      <div class="gallery-strip glove-search-grid" data-gallery-group="glove-search">
+        ${gloves.flatMap((g, gi) => g.photos.slice(0, 1).map(url => `
+          <figure class="glove-search-card">
+            <button class="gallery-thumb" type="button"
+              data-gallery-group="glove-search" data-gallery-index="${gi}"
+              aria-label="Open image: ${escapeHtml(g.brandModel || "glove")}">
+              <img src="${escapeHtml(url)}" alt="${escapeHtml(g.brandModel || "Glove")}" loading="lazy" decoding="async">
+            </button>
+            <figcaption class="glove-search-caption">${escapeHtml([g.brandModel, g.webType, g.laceColors.join("/")].filter(Boolean).join(" · "))}</figcaption>
+          </figure>
+        `)).join("")}
+      </div>`;
+  }
+
+  async function runGloveSearch(q) {
+    if (q.length < 2) {
+      resultsEl.hidden = true;
+      resultsEl.innerHTML = "";
+      galleryRoot.style.display = "";
+      return;
+    }
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "searchPublicGloves", q })
+      });
+      const data = await res.json();
+      if (!data.ok) return;
+      resultsEl.hidden = false;
+      galleryRoot.style.display = "none";
+      renderSearchResults(data.gloves || [], q);
+    } catch { /* leave gallery as-is */ }
+  }
+
+  searchInput?.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => runGloveSearch(searchInput.value.trim()), 320);
+  });
+
+  /* Deep link: /gallery/?q=a2000 (used by the home-page callout). */
+  const params = new URLSearchParams(location.search);
+  const preQ = (params.get("q") || "").trim();
+  if (preQ && searchInput) {
+    searchInput.value = preQ;
+    runGloveSearch(preQ);
+    searchInput.focus();
+  }
 })();
 </script>
+

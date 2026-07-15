@@ -7457,3 +7457,83 @@ body.has-notifications .topbar-menu-btn::after{
   html{ font-size:90%; }
   body{ font-size:0.875rem; }
 }
+
+/* Linked-order pill in the gallery manager */
+.gallery-linked-pill{
+  background:rgba(9,47,77,.12);
+  color:var(--navy);
+}
+
+/* Shop-glove describe dialog (gallery manager) */
+.gallery-describe-overlay{
+  position:fixed;
+  inset:0;
+  z-index:1200;
+  background:rgba(2,11,18,.45);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+}
+.gallery-describe-card{
+  width:min(360px, 100%);
+  background:#fffaf3;
+  border-radius:14px;
+  padding:16px;
+  box-shadow:0 18px 50px rgba(2,11,18,.3);
+}
+.gallery-describe-card h3{
+  margin:0 0 4px;
+  font-size:1rem;
+  color:var(--navy);
+}
+.gallery-describe-card p{
+  margin:0 0 12px;
+  font-size:.8rem;
+  color:rgba(2,11,18,.6);
+}
+.gallery-describe-card label{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  font-size:.75rem;
+  font-weight:600;
+  color:var(--navy);
+  margin-bottom:8px;
+}
+.gallery-describe-card input,
+.gallery-describe-card select{
+  font-size:.85rem;
+  padding:7px 10px;
+  border:1px solid rgba(9,47,77,.24);
+  border-radius:8px;
+  background:#fff;
+  font-family:inherit;
+  color:inherit;
+}
+.gallery-describe-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:12px;
+}
+.gallery-describe-spacer{ flex:1; }
+.gallery-describe-actions button{
+  min-height:32px;
+  padding:4px 12px;
+  border-radius:8px;
+  border:1px solid rgba(9,47,77,.24);
+  background:#fff;
+  color:var(--navy);
+  font-size:.8rem;
+  cursor:pointer;
+}
+.gallery-describe-actions .gallery-describe-save{
+  background:var(--navy);
+  color:#fff;
+  border-color:var(--navy);
+}
+.gallery-describe-actions .gallery-describe-remove{
+  border-color:rgba(146,26,36,.4);
+  color:#921a24;
+}

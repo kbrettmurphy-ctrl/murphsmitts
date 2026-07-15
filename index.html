@@ -110,6 +110,14 @@ body_class: home
       <div class="home-actions">
         <a class="mm-link" href="{{ '/gallery/' | relative_url }}">View the full gallery</a>
       </div>
+
+      <form class="home-similar-search" action="{{ '/gallery/' | relative_url }}" method="get">
+        <label for="homeSimilarInput" class="home-similar-label">Curious what your glove could look like? Search work done on gloves like yours.</label>
+        <div class="home-similar-row">
+          <input id="homeSimilarInput" name="q" type="search" placeholder="e.g. A2000, H-web, tan lace" autocomplete="off" />
+          <button type="submit" aria-label="Search similar gloves">&#8250;</button>
+        </div>
+      </form>
     </div>
   </section>
 
