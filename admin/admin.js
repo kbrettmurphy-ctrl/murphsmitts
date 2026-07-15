@@ -3961,23 +3961,112 @@ const SERVICE_OPTIONS = [
   "ShockTec Air2Gel Palm Pad"
 ];
 
-const LACE_COLOR_OPTIONS = [
-  "Black",
-  "Gray",
-  "Tan – Camel",
-  "Tan – Indian",
-  "Brown – Chestnut",
-  "Brown – Chocolate",
-  "Vintage Chestnut",
-  "Blue – Royal",
-  "Blue – Navy",
-  "Blue – Carolina",
-  "Red",
-  "Red - Dark",
-  "Orange",
-  "Yellow",
-  "Other (Special Order)"
-];
+/* Lace color options come from the live lace inventory — same source, labels,
+   and sort as the public services page and service request form, so an order's
+   stored value always round-trips through the Order Detail selects. */
+const ADMIN_LACE_LABEL_OVERRIDES = new Map([
+  ["blue - carolina", "Carolina Blue"],
+  ["blue - navy", "Navy Blue"],
+  ["blue - royal", "Royal Blue"],
+  ["brown - chocolate", "Chocolate"],
+  ["red - dark", "Dark Red"],
+  ["tan - camel", "Camel"],
+  ["tan - indian", "Indian Tan"],
+  ["tan - japan", "Japan Tan"]
+]);
+const ADMIN_LACE_SORT_ORDER = new Map([
+  ["black", 10],
+  ["gray", 20],
+  ["tan - camel", 30],
+  ["tan - indian", 40],
+  ["tan - japan", 50],
+  ["brown - chocolate", 60],
+  ["blue - carolina", 80],
+  ["blue - royal", 90],
+  ["blue - navy", 100],
+  ["red", 110],
+  ["red - dark", 120],
+  ["orange", 130],
+  ["yellow", 140]
+]);
+
+let adminLaceOptionsCache = null;
+let adminLaceOptionsPromise = null;
+
+function normalizeAdminLaceColor(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/–|—/g, "-")
+    .replace(/\s*-\s*/g, " - ")
+    .replace(/\s+/g, " ");
+}
+
+function adminLaceLabel(color) {
+  const normalized = normalizeAdminLaceColor(color);
+  if (ADMIN_LACE_LABEL_OVERRIDES.has(normalized)) return ADMIN_LACE_LABEL_OVERRIDES.get(normalized);
+  const titled = normalized.split(/\s+/).filter(Boolean)
+    .map(word => `${word.charAt(0).toUpperCase()}${word.slice(1)}`).join(" ");
+  const parts = titled.split(" - ");
+  if (parts.length === 2) return `${parts[1]} ${parts[0]}`;
+  return titled;
+}
+
+function loadAdminLaceOptions() {
+  if (adminLaceOptionsCache) return Promise.resolve(adminLaceOptionsCache);
+  if (!adminLaceOptionsPromise) {
+    adminLaceOptionsPromise = fetch("/api/lace-inventory", { cache: "no-store" })
+      .then(res => res.json())
+      .then(data => {
+        if (!data?.ok || !Array.isArray(data.inventory)) throw new Error("Lace inventory unavailable.");
+        const seen = new Set();
+        const items = [];
+        for (const item of data.inventory) {
+          const value = String(item.color || "").trim();
+          const normalized = normalizeAdminLaceColor(value);
+          if (!value || seen.has(normalized) || item.active === false) continue;
+          if (normalized.includes("pink") || normalized.includes("vintage")) continue;
+          seen.add(normalized);
+          items.push({ value, normalized, label: adminLaceLabel(value) });
+        }
+        items.sort((a, b) => {
+          const ao = ADMIN_LACE_SORT_ORDER.get(a.normalized) ?? 1000;
+          const bo = ADMIN_LACE_SORT_ORDER.get(b.normalized) ?? 1000;
+          if (ao !== bo) return ao - bo;
+          return a.label.localeCompare(b.label);
+        });
+        adminLaceOptionsCache = items;
+        refreshAdminLaceSelects();
+        return items;
+      })
+      .catch(() => {
+        adminLaceOptionsPromise = null;
+        return null;
+      });
+  }
+  return adminLaceOptionsPromise;
+}
+
+function adminLaceOptionMarkup(current, placeholder = "Choose") {
+  const items = adminLaceOptionsCache || [];
+  const cur = String(current || "").trim();
+  const curNormalized = normalizeAdminLaceColor(cur);
+  const inList = !cur || items.some(i => i.normalized === curNormalized);
+  return `<option value=""${!cur ? " selected" : ""}>${escapeHtml(placeholder)}</option>`
+    + (inList ? "" : `<option value="${escapeAttr(cur)}" selected>${escapeHtml(cur)}</option>`)
+    + items.map(i =>
+        `<option value="${escapeAttr(i.value)}"${i.normalized === curNormalized ? " selected" : ""}>${escapeHtml(i.label)}</option>`
+      ).join("");
+}
+
+/* Re-populate any rendered lace selects once the inventory arrives — options
+   only; never re-renders the surrounding detail form. */
+function refreshAdminLaceSelects() {
+  document.querySelectorAll("select[data-lace-color-select]").forEach(select => {
+    const current = select.value || select.dataset.current || "";
+    select.innerHTML = adminLaceOptionMarkup(current, select.dataset.placeholder || "Choose");
+  });
+}
 
 const STATE_OPTIONS = [
   { value: "AL", label: "Alabama" },
@@ -4103,7 +4192,15 @@ function renderPhoneInput(label, id, value) {
 }
 
 function renderLaceInput(label, id, value, placeholder = "Choose") {
-  return renderSelectInput(label, id, value, LACE_COLOR_OPTIONS, placeholder);
+  loadAdminLaceOptions();
+  return `
+    <div class="detail-block">
+      <div class="label">${escapeHtml(label)}</div>
+      <select id="${escapeAttr(id)}" data-lace-color-select data-current="${escapeAttr(String(value || "").trim())}" data-placeholder="${escapeAttr(placeholder)}">
+        ${adminLaceOptionMarkup(value, placeholder)}
+      </select>
+    </div>
+  `;
 }
 
 function gloveTypeOptions(current) {
@@ -11276,10 +11373,10 @@ function openGalleryDescribeDialog(photo) {
       <h3>Shop glove details</h3>
       <p>Makes this photo searchable without an order (your gloves, sold gloves). Saving replaces any order link on this photo.</p>
       <label>Brand / Model<input type="text" data-describe-field="brandModel" value="${escapeHtml(meta.brandModel || "")}" placeholder="Wilson A2000 1786"></label>
-      <label>Glove Type<input type="text" data-describe-field="gloveType" value="${escapeHtml(meta.gloveType || "")}" placeholder="Fielders Glove"></label>
-      <label>Web Type<input type="text" data-describe-field="webType" value="${escapeHtml(meta.webType || "")}" placeholder="I-Web"></label>
-      <label>Primary Lace<input type="text" data-describe-field="primaryLaceColor" value="${escapeHtml(meta.primaryLaceColor || "")}" placeholder="Tan"></label>
-      <label>Secondary Lace<input type="text" data-describe-field="secondaryLaceColor" value="${escapeHtml(meta.secondaryLaceColor || "")}" placeholder="Navy"></label>
+      <label>Glove Type<select data-describe-field="gloveType">${renderSelectOptions(meta.gloveType || "", GLOVE_TYPE_OPTIONS, "Select glove type")}</select></label>
+      <label>Web Type<select data-describe-field="webType">${renderSelectOptions(meta.webType || "", WEB_TYPE_OPTIONS, "Select web type")}</select></label>
+      <label>Primary Lace<select data-describe-field="primaryLaceColor" data-lace-color-select data-current="${escapeAttr(meta.primaryLaceColor || "")}" data-placeholder="Choose">${adminLaceOptionMarkup(meta.primaryLaceColor || "", "Choose")}</select></label>
+      <label>Secondary Lace<select data-describe-field="secondaryLaceColor" data-lace-color-select data-current="${escapeAttr(meta.secondaryLaceColor || "")}" data-placeholder="None">${adminLaceOptionMarkup(meta.secondaryLaceColor || "", "None")}</select></label>
       <div class="gallery-describe-actions">
         ${photo.gloveMeta ? `<button type="button" class="gallery-describe-remove" data-describe-remove>Remove</button>` : ""}
         <span class="gallery-describe-spacer"></span>
@@ -11310,6 +11407,7 @@ function openGalleryDescribeDialog(photo) {
   document.body.appendChild(overlay);
   galleryDescribeDialogEl = overlay;
   document.addEventListener("keydown", handleGalleryDescribeKeydown);
+  loadAdminLaceOptions();
   overlay.querySelector("[data-describe-field]")?.focus();
 }
 

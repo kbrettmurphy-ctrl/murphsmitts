@@ -1009,33 +1009,14 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
   user-select: none;
   -webkit-user-drag: none;
   touch-action: none;
+  cursor: zoom-in;
 }
 .lb-slide img.is-zoomed{ cursor: grab; }
-.lb-slide img.is-panning,
-.lb-slide img.is-zooming{ cursor: grabbing; transition: none; }
+.lb-slide img.is-panning{ cursor: grabbing; }
 
-.lb-close{
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(255,255,255,.14);
-  color: #fff;
-  font-size: 19px;
-  line-height: 1;
-  cursor: pointer;
-  transition: background-color .15s ease;
-  z-index: 3;
-}
-.lb-close:hover{ background: rgba(255,255,255,.28); }
-
-/* No arrows: swipe / tap left-right halves / arrow keys navigate instead */
+/* No chrome: click/tap outside or Esc closes; swipe, edge-taps, trackpad
+   scroll, or arrow keys navigate; pinch/double-tap/ctrl+wheel zooms. */
+.lb-close,
 .lb-prev,
 .lb-next{ display: none; }
 

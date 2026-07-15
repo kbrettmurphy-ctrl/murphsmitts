@@ -7501,12 +7501,15 @@ body.has-notifications .topbar-menu-btn::after{
   color:var(--navy);
   margin-bottom:8px;
 }
-.gallery-describe-card input{
+.gallery-describe-card input,
+.gallery-describe-card select{
   font-size:.85rem;
   padding:7px 10px;
   border:1px solid rgba(9,47,77,.24);
   border-radius:8px;
   background:#fff;
+  font-family:inherit;
+  color:inherit;
 }
 .gallery-describe-actions{
   display:flex;
