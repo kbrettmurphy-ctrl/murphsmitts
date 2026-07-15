@@ -1911,7 +1911,9 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
   .mm-field input:not([type="checkbox"]):not([type="radio"]),
   .mm-field select,
   .mm-field textarea,
-  .mm-inline-other input[type="text"]{
+  .mm-inline-other input[type="text"],
+  .glove-search-input,
+  .home-similar-row input{
     font-size: 16px;
   }
 
