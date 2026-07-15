@@ -1666,6 +1666,56 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 }
 .glove-add-actions{ margin-top: 4px; }
 
+/* Glove photo uploader (request form) — compact staged-photo tiles */
+.glove-photo-row{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 2px;
+}
+.glove-photo-add{
+  width: 56px;
+  height: 56px;
+  border: 1px dashed var(--hairline);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color .15s ease, color .15s ease;
+}
+.glove-photo-add:hover{ border-color: var(--navy); color: var(--navy); }
+.glove-photo-thumb{
+  position: relative;
+  width: 56px;
+  height: 56px;
+}
+.glove-photo-thumb img{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+}
+.glove-photo-remove{
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--navy);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(9,47,77,.3);
+}
+
 .lace-decision-support{
   font-size: 13px;
   color: var(--muted);

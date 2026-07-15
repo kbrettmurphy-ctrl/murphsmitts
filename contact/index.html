@@ -232,11 +232,20 @@ body_class: inner
                   </div>
 
                   <div class="glove-subgroup" data-simple-title="Glove Notes">
-                    <h5 class="glove-subgroup-title">Notes</h5>
+                    <h5 class="glove-subgroup-title">Notes &amp; Photos</h5>
 
                     <div class="mm-field">
                       <label for="sr-notes">Anything I should know about this glove?</label>
                       <textarea id="sr-notes" class="compact-textarea" name="gloveNotes" rows="1" placeholder="Anything I should know about this glove?"></textarea>
+                    </div>
+
+                    <div class="mm-field glove-photo-field" data-photo-field>
+                      <label>Photos of the glove</label>
+                      <div class="glove-photo-row" data-photo-row>
+                        <button type="button" class="glove-photo-add" data-photo-add aria-label="Add photos">+</button>
+                      </div>
+                      <div class="note">Optional, up to 6. They upload after you submit the request.</div>
+                      <input type="file" accept="image/*" multiple hidden data-photo-input>
                     </div>
                   </div>
                 </div>
@@ -578,11 +587,20 @@ body_class: inner
           </div>
 
           <div class="glove-subgroup" data-simple-title="Glove Notes">
-            <h5 class="glove-subgroup-title">Notes</h5>
+            <h5 class="glove-subgroup-title">Notes &amp; Photos</h5>
 
             <div class="mm-field">
               <label>Anything I should know about this glove?</label>
               <textarea class="compact-textarea" name="gloveNotes" rows="1" placeholder="Anything I should know about this glove?"></textarea>
+            </div>
+
+            <div class="mm-field glove-photo-field" data-photo-field>
+              <label>Photos of the glove</label>
+              <div class="glove-photo-row" data-photo-row>
+                <button type="button" class="glove-photo-add" data-photo-add aria-label="Add photos">+</button>
+              </div>
+              <div class="note">Optional, up to 6. They upload after you submit the request.</div>
+              <input type="file" accept="image/*" multiple hidden data-photo-input>
             </div>
           </div>
         </div>
@@ -722,7 +740,63 @@ body_class: inner
     return true;
   }
 
+  /* ---- Glove photos: staged per glove card, uploaded after submit ---- */
+  const MAX_PHOTOS_PER_GLOVE = 6;
+  const glovePhotoFiles = new WeakMap();
+
+  function renderPhotoRow(field) {
+    const row = field.querySelector("[data-photo-row]");
+    if (!row) return;
+    const files = glovePhotoFiles.get(field) || [];
+    row.querySelectorAll(".glove-photo-thumb").forEach(thumb => {
+      if (thumb.dataset.objectUrl) URL.revokeObjectURL(thumb.dataset.objectUrl);
+      thumb.remove();
+    });
+    const addBtn = row.querySelector("[data-photo-add]");
+    files.forEach((file, i) => {
+      const thumb = document.createElement("div");
+      thumb.className = "glove-photo-thumb";
+      const objectUrl = URL.createObjectURL(file);
+      thumb.dataset.objectUrl = objectUrl;
+      thumb.innerHTML = `<img alt="Glove photo ${i + 1}"><button type="button" class="glove-photo-remove" data-photo-remove="${i}" aria-label="Remove photo ${i + 1}">&times;</button>`;
+      thumb.querySelector("img").src = objectUrl;
+      row.insertBefore(thumb, addBtn);
+    });
+    if (addBtn) addBtn.style.display = files.length >= MAX_PHOTOS_PER_GLOVE ? "none" : "";
+  }
+
+  form.addEventListener("click", (e) => {
+    const addBtn = e.target.closest("[data-photo-add]");
+    if (addBtn) {
+      addBtn.closest("[data-photo-field]")?.querySelector("[data-photo-input]")?.click();
+      return;
+    }
+    const removeBtn = e.target.closest("[data-photo-remove]");
+    if (removeBtn) {
+      const field = removeBtn.closest("[data-photo-field]");
+      const files = glovePhotoFiles.get(field) || [];
+      files.splice(Number(removeBtn.dataset.photoRemove), 1);
+      glovePhotoFiles.set(field, files);
+      renderPhotoRow(field);
+    }
+  });
+
   form.addEventListener("change", (e) => {
+    const photoInput = e.target.closest("[data-photo-input]");
+    if (photoInput) {
+      const field = photoInput.closest("[data-photo-field]");
+      const files = glovePhotoFiles.get(field) || [];
+      for (const file of Array.from(photoInput.files || [])) {
+        if (files.length >= MAX_PHOTOS_PER_GLOVE) break;
+        if (!file.type.startsWith("image/")) continue;
+        files.push(file);
+      }
+      glovePhotoFiles.set(field, files);
+      photoInput.value = "";
+      renderPhotoRow(field);
+      return;
+    }
+
     if (e.target.name === "gloveType" || e.target.name === "dropOffMethod") {
       toggleConditionalFields();
     }
@@ -763,6 +837,61 @@ body_class: inner
       e.target.classList.remove("field-invalid");
     }
   });
+
+  /* Shrink photos client-side so mobile uploads stay quick; fall back to the
+     original file if the browser can't decode it (e.g. odd formats). */
+  async function compressGlovePhoto(file) {
+    const MAX_DIM = 1600;
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, MAX_DIM / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.82));
+      return blob ? { blob, contentType: "image/jpeg" } : { blob: file, contentType: file.type || "image/jpeg" };
+    } catch {
+      return { blob: file, contentType: file.type || "image/jpeg" };
+    }
+  }
+
+  async function blobToBase64(blob) {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = "";
+    const CHUNK = 0x8000;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+    }
+    return btoa(binary);
+  }
+
+  async function uploadGlovePhotos(batches) {
+    const total = batches.reduce((n, b) => n + b.files.length, 0);
+    if (!total) return { total: 0, failed: 0 };
+    let done = 0;
+    let failed = 0;
+    for (const batch of batches) {
+      for (const file of batch.files) {
+        showStatus(`Request received — uploading photos (${done + 1}/${total})...`, "pending");
+        try {
+          const { blob, contentType } = await compressGlovePhoto(file);
+          const data = await blobToBase64(blob);
+          const res = await fetch("/api/intake", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "uploadOrderPhoto", orderId: batch.orderId, contentType, data })
+          });
+          const out = await res.json();
+          if (!res.ok || !out.ok) failed += 1;
+        } catch {
+          failed += 1;
+        }
+        done += 1;
+      }
+    }
+    return { total, failed };
+  }
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -811,12 +940,24 @@ body_class: inner
         throw new Error(data.error || "Failed to submit service request.");
       }
 
+      /* Capture staged photos + their glove order BEFORE the form resets.
+         DOM order of photo fields matches the gloves array, which matches
+         the returned orders array. */
+      const photoFields = Array.from(form.querySelectorAll("[data-photo-field]"));
+      const stagedPhotoLists = photoFields.map(field => (glovePhotoFiles.get(field) || []).slice());
+
       form.reset();
       additionalGloves.innerHTML = "";
       gloveCount = 1;
       syncGloveLayoutMode();
       clearInvalidStates();
       toggleConditionalFields();
+      photoFields.forEach(field => {
+        if (document.contains(field)) {
+          glovePhotoFiles.set(field, []);
+          renderPhotoRow(field);
+        }
+      });
       const orderNumbers = Array.isArray(data.orders)
         ? data.orders.map(order => order.orderNumber || order.order_number)
         : [data.order?.orderNumber || data.order?.order_number || ""];
@@ -825,6 +966,21 @@ body_class: inner
       setTimeout(() => {
         scrollToElement(successCard);
       }, 20);
+
+      const orderIds = Array.isArray(data.orders)
+        ? data.orders.map(order => order.id)
+        : [data.order?.id];
+      const batches = stagedPhotoLists
+        .map((files, i) => ({ files, orderId: orderIds[i] }))
+        .filter(batch => batch.orderId && batch.files.length);
+      const uploadResult = await uploadGlovePhotos(batches);
+      if (uploadResult.total) {
+        if (uploadResult.failed) {
+          showStatus(`Request received, but ${uploadResult.failed} photo${uploadResult.failed === 1 ? "" : "s"} failed to upload — you can text them to me instead.`, "error");
+        } else {
+          clearStatus();
+        }
+      }
     } catch (err) {
       showStatus(err.message || "Failed to submit service request.", "error");
       setTimeout(() => {

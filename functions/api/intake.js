@@ -45,6 +45,14 @@ export async function onRequest(context) {
     }
 
     const body = await request.json();
+
+    /* Post-submit photo upload from the service request form. Requires the
+       order's uuid — returned only to the submitting client — so an order
+       number alone can't push photos onto someone else's order. */
+    if (body && body.action === "uploadOrderPhoto") {
+      return await handleOrderPhotoUpload(env, body, jsonHeaders);
+    }
+
     const shared = buildSharedIncoming(body);
     const gloves = buildGloveIncomingList(body);
 
@@ -999,4 +1007,106 @@ function escapeHtml(s) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/* =========================================================================
+   Customer photo upload (service request form) — mirrors the Twilio SMS
+   media flow: same order-photos bucket, same glove_photos list on the order.
+   ========================================================================= */
+
+const ORDER_PHOTO_LIMIT = 12;
+const ORDER_PHOTO_MAX_BASE64 = 8_500_000; // ~6MB decoded
+const ORDER_PHOTO_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+async function handleOrderPhotoUpload(env, body, jsonHeaders) {
+  const orderId = String(body.orderId || "").trim().toLowerCase();
+  const contentType = String(body.contentType || "image/jpeg").trim().toLowerCase();
+  const data = typeof body.data === "string" ? body.data : "";
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(orderId)) {
+    return json({ ok: false, error: "Invalid order reference." }, 200, jsonHeaders);
+  }
+  if (!contentType.startsWith("image/")) {
+    return json({ ok: false, error: "Only image uploads are allowed." }, 200, jsonHeaders);
+  }
+  if (!data || data.length > ORDER_PHOTO_MAX_BASE64) {
+    return json({ ok: false, error: "Photo is missing or too large." }, 200, jsonHeaders);
+  }
+
+  const found = await supabaseFetch(
+    env,
+    `/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}&select=id,order_number,glove_photos,timestamp_submitted&limit=1`
+  );
+  const order = found.ok && Array.isArray(found.data) ? found.data[0] : null;
+  if (!order) {
+    return json({ ok: false, error: "Order not found." }, 200, jsonHeaders);
+  }
+
+  const submitted = Date.parse(order.timestamp_submitted || "");
+  if (!Number.isFinite(submitted) || (Date.now() - submitted) > ORDER_PHOTO_WINDOW_MS) {
+    return json({ ok: false, error: "Photo uploads for this order have closed. You can text photos instead." }, 200, jsonHeaders);
+  }
+
+  const existing = parseOrderPhotoList(order.glove_photos);
+  if (existing.length >= ORDER_PHOTO_LIMIT) {
+    return json({ ok: false, error: "Photo limit reached for this order." }, 200, jsonHeaders);
+  }
+
+  let bytes;
+  try {
+    const binary = atob(data);
+    bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  } catch {
+    return json({ ok: false, error: "Photo data could not be read." }, 200, jsonHeaders);
+  }
+
+  const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
+  const filename = `${order.order_number}/form-${Date.now()}-${Math.floor(Math.random() * 1e6)}.${ext}`;
+
+  const uploadResp = await fetch(
+    `${env.SUPABASE_URL}/storage/v1/object/order-photos/${filename}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": contentType,
+        "x-upsert": "true"
+      },
+      body: bytes
+    }
+  );
+  if (!uploadResp.ok) {
+    return json({ ok: false, error: "Photo upload failed." }, 200, jsonHeaders);
+  }
+
+  const url = `${env.SUPABASE_URL}/storage/v1/object/public/order-photos/${filename}`;
+  const patch = await supabaseFetch(
+    env,
+    `/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ glove_photos: [...existing, url] })
+    }
+  );
+  if (!patch.ok) {
+    return json({ ok: false, error: "Photo stored but could not be attached to the order." }, 200, jsonHeaders);
+  }
+
+  return json({ ok: true, url }, 200, jsonHeaders);
+}
+
+function parseOrderPhotoList(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }

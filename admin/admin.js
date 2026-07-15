@@ -11060,7 +11060,11 @@ async function loadGalleryManagerPhotos() {
 
     galleryPhotos = flattenGalleryPhotos(data.gallery || {}, data.hiddenGallery || {});
     const glinks = data.photoLinks || {};
-    galleryPhotos.forEach(ph => { ph.linkedOrder = glinks[ph.url] || ""; });
+    const gmeta = data.photoGloveMeta || {};
+    galleryPhotos.forEach(ph => {
+      ph.linkedOrder = glinks[ph.url] || "";
+      ph.gloveMeta = gmeta[ph.url] || null;
+    });
     renderGalleryManagerPhotos();
   } catch (err) {
     galleryPhotos = [];
@@ -11140,6 +11144,7 @@ function renderGalleryManagerPhotos() {
               <span>${escapeHtml(photo.sectionLabel)}</span>
               <span class="gallery-manager-pill">${photo.hidden ? "Hidden" : "Visible"}</span>
               ${photo.linkedOrder ? `<span class="gallery-manager-pill gallery-linked-pill">#${escapeHtml(photo.linkedOrder)}</span>` : ""}
+              ${photo.gloveMeta ? `<span class="gallery-manager-pill gallery-linked-pill">Shop glove</span>` : ""}
             </div>
           </div>
           <label class="sr-only" for="galleryActionSelect${index}">Gallery photo actions</label>
@@ -11255,6 +11260,90 @@ function ensureGalleryPhotoActionMenu() {
   return galleryPhotoActionMenuEl;
 }
 
+/* Shop-glove describe dialog: descriptors make a gallery photo searchable
+   on the public site without an order number. Saving replaces any order link. */
+let galleryDescribeDialogEl = null;
+
+function openGalleryDescribeDialog(photo) {
+  if (!photo) return;
+  closeGalleryDescribeDialog();
+
+  const meta = photo.gloveMeta || {};
+  const overlay = document.createElement("div");
+  overlay.className = "gallery-describe-overlay";
+  overlay.innerHTML = `
+    <div class="gallery-describe-card" role="dialog" aria-modal="true" aria-label="Describe glove">
+      <h3>Shop glove details</h3>
+      <p>Makes this photo searchable without an order (your gloves, sold gloves). Saving replaces any order link on this photo.</p>
+      <label>Brand / Model<input type="text" data-describe-field="brandModel" value="${escapeHtml(meta.brandModel || "")}" placeholder="Wilson A2000 1786"></label>
+      <label>Glove Type<input type="text" data-describe-field="gloveType" value="${escapeHtml(meta.gloveType || "")}" placeholder="Fielders Glove"></label>
+      <label>Web Type<input type="text" data-describe-field="webType" value="${escapeHtml(meta.webType || "")}" placeholder="I-Web"></label>
+      <label>Primary Lace<input type="text" data-describe-field="primaryLaceColor" value="${escapeHtml(meta.primaryLaceColor || "")}" placeholder="Tan"></label>
+      <label>Secondary Lace<input type="text" data-describe-field="secondaryLaceColor" value="${escapeHtml(meta.secondaryLaceColor || "")}" placeholder="Navy"></label>
+      <div class="gallery-describe-actions">
+        ${photo.gloveMeta ? `<button type="button" class="gallery-describe-remove" data-describe-remove>Remove</button>` : ""}
+        <span class="gallery-describe-spacer"></span>
+        <button type="button" data-describe-cancel>Cancel</button>
+        <button type="button" class="gallery-describe-save" data-describe-save>Save</button>
+      </div>
+    </div>
+  `;
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay || e.target.closest("[data-describe-cancel]")) {
+      closeGalleryDescribeDialog();
+      return;
+    }
+    if (e.target.closest("[data-describe-remove]")) {
+      saveGalleryDescribe(photo, null);
+      return;
+    }
+    if (e.target.closest("[data-describe-save]")) {
+      const descriptors = {};
+      overlay.querySelectorAll("[data-describe-field]").forEach(input => {
+        descriptors[input.dataset.describeField] = input.value.trim();
+      });
+      saveGalleryDescribe(photo, descriptors);
+    }
+  });
+
+  document.body.appendChild(overlay);
+  galleryDescribeDialogEl = overlay;
+  document.addEventListener("keydown", handleGalleryDescribeKeydown);
+  overlay.querySelector("[data-describe-field]")?.focus();
+}
+
+function closeGalleryDescribeDialog() {
+  if (!galleryDescribeDialogEl) return;
+  galleryDescribeDialogEl.remove();
+  galleryDescribeDialogEl = null;
+  document.removeEventListener("keydown", handleGalleryDescribeKeydown);
+}
+
+function handleGalleryDescribeKeydown(e) {
+  if (e.key !== "Escape") return;
+  closeGalleryDescribeDialog();
+}
+
+async function saveGalleryDescribe(photo, descriptors) {
+  const status = document.getElementById("galleryManagerStatus");
+  const clearing = !descriptors || !Object.values(descriptors).some(Boolean);
+  try {
+    await postJson({
+      action: "setGalleryPhotoOrder",
+      url: photo.url,
+      path: photo.path,
+      orderNumber: "",
+      descriptors: clearing ? null : descriptors
+    }, true);
+    closeGalleryDescribeDialog();
+    if (status) status.textContent = clearing ? "Shop glove details removed." : "Shop glove details saved.";
+    await loadGalleryManagerPhotos();
+  } catch (err) {
+    if (status) status.textContent = err.message || "Could not save glove details.";
+  }
+}
+
 function openGalleryPhotoActionMenu(photo, source) {
   if (!photo) return;
   const root = ensureGalleryPhotoActionMenu();
@@ -11268,6 +11357,7 @@ function openGalleryPhotoActionMenu(photo, source) {
       ? `<button class="workflow-action-btn" type="button" data-gallery-menu-action="restore">Restore / Show in Gallery</button>`
       : `<button class="workflow-action-btn" type="button" data-gallery-menu-action="hide">Hide from Gallery</button>`}
     <button class="workflow-action-btn" type="button" data-gallery-menu-action="link">${photo.linkedOrder ? `Linked to #${escapeHtml(photo.linkedOrder)} — change…` : "Link to Order…"}</button>
+    <button class="workflow-action-btn" type="button" data-gallery-menu-action="describe">${photo.gloveMeta ? "Shop glove details — edit…" : "Describe Glove (no order)…"}</button>
     <button class="workflow-action-btn danger" type="button" data-gallery-menu-action="delete">Delete Photo</button>
   `;
 
@@ -11296,6 +11386,11 @@ async function runGalleryPhotoAction(photo, action) {
 
   if (action === "view") {
     if (photo.url) window.open(photo.url, "_blank", "noopener");
+    return;
+  }
+
+  if (action === "describe") {
+    openGalleryDescribeDialog(photo);
     return;
   }
 

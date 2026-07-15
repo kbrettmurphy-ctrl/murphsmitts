@@ -1547,22 +1547,55 @@ export async function onRequest(context) {
       const orderNumber = cleanText(body.orderNumber);
       if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
 
-      if (!orderNumber) {
+      /* Orderless "shop glove" description: descriptors make the photo
+         searchable without an order (personal/family/sold gloves). */
+      const d = body.descriptors && typeof body.descriptors === "object" ? body.descriptors : null;
+      const descriptors = {
+        brand_model: cleanText(d?.brandModel) || null,
+        glove_type: cleanText(d?.gloveType) || null,
+        web_type: cleanText(d?.webType) || null,
+        primary_lace_color: cleanText(d?.primaryLaceColor) || null,
+        secondary_lace_color: cleanText(d?.secondaryLaceColor) || null
+      };
+      const hasDescriptors = Object.values(descriptors).some(Boolean);
+
+      if (!orderNumber && !hasDescriptors) {
         await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}`, {
           method: "DELETE", headers: { Prefer: "return=minimal" }
         });
         return json({ ok: true, cleared: true }, 200, jsonHeaders);
       }
 
-      const found = await fetchOrderByNumber(env, orderNumber);
-      if (!found.ok || !found.data) {
-        return json({ ok: false, error: `Order #${orderNumber} not found.` }, 200, jsonHeaders);
+      if (orderNumber) {
+        const found = await fetchOrderByNumber(env, orderNumber);
+        if (!found.ok || !found.data) {
+          return json({ ok: false, error: `Order #${orderNumber} not found.` }, 200, jsonHeaders);
+        }
       }
+
+      /* Linking to an order clears descriptors and vice versa. */
+      const row = orderNumber
+        ? {
+            photo_url: url,
+            photo_path: cleanText(body.path) || null,
+            order_number: orderNumber,
+            brand_model: null,
+            glove_type: null,
+            web_type: null,
+            primary_lace_color: null,
+            secondary_lace_color: null
+          }
+        : {
+            photo_url: url,
+            photo_path: cleanText(body.path) || null,
+            order_number: null,
+            ...descriptors
+          };
 
       const resp = await supabaseFetch(env, `/rest/v1/gallery_photo_links?on_conflict=photo_url`, {
         method: "POST",
         headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify({ photo_url: url, photo_path: cleanText(body.path) || null, order_number: orderNumber })
+        body: JSON.stringify(row)
       });
       if (!resp.ok) return json({ ok: false, error: "Could not save the link." }, 200, jsonHeaders);
       return json({ ok: true }, 200, jsonHeaders);
@@ -2265,15 +2298,47 @@ export async function onRequest(context) {
       const terms = q.split(/\s+/).filter(Boolean);
       const gloves = [];
 
-      /* Preferred source: curated gallery photos linked to orders. */
-      const links = await supabaseFetch(env, `/rest/v1/gallery_photo_links?select=photo_url,order_number&limit=1000`);
+      /* Source: curated gallery photos, either linked to an order (searchable
+         via the order's fields) or carrying their own shop-glove descriptors. */
+      const links = await supabaseFetch(
+        env,
+        `/rest/v1/gallery_photo_links?select=photo_url,order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
+      );
+      const linkRows = (links.ok && Array.isArray(links.data)) ? links.data : [];
+
       const byOrder = new Map();
-      for (const l of (links.ok && Array.isArray(links.data)) ? links.data : []) {
-        if (!byOrder.has(l.order_number)) byOrder.set(l.order_number, []);
-        byOrder.get(l.order_number).push(l.photo_url);
+      const orderless = new Map(); // descriptor-tuple -> { fields, photos }
+      for (const l of linkRows) {
+        if (l.order_number) {
+          if (!byOrder.has(l.order_number)) byOrder.set(l.order_number, []);
+          byOrder.get(l.order_number).push(l.photo_url);
+          continue;
+        }
+        const fields = [l.brand_model, l.glove_type, l.web_type, l.primary_lace_color, l.secondary_lace_color];
+        if (!fields.some(Boolean)) continue;
+        const key = fields.map(v => String(v || "").toLowerCase()).join("|");
+        if (!orderless.has(key)) {
+          orderless.set(key, {
+            brandModel: l.brand_model || "",
+            gloveType: l.glove_type || "",
+            webType: l.web_type || "",
+            laceColors: [l.primary_lace_color, l.secondary_lace_color].filter(Boolean),
+            photos: []
+          });
+        }
+        orderless.get(key).photos.push(l.photo_url);
       }
 
-      if (byOrder.size) {
+      /* Shop gloves described directly on the photo link. */
+      for (const glove of orderless.values()) {
+        const hay = [glove.brandModel, glove.gloveType, glove.webType, ...glove.laceColors]
+          .map(v => String(v || "").toLowerCase()).join(" ");
+        if (!terms.every(t => hay.includes(t))) continue;
+        gloves.push({ ...glove, photos: glove.photos.slice(0, 4) });
+        if (gloves.length >= 24) break;
+      }
+
+      if (byOrder.size && gloves.length < 24) {
         const nums = [...byOrder.keys()].map(n => `"${String(n).replace(/"/g, "")}"`).join(",");
         const ordersResp = await supabaseFetch(
           env,
@@ -2323,10 +2388,26 @@ export async function onRequest(context) {
       const hiddenGallery = {};
 
       let photoLinks = {};
+      let photoGloveMeta = {};
       if (includeHidden) {
-        const links = await supabaseFetch(env, `/rest/v1/gallery_photo_links?select=photo_url,order_number&limit=1000`);
+        const links = await supabaseFetch(
+          env,
+          `/rest/v1/gallery_photo_links?select=photo_url,order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
+        );
         if (links.ok && Array.isArray(links.data)) {
-          for (const l of links.data) photoLinks[l.photo_url] = l.order_number;
+          for (const l of links.data) {
+            if (l.order_number) {
+              photoLinks[l.photo_url] = l.order_number;
+              continue;
+            }
+            photoGloveMeta[l.photo_url] = {
+              brandModel: l.brand_model || "",
+              gloveType: l.glove_type || "",
+              webType: l.web_type || "",
+              primaryLaceColor: l.primary_lace_color || "",
+              secondaryLaceColor: l.secondary_lace_color || ""
+            };
+          }
         }
       }
 
@@ -2371,6 +2452,7 @@ export async function onRequest(context) {
           ok: true,
           gallery,
           photoLinks,
+          photoGloveMeta,
           hiddenGallery
         },
         200,
