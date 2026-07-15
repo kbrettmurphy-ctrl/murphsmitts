@@ -11442,6 +11442,11 @@ function openGalleryDescribeDialog(photo) {
     });
   });
 
+  /* Any click outside the suggestion list dismisses it. */
+  overlay.addEventListener("click", (e) => {
+    if (!e.target.closest(".gallery-describe-suggest-wrap")) hideDescribeSuggest();
+  });
+
   /* One-off colors bought per order and never stocked: "Custom color…"
      swaps the dropdown for a free-text field. */
   overlay.addEventListener("change", (e) => {
