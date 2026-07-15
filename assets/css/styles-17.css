@@ -608,6 +608,54 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 }
 .home-gallery-status:empty{ display: none; }
 
+/* "Similar gloves" mini search under the recent-work strip */
+.home-similar-search{ margin-top: 20px; }
+.home-similar-label{
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.home-similar-row{
+  display: flex;
+  gap: 8px;
+  max-width: 380px;
+}
+.home-similar-row input{
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--tint);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  padding: 8px 14px;
+  -webkit-appearance: none;
+  transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+}
+.home-similar-row input::placeholder{ color: var(--faint); }
+.home-similar-row input:focus{
+  outline: none;
+  background: var(--surface);
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+.home-similar-row button{
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--navy);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+.home-similar-row button:hover{ background: var(--navy-deep); }
+
 /* Process preview */
 .home-process-grid{
   display: grid;
@@ -869,6 +917,49 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 }
 
 .gallery-status{ padding: 20px 0; }
+
+/* Glove search (gallery page) — quiet pill field, results reuse the strip */
+.glove-search-wrap{ margin: 0 0 24px; }
+.glove-search-input{
+  width: 100%;
+  max-width: 420px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--tint);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  padding: 9px 16px;
+  -webkit-appearance: none;
+  transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+}
+.glove-search-input::placeholder{ color: var(--faint); }
+.glove-search-input:focus{
+  outline: none;
+  background: var(--surface);
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+.glove-search-empty{
+  font-size: 13.5px;
+  color: var(--muted);
+  padding: 12px 0;
+}
+.glove-search-card{
+  margin: 0;
+  flex: 0 0 auto;
+  width: clamp(150px, 22vw, 210px);
+}
+.glove-search-card .gallery-thumb{ width: 100%; }
+.glove-search-caption{
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--faint);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Lightbox (markup + classes consumed by main.js — keep mechanics intact) */
 .lightbox{
@@ -1807,6 +1898,7 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 
 @media (max-width: 480px){
   .gallery-thumb{ width: 62vw; }
+  .glove-search-card{ width: 62vw; }
   .process-shot{ width: 56vw; }
   .brand-text{ font-size: 11.5px; }
   .mm-final-actions, .cta{ flex-direction: column; gap: 14px; }

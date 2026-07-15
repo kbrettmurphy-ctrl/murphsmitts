@@ -112,41 +112,12 @@ body_class: home
       </div>
 
       <form class="home-similar-search" action="{{ '/gallery/' | relative_url }}" method="get">
-        <label for="homeSimilarInput" class="home-similar-label">Curious what your glove could look like? Search work we've done on gloves like yours.</label>
+        <label for="homeSimilarInput" class="home-similar-label">Curious what your glove could look like? Search work done on gloves like yours.</label>
         <div class="home-similar-row">
           <input id="homeSimilarInput" name="q" type="search" placeholder="e.g. A2000, H-web, tan lace" autocomplete="off" />
-          <button type="submit" aria-label="Search similar gloves">→</button>
+          <button type="submit" aria-label="Search similar gloves">&#8250;</button>
         </div>
       </form>
-      <style>
-        .home-similar-search{ margin-top:14px; }
-        .home-similar-label{
-          display:block;
-          font-size:.8rem;
-          color:rgba(9,47,77,.55);
-          margin-bottom:6px;
-        }
-        .home-similar-row{ display:flex; gap:6px; max-width:360px; }
-        .home-similar-row input{
-          flex:1;
-          padding:7px 12px;
-          font-size:.8rem;
-          color:#092f4d;
-          background:rgba(9,47,77,.05);
-          border:1px solid rgba(9,47,77,.14);
-          border-radius:999px;
-          outline:none;
-        }
-        .home-similar-row input:focus{ border-color:rgba(9,47,77,.35); background:#fffdf8; }
-        .home-similar-row button{
-          border:1px solid rgba(9,47,77,.14);
-          background:rgba(9,47,77,.05);
-          color:rgba(9,47,77,.65);
-          border-radius:999px;
-          width:34px;
-          cursor:pointer;
-        }
-      </style>
     </div>
   </section>
 
