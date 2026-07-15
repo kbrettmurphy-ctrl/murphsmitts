@@ -11436,7 +11436,10 @@ async function saveGalleryDescribe(photo, descriptors) {
     }, true);
     closeGalleryDescribeDialog();
     if (status) status.textContent = clearing ? "Shop glove details removed." : "Shop glove details saved.";
-    await loadGalleryManagerPhotos();
+    const target = galleryPhotos.find(p => p.url === photo.url) || photo;
+    target.gloveMeta = clearing ? null : { ...descriptors };
+    target.linkedOrder = "";
+    renderGalleryManagerPhotos();
   } catch (err) {
     if (status) status.textContent = err.message || "Could not save glove details.";
   }
@@ -11502,7 +11505,12 @@ async function runGalleryPhotoAction(photo, action) {
     try {
       await postJson({ action: "setGalleryPhotoOrder", url: photo.url, path: photo.path, orderNumber }, true);
       if (status) status.textContent = orderNumber ? `Linked to order #${orderNumber}.` : "Link removed.";
-      await loadGalleryManagerPhotos();
+      /* Update in place — a full reload wipes and refetches the whole grid,
+         which reads as a page refresh and loses the scroll position. */
+      const target = galleryPhotos.find(p => p.url === photo.url) || photo;
+      target.linkedOrder = orderNumber;
+      if (orderNumber) target.gloveMeta = null;
+      renderGalleryManagerPhotos();
     } catch (err) {
       if (status) status.textContent = err.message || "Could not save the link.";
     }
