@@ -11073,6 +11073,8 @@ function initUploadView() {
   uploadBtn.addEventListener("click", async () => {
     const files = stagedFiles;
     const section = sectionSelect?.value || "fielding-gloves";
+    const orderInput = document.getElementById("galleryUploadOrderInput");
+    const linkOrderNumber = orderInput?.value.trim() || "";
 
     if (!files.length) {
       status.textContent = "Choose photos before uploading.";
@@ -11084,6 +11086,8 @@ function initUploadView() {
     status.textContent = `Uploading ${files.length} photo${files.length === 1 ? "" : "s"}...`;
 
     let uploaded = 0;
+    let linked = 0;
+    let linkError = "";
     const failed = [];
 
     for (const file of files) {
@@ -11096,7 +11100,7 @@ function initUploadView() {
 
         const dataUrl = await fileToDataUrl(file);
 
-        await postJson({
+        const result = await postJson({
           action: "uploadGalleryPhoto",
           section,
           filename: file.name,
@@ -11105,6 +11109,24 @@ function initUploadView() {
         }, true);
 
         uploaded++;
+
+        /* Upload-with-link: every photo in the batch joins the same glove's
+           album. One failed link (e.g. bad order #) stops further attempts
+           but never blocks the uploads themselves. */
+        if (linkOrderNumber && !linkError && result?.url) {
+          try {
+            await postJson({
+              action: "setGalleryPhotoOrder",
+              url: result.url,
+              path: result.path,
+              orderNumber: linkOrderNumber
+            }, true);
+            linked++;
+          } catch (err) {
+            linkError = err.message || "Could not link to that order.";
+          }
+        }
+
         status.textContent = `Uploaded ${uploaded} of ${files.length} photo${files.length === 1 ? "" : "s"} to ${section}...`;
       } catch (err) {
         failed.push(`${file.name}: ${err.message || "Upload failed"}`);
@@ -11119,7 +11141,11 @@ function initUploadView() {
     }
 
     clearSelection();
-    status.textContent = `Uploaded ${uploaded} photo${uploaded === 1 ? "" : "s"} to the website gallery.`;
+    if (orderInput) orderInput.value = "";
+    const linkNote = linkOrderNumber
+      ? (linkError ? ` Link failed: ${linkError}` : ` Linked ${linked} to order #${linkOrderNumber}.`)
+      : "";
+    status.textContent = `Uploaded ${uploaded} photo${uploaded === 1 ? "" : "s"} to the website gallery.${linkNote}`;
     await loadGalleryManagerPhotos();
   });
 

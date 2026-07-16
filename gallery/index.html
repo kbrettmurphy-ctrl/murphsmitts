@@ -78,7 +78,26 @@ body_class: inner
     return `${sectionLabel} glove photo ${index + 1}`;
   }
 
-  function renderGallery(gallery) {
+  /* Photos linked to the same order form one glove album: a single cover
+     tile with a count badge, all angles inside the lightbox. Unlinked
+     photos stay as single tiles. */
+  function groupIntoAlbums(photos, links) {
+    const albums = [];
+    const byOrder = new Map();
+    photos.forEach(photo => {
+      const order = links[photo.url] || "";
+      if (order && byOrder.has(order)) {
+        byOrder.get(order).photos.push(photo.url);
+        return;
+      }
+      const album = { cover: photo.url, photos: [photo.url] };
+      if (order) byOrder.set(order, album);
+      albums.push(album);
+    });
+    return albums;
+  }
+
+  function renderGallery(gallery, links) {
     galleryRoot.innerHTML = "";
 
     let total = 0;
@@ -87,7 +106,8 @@ body_class: inner
       const photos = Array.isArray(gallery[key]) ? gallery[key] : [];
       if (!photos.length) return;
 
-      total += photos.length;
+      const albums = groupIntoAlbums(photos, links);
+      total += albums.length;
 
       const section = document.createElement("section");
       section.className = "gallery-group";
@@ -98,18 +118,20 @@ body_class: inner
           <h2 class="mm-section-title">${escapeHtml(label)}</h2>
         </div>
         <div class="gallery-strip" data-gallery-group="${escapeHtml(key)}">
-          ${photos.map((photo, index) => `
+          ${albums.map((album, index) => `
             <button
               class="gallery-thumb"
               type="button"
               data-gallery-group="${escapeHtml(key)}"
               data-gallery-index="${index}"
-              aria-label="Open image: ${escapeHtml(prettyAlt(label, photo, index))}">
+              data-photos="${escapeHtml(JSON.stringify(album.photos))}"
+              aria-label="Open image: ${escapeHtml(prettyAlt(label, album, index))}">
               <img
-                src="${escapeHtml(photo.url)}"
-                alt="${escapeHtml(prettyAlt(label, photo, index))}"
+                src="${escapeHtml(album.cover)}"
+                alt="${escapeHtml(prettyAlt(label, album, index))}"
                 loading="lazy"
                 decoding="async">
+              ${album.photos.length > 1 ? `<span class="gallery-thumb-count" aria-hidden="true">${album.photos.length}</span>` : ""}
             </button>
           `).join("")}
         </div>
@@ -141,7 +163,7 @@ body_class: inner
         throw new Error(data.error || "Gallery failed to load.");
       }
 
-      renderGallery(data.gallery || {});
+      renderGallery(data.gallery || {}, data.photoLinks || {});
     } catch (err) {
       if (statusEl) {
         statusEl.textContent = err.message || "Gallery failed to load.";
@@ -168,8 +190,10 @@ body_class: inner
           <figure class="glove-search-card">
             <button class="gallery-thumb" type="button"
               data-gallery-group="glove-search" data-gallery-index="${gi}"
+              data-photos="${escapeHtml(JSON.stringify(g.photos))}"
               aria-label="Open image: ${escapeHtml(g.brandModel || "glove")}">
               <img src="${escapeHtml(url)}" alt="${escapeHtml(g.brandModel || "Glove")}" loading="lazy" decoding="async">
+              ${g.photos.length > 1 ? `<span class="gallery-thumb-count" aria-hidden="true">${g.photos.length}</span>` : ""}
             </button>
             <figcaption class="glove-search-caption">${escapeHtml([g.brandModel, g.webType, g.laceColors.join("/")].filter(Boolean).join(" · "))}</figcaption>
           </figure>
