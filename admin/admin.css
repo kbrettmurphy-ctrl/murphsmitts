@@ -7610,3 +7610,24 @@ body.has-notifications .topbar-menu-btn::after{
 .gallery-manager-search{
   max-width:150px;
 }
+
+/* Move-to-section chooser buttons */
+.gallery-move-options{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.gallery-move-options button{
+  min-height:34px;
+  padding:6px 12px;
+  border-radius:8px;
+  border:1px solid rgba(9,47,77,.24);
+  background:#fff;
+  color:var(--navy);
+  font-size:.85rem;
+  text-align:left;
+  cursor:pointer;
+}
+.gallery-move-options button:hover{
+  background:rgba(9,47,77,.06);
+}

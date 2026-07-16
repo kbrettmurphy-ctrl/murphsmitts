@@ -11520,6 +11520,66 @@ function openGalleryDescribeDialog(photo) {
   overlay.querySelector("[data-describe-field]")?.focus();
 }
 
+/* Section move chooser — same quiet dialog pattern as the describe card. */
+function openGalleryMoveDialog(photo) {
+  if (!photo) return;
+  closeGalleryDescribeDialog();
+
+  const overlay = document.createElement("div");
+  overlay.className = "gallery-describe-overlay";
+  overlay.innerHTML = `
+    <div class="gallery-describe-card" role="dialog" aria-modal="true" aria-label="Move photo">
+      <h3>Move to section</h3>
+      <p>Currently in ${escapeHtml(photo.sectionLabel || photo.section || "")}. The photo keeps its order link and cover flag.</p>
+      <div class="gallery-move-options">
+        ${Object.keys(GALLERY_SECTION_LABELS)
+          .filter(section => section !== photo.section)
+          .map(section => `<button type="button" data-move-section="${escapeAttr(section)}">${escapeHtml(getGallerySectionLabel(section))}</button>`)
+          .join("")}
+      </div>
+      <div class="gallery-describe-actions">
+        <span class="gallery-describe-spacer"></span>
+        <button type="button" data-describe-cancel>Cancel</button>
+      </div>
+    </div>
+  `;
+
+  overlay.addEventListener("click", async (e) => {
+    if (e.target === overlay || e.target.closest("[data-describe-cancel]")) {
+      closeGalleryDescribeDialog();
+      return;
+    }
+    const pick = e.target.closest("[data-move-section]");
+    if (!pick) return;
+    const section = pick.dataset.moveSection;
+    const status = document.getElementById("galleryManagerStatus");
+    try {
+      const result = await postJson({
+        action: "moveGalleryPhoto",
+        path: photo.path,
+        url: photo.url,
+        section
+      }, true);
+      closeGalleryDescribeDialog();
+      const target = galleryPhotos.find(p => p.url === photo.url) || photo;
+      if (result?.photo) {
+        target.url = result.photo.url || target.url;
+        target.path = result.photo.path || target.path;
+      }
+      target.section = section;
+      target.sectionLabel = getGallerySectionLabel(section);
+      if (status) status.textContent = `Moved to ${getGallerySectionLabel(section)}.`;
+      renderGalleryManagerPhotos();
+    } catch (err) {
+      if (status) status.textContent = err.message || "Could not move the photo.";
+    }
+  });
+
+  document.body.appendChild(overlay);
+  galleryDescribeDialogEl = overlay;
+  document.addEventListener("keydown", handleGalleryDescribeKeydown);
+}
+
 function buildDescribeSuggestionPool() {
   const seen = new Set();
   const pool = [];
@@ -11614,6 +11674,7 @@ function openGalleryPhotoActionMenu(photo, source) {
     <button class="workflow-action-btn" type="button" data-gallery-menu-action="link">${photo.linkedOrder ? `Linked to #${escapeHtml(photo.linkedOrder)} — change…` : "Link to Order…"}</button>
     <button class="workflow-action-btn" type="button" data-gallery-menu-action="describe">${photo.gloveMeta ? "Shop glove details — edit…" : "Describe Glove (no order)…"}</button>
     ${photo.linkedOrder ? `<button class="workflow-action-btn" type="button" data-gallery-menu-action="cover">${photo.isCover ? "Album Cover ✓" : "Make Album Cover"}</button>` : ""}
+    <button class="workflow-action-btn" type="button" data-gallery-menu-action="move">Move to Section…</button>
     <button class="workflow-action-btn danger" type="button" data-gallery-menu-action="delete">Delete Photo</button>
   `;
 
@@ -11647,6 +11708,11 @@ async function runGalleryPhotoAction(photo, action) {
 
   if (action === "describe") {
     openGalleryDescribeDialog(photo);
+    return;
+  }
+
+  if (action === "move") {
+    openGalleryMoveDialog(photo);
     return;
   }
 

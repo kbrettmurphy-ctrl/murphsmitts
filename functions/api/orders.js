@@ -1624,6 +1624,39 @@ export async function onRequest(context) {
       return json({ ok: true }, 200, jsonHeaders);
     }
 
+    if (action === "moveGalleryPhoto") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+
+      const photoPath = cleanText(body.path);
+      const oldUrl = cleanText(body.url);
+      const targetSection = safeGallerySection(cleanText(body.section));
+      const parsed = parseGalleryPhotoPath(photoPath);
+      if (!parsed.ok) return json({ ok: false, error: "Invalid gallery photo path." }, 200, jsonHeaders);
+      if (parsed.section === targetSection) {
+        return json({ ok: false, error: "Photo is already in that section." }, 200, jsonHeaders);
+      }
+
+      const destinationPath = parsed.hidden
+        ? `_hidden/${targetSection}/${parsed.name}`
+        : `${targetSection}/${parsed.name}`;
+      const moved = await moveGalleryStorageObject(env, photoPath, destinationPath);
+      if (!moved.ok) return json({ ok: false, error: moved.error || "Move failed." }, 200, jsonHeaders);
+
+      const photo = galleryPhotoFromPath(env, destinationPath, parsed.hidden);
+
+      /* The URL changes with the path — keep the album link attached. */
+      if (oldUrl) {
+        await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(oldUrl)}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ photo_url: photo.url, photo_path: photo.path })
+        });
+      }
+
+      return json({ ok: true, photo }, 200, jsonHeaders);
+    }
+
     if (action === "hideGalleryPhoto" || action === "restoreGalleryPhoto" || action === "deleteGalleryPhoto") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
