@@ -11189,9 +11189,11 @@ async function loadGalleryManagerPhotos() {
     galleryPhotos = flattenGalleryPhotos(data.gallery || {}, data.hiddenGallery || {});
     const glinks = data.photoLinks || {};
     const gmeta = data.photoGloveMeta || {};
+    const gcovers = data.photoCovers || {};
     galleryPhotos.forEach(ph => {
       ph.linkedOrder = glinks[ph.url] || "";
       ph.gloveMeta = gmeta[ph.url] || null;
+      ph.isCover = !!gcovers[ph.url];
     });
     renderGalleryManagerPhotos();
   } catch (err) {
@@ -11273,6 +11275,7 @@ function renderGalleryManagerPhotos() {
               <span class="gallery-manager-pill">${photo.hidden ? "Hidden" : "Visible"}</span>
               ${photo.linkedOrder ? `<span class="gallery-manager-pill gallery-linked-pill">#${escapeHtml(photo.linkedOrder)}</span>` : ""}
               ${photo.gloveMeta ? `<span class="gallery-manager-pill gallery-linked-pill">Shop glove</span>` : ""}
+              ${photo.isCover ? `<span class="gallery-manager-pill gallery-linked-pill">Cover</span>` : ""}
             </div>
           </div>
           <label class="sr-only" for="galleryActionSelect${index}">Gallery photo actions</label>
@@ -11588,6 +11591,7 @@ function openGalleryPhotoActionMenu(photo, source) {
       : `<button class="workflow-action-btn" type="button" data-gallery-menu-action="hide">Hide from Gallery</button>`}
     <button class="workflow-action-btn" type="button" data-gallery-menu-action="link">${photo.linkedOrder ? `Linked to #${escapeHtml(photo.linkedOrder)} — change…` : "Link to Order…"}</button>
     <button class="workflow-action-btn" type="button" data-gallery-menu-action="describe">${photo.gloveMeta ? "Shop glove details — edit…" : "Describe Glove (no order)…"}</button>
+    ${photo.linkedOrder ? `<button class="workflow-action-btn" type="button" data-gallery-menu-action="cover">${photo.isCover ? "Album Cover ✓" : "Make Album Cover"}</button>` : ""}
     <button class="workflow-action-btn danger" type="button" data-gallery-menu-action="delete">Delete Photo</button>
   `;
 
@@ -11621,6 +11625,22 @@ async function runGalleryPhotoAction(photo, action) {
 
   if (action === "describe") {
     openGalleryDescribeDialog(photo);
+    return;
+  }
+
+  if (action === "cover") {
+    try {
+      await postJson({ action: "setGalleryPhotoCover", url: photo.url }, true);
+      galleryPhotos.forEach(p => {
+        if (p.linkedOrder && p.linkedOrder === photo.linkedOrder) p.isCover = false;
+      });
+      const target = galleryPhotos.find(p => p.url === photo.url) || photo;
+      target.isCover = true;
+      if (status) status.textContent = `Set as the album cover for #${photo.linkedOrder}.`;
+      renderGalleryManagerPhotos();
+    } catch (err) {
+      if (status) status.textContent = err.message || "Could not set the cover.";
+    }
     return;
   }
 

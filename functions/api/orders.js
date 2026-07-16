@@ -1540,6 +1540,29 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "setGalleryPhotoCover") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const url = cleanText(body.url);
+      if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
+
+      const link = await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}&select=order_number&limit=1`);
+      const row = link.ok && Array.isArray(link.data) ? link.data[0] : null;
+      if (!row?.order_number) {
+        return json({ ok: false, error: "Photo must be linked to an order first." }, 200, jsonHeaders);
+      }
+
+      /* One cover per album: clear the order's flag, then set this photo. */
+      await supabaseFetch(env, `/rest/v1/gallery_photo_links?order_number=eq.${encodeURIComponent(row.order_number)}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_cover: false })
+      });
+      const set = await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_cover: true })
+      });
+      if (!set.ok) return json({ ok: false, error: "Could not set the cover." }, 200, jsonHeaders);
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
     if (action === "setGalleryPhotoOrder") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) return json(auth, 200, jsonHeaders);
@@ -2383,14 +2406,16 @@ export async function onRequest(context) {
       /* photoLinks (photo -> order number) ships publicly so the gallery can
          group a glove's photos into one album; descriptors stay admin-only. */
       let photoLinks = {};
+      let photoCovers = {};
       let photoGloveMeta = {};
       {
         const links = await supabaseFetch(
           env,
-          `/rest/v1/gallery_photo_links?select=photo_url,order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
+          `/rest/v1/gallery_photo_links?select=photo_url,order_number,is_cover,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
         );
         if (links.ok && Array.isArray(links.data)) {
           for (const l of links.data) {
+            if (l.is_cover) photoCovers[l.photo_url] = true;
             if (l.order_number) {
               photoLinks[l.photo_url] = l.order_number;
               continue;
@@ -2449,6 +2474,7 @@ export async function onRequest(context) {
           ok: true,
           gallery,
           photoLinks,
+          photoCovers,
           photoGloveMeta,
           hiddenGallery
         },

@@ -81,23 +81,33 @@ body_class: inner
   /* Photos linked to the same order form one glove album: a single cover
      tile with a count badge, all angles inside the lightbox. Unlinked
      photos stay as single tiles. */
-  function groupIntoAlbums(photos, links) {
+  function groupIntoAlbums(photos, links, covers) {
     const albums = [];
     const byOrder = new Map();
     photos.forEach(photo => {
+      const isCover = !!covers[photo.url];
       const order = links[photo.url] || "";
       if (order && byOrder.has(order)) {
-        byOrder.get(order).photos.push(photo.url);
+        const album = byOrder.get(order);
+        if (isCover) {
+          album.cover = photo.url;
+          album.photos.unshift(photo.url);
+        } else {
+          album.photos.push(photo.url);
+        }
         return;
       }
-      const album = { cover: photo.url, photos: [photo.url] };
+      const album = { cover: photo.url, photos: [photo.url], hasCover: isCover };
       if (order) byOrder.set(order, album);
       albums.push(album);
     });
+    /* If the flagged cover arrived after other photos it's already handled
+       above; if an earlier photo started the album, demote it when a cover
+       shows up later — the unshift covers ordering, this covers the tile. */
     return albums;
   }
 
-  function renderGallery(gallery, links) {
+  function renderGallery(gallery, links, covers) {
     galleryRoot.innerHTML = "";
 
     let total = 0;
@@ -106,7 +116,7 @@ body_class: inner
       const photos = Array.isArray(gallery[key]) ? gallery[key] : [];
       if (!photos.length) return;
 
-      const albums = groupIntoAlbums(photos, links);
+      const albums = groupIntoAlbums(photos, links, covers);
       total += albums.length;
 
       const section = document.createElement("section");
@@ -163,7 +173,7 @@ body_class: inner
         throw new Error(data.error || "Gallery failed to load.");
       }
 
-      renderGallery(data.gallery || {}, data.photoLinks || {});
+      renderGallery(data.gallery || {}, data.photoLinks || {}, data.photoCovers || {});
     } catch (err) {
       if (statusEl) {
         statusEl.textContent = err.message || "Gallery failed to load.";
