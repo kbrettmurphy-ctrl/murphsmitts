@@ -104,6 +104,7 @@ let orderPhotoActionMenuEl = null;
 let galleryPhotoActionMenuEl = null;
 let galleryPhotos = [];
 let galleryManagerFilter = "all";
+let galleryManagerSearch = "";
 let galleryPhotoPressTimer = null;
 let galleryPhotoPressStart = null;
 let orderPhotoPressTimer = null;
@@ -11154,6 +11155,11 @@ function initUploadView() {
     galleryManagerFilter = managerFilter.value || "all";
     renderGalleryManagerPhotos();
   });
+  const managerSearch = document.getElementById("galleryManagerSearch");
+  managerSearch?.addEventListener("input", () => {
+    galleryManagerSearch = managerSearch.value.trim().toLowerCase();
+    renderGalleryManagerPhotos();
+  });
   setGalleryUploaderOpen(false);
   loadGalleryManagerPhotos();
 }
@@ -11267,15 +11273,14 @@ function renderGalleryManagerPhotos() {
           tabindex="0">
           <button class="gallery-manager-thumb" type="button" data-gallery-action="view">
             <img src="${escapeAttr(photo.url)}" alt="${escapeAttr(photo.name || "Gallery photo")}" loading="lazy">
+            ${photo.isCover ? `<span class="gallery-cover-star" aria-label="Album cover">★</span>` : ""}
           </button>
           <div class="gallery-manager-meta">
-            <div class="gallery-manager-name">${escapeHtml(photo.name || "Gallery photo")}</div>
             <div class="gallery-manager-subrow">
               <span>${escapeHtml(photo.sectionLabel)}</span>
-              <span class="gallery-manager-pill">${photo.hidden ? "Hidden" : "Visible"}</span>
+              ${photo.hidden ? `<span class="gallery-manager-pill">Hidden</span>` : ""}
               ${photo.linkedOrder ? `<span class="gallery-manager-pill gallery-linked-pill">#${escapeHtml(photo.linkedOrder)}</span>` : ""}
               ${photo.gloveMeta ? `<span class="gallery-manager-pill gallery-linked-pill">Shop glove</span>` : ""}
-              ${photo.isCover ? `<span class="gallery-manager-pill gallery-linked-pill">Cover</span>` : ""}
             </div>
           </div>
           <label class="sr-only" for="galleryActionSelect${index}">Gallery photo actions</label>
@@ -11297,7 +11302,13 @@ function getFilteredGalleryManagerEntries() {
 
   return galleryPhotos
     .map((photo, index) => ({ photo, index }))
-    .filter(({ photo }) => activeFilter === "all" || photo.section === activeFilter);
+    .filter(({ photo }) => activeFilter === "all" || photo.section === activeFilter)
+    .filter(({ photo }) => {
+      if (!galleryManagerSearch) return true;
+      const hay = [photo.linkedOrder, photo.name, photo.sectionLabel, photo.gloveMeta?.brandModel]
+        .map(v => String(v || "").toLowerCase()).join(" ");
+      return hay.includes(galleryManagerSearch);
+    });
 }
 
 function attachGalleryManagerItemActions(item) {
