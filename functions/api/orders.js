@@ -2380,9 +2380,11 @@ export async function onRequest(context) {
       const gallery = {};
       const hiddenGallery = {};
 
+      /* photoLinks (photo -> order number) ships publicly so the gallery can
+         group a glove's photos into one album; descriptors stay admin-only. */
       let photoLinks = {};
       let photoGloveMeta = {};
-      if (includeHidden) {
+      {
         const links = await supabaseFetch(
           env,
           `/rest/v1/gallery_photo_links?select=photo_url,order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
@@ -2393,13 +2395,15 @@ export async function onRequest(context) {
               photoLinks[l.photo_url] = l.order_number;
               continue;
             }
-            photoGloveMeta[l.photo_url] = {
-              brandModel: l.brand_model || "",
-              gloveType: l.glove_type || "",
-              webType: l.web_type || "",
-              primaryLaceColor: l.primary_lace_color || "",
-              secondaryLaceColor: l.secondary_lace_color || ""
-            };
+            if (includeHidden) {
+              photoGloveMeta[l.photo_url] = {
+                brandModel: l.brand_model || "",
+                gloveType: l.glove_type || "",
+                webType: l.web_type || "",
+                primaryLaceColor: l.primary_lace_color || "",
+                secondaryLaceColor: l.secondary_lace_color || ""
+              };
+            }
           }
         }
       }

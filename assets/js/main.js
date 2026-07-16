@@ -157,7 +157,15 @@ function initGalleryLightbox() {
 
   function updateCounter() {
     if (!counter) return;
-    counter.textContent = state.slides.length ? `${state.index + 1} / ${state.slides.length}` : "";
+    if (!state.slides.length) {
+      counter.textContent = "";
+      return;
+    }
+    const slide = state.slides[state.index];
+    const albumSize = Number(slide?.dataset.albumSize || 1);
+    counter.textContent = albumSize > 1
+      ? `${slide.dataset.albumPos} / ${albumSize}`
+      : `${state.index + 1} / ${state.slides.length}`;
   }
 
   function goTo(i, animate = true) {
@@ -175,20 +183,37 @@ function initGalleryLightbox() {
   const next = () => goTo(state.index + 1);
   const prev = () => goTo(state.index - 1);
 
+  /* A thumb can carry a whole glove album via data-photos (JSON array of
+     URLs); swiping flows through the album and on into the next glove. */
   function buildSlides(thumbButtons) {
     track.innerHTML = "";
+    state.slides = [];
+    state.slideStartByThumb = [];
 
-    state.slides = thumbButtons.map((btn) => {
+    thumbButtons.forEach((btn) => {
       const sourceImg = btn.querySelector("img");
-      const slide = document.createElement("div");
-      const slideImg = document.createElement("img");
-      slide.className = "lb-slide";
-      slideImg.src = sourceImg.currentSrc || sourceImg.src;
-      slideImg.alt = sourceImg.alt || "Gallery image";
-      slideImg.draggable = false;
-      slide.appendChild(slideImg);
-      track.appendChild(slide);
-      return slide;
+      let photos = [];
+      try {
+        photos = JSON.parse(btn.dataset.photos || "null") || [];
+      } catch {
+        photos = [];
+      }
+      if (!photos.length && sourceImg) photos = [sourceImg.currentSrc || sourceImg.src];
+
+      state.slideStartByThumb.push(state.slides.length);
+      photos.forEach((src, i) => {
+        const slide = document.createElement("div");
+        const slideImg = document.createElement("img");
+        slide.className = "lb-slide";
+        slide.dataset.albumPos = String(i + 1);
+        slide.dataset.albumSize = String(photos.length);
+        slideImg.src = src;
+        slideImg.alt = sourceImg?.alt || "Gallery image";
+        slideImg.draggable = false;
+        slide.appendChild(slideImg);
+        track.appendChild(slide);
+        state.slides.push(slide);
+      });
     });
   }
 
@@ -254,7 +279,7 @@ function initGalleryLightbox() {
     lb.setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
 
-    goTo(clickedIndex, false);
+    goTo(state.slideStartByThumb[clickedIndex] || 0, false);
   }
 
   function closeLightbox() {
