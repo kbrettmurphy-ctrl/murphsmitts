@@ -11308,6 +11308,17 @@ function getFilteredGalleryManagerEntries() {
       const hay = [photo.linkedOrder, photo.name, photo.sectionLabel, photo.gloveMeta?.brandModel]
         .map(v => String(v || "").toLowerCase()).join(" ");
       return hay.includes(galleryManagerSearch);
+    })
+    /* Keep each glove's album together: unlinked photos first (they need
+       attention), then orders newest-first, cover photo leading its album. */
+    .sort((a, b) => {
+      const ao = a.photo.linkedOrder ? parseInt(a.photo.linkedOrder, 10) : null;
+      const bo = b.photo.linkedOrder ? parseInt(b.photo.linkedOrder, 10) : null;
+      if (ao === null && bo !== null) return -1;
+      if (bo === null && ao !== null) return 1;
+      if (ao !== null && bo !== null && ao !== bo) return bo - ao;
+      if (!!a.photo.isCover !== !!b.photo.isCover) return a.photo.isCover ? -1 : 1;
+      return a.index - b.index;
     });
 }
 
