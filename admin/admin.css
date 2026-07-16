@@ -7631,3 +7631,27 @@ body.has-notifications .topbar-menu-btn::after{
 .gallery-move-options button:hover{
   background:rgba(9,47,77,.06);
 }
+
+/* Gallery uploader/manager inputs: compact — 16px floor only for iOS focus-zoom */
+#galleryUploadOrderInput,
+.gallery-manager-search{
+  font-size:16px;
+  padding:7px 10px;
+  min-height:0;
+  line-height:1.3;
+}
+#galleryUploadOrderInput::placeholder,
+.gallery-manager-search::placeholder{
+  font-size:0.85em;
+}
+
+/* Gallery photo action menu: compact. Scoped to gallery-photo-menu-root so
+   the orders workflow sheet keeps its own sizing. */
+.gallery-photo-menu-root .workflow-sheet{
+  max-width:250px;
+}
+.gallery-photo-menu-root .workflow-action-btn{
+  min-height:34px;
+  padding:7px 12px;
+  font-size:0.85rem;
+}
