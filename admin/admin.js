@@ -11071,11 +11071,27 @@ function initUploadView() {
     setGalleryUploaderOpen(false);
   });
 
+  /* Linking to an order that already has gallery photos inherits their
+     section — the folder picker is easy to forget mid-batch. */
+  function sectionForLinkedOrder(orderNumber) {
+    const n = String(orderNumber || "").trim();
+    if (!n) return "";
+    return galleryPhotos.find(p => p.linkedOrder === n)?.section || "";
+  }
+
+  const uploadOrderInput = document.getElementById("galleryUploadOrderInput");
+  uploadOrderInput?.addEventListener("input", () => {
+    const section = sectionForLinkedOrder(uploadOrderInput.value);
+    if (section && sectionSelect && sectionSelect.value !== section) {
+      sectionSelect.value = section;
+    }
+  });
+
   uploadBtn.addEventListener("click", async () => {
     const files = stagedFiles;
-    const section = sectionSelect?.value || "fielding-gloves";
     const orderInput = document.getElementById("galleryUploadOrderInput");
     const linkOrderNumber = orderInput?.value.trim() || "";
+    const section = sectionForLinkedOrder(linkOrderNumber) || sectionSelect?.value || "fielding-gloves";
 
     if (!files.length) {
       status.textContent = "Choose photos before uploading.";
