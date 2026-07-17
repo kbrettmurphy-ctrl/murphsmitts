@@ -7662,3 +7662,12 @@ body.has-notifications .topbar-menu-btn::after{
 .brand-subtitle{
   font-family:'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
 }
+
+/* Mobile: one notch smaller everywhere — the system font's tighter forms
+   afford it. (Desktop already runs a 90% root further up; rem-based sizes
+   scale from the root, px-based anti-zoom rules are unaffected.) */
+@media (max-width: 899px){
+  html{ font-size:95%; }
+  /* stay >=16px real pixels so iOS doesn't zoom when the login focuses */
+  .login-card input{ font-size:16px; }
+}
