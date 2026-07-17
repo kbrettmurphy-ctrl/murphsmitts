@@ -12764,6 +12764,8 @@ function calTodayKey() {
 function calOrderKind(order, dateKey, todayKey) {
   const status = String(order.status || "");
   if (CALENDAR_DONE_STATUSES.has(status)) return "done";
+  /* Work's finished, waiting on pickup/shipping — never overdue. */
+  if (status === "Ready to Go") return "ready";
   if (status === "In Transit to Me") return "arriving";
   return dateKey < todayKey ? "overdue" : "due";
 }
@@ -12776,7 +12778,7 @@ function buildCalendarEvents() {
 
   for (const order of allOrders) {
     const status = String(order.status || "");
-    const isDone = CALENDAR_DONE_STATUSES.has(status);
+    const isDone = CALENDAR_DONE_STATUSES.has(status) || status === "Ready to Go";
     const dateKey = isDone
       ? calKeyFromValue(order.dateCompleted || order.estimatedCompletion)
       : calKeyFromValue(order.estimatedCompletion);
@@ -12813,7 +12815,7 @@ function renderCalendarView() {
   let activeThisMonth = 0;
   for (const [key, list] of events) {
     if (key.startsWith(`${year}-${String(month + 1).padStart(2, "0")}`)) {
-      activeThisMonth += list.filter(e => e.kind !== "done").length;
+      activeThisMonth += list.filter(e => e.kind !== "done" && e.kind !== "ready").length;
     }
   }
   if (count) {
@@ -12844,7 +12846,7 @@ function renderCalendarView() {
         .toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })
     : "";
 
-  const kindLabel = { due: "Due", overdue: "Overdue", arriving: "In Transit", done: "Done" };
+  const kindLabel = { due: "Due", overdue: "Overdue", arriving: "In Transit", ready: "Ready", done: "Done" };
 
   panel.innerHTML = `
     <div class="dashboard-shell">
@@ -12863,6 +12865,7 @@ function renderCalendarView() {
         <span><span class="cal-dot cal-dot-due"></span> Due</span>
         <span><span class="cal-dot cal-dot-overdue"></span> Overdue</span>
         <span><span class="cal-dot cal-dot-arriving"></span> In Transit</span>
+        <span><span class="cal-dot cal-dot-ready"></span> Ready</span>
         <span><span class="cal-dot cal-dot-done"></span> Done</span>
       </div>
     </div>

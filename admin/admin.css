@@ -7981,3 +7981,7 @@ body.has-notifications .topbar-menu-btn::after{
 .cal-tag-overdue{ background:rgba(146,26,36,.12); color:#921a24; }
 .cal-tag-arriving{ background:rgba(201,138,31,.14); color:#8a6116; }
 .cal-tag-done{ background:rgba(30,107,52,.12); color:#1e6b34; }
+
+/* Calendar: Ready to Go — finished work awaiting pickup, its own bucket */
+.cal-dot-ready{ background:#1e6b34; }
+.cal-tag-ready{ background:rgba(30,107,52,.16); color:#1e6b34; }
