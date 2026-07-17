@@ -6177,6 +6177,13 @@ function renderNewOrderForm() {
         </div>
 
         <div class="detail-section-grid">
+          <div class="detail-block full">
+            <div class="label">Template</div>
+            <select id="orderTemplateSelect">
+              <option value="">Start from a template…</option>
+              ${ORDER_TEMPLATES.map((t, i) => `<option value="${i}">${escapeHtml(t.label)}</option>`).join("")}
+            </select>
+          </div>
           <div class="detail-block">
             <div class="label">Brand / Model</div>
             <input id="editBrandModel" type="text" />
@@ -12952,3 +12959,65 @@ function wireCalendarPanel(panel) {
     }
   });
 }
+
+/* =========================
+   ORDER TEMPLATES (Phase 1.4) — admin New Order only.
+   Prefills the typical job shapes from the real price list (SHOP_PRICING /
+   services page tiers). Templates never touch customer fields or lace color,
+   and everything stays editable after applying.
+========================= */
+
+const ORDER_TEMPLATES = [
+  { label: "Standard Full Service — Fielders ($80)", gloveType: "Fielders Glove",
+    services: ["Cleaning + Conditioning + Relacing"], price: 80, turnaroundDays: 14 },
+  { label: "Standard Full Service — Catchers Mitt ($100)", gloveType: "Catchers Mitt",
+    services: ["Cleaning + Conditioning + Relacing"], price: 100, turnaroundDays: 14 },
+  { label: "Standard Full Service — First Base Mitt ($100)", gloveType: "First Base Mitt",
+    services: ["Cleaning + Conditioning + Relacing"], price: 100, turnaroundDays: 14 },
+  { label: "Full Service + Palm Pad — Fielders ($100)", gloveType: "Fielders Glove",
+    services: ["Cleaning + Conditioning + Relacing", "ShockTec Air2Gel Palm Pad"], price: 100, turnaroundDays: 14 },
+  { label: "Full Relace — Fielders ($60)", gloveType: "Fielders Glove",
+    services: ["Relacing"], price: 60, turnaroundDays: 10 },
+  { label: "Full Relace — Catchers Mitt ($80)", gloveType: "Catchers Mitt",
+    services: ["Relacing"], price: 80, turnaroundDays: 10 },
+  { label: "Full Relace — First Base Mitt ($80)", gloveType: "First Base Mitt",
+    services: ["Relacing"], price: 80, turnaroundDays: 10 },
+  { label: "Clean & Condition ($50)",
+    services: ["Cleaning + Conditioning"], price: 50, turnaroundDays: 7 }
+];
+
+function applyOrderTemplate(index) {
+  const template = ORDER_TEMPLATES[index];
+  if (!template) return;
+
+  if (template.gloveType) {
+    const gloveType = document.getElementById("editGloveType");
+    if (gloveType) {
+      gloveType.value = template.gloveType;
+      gloveType.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+
+  document.querySelectorAll('input[name="editServicesRequested"]').forEach(box => {
+    box.checked = template.services.includes(box.value);
+  });
+
+  const price = document.getElementById("editPriceQuoted");
+  if (price) price.value = String(template.price);
+
+  const received = document.getElementById("editDateReceived");
+  const est = document.getElementById("editEstimatedCompletion");
+  const today = new Date();
+  if (received && !received.value) received.value = calDateKey(today);
+  if (est) {
+    const done = new Date(today.getFullYear(), today.getMonth(), today.getDate() + template.turnaroundDays);
+    est.value = calDateKey(done);
+  }
+}
+
+document.addEventListener("change", (e) => {
+  if (e.target?.id !== "orderTemplateSelect") return;
+  const value = e.target.value;
+  if (value === "") return;
+  applyOrderTemplate(Number(value));
+});
