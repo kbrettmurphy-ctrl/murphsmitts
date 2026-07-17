@@ -12495,8 +12495,8 @@ function buildCustomerIndex() {
       customer = {
         key: phoneKey ? `p:${phoneKey}` : emailKey ? `e:${emailKey}` : `n:${nameKey}`,
         name: String(order.customerName || "").trim() || "Unknown",
-        phones: new Set(),
-        emails: new Set(),
+        phones: new Map(),
+        emails: new Map(),
         socialTags: new Set(),
         orders: []
       };
@@ -12507,8 +12507,12 @@ function buildCustomerIndex() {
     if (emailKey) byContact.set(`e:${emailKey}`, customer);
     if (nameKey) byName.set(nameKey, customer);
 
-    if (phoneKey && order.phoneNumber) customer.phones.add(String(order.phoneNumber).trim());
-    if (emailKey) customer.emails.add(String(order.emailAddress).trim());
+    if (phoneKey && !customer.phones.has(phoneKey)) {
+      customer.phones.set(phoneKey, formatPhoneForInput(order.phoneNumber) || String(order.phoneNumber).trim());
+    }
+    if (emailKey && !customer.emails.has(emailKey)) {
+      customer.emails.set(emailKey, String(order.emailAddress).trim());
+    }
     if (order.socialTag) customer.socialTags.add(String(order.socialTag).trim());
     customer.orders.push(order);
   }
@@ -12533,7 +12537,9 @@ function buildCustomerIndex() {
     for (const [lace, count] of laceCounts) {
       if (count > favCount) { fav = lace; favCount = count; }
     }
-    c.favoriteLace = fav ? adminLaceLabel(fav) : "";
+    /* Only claim a "go-to" when a color actually repeats — with all-distinct
+       colors there is no preference to report. */
+    c.favoriteLace = fav && favCount >= 2 ? adminLaceLabel(fav) : "";
   }
 
   customers.sort((a, b) => new Date(b.lastDate || 0) - new Date(a.lastDate || 0));
@@ -12567,8 +12573,9 @@ function renderCustomersView() {
     ? customers.filter(c => {
         const hay = [
           c.name,
-          ...c.phones,
-          ...c.emails,
+          ...c.phones.values(),
+          ...c.phones.keys(),
+          ...c.emails.values(),
           ...c.orders.map(o => `${o.orderNumber} ${o.brandModel || ""}`)
         ].join(" ").toLowerCase();
         return hay.includes(q);
@@ -12605,11 +12612,14 @@ function renderCustomersView() {
 function renderCustomerProfile(panel, count, c) {
   if (count) count.textContent = c.name;
 
-  const contactChips = [
-    ...[...c.phones].map(p => `<a class="customer-chip" href="tel:${escapeAttr(p.replace(/[^+\d]/g, ""))}">${escapeHtml(p)}</a>`),
-    ...[...c.emails].map(e => `<a class="customer-chip" href="mailto:${escapeAttr(e)}">${escapeHtml(e)}</a>`),
-    ...[...c.socialTags].map(t => `<span class="customer-chip customer-chip-social">${escapeHtml(t)}</span>`)
-  ].join("");
+  const contactBits = [
+    ...[...c.phones.values()].map(p => `<a class="customer-contact-link" href="tel:${escapeAttr(p.replace(/[^+\d]/g, ""))}">${escapeHtml(p)}</a>`),
+    ...[...c.emails.values()].map(e => `<a class="customer-contact-link" href="mailto:${escapeAttr(e)}">${escapeHtml(e)}</a>`),
+    ...[...c.socialTags].map(t => `<span>${escapeHtml(t)}</span>`)
+  ];
+  const contactChips = contactBits.length
+    ? `<p class="customer-contact">${contactBits.join(`<span class="customer-contact-sep"> · </span>`)}</p>`
+    : "";
 
   const photos = c.orders
     .flatMap(o => (Array.isArray(o.glovePhotos) ? o.glovePhotos : []).map(url => ({ url, orderNumber: o.orderNumber })))
@@ -12621,7 +12631,7 @@ function renderCustomerProfile(panel, count, c) {
       <button class="customer-back" type="button" data-customer-back>&#8249; Customers</button>
       <div class="customer-profile-head">
         <h2 class="customer-profile-name">${escapeHtml(c.name)}</h2>
-        ${contactChips ? `<div class="customer-chips">${contactChips}</div>` : `<p class="muted customer-no-contact">No contact info on file.</p>`}
+        ${contactChips || `<p class="muted customer-no-contact">No contact info on file.</p>`}
       </div>
       <div class="customer-stats">
         <div class="customer-stat"><span class="customer-stat-value">${c.orderCount}</span><span class="customer-stat-label">Orders</span></div>
