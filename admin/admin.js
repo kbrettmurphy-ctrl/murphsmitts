@@ -64,6 +64,7 @@ const sideNavPasskeyBtn = document.getElementById("sideNavPasskeyBtn");
 const passkeyLoginBtn = document.getElementById("passkeyLoginBtn");
 const passwordLoginBtn = document.getElementById("passwordLoginBtn");
 const usersView = document.getElementById("usersView");
+const customersView = document.getElementById("customersView");
 const usersPanel = document.getElementById("usersPanel");
 const messagesView = document.getElementById("messagesView");
 const messagesPanel = document.getElementById("messagesPanel");
@@ -260,7 +261,7 @@ document.addEventListener("focusout", (e) => {
    VIEW / MENU
 ========================= */
 function showView(view) {
-  [loginView, inviteView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, saleGlovesView, messagesView, usersView]
+  [loginView, inviteView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, saleGlovesView, messagesView, usersView, customersView]
     .filter(Boolean)
     .forEach(v => v.classList.remove("active"));
 
@@ -2146,6 +2147,7 @@ function getViewTitle(viewName) {
     case "inventory": return "Lace Inventory";
     case "gloves-sale": return "Gloves For Sale";
     case "users": return "Users";
+    case "customers": return "Customers";
     case "messages": return "Messages";
     default: return "Orders";
   }
@@ -4955,6 +4957,7 @@ function normalizeAdminView(viewName) {
   if (view === "inventory") return "inventory";
   if (view === "gloves-sale") return "gloves-sale";
   if (view === "users") return "users";
+  if (view === "customers") return "customers";
   if (view === "messages") return "messages";
   if (isOrderFilterView(view)) return view;
   return "dashboard";
@@ -4964,7 +4967,7 @@ function isKnownAdminView(viewName) {
   const view = String(viewName || "").trim().toLowerCase();
   if (!view || view === "dashboard") return true;
   if (view === "orders" || view === "current") return true;
-  return ["map", "money", "upload", "inventory", "gloves-sale", "users", "messages"].includes(view) || isOrderFilterView(view);
+  return ["map", "money", "upload", "inventory", "gloves-sale", "users", "customers", "messages"].includes(view) || isOrderFilterView(view);
 }
 
 function syncAdminViewUrl(viewName) {
@@ -4992,6 +4995,9 @@ function syncAdminViewUrl(viewName) {
     url.searchParams.delete("order");
   } else if (view === "gloves-sale") {
     url.searchParams.set("view", "gloves-sale");
+    url.searchParams.delete("order");
+  } else if (view === "customers") {
+    url.searchParams.set("view", "customers");
     url.searchParams.delete("order");
   } else if (isOrderFilterView(view)) {
     url.searchParams.set("view", "orders");
@@ -5076,6 +5082,15 @@ function setActiveView(viewName) {
     renderUsersView();
     closeMenu();
     resetViewScroll(usersView, { blurActive: true });
+    return;
+  }
+
+  if (resolvedView === "customers") {
+    syncAdminViewUrl(resolvedView);
+    showView(customersView);
+    renderCustomersView();
+    closeMenu();
+    resetViewScroll(customersView, { blurActive: true });
     return;
   }
 
@@ -5696,7 +5711,11 @@ function renderOrderDetail(order) {
     `
       <div class="detail-section-grid">
         ${renderFieldLike("Order #", order.orderNumber || "")}
-        ${renderFieldLike("Customer", order.customerName || "")}
+        <div class="detail-block">
+          <div class="label">Customer</div>
+          <div class="field-like readonly">${escapeHtml(order.customerName || "")}</div>
+          <button id="detailViewCustomerBtn" class="detail-show-on-map-link customer-profile-link" type="button">View Customer Profile</button>
+        </div>
         ${renderPhoneInput("Phone", "editPhoneNumber", order.phoneNumber || "")}
         ${renderFieldLike("Email", order.emailAddress || "")}
         <div class="detail-block">
@@ -12133,6 +12152,7 @@ if (saveOrderBtn) {
 menuBtn.addEventListener("click", openMenu);
 homeMenuBtn?.addEventListener("click", openMenu);
 document.getElementById("usersMenuBtn")?.addEventListener("click", openMenu);
+document.getElementById("customersMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("messagesMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("msgComposeBtn")?.addEventListener("click", renderComposeView);
 
@@ -12427,3 +12447,255 @@ document.addEventListener("visibilitychange", () => {
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
 })();
+
+/* =========================
+   CUSTOMER PROFILES (Phase 1.2)
+   Customers are DERIVED from orders — no new table. Orders sharing a phone
+   or email belong to one customer; orders with neither (the pre-system
+   backfill) fold in by exact name match.
+========================= */
+
+let customersSearch = "";
+let activeCustomerKey = null;
+
+function normalizeCustomerPhone(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+}
+
+function customerDisplayDate(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function buildCustomerIndex() {
+  const customers = [];
+  const byContact = new Map();
+  const byName = new Map();
+
+  const orders = [...allOrders].sort(
+    (a, b) => (parseInt(b.orderNumber, 10) || 0) - (parseInt(a.orderNumber, 10) || 0)
+  );
+
+  for (const order of orders) {
+    const phoneKey = normalizeCustomerPhone(order.phoneNumber);
+    const emailKey = String(order.emailAddress || "").trim().toLowerCase();
+    const nameKey = String(order.customerName || "").trim().toLowerCase();
+    if (!phoneKey && !emailKey && !nameKey) continue;
+
+    let customer =
+      (phoneKey && byContact.get(`p:${phoneKey}`)) ||
+      (emailKey && byContact.get(`e:${emailKey}`)) ||
+      (nameKey && byName.get(nameKey)) ||
+      null;
+
+    if (!customer) {
+      customer = {
+        key: phoneKey ? `p:${phoneKey}` : emailKey ? `e:${emailKey}` : `n:${nameKey}`,
+        name: String(order.customerName || "").trim() || "Unknown",
+        phones: new Set(),
+        emails: new Set(),
+        socialTags: new Set(),
+        orders: []
+      };
+      customers.push(customer);
+    }
+
+    if (phoneKey) byContact.set(`p:${phoneKey}`, customer);
+    if (emailKey) byContact.set(`e:${emailKey}`, customer);
+    if (nameKey) byName.set(nameKey, customer);
+
+    if (phoneKey && order.phoneNumber) customer.phones.add(String(order.phoneNumber).trim());
+    if (emailKey) customer.emails.add(String(order.emailAddress).trim());
+    if (order.socialTag) customer.socialTags.add(String(order.socialTag).trim());
+    customer.orders.push(order);
+  }
+
+  for (const c of customers) {
+    c.orderCount = c.orders.length;
+    c.lifetimePaid = c.orders
+      .filter(o => String(o.paid || "").toLowerCase() === "paid")
+      .reduce((sum, o) => sum + (Number(o.priceQuoted) || 0), 0);
+    c.pendingCount = c.orders.filter(o => String(o.paid || "").toLowerCase() !== "paid").length;
+    c.lastOrder = c.orders[0];
+    c.lastDate = c.lastOrder?.timestampSubmitted || c.lastOrder?.dateCompleted || "";
+
+    const laceCounts = new Map();
+    for (const o of c.orders) {
+      const lace = normalizeAdminLaceColor(o.primaryLaceColor);
+      if (!lace) continue;
+      laceCounts.set(lace, (laceCounts.get(lace) || 0) + 1);
+    }
+    let fav = "";
+    let favCount = 0;
+    for (const [lace, count] of laceCounts) {
+      if (count > favCount) { fav = lace; favCount = count; }
+    }
+    c.favoriteLace = fav ? adminLaceLabel(fav) : "";
+  }
+
+  customers.sort((a, b) => new Date(b.lastDate || 0) - new Date(a.lastDate || 0));
+  return customers;
+}
+
+function findCustomerForOrder(orderNumber) {
+  const num = String(orderNumber || "");
+  return buildCustomerIndex().find(c => c.orders.some(o => String(o.orderNumber) === num)) || null;
+}
+
+function renderCustomersView() {
+  const panel = document.getElementById("customersPanel");
+  const count = document.getElementById("customersCount");
+  if (!panel) return;
+
+  const customers = buildCustomerIndex();
+
+  if (activeCustomerKey) {
+    const customer = customers.find(c => c.key === activeCustomerKey);
+    if (customer) {
+      renderCustomerProfile(panel, count, customer);
+      wireCustomersPanel(panel);
+      return;
+    }
+    activeCustomerKey = null;
+  }
+
+  const q = customersSearch.trim().toLowerCase();
+  const filtered = q
+    ? customers.filter(c => {
+        const hay = [
+          c.name,
+          ...c.phones,
+          ...c.emails,
+          ...c.orders.map(o => `${o.orderNumber} ${o.brandModel || ""}`)
+        ].join(" ").toLowerCase();
+        return hay.includes(q);
+      })
+    : customers;
+
+  if (count) count.textContent = `${customers.length} customer${customers.length === 1 ? "" : "s"}`;
+
+  panel.innerHTML = `
+    <div class="dashboard-card customers-card">
+      <input id="customersSearchInput" class="customers-search" type="search"
+        placeholder="Name, phone, order #" autocomplete="off" value="${escapeAttr(customersSearch)}">
+      <div class="customers-list">
+        ${filtered.length ? filtered.map(c => `
+          <button class="customer-row" type="button" data-customer-key="${escapeAttr(c.key)}">
+            <span class="customer-row-main">
+              <span class="customer-row-name">${escapeHtml(c.name)}</span>
+              <span class="customer-row-sub">${c.orderCount} order${c.orderCount === 1 ? "" : "s"}${c.lastDate ? ` · ${customerDisplayDate(c.lastDate)}` : ""}</span>
+            </span>
+            <span class="customer-row-side">
+              ${c.lifetimePaid ? `<span class="customer-row-spend">$${c.lifetimePaid.toLocaleString()}</span>` : ""}
+              <span class="customer-row-chevron" aria-hidden="true">›</span>
+            </span>
+          </button>
+        `).join("") : `<p class="muted customers-empty">No customers match.</p>`}
+      </div>
+    </div>
+  `;
+  wireCustomersPanel(panel);
+}
+
+function renderCustomerProfile(panel, count, c) {
+  if (count) count.textContent = c.name;
+
+  const contactChips = [
+    ...[...c.phones].map(p => `<a class="customer-chip" href="tel:${escapeAttr(p.replace(/[^+\d]/g, ""))}">${escapeHtml(p)}</a>`),
+    ...[...c.emails].map(e => `<a class="customer-chip" href="mailto:${escapeAttr(e)}">${escapeHtml(e)}</a>`),
+    ...[...c.socialTags].map(t => `<span class="customer-chip customer-chip-social">${escapeHtml(t)}</span>`)
+  ].join("");
+
+  const photos = c.orders
+    .flatMap(o => (Array.isArray(o.glovePhotos) ? o.glovePhotos : []).map(url => ({ url, orderNumber: o.orderNumber })))
+    .slice(0, 12);
+
+  panel.innerHTML = `
+    <div class="dashboard-card customers-card">
+      <button class="customer-back" type="button" data-customer-back>&#8249; Customers</button>
+      <div class="customer-profile-head">
+        <h2 class="customer-profile-name">${escapeHtml(c.name)}</h2>
+        ${contactChips ? `<div class="customer-chips">${contactChips}</div>` : `<p class="muted customer-no-contact">No contact info on file.</p>`}
+      </div>
+      <div class="customer-stats">
+        <div class="customer-stat"><span class="customer-stat-value">${c.orderCount}</span><span class="customer-stat-label">Orders</span></div>
+        <div class="customer-stat"><span class="customer-stat-value">$${c.lifetimePaid.toLocaleString()}</span><span class="customer-stat-label">Lifetime</span></div>
+        ${c.pendingCount ? `<div class="customer-stat"><span class="customer-stat-value">${c.pendingCount}</span><span class="customer-stat-label">Unpaid</span></div>` : ""}
+        ${c.favoriteLace ? `<div class="customer-stat"><span class="customer-stat-value customer-stat-lace">${escapeHtml(c.favoriteLace)}</span><span class="customer-stat-label">Go-to lace</span></div>` : ""}
+      </div>
+      ${photos.length ? `
+        <div class="customer-photo-strip">
+          ${photos.map(p => `
+            <button class="customer-photo" type="button" data-customer-order="${escapeAttr(String(p.orderNumber))}" aria-label="Open order ${escapeAttr(String(p.orderNumber))}">
+              <img src="${escapeAttr(p.url)}" alt="Glove photo" loading="lazy">
+            </button>
+          `).join("")}
+        </div>
+      ` : ""}
+      <div class="customer-orders">
+        ${c.orders.map(o => `
+          <button class="customer-order-row" type="button" data-customer-order="${escapeAttr(String(o.orderNumber))}">
+            <span class="customer-row-main">
+              <span class="customer-row-name">#${escapeHtml(String(o.orderNumber))} · ${escapeHtml(o.brandModel || o.gloveType || "Glove")}</span>
+              <span class="customer-row-sub">${escapeHtml([customerDisplayDate(o.timestampSubmitted || o.dateCompleted), o.primaryLaceColor ? adminLaceLabel(o.primaryLaceColor) : "", o.status].filter(Boolean).join(" · "))}</span>
+            </span>
+            <span class="customer-row-side">
+              ${o.priceQuoted ? `<span class="customer-row-spend">$${Number(o.priceQuoted).toLocaleString()}</span>` : ""}
+              <span class="customer-row-chevron" aria-hidden="true">›</span>
+            </span>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function wireCustomersPanel(panel) {
+  if (panel.dataset.customersBound === "true") return;
+  panel.dataset.customersBound = "true";
+
+  panel.addEventListener("click", (e) => {
+    const back = e.target.closest("[data-customer-back]");
+    if (back) {
+      activeCustomerKey = null;
+      renderCustomersView();
+      return;
+    }
+    const row = e.target.closest("[data-customer-key]");
+    if (row) {
+      activeCustomerKey = row.dataset.customerKey;
+      renderCustomersView();
+      return;
+    }
+    const orderBtn = e.target.closest("[data-customer-order]");
+    if (orderBtn) {
+      openOrder(orderBtn.dataset.customerOrder, { returnView: "customers" });
+    }
+  });
+
+  panel.addEventListener("input", (e) => {
+    if (e.target.id !== "customersSearchInput") return;
+    customersSearch = e.target.value;
+    const pos = e.target.selectionStart;
+    renderCustomersView();
+    const input = document.getElementById("customersSearchInput");
+    if (input) {
+      input.focus();
+      try { input.setSelectionRange(pos, pos); } catch {}
+    }
+  });
+}
+
+/* Order Detail -> customer profile entry point (delegated; the detail body
+   re-renders per order, so no per-render wiring). */
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("#detailViewCustomerBtn");
+  if (!btn || !currentOrder) return;
+  const customer = findCustomerForOrder(currentOrder.orderNumber);
+  if (!customer) return;
+  activeCustomerKey = customer.key;
+  setActiveView("customers");
+});

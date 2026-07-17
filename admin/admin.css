@@ -7671,3 +7671,170 @@ body.has-notifications .topbar-menu-btn::after{
   /* stay >=16px real pixels so iOS doesn't zoom when the login focuses */
   .login-card input{ font-size:16px; }
 }
+
+/* =========================
+   Customer Profiles (Phase 1.2) — compact, iOS-list feel
+========================= */
+.customers-search{
+  width:100%;
+  font-size:16px;
+  padding:7px 10px;
+  min-height:0;
+  line-height:1.3;
+  border:1px solid rgba(9,47,77,.24);
+  border-radius:10px;
+  background:#fff;
+  margin-bottom:10px;
+}
+.customers-search::placeholder{ font-size:.85em; }
+
+.customers-list,
+.customer-orders{
+  display:flex;
+  flex-direction:column;
+}
+.customer-row,
+.customer-order-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  width:100%;
+  min-height:44px;
+  padding:8px 2px;
+  border:0;
+  border-bottom:1px solid rgba(9,47,77,.10);
+  background:none;
+  text-align:left;
+  cursor:pointer;
+}
+.customer-row:last-child,
+.customer-order-row:last-child{ border-bottom:0; }
+.customer-row-main{
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+  min-width:0;
+}
+.customer-row-name{
+  font-size:.9rem;
+  font-weight:600;
+  color:var(--navy);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.customer-row-sub{
+  font-size:.75rem;
+  color:rgba(2,11,18,.55);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.customer-row-side{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-shrink:0;
+}
+.customer-row-spend{
+  font-size:.85rem;
+  font-weight:600;
+  color:var(--navy);
+  font-variant-numeric:tabular-nums;
+}
+.customer-row-chevron{
+  color:rgba(9,47,77,.35);
+  font-size:1.1rem;
+}
+.customers-empty{ padding:12px 2px; }
+
+.customer-back{
+  border:0;
+  background:none;
+  color:var(--navy);
+  font-size:.85rem;
+  font-weight:600;
+  padding:0 0 10px;
+  cursor:pointer;
+}
+.customer-profile-name{
+  margin:0 0 6px;
+  font-size:1.15rem;
+  color:var(--navy);
+}
+.customer-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-bottom:12px;
+}
+.customer-chip{
+  font-size:.75rem;
+  font-weight:600;
+  color:var(--navy);
+  background:rgba(9,47,77,.08);
+  border-radius:999px;
+  padding:3px 10px;
+  text-decoration:none;
+}
+.customer-chip-social{ background:rgba(9,47,77,.05); font-weight:500; }
+.customer-no-contact{ margin:0 0 12px; font-size:.8rem; }
+
+.customer-stats{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:12px;
+}
+.customer-stat{
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+  min-width:70px;
+  padding:8px 12px;
+  border:1px solid rgba(9,47,77,.12);
+  border-radius:10px;
+  background:rgba(9,47,77,.03);
+}
+.customer-stat-value{
+  font-size:.95rem;
+  font-weight:700;
+  color:var(--navy);
+  font-variant-numeric:tabular-nums;
+}
+.customer-stat-lace{ font-size:.85rem; }
+.customer-stat-label{
+  font-size:.68rem;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  color:rgba(2,11,18,.5);
+}
+
+.customer-photo-strip{
+  display:flex;
+  gap:6px;
+  overflow-x:auto;
+  padding-bottom:6px;
+  margin-bottom:10px;
+  -webkit-overflow-scrolling:touch;
+}
+.customer-photo{
+  flex:0 0 auto;
+  width:56px;
+  height:56px;
+  padding:0;
+  border:0;
+  background:none;
+  cursor:pointer;
+}
+.customer-photo img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  border-radius:8px;
+}
+
+.customer-profile-link{
+  margin-top:4px;
+}
