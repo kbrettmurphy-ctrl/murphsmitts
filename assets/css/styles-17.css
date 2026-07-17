@@ -1912,6 +1912,12 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 
   .gallery-grid{ grid-template-columns: repeat(2, 1fr); }
 
+  /* Tighter gallery rhythm on mobile: photos stay big, sections stop
+     eating a full viewport each */
+  .gallery-group{ padding: 18px 0; }
+  .gallery-group .mm-section-title{ font-size: 17px; }
+  .gallery-group .mm-section-intro{ margin-bottom: 12px; }
+
   .process-handoff-grid,
   .relacing-split-list,
   .relacing-info-grid,
@@ -1952,8 +1958,8 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 }
 
 @media (max-width: 480px){
-  .gallery-thumb{ width: 62vw; }
-  .glove-search-card{ width: 62vw; }
+  .gallery-thumb{ width: 56vw; }
+  .glove-search-card{ width: 56vw; }
   .process-shot{ width: 56vw; }
   .brand-text{ font-size: 11.5px; }
   .mm-final-actions, .cta{ flex-direction: column; gap: 14px; }
