@@ -3970,6 +3970,7 @@ const SERVICE_OPTIONS = [
   "Relacing",
   "Cleaning + Conditioning",
   "Cleaning + Conditioning + Relacing",
+  "Lace Repair",
   "ShockTec Air2Gel Palm Pad"
 ];
 
