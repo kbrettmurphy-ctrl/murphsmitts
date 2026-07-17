@@ -3469,6 +3469,14 @@ function renderMoneyViewContent(sessions, loadError) {
 
   const byService = buildMoneyRollup(withLabor, r => getOrderSelectedServices(r.order).join(" + ") || "Other");
   const byGlove = buildMoneyRollup(withLabor, r => String(r.order.gloveType || "Unknown"));
+  /* Referral ROI uses ALL money-eligible orders — revenue per source
+     doesn't require labor logs; $/hr fills in as timers cover more jobs. */
+  const byReferral = buildMoneyRollup(rows, r => {
+    const src = String(r.order.referralSource || "").trim();
+    if (!src) return "Unknown";
+    return src.toLowerCase().startsWith("other") ? "Other" : src;
+  });
+
   const byMonth = buildMoneyRollup(
     withLabor,
     r => String(r.order.dateCompleted || r.order.createdAt || r.order.timestampSubmitted || "").slice(0, 7) || "Unknown",
@@ -3485,6 +3493,7 @@ function renderMoneyViewContent(sessions, loadError) {
     ${renderMoneyRollupTable("By Service", "Service", byService)}
     ${renderMoneyRollupTable("By Glove Type", "Glove type", byGlove)}
     ${renderMoneyRollupTable("By Month", "Month", byMonth)}
+    ${renderMoneyRollupTable("By Referral Source", "Source", byReferral)}
     ${renderMoneyJobsTable("Best Jobs ($/hr)", best)}
     ${worst.length ? renderMoneyJobsTable("Worst Jobs ($/hr)", worst) : ""}
   `;
