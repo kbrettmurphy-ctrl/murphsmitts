@@ -18,3 +18,5 @@ supabase/.temp/
 
 # Supabase local CLI state
 supabase/.temp/
+
+.DS_Store
