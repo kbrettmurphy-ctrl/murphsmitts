@@ -12745,6 +12745,7 @@ document.addEventListener("click", (e) => {
 
 let calendarMonth = null;        // Date pinned to the 1st of the shown month
 let calendarSelectedKey = "";    // YYYY-MM-DD
+let calendarShowUnscheduled = false;
 
 const CALENDAR_DONE_STATUSES = new Set(["Completed", "Picked Up"]);
 
@@ -12774,7 +12775,7 @@ function calOrderKind(order, dateKey, todayKey) {
 function buildCalendarEvents() {
   const events = new Map();
   const todayKey = calTodayKey();
-  let unscheduled = 0;
+  const unscheduledOrders = [];
 
   for (const order of allOrders) {
     const status = String(order.status || "");
@@ -12784,7 +12785,7 @@ function buildCalendarEvents() {
       : calKeyFromValue(order.estimatedCompletion);
 
     if (!dateKey) {
-      if (!isDone) unscheduled += 1;
+      if (!isDone) unscheduledOrders.push(order);
       continue;
     }
 
@@ -12792,7 +12793,8 @@ function buildCalendarEvents() {
     events.get(dateKey).push({ order, kind: calOrderKind(order, dateKey, todayKey) });
   }
 
-  return { events, unscheduled };
+  unscheduledOrders.sort((a, b) => (parseInt(b.orderNumber, 10) || 0) - (parseInt(a.orderNumber, 10) || 0));
+  return { events, unscheduledOrders };
 }
 
 function renderCalendarView() {
@@ -12806,7 +12808,8 @@ function renderCalendarView() {
   }
   if (!calendarSelectedKey) calendarSelectedKey = calTodayKey();
 
-  const { events, unscheduled } = buildCalendarEvents();
+  const { events, unscheduledOrders } = buildCalendarEvents();
+  const unscheduled = unscheduledOrders.length;
   const todayKey = calTodayKey();
   const year = calendarMonth.getFullYear();
   const month = calendarMonth.getMonth();
@@ -12819,7 +12822,9 @@ function renderCalendarView() {
     }
   }
   if (count) {
-    count.textContent = `${activeThisMonth} due this month${unscheduled ? ` · ${unscheduled} active without a date` : ""}`;
+    count.innerHTML = `${activeThisMonth} due this month${unscheduled
+      ? ` · <button type="button" class="cal-undated-link" data-cal-undated>${unscheduled} active without a date</button>`
+      : ""}`;
   }
 
   const firstDow = new Date(year, month, 1).getDay();
@@ -12870,6 +12875,21 @@ function renderCalendarView() {
       </div>
     </div>
     <div class="dashboard-card cal-agenda-card">
+      ${calendarShowUnscheduled ? `
+        <div class="cal-agenda-title">Active without a date · set estimated completions to put them on the calendar</div>
+        ${unscheduledOrders.map(order => `
+          <button class="customer-order-row" type="button" data-cal-order="${escapeAttr(String(order.orderNumber))}">
+            <span class="customer-row-main">
+              <span class="customer-row-name">#${escapeHtml(String(order.orderNumber))} · ${escapeHtml(order.customerName || "Customer")}</span>
+              <span class="customer-row-sub">${escapeHtml([order.brandModel || order.gloveType || "", order.status || ""].filter(Boolean).join(" · "))}</span>
+            </span>
+            <span class="customer-row-side">
+              <span class="cal-tag cal-tag-undated">No date</span>
+              <span class="customer-row-chevron" aria-hidden="true">&#8250;</span>
+            </span>
+          </button>
+        `).join("") || `<p class="muted cal-agenda-empty">Every active order has a date.</p>`}
+      ` : `
       <div class="cal-agenda-title">${escapeHtml(selectedLabel)}</div>
       ${selectedEvents.length ? selectedEvents.map(({ order, kind }) => `
         <button class="customer-order-row" type="button" data-cal-order="${escapeAttr(String(order.orderNumber))}">
@@ -12883,6 +12903,7 @@ function renderCalendarView() {
           </span>
         </button>
       `).join("") : `<p class="muted cal-agenda-empty">Nothing on this day.</p>`}
+      `}
     </div>
     </div>
   `;
@@ -12891,6 +12912,16 @@ function renderCalendarView() {
 }
 
 function wireCalendarPanel(panel) {
+  const count = document.getElementById("calendarCount");
+  if (count && count.dataset.calBound !== "true") {
+    count.dataset.calBound = "true";
+    count.addEventListener("click", (e) => {
+      if (!e.target.closest("[data-cal-undated]")) return;
+      calendarShowUnscheduled = true;
+      renderCalendarView();
+    });
+  }
+
   if (panel.dataset.calendarBound === "true") return;
   panel.dataset.calendarBound = "true";
 
@@ -12911,6 +12942,7 @@ function wireCalendarPanel(panel) {
     const day = e.target.closest("[data-cal-day]");
     if (day) {
       calendarSelectedKey = day.dataset.calDay;
+      calendarShowUnscheduled = false;
       renderCalendarView();
       return;
     }
