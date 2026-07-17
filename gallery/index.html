@@ -97,9 +97,16 @@ body_class: inner
         }
         return;
       }
-      const album = { cover: photo.url, photos: [photo.url], hasCover: isCover };
+      const album = { cover: photo.url, photos: [photo.url], hasCover: isCover, order };
       if (order) byOrder.set(order, album);
       albums.push(album);
+    });
+    /* Newest work first: sort by order number descending; albums without an
+       order (shop gloves) keep their relative order at the end. */
+    albums.sort((a, b) => {
+      const ao = a.order ? parseInt(a.order, 10) : -1;
+      const bo = b.order ? parseInt(b.order, 10) : -1;
+      return bo - ao;
     });
     /* If the flagged cover arrived after other photos it's already handled
        above; if an earlier photo started the album, demote it when a cover
