@@ -12578,6 +12578,7 @@ function renderCustomersView() {
   if (count) count.textContent = `${customers.length} customer${customers.length === 1 ? "" : "s"}`;
 
   panel.innerHTML = `
+    <div class="dashboard-shell">
     <div class="dashboard-card customers-card">
       <input id="customersSearchInput" class="customers-search" type="search"
         placeholder="Name, phone, order #" autocomplete="off" value="${escapeAttr(customersSearch)}">
@@ -12595,6 +12596,7 @@ function renderCustomersView() {
           </button>
         `).join("") : `<p class="muted customers-empty">No customers match.</p>`}
       </div>
+    </div>
     </div>
   `;
   wireCustomersPanel(panel);
@@ -12614,6 +12616,7 @@ function renderCustomerProfile(panel, count, c) {
     .slice(0, 12);
 
   panel.innerHTML = `
+    <div class="dashboard-shell">
     <div class="dashboard-card customers-card">
       <button class="customer-back" type="button" data-customer-back>&#8249; Customers</button>
       <div class="customer-profile-head">
@@ -12649,6 +12652,7 @@ function renderCustomerProfile(panel, count, c) {
           </button>
         `).join("")}
       </div>
+    </div>
     </div>
   `;
 }

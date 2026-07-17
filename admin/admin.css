@@ -1641,7 +1641,8 @@ button.dashboard-metric:active{
 #mapCount,
 #moneyCount,
 #clubhouseCount,
-#usersCount{
+#usersCount,
+#customersCount{
   margin:4px 0 0;
   min-height:1.35em;
   color:rgba(218,202,177,.76);
@@ -4616,7 +4617,8 @@ button.dashboard-metric:active{
   #mapCount,
   #moneyCount,
   #clubhouseCount,
-  #usersCount{
+  #usersCount,
+  #customersCount{
     font-size:.7rem;
   }
 
@@ -4770,6 +4772,7 @@ body,
 #moneyCount,
 #clubhouseCount,
 #usersCount,
+#customersCount,
 .detail-topbar-actions .status{
   margin:4px 0 0;
   min-height:1.35em;
@@ -5681,6 +5684,7 @@ button.secondary,
   #moneyCount,
   #clubhouseCount,
   #usersCount,
+  #customersCount,
   .detail-topbar-actions .status{
     font-size:.7rem;
   }
@@ -6279,7 +6283,8 @@ button.secondary,
   #mapCount,
   #moneyCount,
   #clubhouseCount,
-  #usersCount{
+  #usersCount,
+  #customersCount{
     font-size:.7rem;
   }
 
