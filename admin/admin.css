@@ -7680,6 +7680,10 @@ body.has-notifications .topbar-menu-btn::after{
 /* =========================
    Customer Profiles (Phase 1.2) — compact, iOS-list feel
 ========================= */
+.customers-card{
+  padding:12px 14px;
+}
+
 .customers-search{
   width:100%;
   font-size:16px;
