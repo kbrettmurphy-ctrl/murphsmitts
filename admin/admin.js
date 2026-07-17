@@ -3015,7 +3015,11 @@ const SHOP_ECONOMICS = {
   lacePieceDefaults: { "Fielders Glove": 3, "Catchers Mitt": 4, "First Base Mitt": 5 },
   lacePiecesTrapezeBonus: 1,
   palmPadUnitCost: 1.25, // $25 ShockTec 5 sq ft sheet ÷ twenty 6"x6" pads
-  consumablesPerCleaning: 1.00
+  consumablesPerCleaning: 1.00,
+  /* Every finished glove goes out with 1 business card + 1 sticker.
+     Priced at replacement cost (cards $40.22/100, stickers $41.63/100) —
+     the free replacement cards are a windfall, not a cost basis. */
+  packagingPerOrder: 0.82
 };
 
 const SHOP_PRICING = {
@@ -3084,13 +3088,15 @@ function getOrderMaterialsCost(order) {
   const laceCost = lacePieces * SHOP_ECONOMICS.laceCostPerPiece;
   const palmPadCost = orderHasPalmPadService(order) ? SHOP_ECONOMICS.palmPadUnitCost : 0;
   const consumables = orderHasCleaningService(order) ? SHOP_ECONOMICS.consumablesPerCleaning : 0;
+  const packaging = SHOP_ECONOMICS.packagingPerOrder;
 
   return {
     lacePieces,
     laceCost,
     palmPadCost,
     consumables,
-    total: laceCost + palmPadCost + consumables
+    packaging,
+    total: laceCost + palmPadCost + consumables + packaging
   };
 }
 
@@ -3166,6 +3172,7 @@ function renderOrderEconomicsBody(order) {
         ${m.lacePieces > 0 ? `<div class="order-economics-line"><span>Lace</span><span>${m.lacePieces} × ${escapeHtml(formatCurrency(SHOP_ECONOMICS.laceCostPerPiece))} = ${escapeHtml(formatCurrency(m.laceCost))}</span></div>` : ""}
         ${m.palmPadCost > 0 ? `<div class="order-economics-line"><span>Palm pad</span><span>${escapeHtml(formatCurrency(m.palmPadCost))}</span></div>` : ""}
         ${m.consumables > 0 ? `<div class="order-economics-line"><span>Consumables</span><span>${escapeHtml(formatCurrency(m.consumables))}</span></div>` : ""}
+        ${m.packaging > 0 ? `<div class="order-economics-line"><span>Card + sticker</span><span>${escapeHtml(formatCurrency(m.packaging))}</span></div>` : ""}
         <div class="order-economics-line order-economics-line--strong"><span>Materials</span><span>${escapeHtml(formatCurrency(m.total))}</span></div>
         <div class="order-economics-line order-economics-line--strong"><span>Net</span><span>${econ.net !== null ? escapeHtml(formatCurrency(econ.net)) : "—"}</span></div>
         <div class="order-economics-line"><span>Labor</span><span>${laborLoaded ? escapeHtml(formatLaborDuration(econ.laborMinutes)) : "—"}</span></div>
