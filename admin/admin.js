@@ -65,6 +65,7 @@ const passkeyLoginBtn = document.getElementById("passkeyLoginBtn");
 const passwordLoginBtn = document.getElementById("passwordLoginBtn");
 const usersView = document.getElementById("usersView");
 const customersView = document.getElementById("customersView");
+const calendarView = document.getElementById("calendarView");
 const usersPanel = document.getElementById("usersPanel");
 const messagesView = document.getElementById("messagesView");
 const messagesPanel = document.getElementById("messagesPanel");
@@ -261,7 +262,7 @@ document.addEventListener("focusout", (e) => {
    VIEW / MENU
 ========================= */
 function showView(view) {
-  [loginView, inviteView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, saleGlovesView, messagesView, usersView, customersView]
+  [loginView, inviteView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, saleGlovesView, messagesView, usersView, customersView, calendarView]
     .filter(Boolean)
     .forEach(v => v.classList.remove("active"));
 
@@ -2148,6 +2149,7 @@ function getViewTitle(viewName) {
     case "gloves-sale": return "Gloves For Sale";
     case "users": return "Users";
     case "customers": return "Customers";
+    case "calendar": return "Calendar";
     case "messages": return "Messages";
     default: return "Orders";
   }
@@ -4963,6 +4965,7 @@ function normalizeAdminView(viewName) {
   if (view === "gloves-sale") return "gloves-sale";
   if (view === "users") return "users";
   if (view === "customers") return "customers";
+  if (view === "calendar") return "calendar";
   if (view === "messages") return "messages";
   if (isOrderFilterView(view)) return view;
   return "dashboard";
@@ -4972,7 +4975,7 @@ function isKnownAdminView(viewName) {
   const view = String(viewName || "").trim().toLowerCase();
   if (!view || view === "dashboard") return true;
   if (view === "orders" || view === "current") return true;
-  return ["map", "money", "upload", "inventory", "gloves-sale", "users", "customers", "messages"].includes(view) || isOrderFilterView(view);
+  return ["map", "money", "upload", "inventory", "gloves-sale", "users", "customers", "calendar", "messages"].includes(view) || isOrderFilterView(view);
 }
 
 function syncAdminViewUrl(viewName) {
@@ -5003,6 +5006,9 @@ function syncAdminViewUrl(viewName) {
     url.searchParams.delete("order");
   } else if (view === "customers") {
     url.searchParams.set("view", "customers");
+    url.searchParams.delete("order");
+  } else if (view === "calendar") {
+    url.searchParams.set("view", "calendar");
     url.searchParams.delete("order");
   } else if (isOrderFilterView(view)) {
     url.searchParams.set("view", "orders");
@@ -5087,6 +5093,15 @@ function setActiveView(viewName) {
     renderUsersView();
     closeMenu();
     resetViewScroll(usersView, { blurActive: true });
+    return;
+  }
+
+  if (resolvedView === "calendar") {
+    syncAdminViewUrl(resolvedView);
+    showView(calendarView);
+    renderCalendarView();
+    closeMenu();
+    resetViewScroll(calendarView, { blurActive: true });
     return;
   }
 
@@ -12158,6 +12173,7 @@ menuBtn.addEventListener("click", openMenu);
 homeMenuBtn?.addEventListener("click", openMenu);
 document.getElementById("usersMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("customersMenuBtn")?.addEventListener("click", openMenu);
+document.getElementById("calendarMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("messagesMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("msgComposeBtn")?.addEventListener("click", renderComposeView);
 
@@ -12718,3 +12734,221 @@ document.addEventListener("click", (e) => {
   activeCustomerKey = customer.key;
   setActiveView("customers");
 });
+
+/* =========================
+   CALENDAR VIEW (Phase 1.3)
+   Month grid driven by order dates + status — the promise engine's UI in
+   Phase 2, so everything renders from data, nothing hardcoded.
+   Buckets: due (active orders on estimated_completion; overdue when past),
+   arriving (In Transit to Me), done (Completed/Picked Up on date_completed).
+========================= */
+
+let calendarMonth = null;        // Date pinned to the 1st of the shown month
+let calendarSelectedKey = "";    // YYYY-MM-DD
+let calendarShowUnscheduled = false;
+
+const CALENDAR_DONE_STATUSES = new Set(["Completed", "Picked Up"]);
+
+function calDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function calKeyFromValue(value) {
+  const m = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+}
+
+function calTodayKey() {
+  return calDateKey(new Date());
+}
+
+function calOrderKind(order, dateKey, todayKey) {
+  const status = String(order.status || "");
+  if (CALENDAR_DONE_STATUSES.has(status)) return "done";
+  /* Work's finished, waiting on pickup/shipping — never overdue. */
+  if (status === "Ready to Go") return "ready";
+  if (status === "In Transit to Me") return "arriving";
+  return dateKey < todayKey ? "overdue" : "due";
+}
+
+/* dateKey -> [{ order, kind }] for every order that lands on a calendar day. */
+function buildCalendarEvents() {
+  const events = new Map();
+  const todayKey = calTodayKey();
+  const unscheduledOrders = [];
+
+  for (const order of allOrders) {
+    const status = String(order.status || "");
+    const isDone = CALENDAR_DONE_STATUSES.has(status) || status === "Ready to Go";
+    const dateKey = isDone
+      ? calKeyFromValue(order.dateCompleted || order.estimatedCompletion)
+      : calKeyFromValue(order.estimatedCompletion);
+
+    if (!dateKey) {
+      if (!isDone) unscheduledOrders.push(order);
+      continue;
+    }
+
+    if (!events.has(dateKey)) events.set(dateKey, []);
+    events.get(dateKey).push({ order, kind: calOrderKind(order, dateKey, todayKey) });
+  }
+
+  unscheduledOrders.sort((a, b) => (parseInt(b.orderNumber, 10) || 0) - (parseInt(a.orderNumber, 10) || 0));
+  return { events, unscheduledOrders };
+}
+
+function renderCalendarView() {
+  const panel = document.getElementById("calendarPanel");
+  const count = document.getElementById("calendarCount");
+  if (!panel) return;
+
+  if (!calendarMonth) {
+    const now = new Date();
+    calendarMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  if (!calendarSelectedKey) calendarSelectedKey = calTodayKey();
+
+  const { events, unscheduledOrders } = buildCalendarEvents();
+  const unscheduled = unscheduledOrders.length;
+  const todayKey = calTodayKey();
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const monthLabel = calendarMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
+  let activeThisMonth = 0;
+  for (const [key, list] of events) {
+    if (key.startsWith(`${year}-${String(month + 1).padStart(2, "0")}`)) {
+      activeThisMonth += list.filter(e => e.kind !== "done" && e.kind !== "ready").length;
+    }
+  }
+  if (count) {
+    count.innerHTML = `${activeThisMonth} due this month${unscheduled
+      ? ` · <button type="button" class="cal-undated-link" data-cal-undated>${unscheduled} active without a date</button>`
+      : ""}`;
+  }
+
+  const firstDow = new Date(year, month, 1).getDay();
+  const gridStart = new Date(year, month, 1 - firstDow);
+  const cells = [];
+  for (let i = 0; i < 42; i += 1) {
+    const d = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+    const key = calDateKey(d);
+    const dayEvents = events.get(key) || [];
+    const kinds = [...new Set(dayEvents.map(e => e.kind))];
+    cells.push(`
+      <button type="button" class="cal-day${d.getMonth() !== month ? " is-other" : ""}${key === todayKey ? " is-today" : ""}${key === calendarSelectedKey ? " is-selected" : ""}" data-cal-day="${key}">
+        <span class="cal-day-num">${d.getDate()}</span>
+        ${kinds.length ? `<span class="cal-dots">${kinds.map(k => `<span class="cal-dot cal-dot-${k}"></span>`).join("")}</span>` : ""}
+      </button>
+    `);
+  }
+
+  const selectedEvents = (events.get(calendarSelectedKey) || [])
+    .sort((a, b) => (a.kind === "done") - (b.kind === "done"));
+  const selectedDate = calKeyFromValue(calendarSelectedKey);
+  const selectedLabel = selectedDate
+    ? new Date(...calendarSelectedKey.split("-").map((v, i) => i === 1 ? Number(v) - 1 : Number(v)))
+        .toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })
+    : "";
+
+  const kindLabel = { due: "Due", overdue: "Overdue", arriving: "In Transit", ready: "Ready", done: "Done" };
+
+  panel.innerHTML = `
+    <div class="dashboard-shell">
+    <div class="dashboard-card cal-card">
+      <div class="cal-header">
+        <button type="button" class="cal-nav-btn" data-cal-nav="-1" aria-label="Previous month">&#8249;</button>
+        <div class="cal-title">${escapeHtml(monthLabel)}</div>
+        <div class="cal-header-right">
+          <button type="button" class="cal-today-btn" data-cal-today>Today</button>
+          <button type="button" class="cal-nav-btn" data-cal-nav="1" aria-label="Next month">&#8250;</button>
+        </div>
+      </div>
+      <div class="cal-weekdays">${["S","M","T","W","T","F","S"].map(d => `<span>${d}</span>`).join("")}</div>
+      <div class="cal-grid">${cells.join("")}</div>
+      <div class="cal-legend">
+        <span><span class="cal-dot cal-dot-due"></span> Due</span>
+        <span><span class="cal-dot cal-dot-overdue"></span> Overdue</span>
+        <span><span class="cal-dot cal-dot-arriving"></span> In Transit</span>
+        <span><span class="cal-dot cal-dot-ready"></span> Ready</span>
+        <span><span class="cal-dot cal-dot-done"></span> Done</span>
+      </div>
+    </div>
+    <div class="dashboard-card cal-agenda-card">
+      ${calendarShowUnscheduled ? `
+        <div class="cal-agenda-title">Active without a date · set estimated completions to put them on the calendar</div>
+        ${unscheduledOrders.map(order => `
+          <button class="customer-order-row" type="button" data-cal-order="${escapeAttr(String(order.orderNumber))}">
+            <span class="customer-row-main">
+              <span class="customer-row-name">#${escapeHtml(String(order.orderNumber))} · ${escapeHtml(order.customerName || "Customer")}</span>
+              <span class="customer-row-sub">${escapeHtml([order.brandModel || order.gloveType || "", order.status || ""].filter(Boolean).join(" · "))}</span>
+            </span>
+            <span class="customer-row-side">
+              <span class="cal-tag cal-tag-undated">No date</span>
+              <span class="customer-row-chevron" aria-hidden="true">&#8250;</span>
+            </span>
+          </button>
+        `).join("") || `<p class="muted cal-agenda-empty">Every active order has a date.</p>`}
+      ` : `
+      <div class="cal-agenda-title">${escapeHtml(selectedLabel)}</div>
+      ${selectedEvents.length ? selectedEvents.map(({ order, kind }) => `
+        <button class="customer-order-row" type="button" data-cal-order="${escapeAttr(String(order.orderNumber))}">
+          <span class="customer-row-main">
+            <span class="customer-row-name">#${escapeHtml(String(order.orderNumber))} · ${escapeHtml(order.customerName || "Customer")}</span>
+            <span class="customer-row-sub">${escapeHtml([order.brandModel || order.gloveType || "", order.status || ""].filter(Boolean).join(" · "))}</span>
+          </span>
+          <span class="customer-row-side">
+            <span class="cal-tag cal-tag-${kind}">${kindLabel[kind] || kind}</span>
+            <span class="customer-row-chevron" aria-hidden="true">&#8250;</span>
+          </span>
+        </button>
+      `).join("") : `<p class="muted cal-agenda-empty">Nothing on this day.</p>`}
+      `}
+    </div>
+    </div>
+  `;
+
+  wireCalendarPanel(panel);
+}
+
+function wireCalendarPanel(panel) {
+  const count = document.getElementById("calendarCount");
+  if (count && count.dataset.calBound !== "true") {
+    count.dataset.calBound = "true";
+    count.addEventListener("click", (e) => {
+      if (!e.target.closest("[data-cal-undated]")) return;
+      calendarShowUnscheduled = true;
+      renderCalendarView();
+    });
+  }
+
+  if (panel.dataset.calendarBound === "true") return;
+  panel.dataset.calendarBound = "true";
+
+  panel.addEventListener("click", (e) => {
+    const nav = e.target.closest("[data-cal-nav]");
+    if (nav) {
+      calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + Number(nav.dataset.calNav), 1);
+      renderCalendarView();
+      return;
+    }
+    if (e.target.closest("[data-cal-today]")) {
+      const now = new Date();
+      calendarMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      calendarSelectedKey = calTodayKey();
+      renderCalendarView();
+      return;
+    }
+    const day = e.target.closest("[data-cal-day]");
+    if (day) {
+      calendarSelectedKey = day.dataset.calDay;
+      calendarShowUnscheduled = false;
+      renderCalendarView();
+      return;
+    }
+    const orderBtn = e.target.closest("[data-cal-order]");
+    if (orderBtn) {
+      openOrder(orderBtn.dataset.calOrder, { returnView: "calendar" });
+    }
+  });
+}

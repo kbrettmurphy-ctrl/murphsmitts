@@ -33,6 +33,7 @@
         <button class="nav-link nav-main active" data-view="dashboard">Clubhouse<span id="clubhouseNavBadge" class="nav-badge" hidden></span></button>
         <button class="nav-link nav-main" data-view="current">Orders</button>
         <button class="nav-link nav-main" data-view="customers">Customers</button>
+        <button class="nav-link nav-main" data-view="calendar">Calendar</button>
         <button class="nav-link nav-main" data-view="map">Map</button>
         <button class="nav-link nav-main" data-view="money">Money</button>
         <button class="nav-link nav-main" data-view="inventory">Lace Inventory</button>
@@ -396,6 +397,20 @@
           <div class="topbar-actions"></div>
         </header>
         <div id="customersPanel" class="dashboard-panel" aria-live="polite"></div>
+      </section>
+
+      <section id="calendarView" class="view">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="calendarMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <div class="topbar-heading">
+              <h1 class="topbar-title">Calendar</h1>
+              <p id="calendarCount" class="topbar-subtitle muted"></p>
+            </div>
+          </div>
+          <div class="topbar-actions"></div>
+        </header>
+        <div id="calendarPanel" class="dashboard-panel" aria-live="polite"></div>
       </section>
 
       <div id="pullRefreshIndicator" class="pull-refresh-indicator" aria-hidden="true">
