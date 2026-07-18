@@ -3512,6 +3512,7 @@ function renderMoneyViewContent(sessions, loadError) {
     ${renderMoneyRollupTable("By Month", "Month", byMonth)}
     ${renderMoneyRollupTable("By Referral Source", "Source", byReferral)}
     ${renderMeasuredTimesTable(sessions)}
+    ${renderPhaseHoursTable(sessions)}
     ${renderMoneyJobsTable("Best Jobs ($/hr)", best)}
     ${worst.length ? renderMoneyJobsTable("Worst Jobs ($/hr)", worst) : ""}
   `;
@@ -13319,4 +13320,59 @@ function laborSessionsWithDates() {
     ...s,
     endedMs: s.endedAt ? new Date(s.endedAt).getTime() : null
   }));
+}
+
+/* =========================
+   PHASE ANALYTICS (Phase 2.3, back half)
+   Where the hours actually go. Last 28 days leads (current behavior),
+   all-time alongside. If Admin/Messaging is eating 20% of bench time,
+   that's a pricing or automation decision — this is where it shows.
+========================= */
+
+function renderPhaseHoursTable(sessions) {
+  const rows = new Map(); // phase -> { recent, allTime }
+  const cutoff = Date.now() - PROMISE_PACE_WINDOW_DAYS * 86400000;
+  let recentTotal = 0;
+  let allTimeTotal = 0;
+
+  (Array.isArray(sessions) ? sessions : []).forEach(s => {
+    const phase = String(s.phase || "Work");
+    const minutes = Number(s.durationMinutes) || 0;
+    if (!minutes) return;
+    if (!rows.has(phase)) rows.set(phase, { recent: 0, allTime: 0 });
+    const slot = rows.get(phase);
+    slot.allTime += minutes;
+    allTimeTotal += minutes;
+    const endedMs = s.endedAt ? new Date(s.endedAt).getTime() : null;
+    if (endedMs && endedMs >= cutoff) {
+      slot.recent += minutes;
+      recentTotal += minutes;
+    }
+  });
+
+  if (!allTimeTotal) return "";
+
+  const sorted = [...rows.entries()].sort((a, b) => b[1].allTime - a[1].allTime);
+  return `
+    <div class="dashboard-card money-card">
+      <h3 class="money-card-title">Where the Hours Go</h3>
+      <div class="money-table-wrap">
+        <table class="money-table">
+          <thead>
+            <tr><th>Phase</th><th>Last 28 days</th><th>Share</th><th>All-time</th></tr>
+          </thead>
+          <tbody>
+            ${sorted.map(([phase, m]) => `
+              <tr>
+                <td>${escapeHtml(phase)}</td>
+                <td>${escapeHtml(formatLaborDuration(m.recent))}</td>
+                <td>${recentTotal ? `${Math.round((m.recent / recentTotal) * 100)}%` : "—"}</td>
+                <td>${escapeHtml(formatLaborDuration(m.allTime))}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
