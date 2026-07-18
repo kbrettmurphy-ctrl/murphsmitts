@@ -2996,6 +2996,7 @@ const LABOR_TIMER_PHASES = [
   "Relacing",
   "Conditioning",
   "Palm Pad",
+  "Custom Work",
   "Photos",
   "Packing/Shipping",
   "Admin/Messaging",
@@ -3162,7 +3163,9 @@ function renderOrderEconomicsBody(order) {
       ? `median ${formatLaborDuration(measured.medianMinutes)} × ${formatCurrency(SHOP_ECONOMICS.targetHourlyRate)}/hr + materials, from ${measured.n} measured jobs`
       : `rule-based — under ${MEASURED_MIN_BUCKET_JOBS} measured jobs of this type so far`;
     if (orderHasCustomWork(order)) {
-      basis += ` · custom work on this order — suggestion covers the standard services only, and this job's time stays out of the medians`;
+      basis += orderCustomPhaseMinutes(order.orderNumber) > 0
+        ? ` · custom work timed under its own phase — the standard time feeds the medians`
+        : ` · custom work on this order — time the bespoke part under the "Custom Work" phase so the standard time can feed the medians`;
     }
     suggestionHtml = `
       <div class="order-economics-suggestion muted">Suggested price: ${escapeHtml(formatCurrency(suggestedPrice))}${escapeHtml(deltaText)}</div>
@@ -13077,22 +13080,29 @@ function measuredBucketKey(order) {
   return `${glove}${trapeze} · ${services}`;
 }
 
+const LABOR_CUSTOM_PHASE = "Custom Work";
+
 function buildMeasuredJobStats(sessions) {
-  const minutesByOrder = new Map();
+  const perOrder = new Map(); // orderNumber -> { standard, custom } minutes
   (Array.isArray(sessions) ? sessions : []).forEach(s => {
     const key = String(s.orderNumber || "");
     if (!key) return;
-    minutesByOrder.set(key, (minutesByOrder.get(key) || 0) + (Number(s.durationMinutes) || 0));
+    if (!perOrder.has(key)) perOrder.set(key, { standard: 0, custom: 0 });
+    const slot = perOrder.get(key);
+    if (String(s.phase || "") === LABOR_CUSTOM_PHASE) slot.custom += Number(s.durationMinutes) || 0;
+    else slot.standard += Number(s.durationMinutes) || 0;
   });
 
   const buckets = new Map();
-  for (const [orderNumber, minutes] of minutesByOrder) {
-    if (minutes < MEASURED_MIN_JOB_MINUTES) continue;
+  for (const [orderNumber, mins] of perOrder) {
+    if (mins.standard < MEASURED_MIN_JOB_MINUTES) continue;
     const order = allOrders.find(o => String(o.orderNumber) === orderNumber);
     if (!order) continue;
-    /* Custom ("Other") work makes the job's time unrepresentative of its
-       bucket — one bespoke glove would skew every standard suggestion. */
-    if (orderHasCustomWork(order)) continue;
+    /* Custom ("Other") jobs feed the medians ONLY when their bespoke time
+       was timed under the Custom Work phase — then the standard minutes are
+       clean data. Untagged custom jobs stay out entirely. */
+    if (orderHasCustomWork(order) && mins.custom <= 0) continue;
+    const minutes = mins.standard;
     const key = measuredBucketKey(order);
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key).push(minutes);
@@ -13160,3 +13170,10 @@ async function warmLaborSummaryCache() {
   } catch {}
 }
 setTimeout(warmLaborSummaryCache, 2500);
+
+function orderCustomPhaseMinutes(orderNumber) {
+  if (!Array.isArray(moneyLaborSummaryCache)) return 0;
+  return moneyLaborSummaryCache
+    .filter(s => String(s.orderNumber) === String(orderNumber) && String(s.phase || "") === LABOR_CUSTOM_PHASE)
+    .reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
+}
