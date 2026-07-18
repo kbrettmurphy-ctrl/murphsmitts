@@ -5837,6 +5837,7 @@ function renderOrderDetail(order) {
           <div class="detail-block">
             <div class="label">Estimated Completion</div>
             <input id="editEstimatedCompletion" type="date" />
+            <div id="promiseProposal" class="promise-proposal" hidden></div>
           </div>
 
           <div class="detail-block">
@@ -6078,6 +6079,7 @@ function renderOrderDetail(order) {
   ensureOrderEconomicsDelegation();
   loadLaborSessions(order.orderNumber);
   loadOrderActivity(order.orderNumber);
+  renderPromiseProposal();
 }
 
 function getBlankAdminOrder() {
@@ -6202,6 +6204,7 @@ function renderNewOrderForm() {
           <div class="detail-block">
             <div class="label">Estimated Completion</div>
             <input id="editEstimatedCompletion" type="date" />
+            <div id="promiseProposal" class="promise-proposal" hidden></div>
           </div>
         </div>
       </section>
@@ -6319,6 +6322,7 @@ function renderNewOrderForm() {
   document.getElementById("editDropOffMethod").value = order.dropOffMethod;
   wireDetailForm();
   wireNewOrderCustomerLookup();
+  renderPromiseProposal();
 }
 
 function getOrderRecencyTime(order) {
@@ -13176,4 +13180,135 @@ function orderCustomPhaseMinutes(orderNumber) {
   return moneyLaborSummaryCache
     .filter(s => String(s.orderNumber) === String(orderNumber) && String(s.phase || "") === LABOR_CUSTOM_PHASE)
     .reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
+}
+
+/* =========================
+   PROMISE ENGINE (Phase 2.2)
+   Proposes a completion date from: measured hours for THIS job type +
+   remaining hours queued ahead of it, paced by your MEASURED daily bench
+   output (last 28 days of timer logs). Falls back honestly at every level:
+   bucket median -> global median -> 2h default; measured pace -> 2h/day.
+========================= */
+
+const PROMISE_QUEUE_STATUSES = new Set([
+  "Received", "Estimate Sent", "Customer Approved",
+  "In Transit to Me", "In Progress", "Waiting on Lace/Parts"
+]);
+const PROMISE_FALLBACK_JOB_MINUTES = 120;
+const PROMISE_FALLBACK_PACE_MINUTES_PER_DAY = 120;
+const PROMISE_PACE_WINDOW_DAYS = 28;
+
+function getEstimatedJobMinutes(order, stats) {
+  const bucket = stats.get(measuredBucketKey(order));
+  if (bucket && bucket.n >= MEASURED_MIN_BUCKET_JOBS) {
+    return { minutes: bucket.medianMinutes, basis: `measured (${bucket.n} jobs)` };
+  }
+  const all = [...stats.values()].map(s => s.medianMinutes).sort((a, b) => a - b);
+  if (all.length) {
+    const mid = Math.floor(all.length / 2);
+    const median = all.length % 2 ? all[mid] : (all[mid - 1] + all[mid]) / 2;
+    return { minutes: median, basis: "shop median" };
+  }
+  return { minutes: PROMISE_FALLBACK_JOB_MINUTES, basis: "default estimate" };
+}
+
+/* Measured pace: how many bench minutes you actually log per day lately. */
+function getMeasuredDailyPace() {
+  if (!Array.isArray(moneyLaborSummaryCache)) return null;
+  const sessions = laborSessionsWithDates();
+  const cutoff = Date.now() - PROMISE_PACE_WINDOW_DAYS * 86400000;
+  const recent = sessions.filter(s => s.endedMs && s.endedMs >= cutoff);
+  const total = recent.reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
+  if (total < 300) return null; // under 5 recent hours: not enough signal
+  return total / PROMISE_PACE_WINDOW_DAYS;
+}
+
+function getPromiseProposal(order) {
+  if (!Array.isArray(moneyLaborSummaryCache)) return null;
+
+  const stats = buildMeasuredJobStats(moneyLaborSummaryCache);
+  const loggedByOrder = new Map();
+  moneyLaborSummaryCache.forEach(s => {
+    const key = String(s.orderNumber || "");
+    if (!key) return;
+    loggedByOrder.set(key, (loggedByOrder.get(key) || 0) + (Number(s.durationMinutes) || 0));
+  });
+
+  const thisNum = parseInt(order.orderNumber, 10) || 0;
+  const thisJob = getEstimatedJobMinutes(order, stats);
+  const thisRemaining = Math.max(0, thisJob.minutes - (loggedByOrder.get(String(order.orderNumber)) || 0));
+
+  let queueMinutes = 0;
+  let queueJobs = 0;
+  for (const other of allOrders) {
+    if (!PROMISE_QUEUE_STATUSES.has(String(other.status || ""))) continue;
+    const num = parseInt(other.orderNumber, 10) || 0;
+    if (num >= thisNum) continue; // FIFO: only work ahead of this order
+    const est = getEstimatedJobMinutes(other, stats).minutes;
+    const remaining = Math.max(0, est - (loggedByOrder.get(String(other.orderNumber)) || 0));
+    if (remaining <= 0) continue;
+    queueMinutes += remaining;
+    queueJobs += 1;
+  }
+
+  const measuredPace = getMeasuredDailyPace();
+  const pace = measuredPace || PROMISE_FALLBACK_PACE_MINUTES_PER_DAY;
+  const days = Math.max(1, Math.ceil((queueMinutes + thisRemaining) / pace) + 1); // +1 buffer day
+  const target = new Date();
+  target.setDate(target.getDate() + days);
+
+  return {
+    dateKey: calDateKey(target),
+    dateLabel: target.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }),
+    queueHours: queueMinutes / 60,
+    queueJobs,
+    jobHours: thisRemaining / 60,
+    jobBasis: thisJob.basis,
+    paceHours: pace / 60,
+    paceMeasured: !!measuredPace
+  };
+}
+
+function renderPromiseProposal() {
+  const el = document.getElementById("promiseProposal");
+  if (!el) return;
+  const order = detailMode === "new" ? getBlankAdminOrder() : currentOrder;
+  if (!order) { el.hidden = true; return; }
+
+  const fill = () => {
+    const p = getPromiseProposal(order);
+    const target = document.getElementById("promiseProposal");
+    if (!target || !p) return;
+    target.hidden = false;
+    target.innerHTML = `
+      <span class="promise-text">MurphOS proposes <strong>${escapeHtml(p.dateLabel)}</strong> —
+        ${p.queueJobs ? `${p.queueHours.toFixed(1)}h queued (${p.queueJobs} job${p.queueJobs === 1 ? "" : "s"}) + ` : ""}this job ~${p.jobHours.toFixed(1)}h (${escapeHtml(p.jobBasis)}), at ${p.paceHours.toFixed(1)}h/day ${p.paceMeasured ? "measured pace" : "default pace"} + 1 buffer day</span>
+      <button type="button" class="promise-apply-btn" data-promise-date="${escapeAttr(p.dateKey)}">Use</button>
+    `;
+  };
+
+  if (Array.isArray(moneyLaborSummaryCache)) {
+    fill();
+  } else {
+    warmLaborSummaryCache().then(fill);
+  }
+}
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-promise-date]");
+  if (!btn) return;
+  const input = document.getElementById("editEstimatedCompletion");
+  if (!input) return;
+  input.value = btn.dataset.promiseDate;
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+});
+
+/* Sessions with end timestamps for pace math — summary lacks dates, so we
+   derive from durations attributed to the summary fetch time window via the
+   endedMs field when present; fall back to counting everything. */
+function laborSessionsWithDates() {
+  return (moneyLaborSummaryCache || []).map(s => ({
+    ...s,
+    endedMs: s.endedAt ? new Date(s.endedAt).getTime() : null
+  }));
 }
