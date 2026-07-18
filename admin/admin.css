@@ -8018,3 +8018,24 @@ body.has-notifications .topbar-menu-btn::after{
   background:rgba(30,107,52,.12);
   color:#1e6b34;
 }
+
+/* Promise engine (2.2): proposed completion date under the date field */
+.promise-proposal{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:5px;
+}
+.promise-text{
+  font-size:.7rem;
+  color:rgba(2,11,18,.55);
+  line-height:1.4;
+}
+.promise-text strong{ color:var(--navy); }
+/* Compact sizing only — visual language comes from the shared .secondary */
+.promise-apply-btn{
+  flex-shrink:0;
+  min-height:24px;
+  padding:2px 12px;
+  font-size:.7rem;
+}

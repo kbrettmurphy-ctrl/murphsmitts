@@ -2969,7 +2969,7 @@ async function stopLaborSession(env, { sessionId, notes }) {
 async function fetchLaborSummary(env) {
   const resp = await supabaseFetch(
     env,
-    `/rest/v1/order_labor_sessions?select=order_number,phase,duration_minutes&ended_at=not.is.null`
+    `/rest/v1/order_labor_sessions?select=order_number,phase,duration_minutes,ended_at&ended_at=not.is.null`
   );
 
   if (!resp.ok) return resp;
@@ -2979,7 +2979,8 @@ async function fetchLaborSummary(env) {
     sessions: (Array.isArray(resp.data) ? resp.data : []).map(row => ({
       orderNumber: row.order_number,
       phase: row.phase,
-      durationMinutes: row.duration_minutes != null ? Number(row.duration_minutes) : 0
+      durationMinutes: row.duration_minutes != null ? Number(row.duration_minutes) : 0,
+      endedAt: row.ended_at
     }))
   };
 }
