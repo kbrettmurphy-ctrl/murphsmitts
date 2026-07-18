@@ -3018,7 +3018,7 @@ const SHOP_ECONOMICS = {
   consumablesPerCleaning: 1.00,
   /* Measured pricing (2.1): suggested = median measured hours x target
      rate + materials. Tune the target rate here. */
-  targetHourlyRate: 50,
+  targetHourlyRate: 45,
   /* Every finished glove goes out with 1 business card + 1 sticker.
      Priced at replacement cost (cards $40.22/100, stickers $41.63/100) —
      the free replacement cards are a windfall, not a cost basis. */
