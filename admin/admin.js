@@ -3016,6 +3016,9 @@ const SHOP_ECONOMICS = {
   lacePiecesTrapezeBonus: 1,
   palmPadUnitCost: 1.25, // $25 ShockTec 5 sq ft sheet ÷ twenty 6"x6" pads
   consumablesPerCleaning: 1.00,
+  /* Measured pricing (2.1): suggested = median measured hours x target
+     rate + materials. Tune the target rate here. */
+  targetHourlyRate: 45,
   /* Every finished glove goes out with 1 business card + 1 sticker.
      Priced at replacement cost (cards $40.22/100, stickers $41.63/100) —
      the free replacement cards are a windfall, not a cost basis. */
@@ -3144,16 +3147,24 @@ function renderOrderEconomicsBody(order) {
         : `(estimate for glove type: ${defaultPieces})`);
 
   let suggestionHtml = "";
-  if (suggestion) {
+  const measured = getMeasuredSuggestion(order);
+  const suggestedPrice = measured ? measured.price : (suggestion ? suggestion.price : null);
+  if (suggestedPrice !== null) {
     let deltaText = "";
     if (hasPrice) {
-      const delta = Number(order.priceQuoted) - suggestion.price;
+      const delta = Number(order.priceQuoted) - suggestedPrice;
       if (delta !== 0) {
         const sign = delta > 0 ? "+" : "−";
         deltaText = ` (quoted ${formatCurrency(Number(order.priceQuoted))}, ${sign}${formatCurrency(Math.abs(delta))} vs suggested)`;
       }
     }
-    suggestionHtml = `<div class="order-economics-suggestion muted">Suggested price: ${escapeHtml(formatCurrency(suggestion.price))}${escapeHtml(deltaText)}</div>`;
+    const basis = measured
+      ? `median ${formatLaborDuration(measured.medianMinutes)} × ${formatCurrency(SHOP_ECONOMICS.targetHourlyRate)}/hr + materials, from ${measured.n} measured jobs`
+      : `rule-based — under ${MEASURED_MIN_BUCKET_JOBS} measured jobs of this type so far`;
+    suggestionHtml = `
+      <div class="order-economics-suggestion muted">Suggested price: ${escapeHtml(formatCurrency(suggestedPrice))}${escapeHtml(deltaText)}</div>
+      <div class="order-economics-basis">${escapeHtml(basis)}</div>
+    `;
   }
 
   const rateDisplay = econ.hourlyRate !== null
@@ -3494,6 +3505,7 @@ function renderMoneyViewContent(sessions, loadError) {
     ${renderMoneyRollupTable("By Glove Type", "Glove type", byGlove)}
     ${renderMoneyRollupTable("By Month", "Month", byMonth)}
     ${renderMoneyRollupTable("By Referral Source", "Source", byReferral)}
+    ${renderMeasuredTimesTable(sessions)}
     ${renderMoneyJobsTable("Best Jobs ($/hr)", best)}
     ${worst.length ? renderMoneyJobsTable("Worst Jobs ($/hr)", worst) : ""}
   `;
@@ -13038,3 +13050,102 @@ document.addEventListener("change", (e) => {
   if (value === "") return;
   applyOrderTemplate(Number(value));
 });
+
+/* =========================
+   MEASURED PRICING ENGINE (Phase 2.1)
+   Suggested prices from YOUR measured job times, per-bucket honesty:
+   a bucket (glove type [+trapeze] + service set) with 3+ jobs of 15+
+   logged minutes uses its median; thinner buckets fall back to the
+   SHOP_PRICING rules and say so. Self-improves with every timer session.
+========================= */
+
+const MEASURED_MIN_JOB_MINUTES = 15;
+const MEASURED_MIN_BUCKET_JOBS = 3;
+
+function measuredBucketKey(order) {
+  const services = getOrderSelectedServices(order).slice().sort().join(" + ") || "Other";
+  const glove = String(order?.gloveType || "Unknown");
+  const trapeze = glove === "Fielders Glove" && orderHasTrapezeWeb(order) ? " (Trapeze)" : "";
+  return `${glove}${trapeze} · ${services}`;
+}
+
+function buildMeasuredJobStats(sessions) {
+  const minutesByOrder = new Map();
+  (Array.isArray(sessions) ? sessions : []).forEach(s => {
+    const key = String(s.orderNumber || "");
+    if (!key) return;
+    minutesByOrder.set(key, (minutesByOrder.get(key) || 0) + (Number(s.durationMinutes) || 0));
+  });
+
+  const buckets = new Map();
+  for (const [orderNumber, minutes] of minutesByOrder) {
+    if (minutes < MEASURED_MIN_JOB_MINUTES) continue;
+    const order = allOrders.find(o => String(o.orderNumber) === orderNumber);
+    if (!order) continue;
+    const key = measuredBucketKey(order);
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(minutes);
+  }
+
+  const stats = new Map();
+  for (const [key, list] of buckets) {
+    list.sort((a, b) => a - b);
+    const mid = Math.floor(list.length / 2);
+    const median = list.length % 2 ? list[mid] : (list[mid - 1] + list[mid]) / 2;
+    stats.set(key, { medianMinutes: median, n: list.length });
+  }
+  return stats;
+}
+
+function getMeasuredSuggestion(order) {
+  if (!Array.isArray(moneyLaborSummaryCache)) return null;
+  const stats = buildMeasuredJobStats(moneyLaborSummaryCache).get(measuredBucketKey(order));
+  if (!stats || stats.n < MEASURED_MIN_BUCKET_JOBS) return null;
+  const materials = getOrderMaterialsCost(order).total;
+  const raw = materials + (stats.medianMinutes / 60) * SHOP_ECONOMICS.targetHourlyRate;
+  return { ...stats, price: Math.round(raw / 5) * 5 };
+}
+
+/* Money view: the engine's dashboard — every bucket, its median, and
+   whether it's measured yet. */
+function renderMeasuredTimesTable(sessions) {
+  const stats = buildMeasuredJobStats(sessions);
+  if (!stats.size) return "";
+  const rows = [...stats.entries()].sort((a, b) => b[1].n - a[1].n);
+  return `
+    <div class="dashboard-card money-card">
+      <h3 class="money-card-title">Measured Job Times</h3>
+      <div class="money-table-wrap">
+        <table class="money-table">
+          <thead>
+            <tr><th>Job type</th><th>Jobs</th><th>Median time</th><th>Pricing basis</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(([key, s]) => `
+              <tr>
+                <td>${escapeHtml(key)}</td>
+                <td>${s.n}</td>
+                <td>${escapeHtml(formatLaborDuration(s.medianMinutes))}</td>
+                <td>${s.n >= MEASURED_MIN_BUCKET_JOBS
+                  ? `<span class="measured-tag measured-tag-live">Measured</span>`
+                  : `<span class="measured-tag">${MEASURED_MIN_BUCKET_JOBS - s.n} more to go live</span>`}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+/* Warm the labor cache so Order Detail suggestions can be measured on
+   first open, not just after visiting the Money view. */
+async function warmLaborSummaryCache() {
+  if (Array.isArray(moneyLaborSummaryCache)) return;
+  if (!isAuthenticated()) return;
+  try {
+    const data = await postJson({ action: "listLaborSummary" }, true);
+    moneyLaborSummaryCache = data.sessions || [];
+  } catch {}
+}
+setTimeout(warmLaborSummaryCache, 2500);
