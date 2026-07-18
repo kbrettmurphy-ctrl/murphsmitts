@@ -3158,9 +3158,12 @@ function renderOrderEconomicsBody(order) {
         deltaText = ` (quoted ${formatCurrency(Number(order.priceQuoted))}, ${sign}${formatCurrency(Math.abs(delta))} vs suggested)`;
       }
     }
-    const basis = measured
+    let basis = measured
       ? `median ${formatLaborDuration(measured.medianMinutes)} × ${formatCurrency(SHOP_ECONOMICS.targetHourlyRate)}/hr + materials, from ${measured.n} measured jobs`
       : `rule-based — under ${MEASURED_MIN_BUCKET_JOBS} measured jobs of this type so far`;
+    if (orderHasCustomWork(order)) {
+      basis += ` · custom work on this order — suggestion covers the standard services only, and this job's time stays out of the medians`;
+    }
     suggestionHtml = `
       <div class="order-economics-suggestion muted">Suggested price: ${escapeHtml(formatCurrency(suggestedPrice))}${escapeHtml(deltaText)}</div>
       <div class="order-economics-basis">${escapeHtml(basis)}</div>
@@ -13062,6 +13065,11 @@ document.addEventListener("change", (e) => {
 const MEASURED_MIN_JOB_MINUTES = 15;
 const MEASURED_MIN_BUCKET_JOBS = 3;
 
+function orderHasCustomWork(order) {
+  const parsed = parseServicesValue(order?.servicesRequested || "");
+  return !!(parsed.otherChecked || String(parsed.otherText || "").trim());
+}
+
 function measuredBucketKey(order) {
   const services = getOrderSelectedServices(order).slice().sort().join(" + ") || "Other";
   const glove = String(order?.gloveType || "Unknown");
@@ -13082,6 +13090,9 @@ function buildMeasuredJobStats(sessions) {
     if (minutes < MEASURED_MIN_JOB_MINUTES) continue;
     const order = allOrders.find(o => String(o.orderNumber) === orderNumber);
     if (!order) continue;
+    /* Custom ("Other") work makes the job's time unrepresentative of its
+       bucket — one bespoke glove would skew every standard suggestion. */
+    if (orderHasCustomWork(order)) continue;
     const key = measuredBucketKey(order);
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key).push(minutes);
