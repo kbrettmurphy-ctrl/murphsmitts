@@ -13215,12 +13215,20 @@ function getEstimatedJobMinutes(order, stats) {
 /* Measured pace: how many bench minutes you actually log per day lately. */
 function getMeasuredDailyPace() {
   if (!Array.isArray(moneyLaborSummaryCache)) return null;
-  const sessions = laborSessionsWithDates();
+  const sessions = laborSessionsWithDates().filter(s => s.endedMs);
+  if (!sessions.length) return null;
   const cutoff = Date.now() - PROMISE_PACE_WINDOW_DAYS * 86400000;
-  const recent = sessions.filter(s => s.endedMs && s.endedMs >= cutoff);
+  const recent = sessions.filter(s => s.endedMs >= cutoff);
   const total = recent.reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
   if (total < 300) return null; // under 5 recent hours: not enough signal
-  return total / PROMISE_PACE_WINDOW_DAYS;
+  /* Divide by days the habit has actually existed, not the full window —
+     otherwise pre-timer days dilute the pace and stretch every promise. */
+  const earliest = Math.min(...sessions.map(s => s.endedMs));
+  const effectiveDays = Math.min(
+    PROMISE_PACE_WINDOW_DAYS,
+    Math.max(7, (Date.now() - Math.max(cutoff, earliest)) / 86400000)
+  );
+  return total / effectiveDays;
 }
 
 function getPromiseProposal(order) {
@@ -13283,7 +13291,7 @@ function renderPromiseProposal() {
     target.innerHTML = `
       <span class="promise-text">MurphOS proposes <strong>${escapeHtml(p.dateLabel)}</strong> —
         ${p.queueJobs ? `${p.queueHours.toFixed(1)}h queued (${p.queueJobs} job${p.queueJobs === 1 ? "" : "s"}) + ` : ""}this job ~${p.jobHours.toFixed(1)}h (${escapeHtml(p.jobBasis)}), at ${p.paceHours.toFixed(1)}h/day ${p.paceMeasured ? "measured pace" : "default pace"} + 1 buffer day</span>
-      <button type="button" class="promise-apply-btn" data-promise-date="${escapeAttr(p.dateKey)}">Use</button>
+      <button type="button" class="secondary promise-apply-btn" data-promise-date="${escapeAttr(p.dateKey)}">Use</button>
     `;
   };
 

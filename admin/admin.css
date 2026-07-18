@@ -8032,16 +8032,10 @@ body.has-notifications .topbar-menu-btn::after{
   line-height:1.4;
 }
 .promise-text strong{ color:var(--navy); }
+/* Compact sizing only — visual language comes from the shared .secondary */
 .promise-apply-btn{
   flex-shrink:0;
   min-height:24px;
-  padding:2px 10px;
-  border:1px solid rgba(9,47,77,.25);
-  border-radius:999px;
-  background:#fff;
-  color:var(--navy);
+  padding:2px 12px;
   font-size:.7rem;
-  font-weight:600;
-  cursor:pointer;
 }
-.promise-apply-btn:hover{ background:rgba(9,47,77,.06); }
