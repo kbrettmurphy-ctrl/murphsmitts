@@ -3089,10 +3089,10 @@ function getOrderMaterialsCost(order) {
     lacePieces = orderHasRelacingService(order) ? getDefaultLacePieces(order) : 0;
   }
 
-  const laceCost = lacePieces * SHOP_ECONOMICS.laceCostPerPiece;
+  const laceCost = lacePieces * getUnitCost("lace_piece", SHOP_ECONOMICS.laceCostPerPiece);
   const palmPadCost = orderHasPalmPadService(order) ? SHOP_ECONOMICS.palmPadUnitCost : 0;
   const consumables = orderHasCleaningService(order) ? SHOP_ECONOMICS.consumablesPerCleaning : 0;
-  const packaging = SHOP_ECONOMICS.packagingPerOrder;
+  const packaging = getUnitCost("business_card", 0.41) + getUnitCost("sticker", 0.41);
 
   return {
     lacePieces,
@@ -3186,7 +3186,7 @@ function renderOrderEconomicsBody(order) {
       ${suggestionHtml}
       <div class="order-economics-lines">
         <div class="order-economics-line"><span>Price</span><span>${hasPrice ? escapeHtml(formatCurrency(Number(order.priceQuoted))) : "—"}</span></div>
-        ${m.lacePieces > 0 ? `<div class="order-economics-line"><span>Lace</span><span>${m.lacePieces} × ${escapeHtml(formatCurrency(SHOP_ECONOMICS.laceCostPerPiece))} = ${escapeHtml(formatCurrency(m.laceCost))}</span></div>` : ""}
+        ${m.lacePieces > 0 ? `<div class="order-economics-line"><span>Lace</span><span>${m.lacePieces} × ${escapeHtml(formatCurrency(getUnitCost("lace_piece", SHOP_ECONOMICS.laceCostPerPiece)))} = ${escapeHtml(formatCurrency(m.laceCost))}</span></div>` : ""}
         ${m.palmPadCost > 0 ? `<div class="order-economics-line"><span>Palm pad</span><span>${escapeHtml(formatCurrency(m.palmPadCost))}</span></div>` : ""}
         ${m.consumables > 0 ? `<div class="order-economics-line"><span>Consumables</span><span>${escapeHtml(formatCurrency(m.consumables))}</span></div>` : ""}
         ${m.packaging > 0 ? `<div class="order-economics-line"><span>Card + sticker</span><span>${escapeHtml(formatCurrency(m.packaging))}</span></div>` : ""}
@@ -3312,6 +3312,7 @@ async function renderMoneyView() {
 
   let sessions = [];
   let loadError = "";
+  warmExpensesCache();
   try {
     const data = await postJson({ action: "listLaborSummary" }, true);
     sessions = data.sessions || [];
@@ -3513,6 +3514,7 @@ function renderMoneyViewContent(sessions, loadError) {
     ${renderMoneyRollupTable("By Referral Source", "Source", byReferral)}
     ${renderMeasuredTimesTable(sessions)}
     ${renderPhaseHoursTable(sessions)}
+    ${renderExpensesCard()}
     ${renderMoneyJobsTable("Best Jobs ($/hr)", best)}
     ${worst.length ? renderMoneyJobsTable("Worst Jobs ($/hr)", worst) : ""}
   `;
@@ -13376,3 +13378,127 @@ function renderPhaseHoursTable(sessions) {
     </div>
   `;
 }
+
+/* =========================
+   EXPENSES (Phase 2.4 — Brett's design)
+   Manual shop expenses -> true profit after expenses on the Money view,
+   and dynamic unit costs: the latest purchase tagged with a unit kind
+   (lace piece / business card / sticker) teaches the economics its real
+   cost (amount / quantity). SHOP_ECONOMICS constants stay as fallbacks.
+========================= */
+
+let expensesCache = null;
+
+const EXPENSE_CATEGORIES = ["Lace", "Packaging", "Products", "Shipping Supplies", "Equipment", "Other"];
+const EXPENSE_UNIT_KINDS = [
+  { value: "", label: "No unit tracking" },
+  { value: "lace_piece", label: "Lace pieces" },
+  { value: "business_card", label: "Business cards" },
+  { value: "sticker", label: "Stickers" }
+];
+
+function getUnitCost(kind, fallback) {
+  if (!Array.isArray(expensesCache)) return fallback;
+  const latest = expensesCache.find(e => e.unitKind === kind && e.quantity > 0 && e.amount > 0);
+  return latest ? latest.amount / latest.quantity : fallback;
+}
+
+async function warmExpensesCache() {
+  if (Array.isArray(expensesCache) || !isAuthenticated()) return;
+  try {
+    const data = await postJson({ action: "listExpenses" }, true);
+    expensesCache = data.expenses || [];
+  } catch {}
+}
+setTimeout(warmExpensesCache, 3000);
+
+function renderExpensesCard() {
+  const expenses = Array.isArray(expensesCache) ? expensesCache : [];
+  const monthKey = new Date().toISOString().slice(0, 7);
+
+  const monthExpenses = expenses
+    .filter(e => String(e.expenseDate || "").startsWith(monthKey))
+    .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+  const monthOrders = allOrders.filter(o =>
+    String(o.paid || "").toLowerCase() === "paid" &&
+    String(o.dateCompleted || "").startsWith(monthKey));
+  const monthRevenue = monthOrders.reduce((sum, o) => sum + (Number(o.priceQuoted) || 0), 0);
+  const monthMaterials = monthOrders.reduce((sum, o) => sum + getOrderMaterialsCost(o).total, 0);
+  const monthProfit = monthRevenue - monthMaterials - monthExpenses;
+
+  const today = calDateKey(new Date());
+  return `
+    <div class="dashboard-card money-card" id="expensesCard">
+      <h3 class="money-card-title">Expenses</h3>
+      <div class="expense-summary">
+        This month: ${escapeHtml(formatCurrency(monthRevenue))} collected − ${escapeHtml(formatCurrency(monthMaterials))} materials − ${escapeHtml(formatCurrency(monthExpenses))} expenses =
+        <strong>${escapeHtml(formatCurrency(monthProfit))} profit</strong>
+      </div>
+      <div class="expense-form">
+        <input id="expenseDate" type="date" value="${escapeAttr(today)}" aria-label="Expense date">
+        <select id="expenseCategory" aria-label="Category">${EXPENSE_CATEGORIES.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join("")}</select>
+        <input id="expenseDescription" type="text" placeholder="Description" aria-label="Description">
+        <input id="expenseAmount" type="text" inputmode="decimal" placeholder="$" aria-label="Amount">
+        <input id="expenseQuantity" type="text" inputmode="numeric" placeholder="Qty" aria-label="Quantity">
+        <select id="expenseUnitKind" aria-label="Unit kind">${EXPENSE_UNIT_KINDS.map(k => `<option value="${escapeAttr(k.value)}">${escapeHtml(k.label)}</option>`).join("")}</select>
+        <button id="expenseAddBtn" class="secondary expense-add-btn" type="button">Add</button>
+      </div>
+      <p id="expenseStatus" class="muted expense-status"></p>
+      ${expenses.length ? `
+        <div class="money-table-wrap">
+          <table class="money-table">
+            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Unit cost</th><th></th></tr></thead>
+            <tbody>
+              ${expenses.slice(0, 20).map(e => `
+                <tr>
+                  <td>${escapeHtml(String(e.expenseDate || ""))}</td>
+                  <td>${escapeHtml(e.category || "")}</td>
+                  <td>${escapeHtml(e.description || "")}</td>
+                  <td>${escapeHtml(formatCurrency(e.amount))}</td>
+                  <td>${e.quantity > 0 && e.unitKind ? `${escapeHtml(formatCurrency(e.amount / e.quantity))}/ea` : "—"}</td>
+                  <td><button type="button" class="expense-delete-btn" data-expense-delete="${escapeAttr(e.id)}" aria-label="Delete expense">×</button></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      ` : `<p class="muted">No expenses logged yet.</p>`}
+    </div>
+  `;
+}
+
+document.addEventListener("click", async (e) => {
+  const addBtn = e.target.closest("#expenseAddBtn");
+  const delBtn = e.target.closest("[data-expense-delete]");
+  if (!addBtn && !delBtn) return;
+  const status = document.getElementById("expenseStatus");
+
+  try {
+    if (addBtn) {
+      const amount = parseFloat(String(document.getElementById("expenseAmount")?.value || "").replace(/[^0-9.]/g, ""));
+      const payload = {
+        action: "createExpense",
+        expenseDate: document.getElementById("expenseDate")?.value || "",
+        category: document.getElementById("expenseCategory")?.value || "",
+        description: document.getElementById("expenseDescription")?.value || "",
+        amount,
+        quantity: parseFloat(document.getElementById("expenseQuantity")?.value || "") || null,
+        unitKind: document.getElementById("expenseUnitKind")?.value || ""
+      };
+      if (!payload.expenseDate || !Number.isFinite(amount) || amount <= 0) {
+        if (status) status.textContent = "Date and a positive amount are required.";
+        return;
+      }
+      await postJson(payload, true);
+    } else {
+      if (!window.confirm("Delete this expense?")) return;
+      await postJson({ action: "deleteExpense", id: delBtn.dataset.expenseDelete }, true);
+    }
+    const data = await postJson({ action: "listExpenses" }, true);
+    expensesCache = data.expenses || [];
+    if (activeView === "money") renderMoneyView();
+  } catch (err) {
+    if (status) status.textContent = err.message || "Expense action failed.";
+  }
+});

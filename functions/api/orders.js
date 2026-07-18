@@ -1540,6 +1540,63 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "listExpenses") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const resp = await supabaseFetch(env, `/rest/v1/shop_expenses?select=*&order=expense_date.desc,created_at.desc&limit=500`);
+      if (!resp.ok) return json({ ok: false, error: "Expenses could not be loaded." }, 200, jsonHeaders);
+      return json({
+        ok: true,
+        expenses: (resp.data || []).map(row => ({
+          id: row.id,
+          expenseDate: row.expense_date,
+          category: row.category,
+          description: row.description,
+          amount: row.amount != null ? Number(row.amount) : 0,
+          quantity: row.quantity != null ? Number(row.quantity) : null,
+          unitKind: row.unit_kind
+        }))
+      }, 200, jsonHeaders);
+    }
+
+    if (action === "createExpense") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const amount = Number(body.amount);
+      const expenseDate = cleanText(body.expenseDate);
+      const category = cleanText(body.category);
+      if (!expenseDate || !category || !Number.isFinite(amount) || amount <= 0) {
+        return json({ ok: false, error: "Expense needs a date, category, and amount." }, 200, jsonHeaders);
+      }
+      const quantity = Number(body.quantity);
+      const resp = await supabaseFetch(env, `/rest/v1/shop_expenses`, {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          expense_date: expenseDate,
+          category,
+          description: cleanText(body.description) || null,
+          amount,
+          quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : null,
+          unit_kind: cleanText(body.unitKind) || null
+        })
+      });
+      if (!resp.ok) return json({ ok: false, error: "Expense could not be saved." }, 200, jsonHeaders);
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
+    if (action === "deleteExpense") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const id = cleanText(body.id);
+      if (!id) return json({ ok: false, error: "Missing expense id." }, 200, jsonHeaders);
+      const resp = await supabaseFetch(env, `/rest/v1/shop_expenses?id=eq.${encodeURIComponent(id)}`, {
+        method: "DELETE", headers: { Prefer: "return=minimal" }
+      });
+      if (!resp.ok) return json({ ok: false, error: "Expense could not be deleted." }, 200, jsonHeaders);
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
     if (action === "setGalleryPhotoCover") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) return json(auth, 200, jsonHeaders);
