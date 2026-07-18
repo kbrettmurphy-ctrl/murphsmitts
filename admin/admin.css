@@ -7998,3 +7998,23 @@ body.has-notifications .topbar-menu-btn::after{
   cursor:pointer;
 }
 .cal-tag-undated{ background:rgba(2,11,18,.08); color:rgba(2,11,18,.6); }
+
+/* Measured pricing (2.1): suggestion basis line + bucket status tags */
+.order-economics-basis{
+  font-size:.68rem;
+  color:rgba(2,11,18,.45);
+  margin-top:1px;
+}
+.measured-tag{
+  font-size:.65rem;
+  font-weight:600;
+  padding:2px 8px;
+  border-radius:999px;
+  background:rgba(2,11,18,.07);
+  color:rgba(2,11,18,.55);
+  white-space:nowrap;
+}
+.measured-tag-live{
+  background:rgba(30,107,52,.12);
+  color:#1e6b34;
+}
