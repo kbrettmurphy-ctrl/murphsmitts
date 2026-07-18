@@ -3312,7 +3312,7 @@ async function renderMoneyView() {
 
   let sessions = [];
   let loadError = "";
-  warmExpensesCache();
+  await warmExpensesCache();
   try {
     const data = await postJson({ action: "listLaborSummary" }, true);
     sessions = data.sessions || [];
