@@ -5708,7 +5708,7 @@ function wrapEmailHtmlSplit(beforeThanks, afterThanks, includeReview, trackUrl) 
     ${includeReview ? reviewHtml() : ""}
     ${trackUrl ? `
     <div style="margin:20px 0;">
-      <a href="${trackUrl}" style="display:inline-block; background:#092f4d; color:#ffffff; text-decoration:none; font-weight:bold; font-size:14px; padding:10px 20px; border-radius:999px;">Track your glove</a>
+      <a href="${trackUrl}" style="display:inline-block; background:#092f4d; color:#ffffff; text-decoration:none; font-weight:bold; font-size:12px; padding:7px 15px; border-radius:999px;">Track your glove</a>
     </div>` : ""}
     <div style="white-space:pre-wrap; margin:16px 0 0;">${escapeHtml(afterThanks)}</div>
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px; border-top:1px solid #e6e1d6; width:100%;"><tr>
