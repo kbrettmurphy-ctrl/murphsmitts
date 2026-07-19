@@ -8096,3 +8096,32 @@ body.has-notifications .topbar-menu-btn::after{
 /* Monthly P&L: profit column carries the verdict */
 .pnl-positive{ font-weight:600; color:#1e6b34; }
 .pnl-negative{ font-weight:600; color:#921a24; }
+
+/* Glove service records (3.1) — per-glove history inside the profile */
+.glove-record{
+  padding-top:12px;
+  margin-top:12px;
+  border-top:1px solid rgba(9,47,77,.12);
+}
+.glove-record-head{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:6px;
+}
+.glove-record-name{
+  font-size:.9rem;
+  font-weight:700;
+  color:var(--navy);
+}
+.glove-record-type{
+  font-weight:500;
+  color:rgba(2,11,18,.5);
+  font-size:.78rem;
+}
+.glove-record-meta{
+  font-size:.7rem;
+  color:rgba(2,11,18,.5);
+  white-space:nowrap;
+}

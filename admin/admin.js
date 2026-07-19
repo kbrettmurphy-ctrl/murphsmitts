@@ -12680,6 +12680,30 @@ function renderCustomersView() {
   wireCustomersPanel(panel);
 }
 
+/* Glove Service Records (3.1): within a customer, orders sharing a
+   normalized brand/model + glove type are one glove's history. Derived,
+   like customers themselves — no schema, self-maintaining. */
+function customerGloveKey(order) {
+  const brand = String(order.brandModel || "").trim().toLowerCase().replace(/\s+/g, " ");
+  return `${brand || "unknown"}|${String(order.gloveType || "").trim().toLowerCase()}`;
+}
+
+function groupCustomerGloves(orders) {
+  const gloves = new Map();
+  orders.forEach(o => {
+    const key = customerGloveKey(o);
+    if (!gloves.has(key)) {
+      gloves.set(key, {
+        label: String(o.brandModel || "").trim() || String(o.gloveType || "Glove"),
+        gloveType: String(o.gloveType || ""),
+        orders: []
+      });
+    }
+    gloves.get(key).orders.push(o);
+  });
+  return [...gloves.values()];
+}
+
 function renderCustomerProfile(panel, count, c) {
   if (count) count.textContent = c.name;
 
@@ -12692,9 +12716,7 @@ function renderCustomerProfile(panel, count, c) {
     ? `<p class="customer-contact">${contactBits.join(`<span class="customer-contact-sep"> · </span>`)}</p>`
     : "";
 
-  const photos = c.orders
-    .flatMap(o => (Array.isArray(o.glovePhotos) ? o.glovePhotos : []).map(url => ({ url, orderNumber: o.orderNumber })))
-    .slice(0, 12);
+  const gloves = groupCustomerGloves(c.orders);
 
   panel.innerHTML = `
     <div class="dashboard-shell">
@@ -12706,33 +12728,46 @@ function renderCustomerProfile(panel, count, c) {
       </div>
       <div class="customer-stats">
         <div class="customer-stat"><span class="customer-stat-value">${c.orderCount}</span><span class="customer-stat-label">Orders</span></div>
+        <div class="customer-stat"><span class="customer-stat-value">${gloves.length}</span><span class="customer-stat-label">Glove${gloves.length === 1 ? "" : "s"}</span></div>
         <div class="customer-stat"><span class="customer-stat-value">$${c.lifetimePaid.toLocaleString()}</span><span class="customer-stat-label">Lifetime</span></div>
         ${c.pendingCount ? `<div class="customer-stat"><span class="customer-stat-value">${c.pendingCount}</span><span class="customer-stat-label">Unpaid</span></div>` : ""}
         ${c.favoriteLace ? `<div class="customer-stat"><span class="customer-stat-value customer-stat-lace">${escapeHtml(c.favoriteLace)}</span><span class="customer-stat-label">Go-to lace</span></div>` : ""}
       </div>
-      ${photos.length ? `
-        <div class="customer-photo-strip">
-          ${photos.map(p => `
-            <button class="customer-photo" type="button" data-customer-order="${escapeAttr(String(p.orderNumber))}" aria-label="Open order ${escapeAttr(String(p.orderNumber))}">
-              <img src="${escapeAttr(p.url)}" alt="Glove photo" loading="lazy">
+      ${gloves.map(g => {
+        const first = g.orders[g.orders.length - 1];
+        const photos = g.orders
+          .flatMap(o => (Array.isArray(o.glovePhotos) ? o.glovePhotos : []).map(url => ({ url, orderNumber: o.orderNumber })))
+          .slice(0, 8);
+        return `
+        <div class="glove-record">
+          <div class="glove-record-head">
+            <span class="glove-record-name">${escapeHtml(g.label)}${g.gloveType && g.label !== g.gloveType ? ` <span class="glove-record-type">· ${escapeHtml(g.gloveType)}</span>` : ""}</span>
+            <span class="glove-record-meta">${g.orders.length} service${g.orders.length === 1 ? "" : "s"}${first ? ` · since ${customerDisplayDate(first.timestampSubmitted || first.dateCompleted)}` : ""}</span>
+          </div>
+          ${photos.length ? `
+            <div class="customer-photo-strip">
+              ${photos.map(p => `
+                <button class="customer-photo" type="button" data-customer-order="${escapeAttr(String(p.orderNumber))}" aria-label="Open order ${escapeAttr(String(p.orderNumber))}">
+                  <img src="${escapeAttr(p.url)}" alt="Glove photo" loading="lazy">
+                </button>
+              `).join("")}
+            </div>
+          ` : ""}
+          ${g.orders.map(o => `
+            <button class="customer-order-row" type="button" data-customer-order="${escapeAttr(String(o.orderNumber))}">
+              <span class="customer-row-main">
+                <span class="customer-row-name">#${escapeHtml(String(o.orderNumber))} · ${escapeHtml(getOrderSelectedServices(o).join(" + ") || o.status || "Service")}</span>
+                <span class="customer-row-sub">${escapeHtml([customerDisplayDate(o.timestampSubmitted || o.dateCompleted), [o.primaryLaceColor ? adminLaceLabel(o.primaryLaceColor) : "", o.secondaryLaceColor ? adminLaceLabel(o.secondaryLaceColor) : ""].filter(Boolean).join("/"), o.status].filter(Boolean).join(" · "))}</span>
+              </span>
+              <span class="customer-row-side">
+                ${o.priceQuoted ? `<span class="customer-row-spend">$${Number(o.priceQuoted).toLocaleString()}</span>` : ""}
+                <span class="customer-row-chevron" aria-hidden="true">›</span>
+              </span>
             </button>
           `).join("")}
         </div>
-      ` : ""}
-      <div class="customer-orders">
-        ${c.orders.map(o => `
-          <button class="customer-order-row" type="button" data-customer-order="${escapeAttr(String(o.orderNumber))}">
-            <span class="customer-row-main">
-              <span class="customer-row-name">#${escapeHtml(String(o.orderNumber))} · ${escapeHtml(o.brandModel || o.gloveType || "Glove")}</span>
-              <span class="customer-row-sub">${escapeHtml([customerDisplayDate(o.timestampSubmitted || o.dateCompleted), o.primaryLaceColor ? adminLaceLabel(o.primaryLaceColor) : "", o.status].filter(Boolean).join(" · "))}</span>
-            </span>
-            <span class="customer-row-side">
-              ${o.priceQuoted ? `<span class="customer-row-spend">$${Number(o.priceQuoted).toLocaleString()}</span>` : ""}
-              <span class="customer-row-chevron" aria-hidden="true">›</span>
-            </span>
-          </button>
-        `).join("")}
-      </div>
+        `;
+      }).join("")}
     </div>
     </div>
   `;
