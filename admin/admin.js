@@ -12680,6 +12680,25 @@ function renderCustomersView() {
   wireCustomersPanel(panel);
 }
 
+/* Curated gallery photos by order — the "after" shots for service records. */
+let customerGalleryLinksCache = null;
+
+function warmCustomerGalleryLinks() {
+  if (customerGalleryLinksCache) return;
+  customerGalleryLinksCache = {};
+  postJson({ action: "listGalleryPhotos" }, true).then(data => {
+    const byOrder = {};
+    Object.entries(data.photoLinks || {}).forEach(([url, orderNumber]) => {
+      if (!byOrder[orderNumber]) byOrder[orderNumber] = [];
+      /* covers lead so the record opens on the glove's best shot */
+      if ((data.photoCovers || {})[url]) byOrder[orderNumber].unshift(url);
+      else byOrder[orderNumber].push(url);
+    });
+    customerGalleryLinksCache = byOrder;
+    if (activeView === "customers" && activeCustomerKey) renderCustomersView();
+  }).catch(() => {});
+}
+
 /* Glove Service Records (3.1): within a customer, orders sharing a
    normalized brand/model + glove type are one glove's history. Derived,
    like customers themselves — no schema, self-maintaining. */
@@ -12706,6 +12725,7 @@ function groupCustomerGloves(orders) {
 
 function renderCustomerProfile(panel, count, c) {
   if (count) count.textContent = c.name;
+  warmCustomerGalleryLinks();
 
   const contactBits = [
     ...[...c.phones.values()].map(p => `<a class="customer-contact-link" href="tel:${escapeAttr(p.replace(/[^+\d]/g, ""))}">${escapeHtml(p)}</a>`),
@@ -12735,9 +12755,11 @@ function renderCustomerProfile(panel, count, c) {
       </div>
       ${gloves.map(g => {
         const first = g.orders[g.orders.length - 1];
-        const photos = g.orders
-          .flatMap(o => (Array.isArray(o.glovePhotos) ? o.glovePhotos : []).map(url => ({ url, orderNumber: o.orderNumber })))
-          .slice(0, 8);
+        const galleryByOrder = customerGalleryLinksCache || {};
+        const photos = [
+          ...g.orders.flatMap(o => (galleryByOrder[String(o.orderNumber)] || []).map(url => ({ url, orderNumber: o.orderNumber }))),
+          ...g.orders.flatMap(o => (Array.isArray(o.glovePhotos) ? o.glovePhotos : []).map(url => ({ url, orderNumber: o.orderNumber })))
+        ].slice(0, 8);
         return `
         <div class="glove-record">
           <div class="glove-record-head">
