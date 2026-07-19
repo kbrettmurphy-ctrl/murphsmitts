@@ -13437,7 +13437,7 @@ function renderExpensesCard() {
   const monthKey = new Date().toISOString().slice(0, 7);
 
   const monthExpenses = expenses
-    .filter(e => String(e.expenseDate || "").startsWith(monthKey))
+    .filter(e => !e.unitKind && String(e.expenseDate || "").startsWith(monthKey))
     .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
   const monthOrders = allOrders.filter(o =>
@@ -13452,7 +13452,7 @@ function renderExpensesCard() {
     <div class="dashboard-card money-card" id="expensesCard">
       <h3 class="money-card-title">Expenses</h3>
       <div class="expense-summary">
-        This month: ${escapeHtml(formatCurrency(monthRevenue))} collected − ${escapeHtml(formatCurrency(monthMaterials))} materials − ${escapeHtml(formatCurrency(monthExpenses))} expenses =
+        This month: ${escapeHtml(formatCurrency(monthRevenue))} collected − ${escapeHtml(formatCurrency(monthMaterials))} materials − ${escapeHtml(formatCurrency(monthExpenses))} overhead =
         <strong>${escapeHtml(formatCurrency(monthProfit))} profit</strong>
       </div>
       <div class="expense-form">
@@ -13552,7 +13552,11 @@ function renderMonthlyPnlTable() {
     m.materials += getOrderMaterialsCost(o).total;
   });
 
+  /* Unit-tagged purchases (lace, cards, stickers, consumables) already
+     reach the table as allocated Materials — counting the purchase too
+     would double-dip. Only untagged expenses are overhead. */
   (Array.isArray(expensesCache) ? expensesCache : []).forEach(e => {
+    if (e.unitKind) return;
     const key = String(e.expenseDate || "").slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(key)) return;
     slot(key).expenses += Number(e.amount) || 0;
@@ -13567,7 +13571,7 @@ function renderMonthlyPnlTable() {
       <div class="money-table-wrap">
         <table class="money-table">
           <thead>
-            <tr><th>Month</th><th>Collected</th><th>Materials</th><th>Expenses</th><th>Profit</th></tr>
+            <tr><th>Month</th><th>Collected</th><th>Materials</th><th>Overhead</th><th>Profit</th></tr>
           </thead>
           <tbody>
             ${rows.map(([key, m]) => {
