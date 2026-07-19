@@ -3091,7 +3091,7 @@ function getOrderMaterialsCost(order) {
 
   const laceCost = lacePieces * getUnitCost("lace_piece", SHOP_ECONOMICS.laceCostPerPiece);
   const palmPadCost = orderHasPalmPadService(order) ? SHOP_ECONOMICS.palmPadUnitCost : 0;
-  const consumables = orderHasCleaningService(order) ? SHOP_ECONOMICS.consumablesPerCleaning : 0;
+  const consumables = orderHasCleaningService(order) ? getConsumablesPerGlove() : 0;
   const packaging = getUnitCost("business_card", 0.41) + getUnitCost("sticker", 0.41);
 
   return {
@@ -13388,14 +13388,33 @@ function renderPhaseHoursTable(sessions) {
 ========================= */
 
 let expensesCache = null;
+let expensesShowAll = false;
 
 const EXPENSE_CATEGORIES = ["Lace", "Packaging", "Products", "Shipping Supplies", "Equipment", "Other"];
 const EXPENSE_UNIT_KINDS = [
   { value: "", label: "No unit tracking" },
   { value: "lace_piece", label: "Lace pieces" },
   { value: "business_card", label: "Business cards" },
-  { value: "sticker", label: "Stickers" }
+  { value: "sticker", label: "Stickers" },
+  { value: "consumable", label: "Consumable (per-glove burn)" }
 ];
+
+/* Consumables cost per glove: trailing-12-month tagged spend / gloves
+   cleaned in the same window. Measured burn, not a guess — and homemade
+   product ingredients flow in with no per-bottle bookkeeping. */
+function getConsumablesPerGlove() {
+  if (!Array.isArray(expensesCache)) return SHOP_ECONOMICS.consumablesPerCleaning;
+  const cutoff = Date.now() - 365 * 86400000;
+  const spend = expensesCache
+    .filter(e => e.unitKind === "consumable" && new Date(e.expenseDate).getTime() >= cutoff)
+    .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  if (!spend) return SHOP_ECONOMICS.consumablesPerCleaning;
+  const cleaned = allOrders.filter(o =>
+    orderHasCleaningService(o) &&
+    o.dateCompleted && new Date(o.dateCompleted).getTime() >= cutoff).length;
+  if (cleaned < 10) return SHOP_ECONOMICS.consumablesPerCleaning;
+  return spend / cleaned;
+}
 
 function getUnitCost(kind, fallback) {
   if (!Array.isArray(expensesCache)) return fallback;
@@ -13450,23 +13469,30 @@ function renderExpensesCard() {
           <table class="money-table">
             <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Unit cost</th><th></th></tr></thead>
             <tbody>
-              ${expenses.slice(0, 20).map(e => `
+              ${(expensesShowAll ? expenses : expenses.slice(0, 20)).map(e => `
                 <tr>
                   <td>${escapeHtml(String(e.expenseDate || ""))}</td>
                   <td>${escapeHtml(e.category || "")}</td>
                   <td>${escapeHtml(e.description || "")}</td>
                   <td>${escapeHtml(formatCurrency(e.amount))}</td>
-                  <td>${e.quantity > 0 && e.unitKind ? `${escapeHtml(formatCurrency(e.amount / e.quantity))}/ea` : "—"}</td>
+                  <td>${e.unitKind === "consumable" ? "burn" : (e.quantity > 0 && e.unitKind ? `${escapeHtml(formatCurrency(e.amount / e.quantity))}/ea` : "—")}</td>
                   <td><button type="button" class="expense-delete-btn" data-expense-delete="${escapeAttr(e.id)}" aria-label="Delete expense">×</button></td>
                 </tr>
               `).join("")}
             </tbody>
           </table>
         </div>
+        ${expenses.length > 20 ? `<button type="button" class="detail-show-on-map-link" id="expensesShowAllBtn">${expensesShowAll ? "Show fewer" : `Show all (${expenses.length})`}</button>` : ""}
       ` : `<p class="muted">No expenses logged yet.</p>`}
     </div>
   `;
 }
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#expensesShowAllBtn")) return;
+  expensesShowAll = !expensesShowAll;
+  if (activeView === "money") renderMoneyView();
+});
 
 document.addEventListener("click", async (e) => {
   const addBtn = e.target.closest("#expenseAddBtn");
