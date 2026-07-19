@@ -2830,6 +2830,7 @@ function renderStatusDelivery(order) {
       <div class="status-delivery-actions">
         <button id="resendStatusEmailBtn" class="secondary status-delivery-btn" type="button" ${emailAvailable ? "" : "disabled"}>Send Email Again</button>
         <button id="resendStatusTextBtn" class="secondary status-delivery-btn" type="button" ${textAvailable ? "" : "disabled"}>Send Text Again</button>
+        <button id="copyTrackingLinkBtn" class="secondary status-delivery-btn" type="button" ${order.trackingToken ? "" : "disabled"}>Copy Tracking Link</button>
       </div>
       <p id="statusDeliveryMessage" class="status-delivery-message" aria-live="polite"></p>
     </div>
@@ -13651,3 +13652,22 @@ function renderMonthlyPnlTable() {
     </div>
   `;
 }
+
+
+/* Tracking page (3.2): one-tap copy of the customer's tokenized link. */
+document.addEventListener("click", async (e) => {
+  if (!e.target.closest("#copyTrackingLinkBtn")) return;
+  const token = currentOrder?.trackingToken;
+  if (!token) return;
+  const url = `https://murphsmitts.com/track/?t=${token}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    e.target.textContent = "Copied!";
+    setTimeout(() => {
+      const btn = document.getElementById("copyTrackingLinkBtn");
+      if (btn) btn.textContent = "Copy Tracking Link";
+    }, 1600);
+  } catch {
+    window.prompt("Tracking link:", url);
+  }
+});

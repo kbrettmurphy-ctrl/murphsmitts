@@ -1964,3 +1964,84 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
   .brand-text{ font-size: 11.5px; }
   .mm-final-actions, .cta{ flex-direction: column; gap: 14px; }
 }
+
+/* --------------------------------------------------------------------------
+   Track page (3.2) — pizza-tracker timeline in the site's language
+   -------------------------------------------------------------------------- */
+.track-page{ max-width: 720px; }
+.track-intro{ margin-bottom: 28px; }
+
+.track-timeline{
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  display: flex;
+  gap: 4px;
+}
+.track-step{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  position: relative;
+}
+.track-step::before{
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: -50%;
+  width: 100%;
+  height: 2px;
+  background: var(--hairline);
+}
+.track-step:first-child::before{ display: none; }
+.track-step.is-done::before,
+.track-step.is-current::before{ background: var(--navy); }
+.track-dot{
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--hairline);
+  z-index: 1;
+}
+.track-step.is-done .track-dot{
+  background: var(--navy);
+  border-color: var(--navy);
+}
+.track-step.is-current .track-dot{
+  border-color: var(--navy);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px rgba(9,47,77,.15);
+}
+.track-step-label{
+  font-size: 11px;
+  font-weight: 560;
+  color: var(--faint);
+  text-align: center;
+  line-height: 1.2;
+}
+.track-step.is-done .track-step-label,
+.track-step.is-current .track-step-label{ color: var(--navy); }
+
+.track-promise{
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 8px;
+}
+.track-shipping{
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.track-photos-intro{ margin: 28px 0 14px; }
+.track-photos-title{ font-size: 20px; }
+.track-contact{ margin-top: 28px; }
+
+@media (max-width: 480px){
+  .track-step-label{ font-size: 9.5px; }
+  .track-page .gallery-thumb{ width: 44vw; }
+}

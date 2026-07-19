@@ -1,0 +1,141 @@
+---
+layout: default
+title: Track Your Glove
+description: Follow your glove through the shop — status, photos, and estimated completion from Murph’s Mitt Maintenance.
+nav: track
+body_class: inner
+---
+
+<main class="container page page-under-header track-page">
+  <div id="trackStatus" class="mm-status-message">Looking up your glove...</div>
+
+  <div id="trackContent" hidden>
+    <header class="mm-section-intro track-intro">
+      <p class="mm-eyebrow">Order <span id="trackOrderNum"></span></p>
+      <h1 class="mm-section-title" id="trackTitle"></h1>
+      <p class="mm-section-copy" id="trackGreeting"></p>
+    </header>
+
+    <ol class="track-timeline" id="trackTimeline"></ol>
+
+    <p class="track-promise" id="trackPromise"></p>
+    <p class="track-shipping" id="trackShipping" hidden></p>
+
+    <section id="trackPhotosSection" hidden>
+      <div class="mm-section-intro track-photos-intro">
+        <h2 class="mm-section-title track-photos-title">The finished work</h2>
+      </div>
+      <div class="gallery-strip" id="trackPhotos" data-gallery-group="track"></div>
+    </section>
+
+    <p class="track-contact note">Questions about your order? Email
+      <a class="content-link" href="mailto:murphsmitts@gmail.com">murphsmitts@gmail.com</a>.</p>
+  </div>
+
+  <div class="lightbox" aria-hidden="true">
+    <button class="lb-close" aria-label="Close">×</button>
+    <button class="lb-prev" aria-label="Previous image">←</button>
+    <div class="lb-viewport"><div class="lb-track"></div></div>
+    <button class="lb-next" aria-label="Next image">→</button>
+    <div class="lb-hint" aria-hidden="true"><span class="lb-counter"></span></div>
+  </div>
+</main>
+
+<script>
+(() => {
+  const statusEl = document.getElementById("trackStatus");
+  const content = document.getElementById("trackContent");
+  const token = new URLSearchParams(location.search).get("t") || "";
+
+  const STAGES = ["Received", "Estimate", "Approved", "In the Shop", "Ready", "Complete"];
+
+  function esc(v) {
+    return String(v || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function fmtDate(v) {
+    if (!v) return "";
+    const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return "";
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+      .toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  }
+
+  function carrierLink(carrier, num) {
+    const n = encodeURIComponent(num);
+    if (/ups/i.test(carrier)) return `https://www.ups.com/track?tracknum=${n}`;
+    if (/fedex/i.test(carrier)) return `https://www.fedex.com/fedextrack/?trknbr=${n}`;
+    if (/usps/i.test(carrier)) return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${n}`;
+    return "";
+  }
+
+  async function load() {
+    if (!token) {
+      statusEl.textContent = "This tracking link is missing its code. Check the link from your confirmation message.";
+      return;
+    }
+    try {
+      const res = await fetch(`/api/track?t=${encodeURIComponent(token)}`);
+      if (!res.ok) throw new Error();
+      const o = await res.json();
+      if (!o.ok) throw new Error();
+      render(o);
+    } catch {
+      statusEl.textContent = "We couldn't find an order for this link. Double-check the link from your confirmation message, or email murphsmitts@gmail.com.";
+    }
+  }
+
+  function render(o) {
+    statusEl.hidden = true;
+    content.hidden = false;
+
+    document.getElementById("trackOrderNum").textContent = `#${o.orderNumber}`;
+    document.getElementById("trackTitle").textContent =
+      [o.brandModel, o.gloveType].filter(Boolean).join(" · ") || "Your glove";
+    document.getElementById("trackGreeting").textContent =
+      `Hey ${o.firstName} — here's where your glove is right now.`;
+
+    const done = o.stage >= 6;
+    document.getElementById("trackTimeline").innerHTML = STAGES.map((label, i) => {
+      const n = i + 1;
+      const state = n < o.stage ? "is-done" : n === o.stage ? "is-current" : "";
+      const text = n === 6 && done ? (o.shipped ? "On its way back" : "Picked up") : label;
+      return `<li class="track-step ${state}"><span class="track-dot"></span><span class="track-step-label">${esc(text)}</span></li>`;
+    }).join("");
+
+    const promise = document.getElementById("trackPromise");
+    if (done) {
+      promise.textContent = o.dateCompleted ? `Finished ${fmtDate(o.dateCompleted)}.` : "";
+    } else if (o.stage >= 5) {
+      promise.textContent = o.shipped
+        ? "Your glove is finished and will ship soon."
+        : "Your glove is finished and ready for pickup.";
+    } else if (o.estimatedCompletion) {
+      promise.textContent = `Estimated completion: ${fmtDate(o.estimatedCompletion)}.`;
+    } else {
+      promise.textContent = "An estimated completion date will appear here once the work is scheduled.";
+    }
+
+    if (o.trackingNumber) {
+      const el = document.getElementById("trackShipping");
+      const url = carrierLink(o.carrier, o.trackingNumber);
+      el.hidden = false;
+      el.innerHTML = url
+        ? `${esc(o.carrier || "Carrier")} tracking: <a class="content-link" href="${esc(url)}" target="_blank" rel="noopener">${esc(o.trackingNumber)}</a>`
+        : `${esc(o.carrier || "Carrier")} tracking: ${esc(o.trackingNumber)}`;
+    }
+
+    if (Array.isArray(o.photos) && o.photos.length) {
+      document.getElementById("trackPhotosSection").hidden = false;
+      document.getElementById("trackPhotos").innerHTML = o.photos.map((url, i) => `
+        <button class="gallery-thumb" type="button" data-gallery-group="track" data-gallery-index="${i}"
+          aria-label="Open photo ${i + 1}">
+          <img src="${esc(url)}" alt="Finished glove photo ${i + 1}" loading="lazy" decoding="async">
+        </button>
+      `).join("");
+    }
+  }
+
+  load();
+})();
+</script>
