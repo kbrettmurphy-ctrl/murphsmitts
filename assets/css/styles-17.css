@@ -2045,3 +2045,13 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
   .track-step-label{ font-size: 9.5px; }
   .track-page .gallery-thumb{ width: 44vw; }
 }
+
+/* Track page: contextual status note under the timeline */
+.track-status-note{
+  font-size: 13.5px;
+  color: var(--muted);
+  background: var(--tint);
+  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+  margin-bottom: 12px;
+}

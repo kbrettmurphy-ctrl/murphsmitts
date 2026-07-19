@@ -18,6 +18,7 @@ body_class: inner
 
     <ol class="track-timeline" id="trackTimeline"></ol>
 
+    <p class="track-status-note" id="trackNote" hidden></p>
     <p class="track-promise" id="trackPromise"></p>
     <p class="track-shipping" id="trackShipping" hidden></p>
 
@@ -102,6 +103,18 @@ body_class: inner
       const text = n === 6 && done ? (o.shipped ? "On its way back" : "Picked up") : label;
       return `<li class="track-step ${state}"><span class="track-dot"></span><span class="track-step-label">${esc(text)}</span></li>`;
     }).join("");
+
+    const NOTES = {
+      "Waiting on Lace/Parts": "Waiting on lace or parts to arrive — work picks right back up as soon as they're in.",
+      "On Hold": "This order is on hold for the moment — check your messages from Brett for details.",
+      "In Transit to Me": "Your glove is on its way to the shop.",
+      "Pending Response": "Waiting to hear back from you on the estimate — check your email."
+    };
+    const note = document.getElementById("trackNote");
+    if (NOTES[o.status]) {
+      note.hidden = false;
+      note.textContent = NOTES[o.status];
+    }
 
     const promise = document.getElementById("trackPromise");
     if (done) {
