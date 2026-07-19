@@ -3515,6 +3515,7 @@ function renderMoneyViewContent(sessions, loadError) {
     ${renderMeasuredTimesTable(sessions)}
     ${renderPhaseHoursTable(sessions)}
     ${renderExpensesCard()}
+    ${renderMonthlyPnlTable()}
     ${renderMoneyJobsTable("Best Jobs ($/hr)", best)}
     ${worst.length ? renderMoneyJobsTable("Worst Jobs ($/hr)", worst) : ""}
   `;
@@ -13528,3 +13529,64 @@ document.addEventListener("click", async (e) => {
     if (status) status.textContent = err.message || "Expense action failed.";
   }
 });
+
+/* =========================
+   MONTHLY P&L — one row per month: collected − materials − expenses =
+   profit. Materials use today's rates (same live lens as everything else);
+   the expenses table remains the historical ledger.
+========================= */
+
+function renderMonthlyPnlTable() {
+  const months = new Map(); // YYYY-MM -> { revenue, materials, expenses }
+  const slot = key => {
+    if (!months.has(key)) months.set(key, { revenue: 0, materials: 0, expenses: 0 });
+    return months.get(key);
+  };
+
+  allOrders.forEach(o => {
+    if (String(o.paid || "").toLowerCase() !== "paid") return;
+    const key = String(o.dateCompleted || "").slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(key)) return;
+    const m = slot(key);
+    m.revenue += Number(o.priceQuoted) || 0;
+    m.materials += getOrderMaterialsCost(o).total;
+  });
+
+  (Array.isArray(expensesCache) ? expensesCache : []).forEach(e => {
+    const key = String(e.expenseDate || "").slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(key)) return;
+    slot(key).expenses += Number(e.amount) || 0;
+  });
+
+  if (!months.size) return "";
+  const rows = [...months.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 14);
+
+  return `
+    <div class="dashboard-card money-card">
+      <h3 class="money-card-title">Monthly P&amp;L</h3>
+      <div class="money-table-wrap">
+        <table class="money-table">
+          <thead>
+            <tr><th>Month</th><th>Collected</th><th>Materials</th><th>Expenses</th><th>Profit</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(([key, m]) => {
+              const profit = m.revenue - m.materials - m.expenses;
+              const label = new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, 1)
+                .toLocaleDateString(undefined, { month: "short", year: "numeric" });
+              return `
+                <tr>
+                  <td>${escapeHtml(label)}</td>
+                  <td>${escapeHtml(formatCurrency(m.revenue))}</td>
+                  <td>${escapeHtml(formatCurrency(m.materials))}</td>
+                  <td>${escapeHtml(formatCurrency(m.expenses))}</td>
+                  <td class="${profit < 0 ? "pnl-negative" : "pnl-positive"}">${escapeHtml(formatCurrency(profit))}</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
