@@ -307,9 +307,14 @@ function buildGloveIncomingList(body) {
   }));
 }
 
+function makeTrackingToken() {
+  return (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, "");
+}
+
 function buildOrderRow(shared, glove, orderNumber, submittedAt) {
   return {
     timestamp_submitted: submittedAt,
+    tracking_token: makeTrackingToken(),
     customer_name: shared.customer_name,
     phone_number: shared.phone_number,
     email_address: shared.email_address,
@@ -514,8 +519,12 @@ New Status: ${statusDisplay}
 
 ${msg}`;
 
+  const trackLine = row.tracking_token
+    ? `\nTrack your glove anytime: https://murphsmitts.com/track/?t=${row.tracking_token}\n`
+    : "";
+
   const afterThanks =
-`${THANKS_LINE}
+`${trackLine}${THANKS_LINE}
 
 -Brett`;
 
@@ -878,7 +887,8 @@ async function sendReceivedText(env, row) {
   const body =
     `Murph's Mitts: I received your glove service request (#${orderNum}). ` +
     `I'll review the details and send an estimate by email. ` +
-    `If you'd like, you can reply to this text with photos of your glove to help me evaluate it.`;
+    `If you'd like, you can reply to this text with photos of your glove to help me evaluate it.` +
+    (row.tracking_token ? ` Track your glove anytime: https://murphsmitts.com/track/?t=${row.tracking_token}` : "");
 
   return await sendTwilioText(env, to, body);
 }

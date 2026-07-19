@@ -3360,6 +3360,7 @@ async function createOrderAction(env, body) {
         phoneNumber,
         emailAddress,
         dropOffMethod,
+        tracking_token: (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, ""),
         status: cleanText(input.status) || "Received",
         paid: cleanText(input.paid) || "Unpaid",
         smsOptIn
@@ -4449,6 +4450,7 @@ function getInviteBaseUrl(env) {
 function mapOrderFromDb(row) {
   return {
     id: row.id,
+    trackingToken: row.tracking_token || "",
 
     timestampSubmitted: row.timestamp_submitted,
     customerName: row.customer_name,
@@ -5258,8 +5260,12 @@ New Status: ${statusDisplay}
 
 ${msg}`.trimEnd();
 
+  const trackLine = row.tracking_token
+    ? `\nTrack your glove anytime: https://murphsmitts.com/track/?t=${row.tracking_token}\n`
+    : "";
+
   const afterThanks =
-`${THANKS_LINE}
+`${trackLine}${THANKS_LINE}
 
 -Brett`;
 
