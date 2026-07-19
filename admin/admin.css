@@ -8125,3 +8125,25 @@ body.has-notifications .topbar-menu-btn::after{
   color:rgba(2,11,18,.5);
   white-space:nowrap;
 }
+
+/* Maintenance reminders (3.3): due list above the customer list */
+.maintenance-card{ margin-bottom:10px; }
+.maintenance-row{ cursor:default; }
+.maintenance-open{
+  border:0;
+  background:none;
+  text-align:left;
+  padding:0;
+  cursor:pointer;
+  min-width:0;
+}
+.maintenance-text-btn{
+  min-height:28px;
+  padding:3px 14px;
+  font-size:.75rem;
+  font-weight:600;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  border-radius:8px;
+}
