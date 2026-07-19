@@ -8092,3 +8092,7 @@ body.has-notifications .topbar-menu-btn::after{
   .expense-form input,
   .expense-form select{ font-size:16px; }
 }
+
+/* Monthly P&L: profit column carries the verdict */
+.pnl-positive{ font-weight:600; color:#1e6b34; }
+.pnl-negative{ font-weight:600; color:#921a24; }
