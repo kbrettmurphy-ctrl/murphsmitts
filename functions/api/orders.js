@@ -5260,14 +5260,17 @@ New Status: ${statusDisplay}
 
 ${msg}`.trimEnd();
 
-  const trackLine = row.tracking_token
-    ? `\nTrack your glove anytime: https://murphsmitts.com/track/?t=${row.tracking_token}\n`
+  const trackUrl = row.tracking_token
+    ? `https://murphsmitts.com/track/?t=${row.tracking_token}`
     : "";
 
   const afterThanks =
-`${trackLine}${THANKS_LINE}
+`${trackUrl ? `\nTrack your glove anytime: ${trackUrl}\n\n` : ""}${THANKS_LINE}
 
 -Brett`;
+
+  const afterThanksHtml =
+`${THANKS_LINE}`;
 
   const plainBody = isCompleted
     ? `${beforeThanks}\n\n${reviewText()}\n\n${afterThanks}`
@@ -5280,8 +5283,8 @@ ${msg}`.trimEnd();
       statusDisplay
     })
   : isCompleted
-    ? wrapEmailHtmlSplit(beforeThanks, afterThanks, true)
-    : wrapEmailHtmlSplit(beforeThanks, afterThanks, false);
+    ? wrapEmailHtmlSplit(beforeThanks, afterThanksHtml, true, trackUrl)
+    : wrapEmailHtmlSplit(beforeThanks, afterThanksHtml, false, trackUrl);
 
   return await sendBrandedEmail(env, {
     to: email,
@@ -5698,12 +5701,26 @@ function reviewHtml() {
   </div>`;
 }
 
-function wrapEmailHtmlSplit(beforeThanks, afterThanks, includeReview) {
+function wrapEmailHtmlSplit(beforeThanks, afterThanks, includeReview, trackUrl) {
   return `
-  <div style="font-family: Arial, sans-serif; max-width: 640px; line-height: 1.45; text-align:left;">
+  <div style="font-family: Arial, sans-serif; max-width: 640px; line-height: 1.5; text-align:left; color:#20313d;">
     <div style="white-space:pre-wrap; margin:0;">${escapeHtml(beforeThanks)}</div>
     ${includeReview ? reviewHtml() : ""}
-    <div style="white-space:pre-wrap; margin:0;">${escapeHtml(afterThanks)}</div>
+    ${trackUrl ? `
+    <div style="margin:20px 0;">
+      <a href="${trackUrl}" style="display:inline-block; background:#092f4d; color:#ffffff; text-decoration:none; font-weight:bold; font-size:14px; padding:10px 20px; border-radius:999px;">Track your glove</a>
+    </div>` : ""}
+    <div style="white-space:pre-wrap; margin:16px 0 0;">${escapeHtml(afterThanks)}</div>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px; border-top:1px solid #e6e1d6; width:100%;"><tr>
+      <td style="padding:14px 12px 0 0; width:46px; vertical-align:top;">
+        <img src="https://murphsmitts.com/assets/img/logo.png" width="42" height="42" alt="Murph's Mitt Maintenance" style="display:block;">
+      </td>
+      <td style="padding-top:14px; font-size:13px; line-height:1.5; color:#5a6a76; vertical-align:top;">
+        <strong style="color:#092f4d;">Brett Murphy</strong><br>
+        Murph's Mitt Maintenance &middot; Surf City, NC<br>
+        <a href="https://murphsmitts.com" style="color:#092f4d;">murphsmitts.com</a>
+      </td>
+    </tr></table>
   </div>`;
 }
 
