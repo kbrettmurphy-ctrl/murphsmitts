@@ -12656,8 +12656,22 @@ function renderCustomersView() {
 
   if (count) count.textContent = `${customers.length} customer${customers.length === 1 ? "" : "s"}`;
 
+  const due = buildMaintenanceDue(customers);
   panel.innerHTML = `
     <div class="dashboard-shell">
+    ${due.length ? `
+    <div class="dashboard-card customers-card maintenance-card">
+      <h3 class="money-card-title">Maintenance Due</h3>
+      ${due.slice(0, 8).map(d => `
+        <div class="customer-order-row maintenance-row">
+          <button class="customer-row-main maintenance-open" type="button" data-customer-key="${escapeAttr(d.customerKey)}">
+            <span class="customer-row-name">${escapeHtml(d.customerName)} · ${escapeHtml(d.gloveLabel)}</span>
+            <span class="customer-row-sub">${d.months} months since ${escapeHtml(d.lastServices || "last service")}</span>
+          </button>
+          ${d.smsHref ? `<a class="secondary maintenance-text-btn" href="${escapeAttr(d.smsHref)}">Text</a>` : ""}
+        </div>
+      `).join("")}
+    </div>` : ""}
     <div class="dashboard-card customers-card">
       <input id="customersSearchInput" class="customers-search" type="search"
         placeholder="Name, phone, order #" autocomplete="off" value="${escapeAttr(customersSearch)}">
@@ -13671,3 +13685,54 @@ document.addEventListener("click", async (e) => {
     window.prompt("Tracking link:", url);
   }
 });
+
+/* =========================
+   MAINTENANCE REMINDERS (3.3, lean v1)
+   Gloves whose last service was 10+ months ago, derived from service
+   records. One tap opens Messages with a personal reminder prefilled —
+   sent from Brett's own thread, not a robot. Cron automation can layer
+   on later; the revenue behavior ships now.
+========================= */
+
+const MAINTENANCE_DUE_MONTHS = 10;
+const MAINTENANCE_ACTIVE_STATUSES = new Set([
+  "Received", "Estimate Sent", "Pending Response", "Customer Approved",
+  "In Transit to Me", "In Progress", "Waiting on Lace/Parts", "On Hold", "Ready to Go"
+]);
+
+function buildMaintenanceDue(customers) {
+  const due = [];
+  const now = Date.now();
+
+  customers.forEach(c => {
+    const phone = [...c.phones.values()][0] || "";
+    for (const glove of groupCustomerGloves(c.orders)) {
+      /* skip gloves currently in the shop pipeline */
+      if (glove.orders.some(o => MAINTENANCE_ACTIVE_STATUSES.has(String(o.status || "")))) continue;
+      const last = glove.orders[0];
+      const lastDate = new Date(last.dateCompleted || last.timestampSubmitted || 0).getTime();
+      if (!lastDate) continue;
+      const months = Math.floor((now - lastDate) / (30.44 * 86400000));
+      if (months < MAINTENANCE_DUE_MONTHS) continue;
+
+      const firstName = String(c.name || "").trim().split(/\s+/)[0] || "";
+      const body =
+        `Hey ${firstName}, it's Brett with Murph's Mitt Maintenance. It's been about ` +
+        `${months} months since your ${glove.label} came through the shop — leather dries out ` +
+        `and lace stretches with a season of play. If it's due for a refresh, I'd love to ` +
+        `take care of it: https://murphsmitts.com`;
+
+      due.push({
+        customerKey: c.key,
+        customerName: c.name,
+        gloveLabel: glove.label,
+        lastServices: getOrderSelectedServices(last).join(" + "),
+        months,
+        smsHref: phone ? `sms:${phone.replace(/[^+\d]/g, "")}?&body=${encodeURIComponent(body)}` : ""
+      });
+    }
+  });
+
+  due.sort((a, b) => b.months - a.months);
+  return due;
+}
