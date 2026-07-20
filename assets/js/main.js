@@ -761,7 +761,7 @@ function initPublicLaceInventory() {
 
   const OUT_OF_STOCK_THRESHOLD = 3;
   const PHOTO_BASE_PATH = "/assets/img/lace/";
-  const PHOTO_EXTENSIONS = [".png", ".jpeg", ".jpg"];
+  const PHOTO_EXTENSIONS = [".webp", ".png", ".jpeg", ".jpg"];
   const FALLBACK_LACE_VALUE = "Discuss lace color after review";
   const LEGACY_PHOTO_SLUGS = new Map([
     ["blue - carolina", "carolinablue"],

@@ -21,7 +21,7 @@ The browser never receives the Supabase service-role key. Most admin operations 
 | Public site | root HTML, `_layouts/`, `_includes/`, `assets/` | Marketing pages, shared navigation/lightbox, service request form, lace availability |
 | Public store | `for-sale/`, `/api/gloves-for-sale` | Read-only glove listings and photo galleries |
 | Public tracking | `track/`, `/api/track` | Token-gated, customer-safe order progress and curated finished photos |
-| Admin shell | `admin/index.html`, `admin/admin.css` | SPA views and presentation |
+| Admin shell | `admin/index.html`, `admin/admin.css`, `assets/vendor/leaflet/1.9.4/` | SPA views, presentation, and locally served map library/assets |
 | Admin behavior | `admin/admin.js` | Authentication UI, demo sandbox, orders, dashboard, customers, calendar, map, labor, money, inventory, gallery, store, messages, users, PWA update/push behavior |
 | Admin API | `functions/api/orders.js` | Signed sessions, WebAuthn, action dispatch, database/storage writes, notifications, geocoding, job logic |
 | Intake | `functions/api/intake.js` | Multi-glove request validation/insertion, post-submit photos, confirmation and owner notifications |
@@ -35,6 +35,8 @@ The browser never receives the Supabase service-role key. Most admin operations 
 The admin is a single HTML/CSS/JavaScript application, not a framework build. Its views are Clubhouse, Orders and Order Detail, Customers, Calendar, Map, Money, Lace Inventory, Gallery, Gloves For Sale, Messages, and admin-only Users. The browser stores the signed session token and role in `localStorage`. Demo users operate entirely against an in-browser seeded sandbox; the API independently rejects demo tokens for real-data actions.
 
 `admin/admin.js` owns both rendering and business presentation logic. `functions/api/orders.js` repeats security-sensitive validation and server-side calculations where required. This duplication is intentional in the current system but is a maintenance risk recorded in `TECHNICAL_DEBT.md`.
+
+Logout removes the session token and role plus persisted order/address caches and authenticated in-memory datasets. Dashboard-collapse and build-hash preferences are intentionally retained because they contain no customer data.
 
 ## Data boundaries
 
