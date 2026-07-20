@@ -3517,6 +3517,7 @@ function renderMoneyViewContent(sessions, loadError) {
     ${renderPhaseHoursTable(sessions)}
     ${renderExpensesCard()}
     ${renderMonthlyPnlTable()}
+    ${renderReachCard()}
     ${renderMoneyJobsTable("Best Jobs ($/hr)", best)}
     ${worst.length ? renderMoneyJobsTable("Worst Jobs ($/hr)", worst) : ""}
   `;
@@ -13735,4 +13736,32 @@ function buildMaintenanceDue(customers) {
 
   due.sort((a, b) => b.months - a.months);
   return due;
+}
+
+/* =========================
+   REACH (4.3) — how far the shop's work has traveled. Local drop-offs
+   count as NC; shipped orders count by their state.
+========================= */
+function renderReachCard() {
+  const counts = new Map();
+  allOrders.forEach(o => {
+    let st = String(o.state || "").trim().toUpperCase();
+    if (!st && o.dropOffMethod && /local/i.test(o.dropOffMethod)) st = "NC";
+    if (!st) return;
+    if (st.length > 2) {
+      const ABBR = { "NORTH CAROLINA":"NC","TEXAS":"TX","VIRGINIA":"VA","PENNSYLVANIA":"PA","MICHIGAN":"MI","CALIFORNIA":"CA","ILLINOIS":"IL","LOUISIANA":"LA","COLORADO":"CO" };
+      st = ABBR[st] || st.slice(0, 2);
+    }
+    counts.set(st, (counts.get(st) || 0) + 1);
+  });
+  if (!counts.size) return "";
+  const rows = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  return `
+    <div class="dashboard-card money-card">
+      <h3 class="money-card-title">Reach — ${rows.length} state${rows.length === 1 ? "" : "s"}</h3>
+      <div class="reach-chips">
+        ${rows.map(([st, n]) => `<span class="reach-chip"><b>${escapeHtml(st)}</b> ${n}</span>`).join("")}
+      </div>
+    </div>
+  `;
 }
