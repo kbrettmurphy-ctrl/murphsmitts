@@ -5840,6 +5840,7 @@ function renderOrderDetail(order) {
           <div class="detail-block">
             <div class="label">Price Quoted</div>
             <input id="editPriceQuoted" type="text" inputmode="decimal" placeholder="$0.00" />
+            ${(() => { const s = getEffectiveSuggestion(order); return s ? `<div class="price-suggest-hint muted">Suggested: ${escapeHtml(formatCurrency(s.price))} · ${escapeHtml(suggestionShortBasis(s))}</div>` : ""; })()}
           </div>
 
           <div id="editShippingCostWrap" class="detail-block ${isLocal ? "is-hidden" : ""}">
@@ -8086,12 +8087,12 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
   let inner = "";
 
   if (actionKey === "sendEstimate") {
-    const suggested = getSuggestedPrice(order);
+    const suggested = getEffectiveSuggestion(order);
     inner = `
       <div class="workflow-action-form">
         <label>Estimated amount</label>
         <input id="workflowPriceQuoted" type="text" inputmode="decimal" value="${escapeAttr(formatMoneyForInput(priceQuoted))}" />
-        ${suggested ? `<p class="muted workflow-price-hint">Suggested: ${escapeHtml(formatCurrency(suggested.price))}</p>` : ""}
+        ${suggested ? `<p class="muted workflow-price-hint">Suggested: ${escapeHtml(formatCurrency(suggested.price))} · ${escapeHtml(suggestionShortBasis(suggested))}</p>` : ""}
       </div>
     `;
   } else if (actionKey === "customerApproved") {
@@ -13223,6 +13224,19 @@ function getMeasuredSuggestion(order) {
   const materials = getOrderMaterialsCost(order).total;
   const raw = materials + (stats.medianMinutes / 60) * SHOP_ECONOMICS.targetHourlyRate;
   return { ...stats, price: Math.round(raw / 5) * 5 };
+}
+
+/* One suggestion everywhere: measured engine first, rule-based fallback.
+   Returns { price, measured, n, medianMinutes } or null. */
+function getEffectiveSuggestion(order) {
+  const m = getMeasuredSuggestion(order);
+  if (m) return { price: m.price, measured: true, n: m.n, medianMinutes: m.medianMinutes };
+  const rule = getSuggestedPrice(order);
+  return rule ? { price: rule.price, measured: false } : null;
+}
+
+function suggestionShortBasis(sug) {
+  return sug.measured ? `from ${sug.n} measured job${sug.n === 1 ? "" : "s"}` : "rule-based";
 }
 
 /* Money view: the engine's dashboard — every bucket, its median, and
