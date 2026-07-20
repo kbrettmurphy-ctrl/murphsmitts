@@ -1,136 +1,64 @@
-# Workflow
+# MurphOS Workflows
 
-## Order lifecycle
+As-built baseline reviewed 2026-07-19.
 
-1. **Received**
-   - Created in `functions/api/intake.js` when a new customer request is submitted.
-   - Initial order values:
-     - `status = "Received"`
-     - `paid = "Unpaid"`
-     - `allow_ship_without_payment = false`
-     - `glove_photos = []`
-   - Triggers customer notification:
-     - Email via `sendStatusEmail(..., "Received")`
-     - SMS via `sendReceivedText(...)` when `sms_opt_in` is true.
-   - Updates `last_status_emailed` and `last_status_texted` in the order row.
+## Order creation
 
-2. **Estimate Sent**
-   - Intended status after the estimate is prepared and sent to the customer.
-   - Customer notification logic:
-     - Email is sent on status change if not internal-only.
-     - SMS is sent when `sms_opt_in` is true and status is one of `estimate sent`, `in progress`, `ready to go`, or `completed`.
-   - SMS copy invites reply with YES/NO to approve or place the request on hold.
+Public intake accepts one customer submission containing one or more gloves. It validates contact/delivery/acknowledgement fields and each glove's type, services, primary lace, and fielder web. It creates sequential four-digit orders with status `Received`, unpaid state, independent tracking tokens, and shared customer/delivery data. After insertion it sends customer email, an opt-in SMS, optional owner email, Web Push, and optional Pushover. The submitting browser may then upload photos using the returned order UUID.
 
-3. **Customer Approved**
-   - Set by inbound SMS when a customer replies YES to an order whose normalized status is `estimate sent`.
-   - Marked in `functions/api/sms-reply.js` and stored in `customer_approved_at`.
-   - Code treats this as an internal-only status; customer email/SMS are skipped.
+Admins can also create orders using the order editor and templates.
 
-4. **On Hold**
-   - Set by inbound SMS when a customer replies NO while the order is `estimate sent`.
-   - Also used by other flows if the order needs to pause.
-   - Not explicitly marked internal-only in status logic, so status changes may still trigger email notifications, but not SMS unless the status appears in `shouldSendTextForStatus`.
+## Statuses and workflow
 
-5. **In Progress**
-   - Indicates work has begun on the glove.
-   - Customer receives email and SMS if opted in.
+The selectable statuses are:
 
-6. **Waiting on Lace/Parts**
-   - Indicates the order is temporarily delayed due to materials.
-   - Customer receives email on status change.
-   - SMS is not sent for this status because `shouldSendTextForStatus()` excludes it.
+1. `Received`
+2. `Estimate Sent`
+3. `Pending Response`
+4. `Customer Approved`
+5. `In Transit to Me`
+6. `In Progress`
+7. `Waiting on Lace/Parts`
+8. `Ready to Go`
+9. `On Hold`
+10. `Completed`
+11. `Picked Up`
 
-7. **Ready to Go**
-   - Indicates the glove work is finished and the order is ready for pickup or shipping.
-   - Customer receives email and SMS if opted in.
-   - The message depends on payment and drop-off method.
+This is not a server-enforced transition graph: an authenticated admin can select statuses directly. The UI groups them into Received, Estimate, Work, Ready, and Completed progress stages. `Completed` automatically receives today's completion date when blank. A shipped order cannot be completed while unpaid unless `allow_ship_without_payment` is true.
 
-8. **Completed**
-   - Order is finalized.
-   - Customer receives email and SMS if opted in.
-   - For shipped orders, tracking details are included if present.
-   - The code prevents marking a shipped order completed unless it is paid or `allow_ship_without_payment` is true.
+`Picked Up`, `Customer Approved`, `Pending Response`, and `In Transit to Me` are internal-only for automatic status email. Other statuses, including `On Hold` and `Waiting on Lace/Parts`, are email-eligible. Only `Estimate Sent`, `In Progress`, `Ready to Go`, and `Completed` are eligible for status SMS when the customer opted in; `Received` SMS is handled during intake. Delivery stamps prevent duplicate automatic sends, and admin actions can explicitly resend eligible email/text.
 
-9. **Picked Up**
-   - Internal-only status.
-   - No customer email or SMS is sent by the status delivery helpers.
+Inbound Twilio messages are associated with the newest matching order among the 100 most recent orders by the sender's last 10 phone digits. Exact YES/Y while `Estimate Sent` changes the order to `Customer Approved`; NO/N changes it to `On Hold`. MMS photos are copied to `order-photos`, appended to `orders.glove_photos`, and recorded in `sms_messages`. Other messages are stored for the admin inbox.
 
-10. **Pending Response**
-    - Internal-only status.
-    - No customer email or SMS is sent by the status delivery helpers.
+## Labor sessions
 
-11. **In Transit to Me**
-    - Internal-only status.
-    - No customer email or SMS is sent by the status delivery helpers.
+Supported phases are Tear down, Cleaning, Relacing, Conditioning, Palm Pad, Custom Work, Photos, Packing/Shipping, Admin/Messaging, and Other.
 
-## Status meaning summary
+- Starting requires an order and valid phase. The API prevents another open session for that order; the dashboard also warns about an active timer on another job.
+- Pausing freezes elapsed time and stores optional notes.
+- Resuming adds the just-finished pause interval to `pause_accumulated_seconds`.
+- Stopping computes active minutes from start to end minus accumulated and current paused time, then stores status `stopped` and `duration_minutes`.
+- Only stopped sessions contribute to order economics, measured job times, summaries, and phase-hour reporting.
+- The client updates a running display every second; server timestamps/calculation are authoritative at state changes.
 
-- `Received`: request checked in and queued.
-- `Estimate Sent`: estimate delivered; customer can reply YES or NO.
-- `Customer Approved`: customer approved the estimate; internal tracking only.
-- `On Hold`: order paused until customer or materials are ready.
-- `In Progress`: work is actively underway.
-- `Waiting on Lace/Parts`: materials are pending.
-- `Ready to Go`: glove is finished and awaiting pickup/shipping.
-- `Completed`: service is done; shipped or pickup finished.
-- `Picked Up`: internal pickup confirmation.
-- `Pending Response`: internal follow-up state.
-- `In Transit to Me`: internal transit state when the glove is being returned to the shop.
+## Money, expenses, and economics
 
-## Notification triggers
+Order economics are primarily computed in the admin client. Revenue is `price_quoted`; customer-charged `shipping_cost` is deliberately excluded as pass-through. Materials include lace, palm pad, cleaning consumables, and per-order packaging. Default lace usage is 3 pieces for a fielder (plus one for trapeze/modified trapeze), 4 for a catcher's mitt, and 5 for first base, unless `lace_pieces_used` overrides it.
 
-- **Received**
-  - Email always sent when the order is created.
-  - SMS sent if `sms_opt_in === true`.
+Effective rate is `(quote - materials) / stopped labor hours`. Money rollups include only `Ready to Go`, `Completed`, or `Picked Up` jobs as applicable and exclude jobs with less than 15 logged minutes from rate rollups. Views include service/glove/month/referral summaries, measured times, phase hours, best/worst jobs, expenses, monthly P&L, and customer reach/maintenance signals.
 
-- **Estimate Sent**
-  - Email sent if status changes to `Estimate Sent`.
-  - SMS sent if `sms_opt_in === true`.
+Expense rows are manual. If an expense supplies a recognized unit kind and quantity, the latest purchase's `amount / quantity` overrides the matching fallback unit cost in client calculations. Monthly P&L subtracts materials and recorded expenses from job revenue; it is an operating estimate, not accounting software.
 
-- **In Progress**
-  - Email sent on status change.
-  - SMS sent if `sms_opt_in === true`.
+## Inventory
 
-- **Ready to Go**
-  - Email sent on status change.
-  - SMS sent if `sms_opt_in === true`.
+The public services/contact interfaces read active lace colors and quantities. Admins can add, edit, deactivate/restore, set reorder thresholds, and enable/disable alerts. Order changes adjust stock by lace-usage deltas, so edits are reversible; gallery/store operations do not change lace stock.
 
-- **Completed**
-  - Email sent on status change.
-  - SMS sent if `sms_opt_in === true`.
+## Gallery and tracking linkage
 
-- **Customer Approved**, `Picked Up`, `Pending Response`, `In Transit to Me`
-  - Treated as internal-only statuses by `isInternalOnlyStatus()`.
-  - No customer email or SMS is sent by the status helpers.
+Gallery uploads choose a section and may link directly to an order. Existing photos can be linked to an order or described without one, moved between sections, hidden/restored, deleted, and designated as an album cover. Public gallery photos sharing an order number collapse into one album; public search matches order data for linked photos and stored descriptors for orderless photos.
 
-- **Waiting on Lace/Parts**
-  - Email is sent on status change.
-  - SMS is not sent, because `shouldSendTextForStatus()` does not include it.
+The public tracking URL uses `?t=<64-hex token>`. It maps internal statuses to six customer stages and may show an estimate/completion date, shipment carrier/tracking link, and only gallery photos explicitly linked to the order. It never returns address, contact details, price, payment state, or internal notes.
 
-## SMS reply behavior
+## Notifications and PWA
 
-- Incoming SMS is handled by `functions/api/sms-reply.js`.
-- The app finds the customer order by matching the last 10 digits of the sender phone number against recent orders.
-- If the text is `YES` or `Y` and the current status is `Estimate Sent`, the order updates to `Customer Approved`.
-- If the text is `NO` or `N` and the current status is `Estimate Sent`, the order updates to `On Hold`.
-- Inbound media is saved to the `order-photos` storage bucket and added to `orders.glove_photos`.
-- All incoming texts also update `last_customer_text` and `last_customer_text_at`.
-
-## Local drop-off vs shipped behavior
-
-- The code uses `looksLikeShipMethod(drop_off_method)` to detect shipping when the drop-off method string includes `ship`.
-- For shipping orders:
-  - address fields are preserved in the order row.
-  - shipping-related fields are surfaced in the admin UI (`shippingCost`, `totalDue`, `trackingNumber`, `carrier`).
-  - `Ready to Go` and `Completed` messages include shipping/payment/shipping tracking language.
-  - `Completed` cannot be set for shipped orders unless `paid` is `paid` or `allow_ship_without_payment` is true.
-
-- For local drop-off orders:
-  - shipping fields are hidden in the admin UI.
-  - address/shipping inputs are cleared before saving.
-  - `Ready to Go` and `Completed` messages focus on pickup coordination.
-
-## Notes and TODOs
-
-- TODO: the code does not define every allowed admin status transition explicitly; the admin UI includes controls for status selection, but the full valid transition graph is not codified in one place.
-- TODO: the exact behavior for `Customer Approved` in email history is internal-only and not customer-notified by the status helpers.
+Authenticated admins can subscribe a browser to Web Push and send a test notification. New intake orders, inbound texts, and accepted invites trigger push fan-out when VAPID is configured. The service worker does not cache files. Push clicks focus/navigate the admin, and push messages prompt an open inbox to refresh. Unsupported browsers or absent VAPID configuration simply leave notification enablement unavailable.

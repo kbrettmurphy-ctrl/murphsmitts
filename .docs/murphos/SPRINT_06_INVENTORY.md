@@ -2,32 +2,6 @@
 
 ## Status
 
-Planned
+Historical planning index; substantial scope is implemented.
 
-## Goal
-
-TBD
-
-## Scope
-
-- TBD
-
-## Out of Scope
-
-- TBD
-
-## UX Notes
-
-- TBD
-
-## Implementation Notes
-
-- TBD
-
-## Acceptance Criteria
-
-- TBD
-
-## Validation Checklist
-
-- TBD
+Lace inventory supports public availability, admin CRUD-like management, hidden/active state, reorder alerts, low-stock filtering, and order-usage delta adjustments. See `.docs/WORKFLOW.md` and `.docs/DATABASE.md`.

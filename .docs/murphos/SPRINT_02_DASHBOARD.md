@@ -2,32 +2,6 @@
 
 ## Status
 
-Planned
+Historical planning index; substantial scope is implemented.
 
-## Goal
-
-TBD
-
-## Scope
-
-- TBD
-
-## Out of Scope
-
-- TBD
-
-## UX Notes
-
-- TBD
-
-## Implementation Notes
-
-- TBD
-
-## Acceptance Criteria
-
-- TBD
-
-## Validation Checklist
-
-- TBD
+The Clubhouse dashboard now presents new/on-deck/bench/attention work, timer controls, notification badges, and a finance snapshot. See `.docs/FEATURE_INVENTORY.md` for the as-built inventory.

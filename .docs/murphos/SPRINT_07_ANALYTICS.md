@@ -2,32 +2,6 @@
 
 ## Status
 
-Planned
+Historical planning index; substantial scope is implemented.
 
-## Goal
-
-TBD
-
-## Scope
-
-- TBD
-
-## Out of Scope
-
-- TBD
-
-## UX Notes
-
-- TBD
-
-## Implementation Notes
-
-- TBD
-
-## Acceptance Criteria
-
-- TBD
-
-## Validation Checklist
-
-- TBD
+The Money view includes job economics, effective hourly rates, measured time suggestions, rollups, phase hours, expenses, monthly P&L, referral results, and reach/maintenance reporting. See `.docs/WORKFLOW.md`.

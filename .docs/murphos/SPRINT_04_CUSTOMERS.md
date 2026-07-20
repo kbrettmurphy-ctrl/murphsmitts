@@ -2,32 +2,6 @@
 
 ## Status
 
-Planned
+Historical planning index; substantial scope is implemented.
 
-## Goal
-
-TBD
-
-## Scope
-
-- TBD
-
-## Out of Scope
-
-- TBD
-
-## UX Notes
-
-- TBD
-
-## Implementation Notes
-
-- TBD
-
-## Acceptance Criteria
-
-- TBD
-
-## Validation Checklist
-
-- TBD
+The admin builds customer profiles from order data, including order/glove history, contact details, linked gallery work, and maintenance-due signals. See `.docs/FEATURE_INVENTORY.md`.

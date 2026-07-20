@@ -1,5 +1,7 @@
 # Admin v2 Deploy Checklist
 
+> Historical checklist for the lace-alert release. It is not a complete current deployment checklist. Use `DEPLOYMENT.md` and the full migration ledger in `DATABASE.md` for present-day deployments; confirm actual production migration state outside Git.
+
 Before merging Admin v2 changes to the live branch:
 
 ## Supabase migrations

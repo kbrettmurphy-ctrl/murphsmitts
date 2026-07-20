@@ -4,6 +4,8 @@
 **Status:** Source-Based Draft
 **Last Updated:** June 2026
 
+> Historical point-in-time audit. It may describe work that has since shipped. Use `.docs/ARCHITECTURE.md` and `.docs/FEATURE_INVENTORY.md` for current implemented behavior.
+
 ---
 
 # Why This Exists

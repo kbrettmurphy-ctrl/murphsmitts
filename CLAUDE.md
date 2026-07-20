@@ -8,8 +8,8 @@ and the admin portal ("MurphOS").
 ## Stack
 
 - Static/Jekyll-style public site (repo root: `index.html`, `services/`, `gallery/`, etc.)
-- Admin portal: `/admin` — `admin/index.html`, `admin/admin.js` (single file, ~9k+ lines), `admin/admin.css`
-- API: Cloudflare Pages Functions in `functions/api/` (`orders.js`, `lace-inventory.js`, `gloves-for-sale.js`, `intake.js`, `sms-reply.js`)
+- Admin portal: `/admin` — `admin/index.html`, `admin/admin.js` (single file, ~13k+ lines), `admin/admin.css`
+- API: Cloudflare Pages Functions in `functions/api/` (`orders.js`, `lace-inventory.js`, `gloves-for-sale.js`, `intake.js`, `sms-reply.js`, `track.js`, plus `_webpush.js` support code)
 - Database/storage: Supabase (REST via `supabaseFetch`; migrations in `supabase/migrations/`)
 - Deploys: Cloudflare Pages. `main` = production. Feature branches get preview URLs:
   `https://<branch>.murphsmitts.pages.dev/admin/`
@@ -49,6 +49,8 @@ and the admin portal ("MurphOS").
   `border-radius:10px`, `rgba(9,47,77,...)` navy palette, `#fffaf3` surfaces.
 
 ## Architecture map
+
+The current as-built system is documented in `.docs/ARCHITECTURE.md`, `.docs/FEATURE_INVENTORY.md`, `.docs/DATABASE.md`, `.docs/WORKFLOW.md`, and `.docs/DEPLOYMENT.md`. Ranked risks are in `.docs/TECHNICAL_DEBT.md`.
 
 **admin/admin.js** — everything client-side. Key regions (search by name):
 - `postJson(body, useAuth)` — all API calls, action-based bodies

@@ -15,7 +15,7 @@ The goal is to make the admin portal feel like a purpose-built glove repair oper
 - Build in sprints.
 - Do not implement future sprint ideas early.
 
-## Sprint Order
+## Historical Sprint Order
 
 1. Workflow Orders
 2. Dashboard
@@ -26,6 +26,6 @@ The goal is to make the admin portal feel like a purpose-built glove repair oper
 7. Analytics
 8. Polish
 
-## Current Sprint
+## Current Status
 
-Sprint 1: Workflow Orders
+This roadmap is historical planning context, not a current delivery tracker. The repository now contains substantial implementations of workflow orders, Clubhouse/dashboard, map, customer profiles, workbench/timers, inventory, analytics/money, and polish/PWA work. See `.docs/FEATURE_INVENTORY.md` and the other as-built baseline documents for current behavior. The original sprint files have been retained as historical index entries instead of presenting shipped work as TBD.

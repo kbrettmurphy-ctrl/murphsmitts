@@ -1,104 +1,53 @@
-# Architecture
+# MurphOS Architecture
 
-## Overview
+As-built baseline reviewed 2026-07-19. Source code and checked-in migrations are authoritative; `_site/` is generated output and local caches are not architecture sources.
 
-This repository is a Jekyll-based marketing and service website for Murph’s Mitt Maintenance, with a lightweight administrative dashboard and Cloudflare Functions backend. The site serves static content for customers while using Cloudflare Functions to process service requests, manage order workflow, expose inventory, and support a store of gloves for sale.
+## Runtime
 
-## Runtime model
+MurphOS is one Cloudflare Pages deployment containing:
 
-### Static site layer
-- Jekyll builds the public-facing pages from the repository’s HTML templates, includes, and layouts.
-- The main layout is [
-_layouts/default.html](_layouts/default.html), and the home page is [index.html](index.html).
-- The homepage and gallery page load gallery photos from the Cloudflare Functions gallery endpoint backed by Supabase Storage.
+- a Jekyll-built public site;
+- a dependency-free admin SPA under `/admin/`;
+- Cloudflare Pages Functions under `/functions/api/`;
+- Supabase Postgres and public Storage buckets, accessed only by Functions with the service-role credential;
+- Resend email, Twilio SMS/MMS, Web Push/VAPID, optional Pushover, and Leaflet/OpenStreetMap/Nominatim integrations.
 
-### Client-side behavior
-- Public pages use [assets/js/main.js](assets/js/main.js) for gallery lightbox interactions, mobile navigation, and other UI enhancements.
-- The contact form on [contact/index.html](contact/index.html) submits to the intake endpoint.
-- The services page on [services/index.html](services/index.html) fetches lace inventory from the public inventory API.
-- The admin UI in [admin/index.html](admin/index.html) is a standalone single-page app backed by [admin/admin.js](admin/admin.js).
+The browser never receives the Supabase service-role key. Most admin operations post an `action` payload to `/api/orders`; public read endpoints and intake are deliberately separate except for public gallery listing/search actions hosted by the orders Function.
 
-### API layer
-- Cloudflare Functions are defined under [functions/api](functions/api).
-- The Functions runtime is configured by [wrangler.jsonc](wrangler.jsonc), which sets the app name, compatibility settings, and static asset directory.
-- The serverless endpoints are:
-  - [functions/api/intake.js](functions/api/intake.js): accepts new service requests, validates inputs, creates an order in Supabase, and sends email/text notifications.
-  - [functions/api/orders.js](functions/api/orders.js): handles admin operations for orders, inventory adjustments, gallery uploads, and sale-glove management.
-  - [functions/api/lace-inventory.js](functions/api/lace-inventory.js): exposes active lace inventory from Supabase.
-  - [functions/api/gloves-for-sale.js](functions/api/gloves-for-sale.js): exposes gloves-for-sale listings and associated photos.
-  - [functions/api/sms-reply.js](functions/api/sms-reply.js): handles Twilio inbound SMS replies and updates order records.
+## Source map
 
-## Data storage
+| Area | Source | Current responsibility |
+| --- | --- | --- |
+| Public site | root HTML, `_layouts/`, `_includes/`, `assets/` | Marketing pages, shared navigation/lightbox, service request form, lace availability |
+| Public store | `for-sale/`, `/api/gloves-for-sale` | Read-only glove listings and photo galleries |
+| Public tracking | `track/`, `/api/track` | Token-gated, customer-safe order progress and curated finished photos |
+| Admin shell | `admin/index.html`, `admin/admin.css` | SPA views and presentation |
+| Admin behavior | `admin/admin.js` | Authentication UI, demo sandbox, orders, dashboard, customers, calendar, map, labor, money, inventory, gallery, store, messages, users, PWA update/push behavior |
+| Admin API | `functions/api/orders.js` | Signed sessions, WebAuthn, action dispatch, database/storage writes, notifications, geocoding, job logic |
+| Intake | `functions/api/intake.js` | Multi-glove request validation/insertion, post-submit photos, confirmation and owner notifications |
+| Inbound SMS | `functions/api/sms-reply.js` | Twilio webhook, SMS/MMS storage, YES/NO estimate response handling, alerts |
+| Push helper | `functions/api/_webpush.js` | VAPID payload encryption, fan-out, expired-subscription removal |
+| Data changes | `supabase/migrations/` | Additive migrations after the original live schema |
+| Deployment | `wrangler.jsonc`, `_config.yml`, `Gemfile` | Pages/Workers compatibility and Jekyll build inputs |
 
-The application relies on Supabase for its primary data store:
-- Orders are stored in the public orders table.
-- Lace inventory is stored in the public lace_inventory table.
-- Gloves for sale are stored in the public gloves_for_sale table.
-- Related sale photos are stored in the public glove_sale_photos table.
-- Gallery images and sale-glove images are uploaded to Supabase Storage buckets.
+## Admin SPA
 
-The backend uses the Supabase REST API with the service role key and the Supabase URL from environment variables.
+The admin is a single HTML/CSS/JavaScript application, not a framework build. Its views are Clubhouse, Orders and Order Detail, Customers, Calendar, Map, Money, Lace Inventory, Gallery, Gloves For Sale, Messages, and admin-only Users. The browser stores the signed session token and role in `localStorage`. Demo users operate entirely against an in-browser seeded sandbox; the API independently rejects demo tokens for real-data actions.
 
-### Notes on order media storage
-- Order rows include an `orders.glove_photos` field that is stored as serialized JSON text containing an array of image URLs.
-- SMS and admin handlers parse `glove_photos` when reading the row and append new media URLs when photos are received.
+`admin/admin.js` owns both rendering and business presentation logic. `functions/api/orders.js` repeats security-sensitive validation and server-side calculations where required. This duplication is intentional in the current system but is a maintenance risk recorded in `TECHNICAL_DEBT.md`.
 
-## Authentication and authorization
+## Data boundaries
 
-### Admin auth
-- The admin UI authenticates via a PIN entered in the browser.
-- The PIN is validated by [functions/api/orders.js](functions/api/orders.js), which issues a signed, expiring session token.
-- Subsequent admin actions must include that token in the request body.
+- Functions call Supabase REST and Storage with server-side environment bindings.
+- Public lace and store endpoints expose selected active/non-hidden records.
+- Public tracking requires a 64-hex per-order token and returns only first name, order/glove identifiers, status/stage, dates, shipment tracking, and gallery photos linked to that order.
+- Gallery listing and glove search expose public gallery URLs plus linkage/search descriptors, not customer contact data.
+- `orders.glove_photos` is a JSON array in current writes, with defensive support for legacy serialized JSON text.
 
-### Environment variables
-The code expects the following environment variables at runtime:
-- SUPABASE_URL
-- SUPABASE_SERVICE_ROLE_KEY
-- ADMIN_PIN
-- ADMIN_SESSION_SECRET
-- RESEND_API_KEY
-- RESEND_FROM (optional, defaults in code)
-- TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_MESSAGING_SERVICE_SID (needed for SMS updates)
-- PUSHOVER_APP_TOKEN, PUSHOVER_USER_KEY (optional notifications)
+## PWA behavior
 
-If any required values are missing, the relevant API returns an error response.
+The public site has a favicon manifest but no public service worker. `/admin/` is installable with its own manifest and service worker. The admin service worker intentionally performs no caching: it claims clients, shows Web Push notifications, focuses/navigates an existing admin window on notification click, and notifies open clients to refresh messages. The SPA also hashes fetched admin assets periodically and reloads when it detects a changed build.
 
-## Request flow examples
+## Generated and local-only paths
 
-### New service request
-1. The customer submits the contact form in [contact/index.html](contact/index.html).
-2. The browser posts JSON to /api/intake.
-3. [functions/api/intake.js](functions/api/intake.js) validates the request, generates the next order number, inserts the order into Supabase, and sends notifications.
-4. The response returns the created order payload to the client.
-
-### Admin order management
-1. The admin app in [admin/admin.js](admin/admin.js) logs in and stores a token in localStorage.
-2. The app sends POST requests to /api/orders.
-3. [functions/api/orders.js](functions/api/orders.js) authenticates the token, performs the requested action, and updates Supabase.
-4. The admin UI re-renders the order list or detail view with the returned data.
-
-### Public inventory display
-1. The services page fetches /api/lace-inventory.
-2. [functions/api/lace-inventory.js](functions/api/lace-inventory.js) queries the active lace inventory rows.
-3. The page updates the in-stock/out-of-stock UI based on the returned data.
-
-## Main modules and responsibilities
-
-- [index.html](index.html): public marketing home page.
-- [contact/index.html](contact/index.html): service request form and submission logic.
-- [services/index.html](services/index.html): service overview and lace inventory status UI.
-- [admin/index.html](admin/index.html): admin application shell.
-- [admin/admin.js](admin/admin.js): admin UI logic, order rendering, inventory management, and sale-glove management.
-- [admin/config.js](admin/config.js): admin API base URL configuration.
-- [assets/js/main.js](assets/js/main.js): common frontend interactions.
-- [functions/api/intake.js](functions/api/intake.js): intake workflow and notifications.
-- [functions/api/orders.js](functions/api/orders.js): admin API and business logic.
-- [functions/api/lace-inventory.js](functions/api/lace-inventory.js): public inventory endpoint.
-- [functions/api/gloves-for-sale.js](functions/api/gloves-for-sale.js): public gloves-for-sale endpoint.
-- [functions/api/sms-reply.js](functions/api/sms-reply.js): inbound SMS handling.
-
-## Deployment notes
-
-- The site is designed to be deployed as a static site with Cloudflare Functions.
-- Jekyll is the build engine for the static content.
-- Wrangler manages the deploy configuration and asset serving.
+`_site/`, `.jekyll-cache/`, `.wrangler/`, and `supabase/.temp/` are generated/local state and ignored by Git. Local secret files are ignored. Documentation must list variable names only, never values.

@@ -2,32 +2,6 @@
 
 ## Status
 
-Planned
+Historical planning index; substantial scope is implemented.
 
-## Goal
-
-TBD
-
-## Scope
-
-- TBD
-
-## Out of Scope
-
-- TBD
-
-## UX Notes
-
-- TBD
-
-## Implementation Notes
-
-- TBD
-
-## Acceptance Criteria
-
-- TBD
-
-## Validation Checklist
-
-- TBD
+The admin includes a Leaflet shipped-order map, server-assisted geocoding, persisted quality/status metadata, local fallback cache, unmapped reporting, and order deep links. See `.docs/ARCHITECTURE.md` and `.docs/FEATURE_INVENTORY.md`.

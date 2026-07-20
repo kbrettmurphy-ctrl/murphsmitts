@@ -4,6 +4,8 @@
 **Status:** Draft
 **Last Updated:** June 2026
 
+> Historical redesign execution plan, not a statement of current implementation status. Use `.docs/ARCHITECTURE.md`, `.docs/FEATURE_INVENTORY.md`, and `.docs/WORKFLOW.md` before planning new work.
+
 ---
 
 # Why This Exists

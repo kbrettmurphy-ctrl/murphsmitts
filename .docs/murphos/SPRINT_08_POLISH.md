@@ -2,32 +2,6 @@
 
 ## Status
 
-Planned
+Historical planning index; partially and substantially implemented across multiple areas.
 
-## Goal
-
-TBD
-
-## Scope
-
-- TBD
-
-## Out of Scope
-
-- TBD
-
-## UX Notes
-
-- TBD
-
-## Implementation Notes
-
-- TBD
-
-## Acceptance Criteria
-
-- TBD
-
-## Validation Checklist
-
-- TBD
+Responsive admin interactions, shared UI primitives, installable admin PWA metadata, push notifications, pull-to-refresh, build-change reload, and mobile-specific behavior are present. No single historical acceptance checklist survives in this placeholder; current behavior is in `.docs/ARCHITECTURE.md` and `.docs/FEATURE_INVENTORY.md`.

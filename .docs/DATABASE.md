@@ -1,257 +1,82 @@
-# Database
+# MurphOS Database and Migrations
 
-## Overview
+As-built baseline reviewed 2026-07-19.
 
-The application uses Supabase as its primary database and storage backend. The code makes direct REST requests to Supabase tables and storage endpoints. The repository does not include a migration directory, but a SQL schema summary from Supabase has been added below.
+## Important limitation
 
-The column type annotations below are inferred from live Supabase row samples and the Supabase schema export.
+The repository does not contain the original schema migration for the core tables (`orders`, `lace_inventory`, `gloves_for_sale`, and `glove_sale_photos`) or Storage buckets. The definitions below combine fields used by current source with the additive migrations that are checked in. A new Supabase project cannot be reproduced from this repository alone.
 
-## Tables and collections referenced by the code
+## Tables
 
-### orders
-The main transactional table for glove service requests.
+### `orders`
 
-Confirmed fields based on Supabase runtime samples:
-- id (uuid)
-- timestamp_submitted (timestamptz)
-- customer_name (text)
-- phone_number (text)
-- email_address (text)
-- brand_model (text)
-- glove_type (text)
-- web_type (text)
-- services_requested (text)
-- primary_lace_color (text)
-- secondary_lace_color (text)
-- custom_color_request (text)
-- drop_off_method (text)
-- street_address (text)
-- city (text)
-- state (text)
-- zip_code (text)
-- glove_notes (text)
-- social_tag (text)
-- turnaround_acknowledged (text)
-- referral_source (text)
-- glove_photos (text nullable; stores a serialized JSON array of image URLs)
-- order_number (text)
-- status (text)
-- date_received (date)
-- estimated_completion (date)
-- price_quoted (numeric)
-- paid (text)
-- allow_ship_without_payment (boolean)
-- tracking_number (text)
-- carrier (text)
-- date_completed (date)
-- internal_notes (text)
-- last_status_emailed (text)
-- created_at (timestamptz)
-- updated_at (timestamptz)
-- customer_notes (text)
-- sms_opt_in (boolean)
-- last_status_texted (text)
-- last_customer_text (text)
-- last_customer_text_at (timestamptz)
-- customer_approved_at (timestamptz)
-- primary_lace_used (numeric)
-- secondary_lace_used (numeric)
-- shipping_cost (numeric)
+Core customer/job fields used by the application include identity and timestamps; customer contact; glove type/model/web; requested services and lace colors; delivery/address; notes/photos; order number and status; received/estimated/completed dates; quote/payment/shipping; email/SMS delivery stamps; SMS opt-in and latest inbound message; approval time; lace usage; map/geocoding metadata; and `tracking_token`.
 
-Observed usage:
-- The intake flow creates a new row with a generated order number and initial status of Received.
-- The admin API reads and updates rows by order_number.
-- The SMS handler updates the row based on the customer’s phone number and stores inbound text/photo metadata.
-- The application stores `orders.glove_photos` as serialized JSON text and parses it into an array when reading the order row.
-- The application parsing logic treats `glove_photos` as either an array or a JSON string and JSON.parse's it when necessary.
+`order_number` is the application-facing key used by related tables and URLs. Intake currently finds the maximum existing number and increments it. `glove_photos` holds an array of order/intake/SMS photo URLs; readers tolerate either a native array or serialized JSON text.
 
-### lace_inventory
-Tracks lace stock levels for customer-facing inventory display and admin inventory management.
+### `lace_inventory`
 
-Confirmed fields based on Supabase runtime samples:
-- id (uuid)
-- color (text)
-- quantity_on_hand (numeric)
-- reorder_at (numeric)
-- active (boolean)
-- created_at (timestamptz)
-- updated_at (timestamptz)
+Tracks color, quantity, reorder threshold (`reorder_at` or a legacy `reorder_threshold` tolerated by migration logic), active state, and `reorder_alert_enabled`. Public responses expose active color/quantity only. Admin order updates adjust inventory by the delta between old and new per-color usage values.
 
-Observed usage:
-- The public inventory endpoint queries rows where active is true.
-- The admin API lists inventory rows and adjusts quantity_on_hand when order changes consume lace.
+### `order_activity`
 
-### gloves_for_sale
-Stores public-facing gloves that are listed for sale.
+Append-only activity events keyed by order number with type, label, optional detail, actor, metadata, and timestamp. It records significant order, labor, photo, and delivery actions.
 
-Confirmed fields based on Supabase runtime samples:
-- id (uuid)
-- slug (text)
-- title (text)
-- short_description (text)
-- description (text)
-- price (numeric)
-- brand (text)
-- model (text)
-- glove_size (text)
-- position (text)
-- web (text)
-- throw_hand (text)
-- condition (text)
-- status (text)
-- featured_image_url (text nullable)
-- hover_image_url (text nullable)
-- purchase_url (text nullable)
-- featured (boolean)
-- sort_order (integer)
-- created_at (timestamptz)
-- updated_at (timestamptz)
+### `order_labor_sessions`
 
-Observed usage:
-- The public gloves-for-sale endpoint reads rows excluding hidden status and orders them by sort_order and created_at.
-- The admin API lists, creates, updates, deletes, and manages photos for these rows.
+Sessions contain order number, phase, start/end timestamps, computed duration minutes, notes, status (`running`, `paused`, `stopped`), pause timestamp, accumulated paused seconds, and timestamps. A partial index covers open sessions.
 
-### glove_sale_photos
-Stores one or more photos associated with each glove listing.
+### `admin_users` and `webauthn_credentials`
 
-Confirmed fields based on Supabase runtime samples:
-- id (uuid)
-- glove_id (uuid)
-- url (text)
-- filename (text)
-- caption (text nullable)
-- sort_order (integer)
-- created_at (timestamptz)
-- is_primary (boolean)
-- is_hover (boolean)
+Users have email, display name, `admin` or `demo` role, PBKDF2 password material, active/invite state, and login timestamps. WebAuthn credentials store credential ID, P-256 public-key data, signature counter, transports, label, and use timestamps. Passkeys currently authenticate as the owner/admin rather than mapping to an `admin_users` row.
 
-Observed usage:
-- The public gloves endpoint joins photos for each glove and chooses primary/hover photos.
-- The admin API uploads, lists, sets primary/hover, and deletes photos.
+### `sms_messages`
 
-## Storage buckets
+Conversation history contains direction, phone/customer/order association, text, media URL JSON, Twilio SID, read state, and timestamp. The initial migration backfills each order's last inbound text once.
 
-### gallery
-Used for public gallery images.
+### `push_subscriptions`
 
-Observed usage:
-- Admin uploads gallery images through the upload action.
-- The admin API stores files under a section-based path such as fielding-gloves/<timestamp>-<filename>.<ext>.
-- The admin API lists files from the gallery bucket by section prefix.
-- The Supabase UI shows this bucket as public with no bucket-level storage policies configured.
+Stores unique push endpoint, browser `p256dh` and auth keys, label, and timestamps. Expired endpoints are deleted after push providers return 404 or 410.
 
-### gloves-for-sale
-Used for sale-glove photos.
+### `gallery_photo_links`
 
-Observed usage:
-- Admin uploads sale-glove photos under a slug-based path such as <slug>/<timestamp>-<filename>.<ext>.
-- The public and admin APIs build public URLs from the stored object path.
-- The Supabase UI shows this bucket as public with no bucket-level storage policies configured.
+Associates a unique public gallery photo URL/path with an optional order number. Orderless curated photos may carry glove/search descriptors. `is_cover` selects an album cover. Order-linked photos inherit searchable glove descriptors from the order at query time.
 
-### order-photos
-Used for inbound SMS media attachments.
+### `shop_expenses`
 
-Observed usage:
-- The SMS handler downloads incoming Twilio media and uploads it to storage.
-- The stored path is based on the order number and timestamp.
-- The Supabase UI shows this bucket as public with no bucket-level storage policies configured.
-- The Supabase `storage` schema contains `buckets` and `objects`, but the project does not expose a `storage.policies` relation, so policy detail is limited to the bucket settings visible in the UI.
+Manual expenses contain date, category, description, amount, optional quantity and unit kind, and timestamp. The newest categorized unit purchase teaches the client-side economics model an effective unit cost.
 
-## Relationships
+### `gloves_for_sale` and `glove_sale_photos`
 
-The code implies the following relationships:
-- orders has many order-related media references through the glove_photos field.
-- gloves_for_sale has many glove_sale_photos via glove_id.
-- There is no explicit foreign-key enforcement shown in the repository code.
+The store tables hold listing content, price/specification/status/featured/sort fields and a one-to-many photo set with primary/hover roles. Their original DDL is not checked in.
 
-## Data conventions observed in code
+## Storage buckets used
 
-- Order numbers are stored as strings and generated as zero-padded numeric values (for example 0080).
-- Status values are treated as display strings and normalized in the code (for example Received, Estimate Sent, In Progress, Completed).
-- Lace inventory uses color strings as the primary lookup key.
-- Gallery sections are restricted to a fixed set: fielding-gloves, catchers-mitts, first-base-mitts, custom-color-relaces, and vintage.
+- `gallery`: section-prefixed public gallery photos, including a hidden prefix used by admin hide/restore.
+- `gloves-for-sale`: listing photos stored under listing slugs.
+- `order-photos`: intake, inbound MMS, and outbound-message attachments.
 
-| table_name        | column_name                | data_type                | is_nullable | column_default    |
-| ----------------- | -------------------------- | ------------------------ | ----------- | ----------------- |
-| glove_sale_photos | id                         | uuid                     | NO          | gen_random_uuid() |
-| glove_sale_photos | glove_id                   | uuid                     | NO          | null              |
-| glove_sale_photos | url                        | text                     | NO          | null              |
-| glove_sale_photos | filename                   | text                     | YES         | null              |
-| glove_sale_photos | caption                    | text                     | YES         | null              |
-| glove_sale_photos | sort_order                 | integer                  | NO          | 0                 |
-| glove_sale_photos | created_at                 | timestamp with time zone | NO          | now()             |
-| glove_sale_photos | is_primary                 | boolean                  | YES         | false             |
-| glove_sale_photos | is_hover                   | boolean                  | YES         | false             |
-| gloves_for_sale   | id                         | uuid                     | NO          | gen_random_uuid() |
-| gloves_for_sale   | slug                       | text                     | NO          | null              |
-| gloves_for_sale   | title                      | text                     | NO          | null              |
-| gloves_for_sale   | short_description          | text                     | YES         | null              |
-| gloves_for_sale   | description                | text                     | YES         | null              |
-| gloves_for_sale   | price                      | numeric                  | YES         | null              |
-| gloves_for_sale   | brand                      | text                     | YES         | null              |
-| gloves_for_sale   | model                      | text                     | YES         | null              |
-| gloves_for_sale   | glove_size                 | text                     | YES         | null              |
-| gloves_for_sale   | position                   | text                     | YES         | null              |
-| gloves_for_sale   | web                        | text                     | YES         | null              |
-| gloves_for_sale   | throw_hand                 | text                     | YES         | null              |
-| gloves_for_sale   | condition                  | text                     | YES         | null              |
-| gloves_for_sale   | status                     | text                     | NO          | 'available'::text |
-| gloves_for_sale   | featured_image_url         | text                     | YES         | null              |
-| gloves_for_sale   | hover_image_url            | text                     | YES         | null              |
-| gloves_for_sale   | purchase_url               | text                     | YES         | null              |
-| gloves_for_sale   | featured                   | boolean                  | NO          | false             |
-| gloves_for_sale   | sort_order                 | integer                  | NO          | 0                 |
-| gloves_for_sale   | created_at                 | timestamp with time zone | NO          | now()             |
-| gloves_for_sale   | updated_at                 | timestamp with time zone | NO          | now()             |
-| lace_inventory    | id                         | uuid                     | NO          | gen_random_uuid() |
-| lace_inventory    | color                      | text                     | NO          | null              |
-| lace_inventory    | quantity_on_hand           | numeric                  | NO          | 0                 |
-| lace_inventory    | reorder_at                 | numeric                  | NO          | 3                 |
-| lace_inventory    | active                     | boolean                  | NO          | true              |
-| lace_inventory    | created_at                 | timestamp with time zone | YES         | now()             |
-| lace_inventory    | updated_at                 | timestamp with time zone | YES         | now()             |
-| orders            | id                         | uuid                     | NO          | gen_random_uuid() |
-| orders            | timestamp_submitted        | timestamp with time zone | YES         | null              |
-| orders            | customer_name              | text                     | YES         | null              |
-| orders            | phone_number               | text                     | YES         | null              |
-| orders            | email_address              | text                     | YES         | null              |
-| orders            | brand_model                | text                     | YES         | null              |
-| orders            | glove_type                 | text                     | YES         | null              |
-| orders            | web_type                   | text                     | YES         | null              |
-| orders            | services_requested         | text                     | YES         | null              |
-| orders            | primary_lace_color         | text                     | YES         | null              |
-| orders            | secondary_lace_color       | text                     | YES         | null              |
-| orders            | custom_color_request       | text                     | YES         | null              |
-| orders            | drop_off_method            | text                     | YES         | null              |
-| orders            | street_address             | text                     | YES         | null              |
-| orders            | city                       | text                     | YES         | null              |
-| orders            | state                      | text                     | YES         | null              |
-| orders            | zip_code                   | text                     | YES         | null              |
-| orders            | glove_notes                | text                     | YES         | null              |
-| orders            | social_tag                 | text                     | YES         | null              |
-| orders            | turnaround_acknowledged    | text                     | YES         | null              |
-| orders            | referral_source            | text                     | YES         | null              |
-| orders            | glove_photos               | text                     | YES         | null              |
-| orders            | order_number               | text                     | NO          | null              |
-| orders            | status                     | text                     | NO          | 'Received'::text  |
-| orders            | date_received              | date                     | YES         | null              |
-| orders            | estimated_completion       | date                     | YES         | null              |
-| orders            | price_quoted               | numeric                  | YES         | null              |
-| orders            | paid                       | text                     | YES         | null              |
-| orders            | allow_ship_without_payment | boolean                  | NO          | false             |
-| orders            | tracking_number            | text                     | YES         | null              |
-| orders            | carrier                    | text                     | YES         | null              |
-| orders            | date_completed             | date                     | YES         | null              |
-| orders            | internal_notes             | text                     | YES         | null              |
-| orders            | last_status_emailed        | text                     | YES         | null              |
-| orders            | created_at                 | timestamp with time zone | NO          | now()             |
-| orders            | updated_at                 | timestamp with time zone | NO          | now()             |
-| orders            | customer_notes             | text                     | YES         | null              |
-| orders            | sms_opt_in                 | boolean                  | NO          | false             |
-| orders            | last_status_texted         | text                     | YES         | null              |
-| orders            | last_customer_text         | text                     | YES         | null              |
-| orders            | last_customer_text_at      | timestamp with time zone | YES         | null              |
-| orders            | customer_approved_at       | timestamp with time zone | YES         | null              |
-| orders            | primary_lace_used          | numeric                  | YES         | null              |
-| orders            | secondary_lace_used        | numeric                  | YES         | null              |
-| orders            | shipping_cost              | numeric                  | YES         | null              |
+Bucket creation, public access configuration, size limits, and Storage policies are not represented by checked-in migrations.
+
+## Checked-in migration ledger
+
+| Migration | Effect |
+| --- | --- |
+| `20260628000000_add_order_map_geocoding_columns.sql` | Adds map coordinates, normalized address/source/status/error/hash/time |
+| `20260701000000_add_lace_inventory_alert_enabled.sql` | Adds reorder-alert flag and converts the legacy `-1` disable sentinel |
+| `20260702000000_add_order_activity.sql` | Creates activity table and indexes |
+| `20260703000000_add_order_map_geocode_quality.sql` | Adds geocode quality |
+| `20260704000000_add_order_labor_sessions.sql` | Creates labor sessions and indexes |
+| `20260705000000_add_labor_timer_pause_state.sql` | Adds running/paused/stopped state and paused-time accounting |
+| `20260706000000_add_order_lace_pieces_used.sql` | Adds per-order total lace-piece costing override |
+| `20260707000000_add_webauthn_credentials.sql` | Creates passkey credential storage |
+| `20260708000000_add_admin_users.sql` | Creates users and idempotently seeds the owner account |
+| `20260709000000_add_sms_messages.sql` | Creates message history and backfills last inbound messages |
+| `20260710000000_add_push_subscriptions.sql` | Creates Web Push subscriptions |
+| `20260711000000_add_gallery_photo_links.sql` | Creates gallery-to-order linkage |
+| `20260714120000_gallery_link_descriptors.sql` | Adds descriptors and permits orderless curated links |
+| `20260716090000_gallery_link_cover.sql` | Adds album-cover flag |
+| `20260718150000_shop_expenses.sql` | Creates manual expense ledger |
+| `20260719120000_tracking_tokens.sql` | Adds/backfills unique public tracking tokens |
+
+Migrations are additive and should be reviewed/applied in timestamp order. There is no checked-in Supabase config or automated migration verification in this repository.
