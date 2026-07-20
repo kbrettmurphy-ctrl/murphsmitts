@@ -392,6 +392,23 @@ function setToken(token) {
 function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(ROLE_KEY);
+  localStorage.removeItem("mm_orders_cache");
+  localStorage.removeItem("mm_geocode_cache_v1");
+  localStorage.removeItem("mm_orders_seen_ts");
+
+  /* Drop authenticated data held in memory as well as persistent caches.
+     Harmless UI/build preferences intentionally remain in localStorage. */
+  allOrders = [];
+  currentOrder = null;
+  laceInventory = [];
+  galleryPhotos = [];
+  dashboardLaborSessions = {};
+  dashboardActivityOrders = new Set();
+  dashboardActivityLoaded = false;
+  allMessages = [];
+  moneyLaborSummaryCache = null;
+  customerGalleryLinksCache = null;
+  expensesCache = null;
 }
 
 function setRole(role) {

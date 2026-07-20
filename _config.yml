@@ -1,3 +1,41 @@
 # _config.yml
 title: Murph’s Mitt Maintenance
 url: https://murphsmitts.com
+
+# Only customer-facing pages and their runtime assets belong in `_site`.
+# Cloudflare Pages Functions remain available to the Pages build from the
+# repository root, but their source and all operational files are excluded
+# from Jekyll's public output.
+exclude:
+  - .agents/
+  - .codex/
+  - .dev.vars
+  - .dev.vars.*
+  - .docs/
+  - .env
+  - .env.*
+  - .git/
+  - .github/
+  - .gitignore
+  - .idea/
+  - .jekyll-cache/
+  - .ruby-version
+  - .sass-cache/
+  - .vscode/
+  - .wrangler/
+  - .DS_Store
+  - "*.code-workspace"
+  - "*.env"
+  - CLAUDE.md
+  - Gemfile
+  - Gemfile.lock
+  - node_modules/
+  - README.md
+  - README.*
+  - functions/
+  - murphsmitts.code-workspace
+  - supabase/
+  - supabase.env
+  - vendor/bundle/
+  - wrangler.jsonc
+  - _site/

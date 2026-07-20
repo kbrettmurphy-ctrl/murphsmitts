@@ -18,11 +18,12 @@ Ranked from the 2026-07-19 repository baseline. This is a register, not authoriz
 
 - **Business rules are duplicated.** Status groupings, labor phases, customer messages, and economics concepts exist in client and Function code and can drift.
 - **Passkeys are owner-global.** WebAuthn credentials are not associated with admin user records; any accepted passkey produces an owner/admin session.
-- **Sessions are long-lived browser tokens.** Signed tokens last 14 days, live in `localStorage`, and have no server-side revocation list or per-session audit trail.
+- **Sessions are long-lived browser tokens.** Signed tokens last 14 days, live in `localStorage`, and have no server-side revocation list or per-session audit trail. Phase 1 clears persisted order/address caches and in-memory authenticated datasets on logout, but it does not revoke the signed token server-side.
 - **Inbound message association is heuristic.** Only the 100 newest orders are scanned and matching uses the last 10 phone digits, so older/shared-number conversations can attach incorrectly.
 - **Public reads share the admin action Function.** Gallery listing/search and the push public key live alongside privileged actions, and the Function globally depends on admin configuration.
 - **Client-side economics is not a ledger.** Constants, latest-purchase unit costs, eligibility rules, and manual expenses produce operational estimates rather than auditable accounting results.
-- **External CDN runtime dependencies are unpinned operational risks.** Admin map CSS/JS and fonts load at runtime from third parties; availability and policy are outside the deployment artifact.
+- **External runtime services remain.** Phase 1 vendors the exact Leaflet 1.9.4 library and marker assets, resolving that CDN dependency. Google Fonts and CARTO map tiles still load from third parties; tile availability and privacy policy remain outside the deployment artifact.
+- **An unsafe alternate Wrangler path remains.** The active Cloudflare Pages Git deployment produces Jekyll output, but `wrangler.jsonc` still declares the repository root as a Workers Static Assets directory. An operator running `wrangler deploy` could publish internal repository files to a separate Workers deployment. Phase 1 documentation prohibits that command; changing the configuration to `_site` should be reviewed separately after confirming whether the Workers deployment path has any legitimate operator use.
 
 ## Low
 
