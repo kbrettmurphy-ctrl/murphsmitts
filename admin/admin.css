@@ -8152,3 +8152,10 @@ body.has-notifications .topbar-menu-btn::after{
 .reach-chips{display:flex; flex-wrap:wrap; gap:6px}
 .reach-chip{font-size:.72rem; padding:3px 10px; border-radius:999px; background:rgba(9,47,77,.07); color:var(--navy)}
 .reach-chip b{font-weight:700}
+
+/* Suggested price hint under the Price Quoted field (Order Detail) */
+.price-suggest-hint{
+  font-size:.72rem;
+  color:rgba(2,11,18,.5);
+  margin-top:5px;
+}
