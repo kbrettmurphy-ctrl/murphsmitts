@@ -9456,6 +9456,7 @@ async function startInviteFlow(token) {
 ========================= */
 let allMessages = [];
 let openThreadKey = null;
+let lastMessagesSig = "";
 let pendingMsgPhoto = "";
 const ORDERS_SEEN_KEY = "mm_orders_seen_ts";
 
@@ -9511,11 +9512,18 @@ async function refreshMessages({ rerender = false } = {}) {
     const data = await postJson({ action: "listMessages" }, true);
     allMessages = data.messages || [];
     syncNotificationBadges();
+    const sig = `${allMessages.length}:${allMessages[allMessages.length - 1]?.id || ""}`;
     if (rerender && messagesView && messagesView.classList.contains("active")) {
       /* Never yank the DOM out from under an active draft/keyboard. */
       if (document.activeElement && document.activeElement.id === "msgReplyInput") return;
+      /* Nothing new since the last render — don't re-render and snap the
+         user's scroll position back. */
+      if (sig === lastMessagesSig) return;
+      lastMessagesSig = sig;
       if (openThreadKey) openMessageThread(openThreadKey);
       else renderMessagesView();
+    } else {
+      lastMessagesSig = sig;
     }
   } catch {
     /* Inbox is a background extra — never block the app. */
@@ -9645,7 +9653,16 @@ function openMessageThread(key) {
     if (input) input.value = prevDraft;
   }
   const convo = messagesPanel.querySelector(".msg-convo");
-  if (convo) convo.scrollTop = convo.scrollHeight;
+  if (convo) {
+    const toBottom = () => { if (openThreadKey && convo.isConnected) convo.scrollTop = convo.scrollHeight; };
+    toBottom();
+    /* Images (MMS) load after render and grow the height — re-pin to bottom
+       when each finishes, and once more after layout settles. */
+    convo.querySelectorAll("img").forEach(img => {
+      if (!img.complete) img.addEventListener("load", toBottom, { once: true });
+    });
+    setTimeout(toBottom, 250);
+  }
   requestAnimationFrame(fitConvoToViewport);
 }
 
