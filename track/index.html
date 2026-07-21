@@ -22,6 +22,8 @@ body_class: inner
     <p class="track-promise" id="trackPromise"></p>
     <p class="track-shipping" id="trackShipping" hidden></p>
 
+    <p class="track-photo-pending" id="trackPhotoPending" hidden>&#128248; Photos of your finished glove will show up right here once the work's done — check back when it's complete.</p>
+
     <section id="trackPhotosSection" hidden>
       <div class="mm-section-intro track-photos-intro">
         <h2 class="mm-section-title track-photos-title">The finished work</h2>
@@ -140,6 +142,11 @@ body_class: inner
 
     if (Array.isArray(o.photos) && o.photos.length) {
       document.getElementById("trackPhotosSection").hidden = false;
+      document.getElementById("trackPhotoPending").hidden = true;
+    } else if (o.stage < 6) {
+      document.getElementById("trackPhotoPending").hidden = false;
+    }
+    if (Array.isArray(o.photos) && o.photos.length) {
       document.getElementById("trackPhotos").innerHTML = o.photos.map((url, i) => `
         <button class="gallery-thumb" type="button" data-gallery-group="track" data-gallery-index="${i}"
           aria-label="Open photo ${i + 1}">

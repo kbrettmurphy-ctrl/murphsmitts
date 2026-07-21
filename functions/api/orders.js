@@ -5545,7 +5545,8 @@ async function sendStatusText(env, row, statusDisplay) {
   const status = normalizeStatus(statusDisplay);
   const orderNum = String(order.orderNumber || "").trim() || "(unknown)";
 
-  const body = `Murph's Mitts: Order #${orderNum} update - ${statusDisplay}. ${smsMessageSmart(order, status)}`;
+  const body = `Murph's Mitts: Order #${orderNum} update - ${statusDisplay}. ${smsMessageSmart(order, status)}`
+    + (row.tracking_token ? ` Track your glove: https://murphsmitts.com/track/?t=${row.tracking_token}` : "");
 
   const accountSid = env.TWILIO_ACCOUNT_SID;
   const authToken = env.TWILIO_AUTH_TOKEN;
@@ -5763,7 +5764,7 @@ function wrapReadyToGoEmailHtml(order, { firstName, orderNum, statusDisplay }) {
       <p style="margin:0 0 14px;"><strong>Total:</strong> ${escapeHtml(formatCurrency(pay.total))}</p>
     `;
 
-  const paymentHtml = paid === "paid"
+  const paymentHtml = (paid === "paid" || pay.total <= 0)
     ? ""
     : `
       ${amountHtml}
