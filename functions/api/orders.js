@@ -4770,6 +4770,17 @@ async function deleteGalleryPhoto(env, photoPath) {
   const deleted = await deleteGalleryStorageObject(env, parsed.path);
   if (!deleted.ok) return deleted;
 
+  /* Drop any album link pointing at this photo so it can't leave a broken
+     image on the gallery, customer profile, or tracking page. Match by the
+     unique filename to cover both visible and hidden URL variants. */
+  if (parsed.name) {
+    await supabaseFetch(
+      env,
+      `/rest/v1/gallery_photo_links?photo_url=like.${encodeURIComponent("*" + parsed.name)}`,
+      { method: "DELETE", headers: { Prefer: "return=minimal" } }
+    );
+  }
+
   return {
     ok: true,
     photo: galleryPhotoFromPath(env, parsed.path, parsed.hidden)
@@ -5546,8 +5557,8 @@ async function sendStatusText(env, row, statusDisplay) {
   const status = normalizeStatus(statusDisplay);
   const orderNum = String(order.orderNumber || "").trim() || "(unknown)";
 
-  const body = `Murph's Mitts: Order #${orderNum} update - ${statusDisplay}. ${smsMessageSmart(order, status)}`
-    + (row.tracking_token ? ` ${status === "completed" ? "See your finished glove" : "Track your glove"}: https://murphsmitts.com/track/?t=${row.tracking_token}` : "");
+  const body = `Murph's Mitts: Order #${orderNum} update — ${statusDisplay}\n\n${smsMessageSmart(order, status)}`
+    + (row.tracking_token ? `\n\n${status === "completed" ? "See your finished glove" : "Track your glove"}:\nhttps://murphsmitts.com/track/?t=${row.tracking_token}` : "");
 
   const accountSid = env.TWILIO_ACCOUNT_SID;
   const authToken = env.TWILIO_AUTH_TOKEN;
@@ -5662,7 +5673,7 @@ I'll coordinate pickup once payment is received.`;
   if (status === "completed") {
     const tracking = cleanDisplay(order.trackingNumber || order.tracking);
     return tracking
-      ? `Your glove is complete and has shipped. Tracking: ${tracking}`
+      ? `Your glove is complete and has shipped.\nTracking: ${tracking}`
       : "Your glove service is complete. Thanks again for choosing Murph's Mitts!";
   }
 

@@ -150,7 +150,7 @@ body_class: inner
       document.getElementById("trackPhotos").innerHTML = o.photos.map((url, i) => `
         <button class="gallery-thumb" type="button" data-gallery-group="track" data-gallery-index="${i}"
           aria-label="Open photo ${i + 1}">
-          <img src="${esc(url)}" alt="Finished glove photo ${i + 1}" loading="lazy" decoding="async">
+          <img src="${esc(url)}" alt="Finished glove photo ${i + 1}" loading="lazy" decoding="async" onerror="this.closest('.gallery-thumb').style.display='none'">
         </button>
       `).join("");
     }

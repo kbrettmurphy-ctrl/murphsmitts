@@ -9797,6 +9797,9 @@ function armMessageDelete(panel) {
   panel.addEventListener("contextmenu", (e) => {
     const line = e.target.closest?.(".msg-line[data-mid]");
     if (!line) return;
+    /* If the user has selected text (e.g. a tracking number), let the native
+       right-click menu open so they can copy it — don't hijack to delete. */
+    if (String(window.getSelection?.() || "").trim()) return;
     e.preventDefault();
     confirmDeleteMessage(line.dataset.mid);
   });
@@ -12804,7 +12807,7 @@ function renderCustomerProfile(panel, count, c) {
             <div class="customer-photo-strip">
               ${photos.map(p => `
                 <button class="customer-photo" type="button" data-customer-order="${escapeAttr(String(p.orderNumber))}" aria-label="Open order ${escapeAttr(String(p.orderNumber))}">
-                  <img src="${escapeAttr(p.url)}" alt="Glove photo" loading="lazy">
+                  <img src="${escapeAttr(p.url)}" alt="Glove photo" loading="lazy" onerror="this.closest('.customer-photo').style.display='none'">
                 </button>
               `).join("")}
             </div>
