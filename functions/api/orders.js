@@ -5265,7 +5265,7 @@ ${msg}`.trimEnd();
     : "";
 
   const afterThanks =
-`${trackUrl ? `\nTrack your glove anytime: ${trackUrl}\n\n` : ""}${THANKS_LINE}
+`${trackUrl ? `\n${isCompleted ? "See your finished glove" : "Track your glove anytime"}: ${trackUrl}\n\n` : ""}${THANKS_LINE}
 
 -Brett`;
 
@@ -5547,7 +5547,7 @@ async function sendStatusText(env, row, statusDisplay) {
   const orderNum = String(order.orderNumber || "").trim() || "(unknown)";
 
   const body = `Murph's Mitts: Order #${orderNum} update - ${statusDisplay}. ${smsMessageSmart(order, status)}`
-    + (row.tracking_token ? ` Track your glove: https://murphsmitts.com/track/?t=${row.tracking_token}` : "");
+    + (row.tracking_token ? ` ${status === "completed" ? "See your finished glove" : "Track your glove"}: https://murphsmitts.com/track/?t=${row.tracking_token}` : "");
 
   const accountSid = env.TWILIO_ACCOUNT_SID;
   const authToken = env.TWILIO_AUTH_TOKEN;
@@ -5703,10 +5703,10 @@ function reviewHtml() {
   </div>`;
 }
 
-function emailTrackButtonHtml(trackUrl) {
+function emailTrackButtonHtml(trackUrl, label = "Track your glove") {
   return trackUrl ? `
     <div style="margin:20px 0;">
-      <a href="${trackUrl}" style="display:inline-block; background:#092f4d; color:#ffffff; text-decoration:none; font-weight:bold; font-size:12px; padding:7px 15px; border-radius:999px;">Track your glove</a>
+      <a href="${trackUrl}" style="display:inline-block; background:#092f4d; color:#ffffff; text-decoration:none; font-weight:bold; font-size:12px; padding:7px 15px; border-radius:999px;">${label}</a>
     </div>` : "";
 }
 
@@ -5729,7 +5729,7 @@ function wrapEmailHtmlSplit(beforeThanks, afterThanks, includeReview, trackUrl) 
   <div style="font-family: Arial, sans-serif; max-width: 640px; line-height: 1.5; text-align:left; color:#20313d;">
     <div style="white-space:pre-wrap; margin:0;">${escapeHtml(beforeThanks)}</div>
     ${includeReview ? reviewHtml() : ""}
-    ${emailTrackButtonHtml(trackUrl)}
+    ${emailTrackButtonHtml(trackUrl, includeReview ? "See your finished glove" : "Track your glove")}
     <div style="white-space:pre-wrap; margin:16px 0 0;">${escapeHtml(afterThanks)}</div>
     ${emailSignatureHtml()}
   </div>`;
