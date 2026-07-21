@@ -902,10 +902,10 @@ async function sendReceivedText(env, row) {
   const orderNum = String(row.order_number || "").trim() || "(unknown)";
 
   const body =
-    `Murph's Mitts: I received your glove service request (#${orderNum}). ` +
+    `Murph's Mitts: I received your glove service request (#${orderNum}).\n\n` +
     `I'll review the details and send an estimate by email. ` +
-    `If you'd like, you can reply to this text with photos of your glove to help me evaluate it.` +
-    (row.tracking_token ? ` Track your glove anytime: https://murphsmitts.com/track/?t=${row.tracking_token}` : "");
+    `If you'd like, reply to this text with photos of your glove to help me evaluate it.` +
+    (row.tracking_token ? `\n\nTrack your glove anytime:\nhttps://murphsmitts.com/track/?t=${row.tracking_token}` : "");
 
   return await sendTwilioText(env, to, body);
 }
