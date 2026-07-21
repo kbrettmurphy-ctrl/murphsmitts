@@ -619,6 +619,11 @@ function seedDemoStore() {
     secondaryLaceUsed: "",
     status: o.status,
     paid: o.paid || "Unpaid",
+    /* Demo: the current status was already delivered, so the Status Delivery
+       panel reads "sent" instead of a failed-looking "Not sent". */
+    lastStatusEmailed: o.emailedStatus ?? o.status,
+    lastStatusTexted: o.textedStatus ?? o.status,
+    lastStatusTextedAt: daysAgoIso(o.updatedDaysAgo != null ? o.updatedDaysAgo : (o.age || 0)) + "T14:02:00.000Z",
     priceQuoted: o.price ?? "",
     shippingCost: o.shippingCost ?? 0,
     dropOffMethod: o.dropOffMethod || "Local Drop-Off",
