@@ -593,7 +593,15 @@ function demoStatusActivity(status, receivedIso) {
 
 function seedDemoStore() {
   const nameKey = s => String(s || "").toLowerCase().replace(/[^a-z]+/g, ".").replace(/^\.|\.$/g, "");
-  const phoneFor = s => { let h = 0; for (const c of nameKey(s)) h = (h * 31 + c.charCodeAt(0)) % 100; return `(910) 555-01${String(h).padStart(2, "0")}`; };
+  /* Unique phone per unique customer (sequential, not hashed) — a hash
+     collision would merge two people in the Customers view. */
+  const phoneMap = {};
+  let phoneSeq = 1;
+  const phoneFor = s => {
+    const k = nameKey(s);
+    if (!phoneMap[k]) phoneMap[k] = `(910) 555-0${String(100 + phoneSeq++).slice(-3)}`;
+    return phoneMap[k];
+  };
 
   const mkOrder = (n, o) => ({
     orderNumber: n,
