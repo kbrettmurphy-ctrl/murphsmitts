@@ -5280,7 +5280,8 @@ ${msg}`.trimEnd();
   ? wrapReadyToGoEmailHtml(order, {
       firstName,
       orderNum,
-      statusDisplay
+      statusDisplay,
+      trackUrl
     })
   : isCompleted
     ? wrapEmailHtmlSplit(beforeThanks, afterThanksHtml, true, trackUrl)
@@ -5701,16 +5702,15 @@ function reviewHtml() {
   </div>`;
 }
 
-function wrapEmailHtmlSplit(beforeThanks, afterThanks, includeReview, trackUrl) {
-  return `
-  <div style="font-family: Arial, sans-serif; max-width: 640px; line-height: 1.5; text-align:left; color:#20313d;">
-    <div style="white-space:pre-wrap; margin:0;">${escapeHtml(beforeThanks)}</div>
-    ${includeReview ? reviewHtml() : ""}
-    ${trackUrl ? `
+function emailTrackButtonHtml(trackUrl) {
+  return trackUrl ? `
     <div style="margin:20px 0;">
       <a href="${trackUrl}" style="display:inline-block; background:#092f4d; color:#ffffff; text-decoration:none; font-weight:bold; font-size:12px; padding:7px 15px; border-radius:999px;">Track your glove</a>
-    </div>` : ""}
-    <div style="white-space:pre-wrap; margin:16px 0 0;">${escapeHtml(afterThanks)}</div>
+    </div>` : "";
+}
+
+function emailSignatureHtml() {
+  return `
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px; border-top:1px solid #e6e1d6; width:100%;"><tr>
       <td style="padding:14px 12px 0 0; width:46px; vertical-align:top;">
         <img src="https://murphsmitts.com/assets/img/logo.png" width="42" height="42" alt="Murph's Mitt Maintenance" style="display:block;">
@@ -5720,11 +5720,21 @@ function wrapEmailHtmlSplit(beforeThanks, afterThanks, includeReview, trackUrl) 
         Murph's Mitt Maintenance &middot; Surf City, NC<br>
         <a href="https://murphsmitts.com" style="color:#092f4d;">murphsmitts.com</a>
       </td>
-    </tr></table>
+    </tr></table>`;
+}
+
+function wrapEmailHtmlSplit(beforeThanks, afterThanks, includeReview, trackUrl) {
+  return `
+  <div style="font-family: Arial, sans-serif; max-width: 640px; line-height: 1.5; text-align:left; color:#20313d;">
+    <div style="white-space:pre-wrap; margin:0;">${escapeHtml(beforeThanks)}</div>
+    ${includeReview ? reviewHtml() : ""}
+    ${emailTrackButtonHtml(trackUrl)}
+    <div style="white-space:pre-wrap; margin:16px 0 0;">${escapeHtml(afterThanks)}</div>
+    ${emailSignatureHtml()}
   </div>`;
 }
 
-function wrapReadyToGoEmailHtml(order, { firstName, orderNum, statusDisplay }) {
+function wrapReadyToGoEmailHtml(order, { firstName, orderNum, statusDisplay, trackUrl }) {
   const ship = looksLikeShipMethod(order.dropOffMethod);
   const paid = normalizePaidValue(order.paid);
   const pay = buildPaymentLinks(order);
@@ -5786,7 +5796,7 @@ function wrapReadyToGoEmailHtml(order, { firstName, orderNum, statusDisplay }) {
     `;
 
   return `
-  <div style="font-family: Arial, sans-serif; max-width: 640px; line-height: 1.45; text-align:left;">
+  <div style="font-family: Arial, sans-serif; max-width: 640px; line-height: 1.5; text-align:left; color:#20313d;">
     <p>Hey${firstName ? " " + escapeHtml(firstName) : ""},</p>
 
     <p>Quick update on your glove service.</p>
@@ -5800,9 +5810,12 @@ function wrapReadyToGoEmailHtml(order, { firstName, orderNum, statusDisplay }) {
 
     ${paymentHtml}
 
+    ${emailTrackButtonHtml(trackUrl)}
+
     <p>${escapeHtml(THANKS_LINE)}</p>
 
     <p>-Brett</p>
+    ${emailSignatureHtml()}
   </div>`;
 }
 
