@@ -3137,8 +3137,13 @@ const SHOP_ECONOMICS = {
 };
 
 const SHOP_PRICING = {
-  relaceBase: { "Fielders Glove": 80, "Catchers Mitt": 100, "First Base Mitt": 100 },
-  trapezeUpcharge: 20, // fielders w/ Trapeze or Modified Trapeze web => 100
+  /* Full Service = clean + condition + relace. Full Relace = relace only.
+     Catcher's/first-base bases already include the +$20 the price list adds. */
+  fullServiceBase: { "Fielders Glove": 80, "Catchers Mitt": 100, "First Base Mitt": 100 },
+  fullRelaceBase:  { "Fielders Glove": 60, "Catchers Mitt": 80,  "First Base Mitt": 80 },
+  cleanConditionBase: 50,
+  laceRepairBase: 40, // varies in practice — measured data supersedes once the bucket fills
+  trapezeUpcharge: 20, // fielders w/ Trapeze or Modified Trapeze web
   palmPadAddOn: 20
 };
 
@@ -3387,17 +3392,33 @@ function ensureOrderEconomicsDelegation() {
    from historical quoted prices. The price table is swappable: a
    future sprint will replace it with measured timer data. */
 function getSuggestedPrice(order) {
-  if (!orderHasRelacingService(order)) return null;
-
   const gloveType = String(order?.gloveType || "");
-  const base = SHOP_PRICING.relaceBase[gloveType] ?? SHOP_PRICING.relaceBase["Fielders Glove"];
-  const parts = [`Relace: ${formatCurrency(base)}`];
-  let price = base;
+  const hasRelace = orderHasRelacingService(order);
+  const hasClean = orderHasCleaningService(order);
+  const hasLaceRepair = getOrderSelectedServices(order).includes("Lace Repair");
 
-  if (gloveType === "Fielders Glove" && orderHasTrapezeWeb(order)) {
-    price += SHOP_PRICING.trapezeUpcharge;
-    parts.push(`Trapeze web: +${formatCurrency(SHOP_PRICING.trapezeUpcharge)}`);
+  let price = null;
+  const parts = [];
+
+  if (hasRelace) {
+    /* Full Service (clean + condition + relace) vs Full Relace (relace only). */
+    const fullService = hasClean;
+    const table = fullService ? SHOP_PRICING.fullServiceBase : SHOP_PRICING.fullRelaceBase;
+    price = table[gloveType] ?? table["Fielders Glove"];
+    parts.push(`${fullService ? "Full service" : "Full relace"}: ${formatCurrency(price)}`);
+    if (gloveType === "Fielders Glove" && orderHasTrapezeWeb(order)) {
+      price += SHOP_PRICING.trapezeUpcharge;
+      parts.push(`Trapeze web: +${formatCurrency(SHOP_PRICING.trapezeUpcharge)}`);
+    }
+  } else if (hasClean) {
+    price = SHOP_PRICING.cleanConditionBase;
+    parts.push(`Clean & condition: ${formatCurrency(price)}`);
+  } else if (hasLaceRepair) {
+    price = SHOP_PRICING.laceRepairBase;
+    parts.push(`Lace repair: ${formatCurrency(price)} (varies)`);
   }
+
+  if (price === null) return null;
 
   if (orderHasPalmPadService(order)) {
     price += SHOP_PRICING.palmPadAddOn;
