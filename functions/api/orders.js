@@ -5202,6 +5202,13 @@ function moneyNumber(value) {
   return Number.isNaN(n) ? 0 : n;
 }
 
+/* A gift / no-charge order (unpaid but $0 total) owes nothing — every
+   ready-to-go/completed message must skip all payment wording for it. */
+function orderHasBalanceDue(order) {
+  if (normalizePaidValue(order.paid) === "paid") return false;
+  return buildPaymentLinks(order).total > 0;
+}
+
 function buildPaymentLinks(order) {
   const service = moneyNumber(order.priceQuoted);
   const shipping = moneyNumber(order.shippingCost);
@@ -5357,7 +5364,7 @@ I'll keep you updated if anything changes.`;
     const pay = buildPaymentLinks(order);
   
     if (ship) {
-      if (paid === "paid") {
+      if (!orderHasBalanceDue(order)) {
         return `Your glove is finished and ready to ship!
   
   I'll get it packaged up and send tracking once it's on the way.`;
@@ -5381,7 +5388,7 @@ I'll keep you updated if anything changes.`;
 Once payment is received, I'll ship your glove and send your tracking information.`;
     }
   
-    if (paid === "paid") {
+    if (!orderHasBalanceDue(order)) {
       return `Your glove is finished and ready for pickup!
   
   I'll call/text shortly to coordinate a pickup time.`;
@@ -5415,7 +5422,7 @@ Once payment is received, I'll ship your glove and send your tracking informatio
         ? `\nCarrier: ${carrier || "Not specified"}\nTracking Number: ${tracking}${link ? "\nTracking Link: " + link : ""}`
         : "";
 
-      if (paid !== "paid") {
+      if (orderHasBalanceDue(order)) {
         return `All finished up. Your glove is on the way!${trackingLine}
 
 Quick note: this one went out under the “ship before payment” exception.
@@ -5428,7 +5435,7 @@ If not, please take care of it when you can.`;
 I really appreciate the support. Hope it feels great when it hits your mailbox.`;
     }
 
-    if (paid !== "paid") {
+    if (orderHasBalanceDue(order)) {
       return `Your glove is all finished up.
 
 I just need to get payment taken care of before we fully close this one out.
@@ -5637,7 +5644,7 @@ function smsMessageSmart(order, status) {
   const paid = normalizePaidValue(order.paid);
   const pay = buildPaymentLinks(order);
 
-  if (paid === "paid") {
+  if (!orderHasBalanceDue(order)) {
     return ship
       ? "Your glove is finished and ready to ship! I’ll send tracking once it’s on the way."
       : "Your glove is finished and ready for pickup! I’ll contact you shortly to coordinate pickup.";
