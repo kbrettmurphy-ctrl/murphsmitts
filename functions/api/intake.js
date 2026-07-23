@@ -907,7 +907,29 @@ async function sendReceivedText(env, row) {
     `If you'd like, reply to this text with photos of your glove to help me evaluate it.` +
     (row.tracking_token ? `\n\nTrack your glove anytime:\nhttps://murphsmitts.com/track/?t=${row.tracking_token}` : "");
 
-  return await sendTwilioText(env, to, body);
+  const sent = await sendTwilioText(env, to, body);
+
+  /* Mirror the received-confirmation text into the Messages inbox, same as
+     status texts — it's the first message the customer gets. Best-effort. */
+  if (sent.ok) {
+    try {
+      await supabaseFetch(env, `/rest/v1/sms_messages`, {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          direction: "out",
+          phone_number: to,
+          customer_name: row.customer_name || null,
+          order_number: orderNum,
+          body,
+          twilio_sid: (sent.data && sent.data.sid) || null,
+          read: true
+        })
+      });
+    } catch { /* never block the confirmation text on inbox logging */ }
+  }
+
+  return sent;
 }
 
 async function sendTwilioText(env, to, body) {
