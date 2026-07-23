@@ -74,18 +74,18 @@ export async function onRequest(context) {
         updates.status = "Customer Approved";
         updates.customer_approved_at = new Date().toISOString();
 
-        reply = "Thanks, your estimate is approved. Brett will follow up to coordinate drop-off or shipping.";
+        reply = "Awesome — you're approved! I'll be in touch to sort out drop-off or shipping. Thanks so much!";
       } else {
-        reply = "Thanks, I received your approval. Brett will follow up if anything else is needed.";
+        reply = "Thanks — got your approval! I'll follow up if I need anything else.";
       }
     }
 
     if (normalized === "no" || normalized === "n") {
       if (normalizeStatus(order.status) === "estimate sent") {
         updates.status = "On Hold";
-        reply = "No problem. Your request has been placed on hold. Brett will follow up if needed.";
+        reply = "No problem at all — I've set it aside for now. Just reach out whenever you're ready and I'll pick it right back up.";
       } else {
-        reply = "Thanks, I received your message. Brett will follow up if needed.";
+        reply = "Thanks — got your message! I'll follow up if anything's needed.";
       }
     }
 
@@ -125,6 +125,15 @@ export async function onRequest(context) {
       `Text from Order #${orderNumber}`,
       `${order.customer_name || "Customer"}: ${message}`
     );
+
+    if (reply) {
+      await storeOutboundMessage(env, {
+        to: from,
+        body: reply,
+        orderNumber,
+        customerName: order.customer_name || null
+      });
+    }
 
     return twiml(reply);
   } catch (err) {
@@ -195,6 +204,25 @@ async function storeInboundMessage(env, { from, body, orderNumber, customerName,
     });
   } catch {
     /* The reply flow must never fail because logging the message failed. */
+  }
+}
+
+async function storeOutboundMessage(env, { to, body, orderNumber, customerName }) {
+  try {
+    await supabaseFetch(env, `/rest/v1/sms_messages`, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        direction: "out",
+        phone_number: to,
+        customer_name: customerName || null,
+        order_number: orderNumber || null,
+        body: body || "",
+        read: true
+      })
+    });
+  } catch {
+    /* The reply flow must never fail because logging the auto-reply failed. */
   }
 }
 

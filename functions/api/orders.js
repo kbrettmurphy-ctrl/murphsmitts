@@ -1251,11 +1251,6 @@ export async function onRequest(context) {
         mergedPreview.date_completed = dbUpdates.date_completed;
       }
 
-      if (statusChanged && isInternalOnlyStatus(newStatus)) {
-        dbUpdates.last_status_emailed = normalizeDisplayStatus(mergedPreview.status);
-        mergedPreview.last_status_emailed = normalizeDisplayStatus(mergedPreview.status);
-      }
-
       if (shouldEmailForStatus && !env.RESEND_API_KEY) {
         return json(
           {
@@ -5317,7 +5312,7 @@ function statusMessageSmart(order, statusDisplay) {
   const s = normalizeStatus(statusDisplay);
 
   if (s === "received") {
-    return "Your glove is checked in and queued up.";
+    return "You're all set — I've got your order in the queue. I'll be in touch as things move along!";
   }
 
   if (s === "estimate sent") {
@@ -5327,7 +5322,7 @@ function statusMessageSmart(order, statusDisplay) {
     const laceNotes = cleanDisplay(order.customLaceNotes || order.customColorRequest);
     const formattedPrice = formatCurrency(order.priceQuoted);
 
-    return `Here is your estimate and request summary:
+    return `Here's your estimate and a quick recap of what you asked for:
 
 Services Requested:
 ${services || "Not specified"}
@@ -5340,78 +5335,73 @@ ${laceNotes ? "Color Notes: " + laceNotes : ""}
 Estimated Total:
 ${formattedPrice || "Pending"}
 
-Reply YES to approve and coordinate drop-off/shipping so that I can begin the work.
-Reply NO to place the request on hold.
-
-If I don't hear back within 48 hours, the order will be placed on hold.`;
+Reply YES to approve, or NO to set it aside for now. Once you're good to go, we'll sort out drop-off or shipping and I'll get started. If I don't hear back in a couple days, I'll just hold onto it until you're ready.`;
   }
 
   if (s === "in progress") {
     const formattedDate = formatLongDate(order.estimatedCompletion);
 
-    return `Work has begun on your glove!${formattedDate ? "\n\nEstimated completion: " + formattedDate : ""}
+    return `Good news — I've started on your glove!${formattedDate ? "\n\nEstimated completion: " + formattedDate : ""}
 
-I'll keep you updated if anything changes.`;
+I'll reach out if anything comes up.`;
   }
 
   if (s === "waiting on lace/parts") {
-    return "Your glove is temporarily on hold while I wait on materials needed to complete the work.\n\nAs soon as the lace/parts arrive, I'll be able to start the work and send another update.";
+    return "Quick heads-up — I'm waiting on some lace/parts to come in before I can wrap up your glove.\n\nAs soon as they land, I'll jump right back on it and let you know.";
   }
 
   if (s === "ready to go") {
     const ship = looksLikeShipMethod(order.dropOffMethod);
-    const paid = normalizePaidValue(order.paid);
     const pay = buildPaymentLinks(order);
-  
+
     if (ship) {
       if (!orderHasBalanceDue(order)) {
-        return `Your glove is finished and ready to ship!
-  
-  I'll get it packaged up and send tracking once it's on the way.`;
+        return `Your glove's finished and ready to ship!
+
+I'll get it boxed up and send tracking as soon as it's on the way.`;
       }
-  
-      return `Your glove is finished and ready to ship!
-  
-  Amount Due
-  
-  Service:   ${formatCurrency(pay.service)}
-  Shipping:  ${formatCurrency(pay.shipping)}
-  ----------------------
-  Total:     ${formatCurrency(pay.total)}
-  
-  Payment Options
-  
-  Venmo: ${pay.venmo}
-  PayPal: ${pay.paypal}
-  Zelle: ${pay.zelle}
-  
-Once payment is received, I'll ship your glove and send your tracking information.`;
+
+      return `Your glove's finished and ready to ship!
+
+Amount Due
+
+Service:   ${formatCurrency(pay.service)}
+Shipping:  ${formatCurrency(pay.shipping)}
+----------------------
+Total:     ${formatCurrency(pay.total)}
+
+Payment Options
+
+Venmo: ${pay.venmo}
+PayPal: ${pay.paypal}
+Zelle: ${pay.zelle}
+
+As soon as payment comes through, I'll ship it out and send your tracking.`;
     }
-  
+
     if (!orderHasBalanceDue(order)) {
-      return `Your glove is finished and ready for pickup!
-  
-  I'll call/text shortly to coordinate a pickup time.`;
+      return `Your glove's finished and ready for pickup!
+
+I'll reach out shortly to set up a good time.`;
     }
-  
-    return `Your glove is finished and ready for pickup!
-  
-  Amount Due
-  
-  Total: ${formatCurrency(pay.total)}
-  
-  Payment Options
-  
-  Venmo: ${pay.venmo}
-  PayPal: ${pay.paypal}
-  Zelle: ${pay.zelle}
-  
-  Once payment is received, I'll coordinate pickup with you unless you are paying cash.`;
+
+    return `Your glove's finished and ready for pickup!
+
+Amount Due
+
+Total: ${formatCurrency(pay.total)}
+
+Payment Options
+
+Venmo: ${pay.venmo}
+PayPal: ${pay.paypal}
+Zelle: ${pay.zelle}
+
+Send the payment whenever works, or just bring cash at pickup — either's fine by me.`;
   }
-  
+
   if (s === "completed") {
     const ship = looksLikeShipMethod(order.dropOffMethod);
-    const paid = normalizePaidValue(order.paid);
 
     if (ship) {
       const carrier = cleanDisplay(order.carrier);
@@ -5423,39 +5413,36 @@ Once payment is received, I'll ship your glove and send your tracking informatio
         : "";
 
       if (orderHasBalanceDue(order)) {
-        return `All finished up. Your glove is on the way!${trackingLine}
+        return `All done — your glove's on the way!${trackingLine}
 
-Quick note: this one went out under the “ship before payment” exception.
-If you've already handled payment, you're all set.
-If not, please take care of it when you can.`;
+Quick note: this one went out before payment. If you've already squared up, you're all set. If not, just take care of it whenever you can.`;
       }
 
-      return `All finished up. Your glove is on the way!${trackingLine}
+      return `All done — your glove's on the way!${trackingLine}
 
-I really appreciate the support. Hope it feels great when it hits your mailbox.`;
+Really appreciate the support. Hope it feels great when it lands in your mailbox.`;
     }
 
     if (orderHasBalanceDue(order)) {
-      return `Your glove is all finished up.
+      return `Your glove's all finished up!
 
-I just need to get payment taken care of before we fully close this one out.
-Whenever you're ready, shoot me a message and we'll settle up.
+Just need to square up payment before I close this one out — whenever you're ready, shoot me a message and we'll settle it.
 
 Appreciate you trusting me with it.`;
     }
 
-    return `Your glove is officially finished and good to go!
+    return `Your glove's all finished and good to go!
 
-I really appreciate you trusting me with your glove and hope it treats you well on the field.
+Really appreciate you trusting me with it — hope it treats you well out there.
 
-If you ever need another glove cleaned up, relaced, or tuned up, you know where to find me!`;
+Ever need another one cleaned up, relaced, or tuned up, you know where to find me!`;
   }
 
-if (s === "on hold") {
-  return `Your order has been placed on hold for now.
+  if (s === "on hold") {
+    return `No rush at all — I've set your order aside for now.
 
-When you're ready to move forward with servicing your glove, just reply to this email and I’ll be happy to pick things back up from there.`;
-}
+Whenever you're ready to move forward, just reply here and I'll pick right back up where we left off.`;
+  }
 
   return "Status has been updated.";
 }
@@ -5626,32 +5613,35 @@ async function sendStatusText(env, row, statusDisplay) {
 function smsMessageSmart(order, status) {
   if (status === "estimate sent") {
     const estimate = formatCurrency(order.priceQuoted);
-  
-    return `Your estimate has been sent to your email.
-  
-  Estimated Total: ${estimate}
-  
-  Reply YES to approve or NO to place the request on hold.`;
+
+    return `Your estimate's in your email!
+
+Estimated total: ${estimate}
+
+Reply YES to approve, or NO to set it aside for now.`;
   }
 
   if (status === "in progress") {
     const d = formatLongDate(order.estimatedCompletion);
-    return `Work has begun on your glove.${d ? " Estimated completion: " + d + "." : ""}`;
+    return `I've started on your glove!${d ? " Est. completion: " + d + "." : ""}`;
+  }
+
+  if (status === "waiting on lace/parts") {
+    return "I'm waiting on some lace/parts to come in before I can finish your glove. I'll text again the moment they land!";
   }
 
   if (status === "ready to go") {
-  const ship = looksLikeShipMethod(order.dropOffMethod);
-  const paid = normalizePaidValue(order.paid);
-  const pay = buildPaymentLinks(order);
+    const ship = looksLikeShipMethod(order.dropOffMethod);
+    const pay = buildPaymentLinks(order);
 
-  if (!orderHasBalanceDue(order)) {
-    return ship
-      ? "Your glove is finished and ready to ship! I’ll send tracking once it’s on the way."
-      : "Your glove is finished and ready for pickup! I’ll contact you shortly to coordinate pickup.";
-  }
+    if (!orderHasBalanceDue(order)) {
+      return ship
+        ? "Your glove's finished and ready to ship! I'll send tracking as soon as it's on the way."
+        : "Your glove's finished and ready for pickup! I'll reach out shortly to set up a good time.";
+    }
 
-  if (ship) {
-    return `Your glove is finished and ready to ship!
+    if (ship) {
+      return `Your glove's finished and ready to ship!
 
 Service: ${formatCurrency(pay.service)}
 Shipping: ${formatCurrency(pay.shipping)}
@@ -5662,10 +5652,10 @@ Venmo: ${pay.venmo}
 PayPal: ${pay.paypalText}
 Zelle: ${pay.zelle}
 
-Your glove will ship once payment is received.`;
-  }
+As soon as payment comes through, I'll get it shipped out.`;
+    }
 
-  return `Your glove is finished and ready for pickup!
+    return `Your glove's finished and ready for pickup!
 
 Total Due: ${formatCurrency(pay.total)}
 
@@ -5674,19 +5664,25 @@ Venmo: ${pay.venmo}
 PayPal: ${pay.paypalText}
 Zelle: ${pay.zelle}
 
-I'll coordinate pickup once payment is received, unless you're paying cash.`;
-}
+Send it whenever works, or just bring cash at pickup — either's fine.`;
+  }
 
   if (status === "completed") {
     const tracking = cleanDisplay(order.trackingNumber || order.tracking);
     const owes = orderHasBalanceDue(order);
+
     if (tracking) {
-      return `Your glove is complete and has shipped.\nTracking: ${tracking}`
-        + (owes ? "\n\nJust need to settle up payment when you get a chance." : "");
+      return `Your glove's all done and on its way!\nTracking: ${tracking}`
+        + (owes
+            ? "\n\nJust square up payment whenever you can."
+            : `\n\nIf you've got a sec, a quick review really helps a small shop like mine:\n${REVIEW_URL}`);
     }
-    return owes
-      ? "Your glove is all finished up! Just need to settle up payment when you get a chance — shoot me a message and we'll take care of it."
-      : "Your glove service is complete. Thanks again for choosing Murph's Mitts!";
+
+    if (owes) {
+      return "Your glove's all finished up! Just need to square up payment when you get a chance — shoot me a message and we'll sort it out.";
+    }
+
+    return `Your glove's all finished up — thanks so much for trusting me with it!\n\nIf you've got a sec, a quick review really helps a small shop like mine:\n${REVIEW_URL}`;
   }
 
   return "Your order status has been updated.";
@@ -5705,6 +5701,7 @@ function shouldSendTextForStatus(status) {
   return (
     status === "estimate sent" ||
     status === "in progress" ||
+    status === "waiting on lace/parts" ||
     status === "ready to go" ||
     status === "completed"
   );
