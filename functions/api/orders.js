@@ -5341,7 +5341,7 @@ Estimated Total:
 ${formattedPrice || "Pending"}
 
 Reply YES to approve and coordinate drop-off/shipping so that I can begin the work.
-Reply NO to cancel this request.
+Reply NO to place the request on hold.
 
 If I don't hear back within 48 hours, the order will be placed on hold.`;
   }
@@ -5674,13 +5674,18 @@ Venmo: ${pay.venmo}
 PayPal: ${pay.paypalText}
 Zelle: ${pay.zelle}
 
-I'll coordinate pickup once payment is received.`;
+I'll coordinate pickup once payment is received, unless you're paying cash.`;
 }
 
   if (status === "completed") {
     const tracking = cleanDisplay(order.trackingNumber || order.tracking);
-    return tracking
-      ? `Your glove is complete and has shipped.\nTracking: ${tracking}`
+    const owes = orderHasBalanceDue(order);
+    if (tracking) {
+      return `Your glove is complete and has shipped.\nTracking: ${tracking}`
+        + (owes ? "\n\nJust need to settle up payment when you get a chance." : "");
+    }
+    return owes
+      ? "Your glove is all finished up! Just need to settle up payment when you get a chance — shoot me a message and we'll take care of it."
       : "Your glove service is complete. Thanks again for choosing Murph's Mitts!";
   }
 
