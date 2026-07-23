@@ -680,11 +680,9 @@ function statusMessageSmart(order, statusDisplay) {
   const s = normalizeStatus(statusDisplay);
 
   if (s === "received") {
-    return `Your glove request has been received.
+    return `Got your request — thanks for reaching out!
 
-I will get back to you if I have any questions. Otherwise, you will be receiving an order summary and quote for services at the email address you provided.
-
-In the meantime, if you have photos of your glove, it would be very helpful if you could reply to this email and attach them so I can better determine what your glove may need.
+I'll look over the details and get an estimate to you by email shortly. If you've got photos of the glove handy, just reply and send them over — it helps me figure out exactly what it needs.
 
 `;
   }
@@ -902,10 +900,10 @@ async function sendReceivedText(env, row) {
   const orderNum = String(row.order_number || "").trim() || "(unknown)";
 
   const body =
-    `Murph's Mitts: I received your glove service request (#${orderNum}).\n\n` +
-    `I'll review the details and send an estimate by email. ` +
-    `If you'd like, reply to this text with photos of your glove to help me evaluate it.` +
-    (row.tracking_token ? `\n\nTrack your glove anytime:\nhttps://murphsmitts.com/track/?t=${row.tracking_token}` : "");
+    `Murph's Mitts: Got your request (#${orderNum})!\n\n` +
+    `I'll look it over and send an estimate by email. ` +
+    `Feel free to reply here with photos of the glove — helps me size up the work.` +
+    (row.tracking_token ? `\n\nTrack it anytime:\nhttps://murphsmitts.com/track/?t=${row.tracking_token}` : "");
 
   const sent = await sendTwilioText(env, to, body);
 
