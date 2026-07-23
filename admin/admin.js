@@ -6966,6 +6966,10 @@ function mergeUpdatedOrder(order) {
       ...allOrders[idx],
       ...order
     };
+  } else {
+    /* Brand-new order (e.g. just created): add it so openOrder can find it
+       immediately instead of alerting "Order not found." */
+    allOrders.push(order);
   }
 }
 
