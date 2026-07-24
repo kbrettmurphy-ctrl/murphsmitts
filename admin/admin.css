@@ -1289,6 +1289,14 @@ button.dashboard-metric:active{
   min-width:172px;
 }
 
+/* Flip the finance filter popover above the toggle when it would open past
+   the bottom of the viewport (Finance Snapshot lives at the bottom of the
+   Clubhouse). The .open-up class is toggled in setFinanceFilterMenuOpen. */
+.dashboard-finance-controls .dashboard-finance-filter-popover.open-up{
+  top:auto;
+  bottom:calc(100% + 6px);
+}
+
 .dashboard-finance-custom{
   display:grid;
   grid-template-columns:repeat(2, minmax(0, 1fr));
