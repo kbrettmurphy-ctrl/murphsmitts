@@ -1266,6 +1266,12 @@ function getFinanceDateRange(
   const today = startOfDay(now);
 
   switch (filterKey) {
+    case "this-month":
+      return {
+        start: startOfDay(new Date(today.getFullYear(), today.getMonth(), 1)),
+        end: endOfDay(now),
+        label: "This month"
+      };
     case "last-30-days":
       return {
         start: startOfDay(new Date(today.getTime() - 29 * 86400000)),
