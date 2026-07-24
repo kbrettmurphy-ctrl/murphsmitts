@@ -1838,9 +1838,26 @@ function updateFinanceSnapshotSummary() {
 function setFinanceFilterMenuOpen(open) {
   financeFilterMenuOpen = open;
   const popover = document.getElementById("financeFilterPopover");
-  if (popover) popover.hidden = !open;
-
   const toggle = document.getElementById("financeFilterToggleBtn");
+
+  if (popover) {
+    popover.hidden = !open;
+    // Finance Snapshot sits at the bottom of the Clubhouse, so opening the
+    // popover downward can push it off-screen. Flip it above the toggle when
+    // there isn't enough room below and there's more space above.
+    popover.classList.remove("open-up");
+    if (open) {
+      const anchor = toggle || popover;
+      const anchorRect = anchor.getBoundingClientRect();
+      const popoverHeight = popover.offsetHeight || 0;
+      const spaceBelow = window.innerHeight - anchorRect.bottom;
+      const spaceAbove = anchorRect.top;
+      if (spaceBelow < popoverHeight + 12 && spaceAbove > spaceBelow) {
+        popover.classList.add("open-up");
+      }
+    }
+  }
+
   if (toggle) {
     toggle.classList.toggle("is-active", open);
     toggle.setAttribute("aria-expanded", open ? "true" : "false");
