@@ -1266,6 +1266,12 @@ function getFinanceDateRange(
   const today = startOfDay(now);
 
   switch (filterKey) {
+    case "this-month":
+      return {
+        start: startOfDay(new Date(today.getFullYear(), today.getMonth(), 1)),
+        end: endOfDay(now),
+        label: "This month"
+      };
     case "last-30-days":
       return {
         start: startOfDay(new Date(today.getTime() - 29 * 86400000)),
@@ -1525,7 +1531,8 @@ function renderDashboardTimerButton(order, session) {
 }
 
 function renderDashboardOrderRow(order, { timerControls = false } = {}) {
-  const lace = String(order.primaryLaceColor || order.lacePrimary || "").trim();
+  const laceRaw = String(order.primaryLaceColor || order.lacePrimary || "").trim();
+  const lace = laceRaw ? adminLaceLabel(laceRaw) : "";
   const brand = String(order.brandModel || "").trim();
   const meta = [brand, lace].filter(Boolean).join(" · ");
   const orderKey = String(order.orderNumber || "");
@@ -1832,9 +1839,26 @@ function updateFinanceSnapshotSummary() {
 function setFinanceFilterMenuOpen(open) {
   financeFilterMenuOpen = open;
   const popover = document.getElementById("financeFilterPopover");
-  if (popover) popover.hidden = !open;
-
   const toggle = document.getElementById("financeFilterToggleBtn");
+
+  if (popover) {
+    popover.hidden = !open;
+    // Finance Snapshot sits at the bottom of the Clubhouse, so opening the
+    // popover downward can push it off-screen. Flip it above the toggle when
+    // there isn't enough room below and there's more space above.
+    popover.classList.remove("open-up");
+    if (open) {
+      const anchor = toggle || popover;
+      const anchorRect = anchor.getBoundingClientRect();
+      const popoverHeight = popover.offsetHeight || 0;
+      const spaceBelow = window.innerHeight - anchorRect.bottom;
+      const spaceAbove = anchorRect.top;
+      if (spaceBelow < popoverHeight + 12 && spaceAbove > spaceBelow) {
+        popover.classList.add("open-up");
+      }
+    }
+  }
+
   if (toggle) {
     toggle.classList.toggle("is-active", open);
     toggle.setAttribute("aria-expanded", open ? "true" : "false");
@@ -2512,8 +2536,8 @@ function summarizeLace(order) {
   const primaryUsed = order.primaryLaceUsed;
   const secondaryUsed = order.secondaryLaceUsed;
 
-  if (primary) parts.push(primary);
-  if (secondary) parts.push(secondary);
+  if (primary) parts.push(adminLaceLabel(primary));
+  if (secondary) parts.push(adminLaceLabel(secondary));
   if (primaryUsed !== null && primaryUsed !== undefined && primaryUsed !== "") {
     parts.push(`${primaryUsed} primary used`);
   }
@@ -2677,8 +2701,8 @@ function summarizeLaceFromForm() {
   const primaryUsed = String(document.getElementById("editPrimaryLaceUsed")?.value || "").trim();
   const secondaryUsed = String(document.getElementById("editSecondaryLaceUsed")?.value || "").trim();
 
-  if (primary) parts.push(primary);
-  if (secondary) parts.push(secondary);
+  if (primary) parts.push(adminLaceLabel(primary));
+  if (secondary) parts.push(adminLaceLabel(secondary));
   if (primaryUsed) parts.push(`${primaryUsed} primary used`);
   if (secondaryUsed) parts.push(`${secondaryUsed} secondary used`);
 
@@ -3581,8 +3605,8 @@ function renderMoneyViewContent(sessions, loadError) {
 
   /* Rollups only count orders with labor logged; the rest appear only in
      the coverage stat. Jobs under 1 logged minute are excluded from the
-     rollups and best/worst too — a 3-minute test session otherwise prints
-     a $4,000/hr artifact. */
+     rollups and best/worst too — a sub-minute fat-finger start/stop
+     otherwise prints a wild $/hr artifact. Real short jobs still count. */
   const MIN_ROLLUP_LABOR_MINUTES = 1;
   const logged = rows.filter(r => r.econ.laborMinutes > 0);
   const withLabor = logged.filter(r => r.econ.laborMinutes >= MIN_ROLLUP_LABOR_MINUTES);
@@ -10737,7 +10761,7 @@ function renderInventory(rows) {
       <div class="inventory-card-row inventory-card-row-main">
         <div class="inventory-color">
           ${renderInventorySwatch(colorName)}
-          <span class="inventory-color-name">${escapeHtml(colorName || "Unknown")}</span>
+          <span class="inventory-color-name">${escapeHtml(colorName ? adminLaceLabel(colorName) : "Unknown")}</span>
         </div>
         <span class="inventory-status-pill">${escapeHtml(status.label)}</span>
       </div>
@@ -10915,7 +10939,7 @@ function openInventoryActions(item, source) {
 
   sheetRoot.anchor = getAdminAnchorPosition(source, source?.currentTarget || source);
   sheetRoot.className = "admin-action-menu-root workflow-sheet-root inventory-sheet-root open";
-  sheetRoot.querySelector(".workflow-customer-name").textContent = colorName || "Lace color";
+  sheetRoot.querySelector(".workflow-customer-name").textContent = colorName ? adminLaceLabel(colorName) : "Lace color";
   sheetRoot.querySelector(".workflow-current-status").textContent = `${qty} on hand · ${status.label}`;
   form.innerHTML = "";
   form.classList.remove("is-submenu");
@@ -11169,7 +11193,7 @@ async function updateInventoryItem(item, updates) {
 }
 
 async function deactivateInventoryItem(item, button) {
-  const ok = window.confirm(`Hide ${item.color || "this lace color"} from the inventory list?`);
+  const ok = window.confirm(`Hide ${item.color ? adminLaceLabel(item.color) : "this lace color"} from the inventory list?`);
   if (!ok) return;
 
   button.disabled = true;
@@ -11210,7 +11234,7 @@ function renderReorderBanner(rows) {
   const lowText = lowItems.map(item => {
     const color = String(item.color || "").trim();
     const qty = Number(item.quantity_on_hand ?? 0);
-    return `${color} (${qty} left)`;
+    return `${color ? adminLaceLabel(color) : "Unknown"} (${qty} left)`;
   }).join(", ");
 
   const banner = document.createElement("div");
@@ -11743,7 +11767,7 @@ function openGalleryDescribeDialog(photo) {
     suggestEl.innerHTML = matches.map((g, i) => `
       <button type="button" data-suggest-index="${i}">
         <strong>${escapeHtml(g.brandModel)}</strong>
-        <span>${escapeHtml([g.gloveType, g.webType, [g.primaryLaceColor, g.secondaryLaceColor].filter(Boolean).join("/")].filter(Boolean).join(" · "))}</span>
+        <span>${escapeHtml([g.gloveType, g.webType, [g.primaryLaceColor && adminLaceLabel(g.primaryLaceColor), g.secondaryLaceColor && adminLaceLabel(g.secondaryLaceColor)].filter(Boolean).join("/")].filter(Boolean).join(" · "))}</span>
       </button>
     `).join("");
     suggestEl.hidden = false;
