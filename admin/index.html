@@ -35,6 +35,7 @@
         <button class="nav-link nav-main" data-view="calendar">Calendar</button>
         <button class="nav-link nav-main" data-view="map">Map</button>
         <button class="nav-link nav-main" data-view="money">Money</button>
+        <button class="nav-link nav-main" data-view="pricing">Pricing</button>
         <button class="nav-link nav-main" data-view="inventory">Lace Inventory</button>
         <button class="nav-link nav-main" data-view="upload">Gallery</button>
         <button class="nav-link nav-main" data-view="gloves-sale">Gloves For Sale</button>
@@ -332,6 +333,24 @@
         <div class="money-view">
           <div id="moneyPanel" class="money-panel"></div>
         </div>
+      </section>
+
+      <section id="pricingView" class="view">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="pricingMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <div class="topbar-heading">
+              <h1 class="topbar-title">Pricing</h1>
+              <p id="pricingCount" class="topbar-subtitle muted">Public service prices &amp; drafts</p>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <button id="pricingRefreshBtn" class="secondary topbar-icon-action" type="button" aria-label="Refresh pricing">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 11a8 8 0 1 0-.9 4.6"></path><path d="M20 5v6h-6"></path></svg>
+            </button>
+          </div>
+        </header>
+        <div id="pricingPanel" class="dashboard-panel" aria-live="polite"></div>
       </section>
 
       <section id="detailView" class="view">

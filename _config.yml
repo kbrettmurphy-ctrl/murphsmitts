@@ -32,6 +32,7 @@ exclude:
   - node_modules/
   - README.md
   - README.*
+  - scripts/
   - functions/
   - murphsmitts.code-workspace
   - supabase/

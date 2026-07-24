@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-24 — Pricing Management
+
+### Added
+- MurphOS Pricing view: GUI-managed public service prices with draft/publish workflow, price history, rollback, editable business settings (target rate, minimum shop charge, rounding increment), pricing intelligence, and add/hide/deactivate services.
+- Public read-only pricing endpoint `GET /api/public/service-pricing` and shared `functions/api/_pricing.js`.
+- Migration `20260724120000_service_pricing.sql`: `service_pricing`, `service_pricing_revisions`, `shop_settings`, `service_pricing_job_types`; seeds seven services with approved published prices, settings, and analytics mappings.
+- Per-service pricing intelligence card in the Money view.
+- `.docs/murphos/PRICING_MANAGEMENT.md`; `scripts/pricing-selftest.mjs`.
+
+### Changed
+- Public Services page now renders published prices/names/bullets, with the approved prices retained as a static fallback.
+- Approved public prices: Standard Full Service $90–$110, Full Relace $60–$80, Lace Repair now "Starting at $30".
+- Order Detail Price Quoted and Send Estimate show the current published price as a display-only hint.
+
+### Notes
+- Additive migration; owner reviews and pushes it. Historical order prices are never changed.
+
 ## 2026-07-20 — Phase 1: Perimeter and Hygiene
 
 - Added explicit Jekyll exclusions for internal source, migrations, documentation, local secrets, caches, and deployment files.

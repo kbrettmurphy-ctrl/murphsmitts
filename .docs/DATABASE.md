@@ -50,6 +50,10 @@ Manual expenses contain date, category, description, amount, optional quantity a
 
 The store tables hold listing content, price/specification/status/featured/sort fields and a one-to-many photo set with primary/hover roles. Their original DDL is not checked in.
 
+### `service_pricing`, `service_pricing_revisions`, `shop_settings`, `service_pricing_job_types`
+
+Pricing Management (`20260724120000_service_pricing.sql`). `service_pricing` is the live, published state the public Services page reads: stable `service_key`, editable name/category/short description, `bullet_details` jsonb (plain-text array), `pricing_type`, structured `base_price`/`premium_price`/`price_suffix`, optional `display_override`, `is_public`, `is_active`, `sort_order`, and lifecycle timestamps including `published_at`. `service_pricing_revisions` holds pending drafts and immutable published history — a full field snapshot in `data` jsonb, `status` (draft/published/archived), previous/new display strings, and an internal note; a partial unique index limits one open draft per service. `shop_settings` is a key/value store for `target_labor_rate`, `min_shop_charge`, and `rounding_increment`. `service_pricing_job_types` maps a public service to measured job buckets (glove type, primary service value, trapeze flag) for pricing intelligence. All four have RLS enabled with no policies. See `.docs/murphos/PRICING_MANAGEMENT.md`.
+
 ## Storage buckets used
 
 - `gallery`: section-prefixed public gallery photos, including a hidden prefix used by admin hide/restore.
@@ -78,5 +82,7 @@ Bucket creation, public access configuration, size limits, and Storage policies 
 | `20260716090000_gallery_link_cover.sql` | Adds album-cover flag |
 | `20260718150000_shop_expenses.sql` | Creates manual expense ledger |
 | `20260719120000_tracking_tokens.sql` | Adds/backfills unique public tracking tokens |
+| `20260721140000_enable_rls_all_tables.sql` | Enables RLS on all existing public tables |
+| `20260724120000_service_pricing.sql` | Creates pricing tables, seeds seven services with approved published prices, business settings, and analytics mappings |
 
 Migrations are additive and should be reviewed/applied in timestamp order. There is no checked-in Supabase config or automated migration verification in this repository.

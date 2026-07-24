@@ -8164,3 +8164,256 @@ body.has-notifications .topbar-menu-btn::after{
   -webkit-user-select: text;
   user-select: text;
 }
+
+/* =========================================================================
+   PRICING MANAGEMENT (Pricing view) — scoped, appended. Reuses the shared
+   .dashboard-card / .dashboard-metric / .money-card language.
+   ========================================================================= */
+.pricing-shell{gap:12px}
+
+.pricing-group{display:grid; gap:8px}
+.pricing-group-title{margin:6px 2px 0}
+
+.pricing-settings-card{display:grid; gap:10px; padding:12px}
+.pricing-settings-note{margin:0; font-size:.72rem; line-height:1.35}
+.pricing-settings-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+  gap:10px;
+}
+
+.pricing-field{display:grid; gap:5px; min-width:0}
+.pricing-field-wide{grid-column:1 / -1}
+.pricing-field-label{
+  font-size:.7rem;
+  font-weight:600;
+  color:rgba(9,47,77,.62);
+  line-height:1.25;
+}
+.pricing-field input[type="text"],
+.pricing-field input[type="number"],
+.pricing-field select,
+.pricing-field textarea{
+  width:100%;
+  box-sizing:border-box;
+  border:1px solid rgba(9,47,77,.16);
+  border-radius:10px;
+  background:#fffdf9;
+  padding:8px 10px;
+  font:inherit;
+  font-size:.82rem;
+  color:var(--ink);
+}
+.pricing-field textarea{resize:vertical; line-height:1.4; min-height:96px}
+.pricing-field input:focus,
+.pricing-field select:focus,
+.pricing-field textarea:focus{
+  outline:none;
+  border-color:rgba(9,47,77,.4);
+  box-shadow:0 0 0 3px rgba(9,47,77,.08);
+}
+
+.pricing-actions{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+.pricing-actions button{min-height:34px; border-radius:10px; padding:0 14px; font-size:.8rem}
+.pricing-publish{
+  background:var(--navy);
+  color:#fffaf3;
+  border:1px solid var(--navy);
+  font-weight:600;
+  cursor:pointer;
+}
+.pricing-publish:hover{background:#0b3a5f}
+.pricing-danger{color:var(--red); border-color:rgba(146,26,36,.3)}
+
+/* Service cards */
+.pricing-card{padding:10px 12px 11px; display:grid; gap:7px}
+.pricing-card.is-expanded{box-shadow:0 10px 26px rgba(9,47,77,.10)}
+.pricing-card-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  width:100%;
+  background:none;
+  border:0;
+  padding:0;
+  font:inherit;
+  color:inherit;
+  cursor:pointer;
+  text-align:left;
+}
+.pricing-card-headmain{display:grid; gap:2px; min-width:0}
+.pricing-card-name{
+  font-size:.92rem;
+  font-weight:620;
+  color:var(--navy);
+  line-height:1.2;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.pricing-card-meta{font-size:.68rem; color:rgba(9,47,77,.55)}
+.pricing-card-headside{display:flex; align-items:center; gap:8px; flex-shrink:0}
+.pricing-card-price{
+  font-size:.9rem;
+  font-weight:650;
+  color:var(--navy);
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.pricing-card-draftprice{
+  font-size:.74rem;
+  color:var(--red);
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.pricing-card-chevron{color:rgba(9,47,77,.5); font-size:.8rem}
+.pricing-card-pills{display:flex; flex-wrap:wrap; align-items:center; gap:6px}
+.pricing-card-suggest{font-size:.68rem; margin-left:auto}
+
+.pricing-pill{
+  font-size:.66rem;
+  font-weight:600;
+  padding:2px 8px;
+  border-radius:999px;
+  line-height:1.5;
+  white-space:nowrap;
+}
+.pricing-pill-good{background:rgba(62,155,99,.14); color:#2f7d4f}
+.pricing-pill-warn{background:rgba(146,26,36,.12); color:var(--red)}
+.pricing-pill-neutral{background:rgba(9,47,77,.09); color:var(--navy)}
+.pricing-pill-muted{background:rgba(9,47,77,.06); color:rgba(9,47,77,.55)}
+
+/* Editor */
+.pricing-editor{display:grid; gap:12px; padding-top:6px; border-top:1px solid rgba(9,47,77,.1)}
+.pricing-editor-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+  gap:10px;
+}
+.pricing-toggles{display:flex; flex-wrap:wrap; gap:14px; align-items:center}
+.pricing-toggle{display:flex; align-items:center; gap:7px; font-size:.78rem; color:var(--ink)}
+.pricing-toggle input{width:16px; height:16px}
+
+.pricing-preview{
+  border:1px dashed rgba(9,47,77,.2);
+  border-radius:12px;
+  padding:10px 12px;
+  background:rgba(255,253,249,.7);
+  display:grid;
+  gap:6px;
+}
+.pricing-preview-label{font-size:.66rem; font-weight:600; color:rgba(9,47,77,.5); text-transform:uppercase; letter-spacing:.04em}
+.pricing-preview-item{display:grid; gap:6px}
+.pricing-preview-heading{display:flex; align-items:baseline; justify-content:space-between; gap:12px}
+.pricing-preview-heading h4{margin:0; font-size:.9rem; color:var(--navy)}
+.pricing-preview-price{font-size:.82rem; font-weight:620; color:var(--navy); white-space:nowrap; font-variant-numeric:tabular-nums}
+.pricing-preview-item ul{margin:0; padding-left:1.1em; display:grid; gap:2px}
+.pricing-preview-item li{font-size:.74rem; color:var(--muted); line-height:1.35}
+
+/* Intelligence */
+.pricing-intel{
+  border:1px solid rgba(9,47,77,.1);
+  border-radius:12px;
+  padding:11px 12px;
+  background:rgba(248,239,223,.4);
+  display:grid;
+  gap:8px;
+}
+.pricing-intel-head{display:flex; align-items:center; justify-content:space-between; gap:10px}
+.pricing-intel-title{font-size:.78rem; font-weight:650; color:var(--navy)}
+.pricing-intel-grid{
+  margin:0;
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+  gap:6px 14px;
+}
+.pricing-intel-row{display:flex; align-items:baseline; justify-content:space-between; gap:10px; min-width:0}
+.pricing-intel-row dt{font-size:.72rem; color:rgba(9,47,77,.6)}
+.pricing-intel-row dd{margin:0; font-size:.76rem; font-weight:600; color:var(--navy); font-variant-numeric:tabular-nums; text-align:right}
+.pricing-intel-note{margin:0; font-size:.72rem; line-height:1.4}
+
+/* History */
+.pricing-history{padding-top:2px}
+.pricing-link{
+  background:none;
+  border:0;
+  padding:0;
+  font:inherit;
+  font-size:.74rem;
+  font-weight:600;
+  color:var(--navy);
+  cursor:pointer;
+  text-decoration:underline;
+  text-underline-offset:2px;
+}
+.pricing-history-list{display:grid; gap:8px}
+.pricing-history-title{font-size:.72rem; font-weight:650; color:rgba(9,47,77,.6); text-transform:uppercase; letter-spacing:.03em}
+.pricing-history-row{
+  display:grid;
+  gap:2px;
+  padding:7px 0;
+  border-top:1px solid rgba(9,47,77,.08);
+}
+.pricing-history-main{display:flex; align-items:baseline; justify-content:space-between; gap:10px}
+.pricing-history-change{font-size:.78rem; font-weight:600; color:var(--navy); font-variant-numeric:tabular-nums}
+.pricing-history-date{font-size:.7rem}
+.pricing-history-note{font-size:.72rem}
+.pricing-history-empty{font-size:.74rem; margin:0}
+
+.pricing-create-toggle{display:flex; justify-content:center; padding:4px 0 10px}
+.pricing-create-card{display:grid; gap:10px; padding:12px}
+
+/* Preview environment badge — only injected in non-production deployments */
+.mm-preview-badge{
+  position:fixed;
+  bottom:calc(12px + env(safe-area-inset-bottom, 0px));
+  left:50%;
+  transform:translateX(-50%);
+  z-index:99999;
+  padding:5px 14px;
+  border-radius:999px;
+  background:var(--red);
+  color:#fff;
+  font-size:.64rem;
+  font-weight:700;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  box-shadow:0 6px 18px rgba(146,26,36,.35);
+  pointer-events:none;
+  user-select:none;
+}
+
+/* Money view — Service Pricing Intelligence card */
+.pricing-money-note{margin:0; font-size:.72rem; line-height:1.35}
+.pricing-money-list{display:grid; gap:6px}
+.pricing-money-item{
+  border:1px solid rgba(9,47,77,.1);
+  border-radius:12px;
+  background:rgba(255,253,249,.7);
+  overflow:hidden;
+}
+.pricing-money-summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:9px 11px;
+  cursor:pointer;
+  list-style:none;
+}
+.pricing-money-summary::-webkit-details-marker{display:none}
+.pricing-money-name{font-size:.82rem; font-weight:600; color:var(--navy); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pricing-money-side{display:flex; align-items:center; gap:8px; flex-shrink:0}
+.pricing-money-price{font-size:.82rem; font-weight:650; color:var(--navy); font-variant-numeric:tabular-nums; white-space:nowrap}
+.pricing-money-rate{font-size:.7rem; font-variant-numeric:tabular-nums}
+.pricing-money-item[open] .pricing-money-summary{border-bottom:1px solid rgba(9,47,77,.08)}
+.pricing-money-item .pricing-intel{border:0; border-radius:0; background:transparent; padding:10px 11px}
+@media (max-width:520px){
+  .pricing-money-rate{display:none}
+}
+
+@media (max-width:520px){
+  .pricing-card-name{white-space:normal}
+  .pricing-intel-row dd{text-align:right}
+}

@@ -21,6 +21,7 @@ const uploadView = document.getElementById("uploadView");
 const mapView = document.getElementById("mapView");
 const moneyView = document.getElementById("moneyView");
 const moneyMenuBtn = document.getElementById("moneyMenuBtn");
+const pricingView = document.getElementById("pricingView");
 const detailTitle = document.getElementById("detailTitle");
 const pinInput = document.getElementById("pinInput");
 const emailInput = document.getElementById("emailInput");
@@ -262,7 +263,7 @@ document.addEventListener("focusout", (e) => {
    VIEW / MENU
 ========================= */
 function showView(view) {
-  [loginView, inviteView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, saleGlovesView, messagesView, usersView, customersView, calendarView]
+  [loginView, inviteView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, pricingView, saleGlovesView, messagesView, usersView, customersView, calendarView]
     .filter(Boolean)
     .forEach(v => v.classList.remove("active"));
 
@@ -2277,6 +2278,7 @@ function getViewTitle(viewName) {
     case "dashboard": return "Clubhouse";
     case "map": return "Map";
     case "money": return "Money";
+    case "pricing": return "Pricing";
     case "upload": return "Gallery";
     case "inventory": return "Lace Inventory";
     case "gloves-sale": return "Gloves For Sale";
@@ -3468,6 +3470,7 @@ async function renderMoneyView() {
   let sessions = [];
   let loadError = "";
   await warmExpensesCache();
+  await warmPricingCache();
   try {
     const data = await postJson({ action: "listLaborSummary" }, true);
     sessions = data.sessions || [];
@@ -3584,6 +3587,46 @@ function renderMoneyJobsTable(title, items) {
   `;
 }
 
+/* Money view: per-service pricing intelligence — published price vs measured
+   performance, separated from raw job costing. Read-only here (full editing
+   lives in the Pricing view). Native <details> keeps it stateless + mobile
+   friendly. Only appears once the pricing cache has loaded. */
+function renderMoneyPricingCard(laborByOrder) {
+  const state = pricingStateCache;
+  if (!state || !Array.isArray(state.services) || !state.services.length) return "";
+  const services = state.services;
+  const rows = services
+    .filter((s) => (s.analyticsMappings || []).length)
+    .map((s) => ({ s, intel: computeServicePricingIntel(s, services, laborByOrder) }));
+  if (!rows.length) return "";
+
+  return `
+    <div class="dashboard-card money-card">
+      <h3 class="money-card-title">Service Pricing Intelligence</h3>
+      <p class="muted pricing-money-note">Published price vs measured labor and materials. Prices are managed in the Pricing view — this is analysis only.</p>
+      <div class="pricing-money-list">
+        ${rows.map(({ s, intel }) => {
+          const interp = pricingInterpretation(s, intel);
+          const rateText = intel.effectiveRate != null ? `${formatCurrency(intel.effectiveRate)}/hr` : "—";
+          return `
+            <details class="pricing-money-item">
+              <summary class="pricing-money-summary">
+                <span class="pricing-money-name">${escapeHtml(s.serviceName)}</span>
+                <span class="pricing-money-side">
+                  <span class="pricing-money-price">${escapeHtml(s.display)}</span>
+                  <span class="pricing-money-rate muted">${escapeHtml(rateText)}</span>
+                  ${pricingPill(interp.label, interp.tone)}
+                </span>
+              </summary>
+              ${renderServicePricingIntelBlock(s, intel)}
+            </details>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
 /* Money view only counts finished work — in-progress orders have
    partial labor logged and would skew every rate. */
 function isMoneyEligibleOrder(order) {
@@ -3663,6 +3706,7 @@ function renderMoneyViewContent(sessions, loadError) {
   return `
     ${errorHtml}
     ${statsHtml}
+    ${renderMoneyPricingCard(laborByOrder)}
     ${renderMoneyRollupTable("By Service", "Service", byService)}
     ${renderMoneyRollupTable("By Glove Type", "Glove type", byGlove)}
     ${renderMoneyRollupTable("By Month", "Month", byMonth)}
@@ -5155,6 +5199,7 @@ function normalizeAdminView(viewName) {
   if (view === "orders" || view === "current") return "current";
   if (view === "map") return "map";
   if (view === "money") return "money";
+  if (view === "pricing") return "pricing";
   if (view === "upload") return "upload";
   if (view === "inventory") return "inventory";
   if (view === "gloves-sale") return "gloves-sale";
@@ -5170,7 +5215,7 @@ function isKnownAdminView(viewName) {
   const view = String(viewName || "").trim().toLowerCase();
   if (!view || view === "dashboard") return true;
   if (view === "orders" || view === "current") return true;
-  return ["map", "money", "upload", "inventory", "gloves-sale", "users", "customers", "calendar", "messages"].includes(view) || isOrderFilterView(view);
+  return ["map", "money", "pricing", "upload", "inventory", "gloves-sale", "users", "customers", "calendar", "messages"].includes(view) || isOrderFilterView(view);
 }
 
 function syncAdminViewUrl(viewName) {
@@ -5189,6 +5234,9 @@ function syncAdminViewUrl(viewName) {
     }
   } else if (view === "money") {
     url.searchParams.set("view", "money");
+    url.searchParams.delete("order");
+  } else if (view === "pricing") {
+    url.searchParams.set("view", "pricing");
     url.searchParams.delete("order");
   } else if (view === "upload") {
     url.searchParams.set("view", "upload");
@@ -5323,6 +5371,15 @@ function setActiveView(viewName) {
     closeMenu();
     resetViewScroll(moneyView, { blurActive: true });
     renderMoneyView();
+    return;
+  }
+
+  if (resolvedView === "pricing") {
+    syncAdminViewUrl(resolvedView);
+    showView(pricingView);
+    closeMenu();
+    resetViewScroll(pricingView, { blurActive: true });
+    renderPricingView();
     return;
   }
 
@@ -5977,6 +6034,7 @@ function renderOrderDetail(order) {
             <div class="label">Price Quoted</div>
             <input id="editPriceQuoted" type="text" inputmode="decimal" placeholder="$0.00" />
             ${(() => { const s = getEffectiveSuggestion(order); return s ? `<div class="price-suggest-hint muted">Suggested: ${escapeHtml(formatCurrency(s.price))} · ${escapeHtml(suggestionShortBasis(s))}</div>` : ""; })()}
+            ${(() => { const p = getPublishedPriceForOrder(order); return p ? `<div class="price-suggest-hint muted">Published ${escapeHtml(p.serviceName)}: ${escapeHtml(p.display)}</div>` : ""; })()}
           </div>
 
           <div id="editShippingCostWrap" class="detail-block ${isLocal ? "is-hidden" : ""}">
@@ -8232,6 +8290,7 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
         <label>Estimated amount</label>
         <input id="workflowPriceQuoted" type="text" inputmode="decimal" value="${escapeAttr(formatMoneyForInput(priceQuoted))}" />
         ${suggested ? `<p class="muted workflow-price-hint">Suggested: ${escapeHtml(formatCurrency(suggested.price))} · ${escapeHtml(suggestionShortBasis(suggested))}</p>` : ""}
+        ${(() => { const p = getPublishedPriceForOrder(order); return p ? `<p class="muted workflow-price-hint">Published ${escapeHtml(p.serviceName)}: ${escapeHtml(p.display)}</p>` : ""; })()}
       </div>
     `;
   } else if (actionKey === "customerApproved") {
@@ -12100,6 +12159,10 @@ function openOrder(orderNumber, { returnView } = {}) {
     return;
   }
 
+  /* Warm the published-pricing cache so the Price Quoted / Send Estimate hints
+     can show the current public price. Fire-and-forget, display-only. */
+  warmPricingCache();
+
   renderOrderDetail(order);
   clearSaveStatus();
   showView(detailView);
@@ -12401,6 +12464,7 @@ if (saveOrderBtn) {
 menuBtn.addEventListener("click", openMenu);
 homeMenuBtn?.addEventListener("click", openMenu);
 document.getElementById("usersMenuBtn")?.addEventListener("click", openMenu);
+document.getElementById("pricingMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("customersMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("calendarMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("messagesMenuBtn")?.addEventListener("click", openMenu);
@@ -13254,6 +13318,773 @@ function wireCalendarPanel(panel) {
 }
 
 /* =========================
+   PRICING MANAGEMENT
+   Owner-controlled public service pricing with a draft/publish workflow, price
+   history, editable business settings, and pricing intelligence that compares
+   the published price against measured labor + material data. The public site
+   reads only published rows; editing here never touches historical orders.
+========================= */
+
+let pricingStateCache = null;      // { services, settings } from listServicePricing
+let pricingExpandedKey = null;     // which service card is open in the editor
+let pricingHistoryCache = {};      // serviceKey -> [history rows]
+let pricingCreating = false;       // "new service" mini-form visible
+let pricingDelegated = false;
+
+/* Client mirror of functions/api/_pricing.js formatServiceDisplayPrice — keep
+   the two in sync. Generates the public price string from structured fields. */
+function pricingFormatAmount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+}
+
+function pricingDisplayText(fields) {
+  const override = String(fields.displayOverride || "").trim();
+  if (override) return override;
+  const type = fields.pricingType || "fixed";
+  const base = fields.basePrice;
+  const premium = fields.premiumPrice;
+  const suffix = String(fields.priceSuffix || "").trim();
+  const hasBase = base !== null && base !== undefined && base !== "" && Number.isFinite(Number(base));
+  const hasPremium = premium !== null && premium !== undefined && premium !== "" && Number.isFinite(Number(premium));
+  const money = (n) => `$${pricingFormatAmount(n)}`;
+  switch (type) {
+    case "variable": return "Prices vary";
+    case "starting_at": return hasBase ? `Starting at ${money(base)}` : "Prices vary";
+    case "per_item": return hasBase ? `${money(base)}${suffix ? ` ${suffix}` : " each"}` : "Prices vary";
+    case "range":
+    case "tiered": return hasBase && hasPremium ? `${money(base)}–${money(premium)}` : (hasBase ? money(base) : "Prices vary");
+    case "fixed":
+    default: return hasBase ? money(base) : "Prices vary";
+  }
+}
+
+function pricingRoundToIncrement(amount, increment) {
+  const value = Number(amount);
+  const step = Number(increment);
+  if (!Number.isFinite(value)) return null;
+  if (!Number.isFinite(step) || step <= 0) return Math.round(value);
+  return Math.max(0, Math.round(value / step) * step);
+}
+
+function pricingMedian(list) {
+  const a = (list || []).filter((x) => Number.isFinite(x)).slice().sort((x, y) => x - y);
+  if (!a.length) return null;
+  const mid = Math.floor(a.length / 2);
+  return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
+}
+
+function pricingConfidenceLabel(n) {
+  if (n <= 0) return "No data";
+  if (n <= 2) return "Early estimate";
+  if (n <= 5) return "Learning";
+  if (n <= 10) return "Good confidence";
+  if (n <= 25) return "Strong confidence";
+  return "Established benchmark";
+}
+
+const PRICING_TYPE_OPTIONS = [
+  ["fixed", "Fixed"],
+  ["tiered", "Tiered (two prices)"],
+  ["range", "Range"],
+  ["starting_at", "Starting at"],
+  ["per_item", "Per item"],
+  ["variable", "Variable"]
+];
+
+function pricingTypeLabel(type) {
+  const found = PRICING_TYPE_OPTIONS.find(([v]) => v === type);
+  return found ? found[1] : "Fixed";
+}
+
+/* Business settings with safe fallbacks to the SHOP_ECONOMICS constants. */
+function getPricingSettings() {
+  const s = (pricingStateCache && pricingStateCache.settings) || {};
+  return {
+    targetLaborRate: Number.isFinite(Number(s.targetLaborRate)) ? Number(s.targetLaborRate) : SHOP_ECONOMICS.targetHourlyRate,
+    minShopCharge: Number.isFinite(Number(s.minShopCharge)) ? Number(s.minShopCharge) : 30,
+    roundingIncrement: Number(s.roundingIncrement) > 0 ? Number(s.roundingIncrement) : 5
+  };
+}
+
+/* Attribute one order to a single public service using the DB-driven analytics
+   mappings. When an order matches more than one service (e.g. full service +
+   palm pad add-on) the richer primary service wins (relacing first, then by
+   sort order), so add-ons never steal a job's labor. */
+function attributeOrderToServiceKey(order, services) {
+  const selected = getOrderSelectedServices(order);
+  const glove = String(order?.gloveType || "");
+  let best = null;
+  let bestRank = Infinity;
+  for (const svc of services) {
+    const maps = svc.analyticsMappings || [];
+    const matched = maps.some((m) => {
+      if (m.services && !selected.includes(m.services)) return false;
+      if (m.gloveType && glove !== m.gloveType) return false;
+      return true;
+    });
+    if (!matched) continue;
+    const rank = (svc.category === "relacing" ? 0 : 1000) + (Number(svc.sortOrder) || 0);
+    if (rank < bestRank) { bestRank = rank; best = svc.serviceKey; }
+  }
+  return best;
+}
+
+function pricingTimeTrend(measuredJobs) {
+  if (measuredJobs.length < 4) return "insufficient";
+  const sorted = measuredJobs.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const half = Math.floor(sorted.length / 2);
+  const earlier = pricingMedian(sorted.slice(0, half).map((j) => j.minutes));
+  const recent = pricingMedian(sorted.slice(sorted.length - half).map((j) => j.minutes));
+  if (!earlier || !recent) return "insufficient";
+  if (recent < earlier * 0.9) return "improved";
+  if (recent > earlier * 1.1) return "slower";
+  return "stable";
+}
+
+const PRICING_TREND_LABELS = {
+  improved: "Efficiency Improved",
+  stable: "Stable",
+  slower: "Slower Recently",
+  insufficient: "Not Enough Data"
+};
+
+/* Core pricing intelligence for one service. Keeps published price, average
+   charged price, target rate, and effective rate strictly separate. */
+function computeServicePricingIntel(service, services, laborByOrder) {
+  const settings = getPricingSettings();
+  const attributed = allOrders.filter(
+    (o) => isMoneyEligibleOrder(o) && attributeOrderToServiceKey(o, services) === service.serviceKey
+  );
+
+  const priced = attributed.filter((o) => {
+    const p = Number(o.priceQuoted);
+    return o.priceQuoted != null && o.priceQuoted !== "" && Number.isFinite(p);
+  });
+  const avgCharged = priced.length
+    ? priced.reduce((s, o) => s + Number(o.priceQuoted), 0) / priced.length
+    : null;
+
+  const measured = attributed
+    .map((o) => ({
+      minutes: laborByOrder[String(o.orderNumber)] || 0,
+      materials: getOrderMaterialsCost(o).total,
+      price: (o.priceQuoted != null && o.priceQuoted !== "" && Number.isFinite(Number(o.priceQuoted))) ? Number(o.priceQuoted) : null,
+      date: o.dateCompleted || o.createdAt || o.timestampSubmitted || ""
+    }))
+    .filter((j) => j.minutes >= 1);
+
+  const n = measured.length;
+  const medianMinutes = n ? pricingMedian(measured.map((j) => j.minutes)) : null;
+  const avgMaterials = n ? measured.reduce((s, j) => s + j.materials, 0) / n : null;
+
+  const rated = measured.filter((j) => j.price != null);
+  const netSum = rated.reduce((s, j) => s + (j.price - j.materials), 0);
+  const hoursSum = rated.reduce((s, j) => s + j.minutes / 60, 0);
+  const effectiveRate = hoursSum > 0 ? netSum / hoursSum : null;
+
+  let rawEstimate = null;
+  let suggestedPrice = null;
+  let minChargeApplied = false;
+  if (n >= 1 && medianMinutes != null && avgMaterials != null) {
+    rawEstimate = (medianMinutes / 60) * settings.targetLaborRate + avgMaterials;
+    const floored = Math.max(rawEstimate, settings.minShopCharge);
+    minChargeApplied = floored > rawEstimate + 0.001;
+    suggestedPrice = pricingRoundToIncrement(floored, settings.roundingIncrement);
+  }
+
+  const trend = pricingTimeTrend(measured);
+
+  return {
+    n,
+    jobCount: attributed.length,
+    avgCharged,
+    medianMinutes,
+    avgMaterials,
+    effectiveRate,
+    rawEstimate,
+    suggestedPrice,
+    minChargeApplied,
+    trend,
+    settings,
+    confidence: pricingConfidenceLabel(n)
+  };
+}
+
+/* Interpretation copy — never "under/over target". Getting faster on a fixed
+   price is efficiency, not a reason to cut the price. */
+function pricingInterpretation(service, intel) {
+  const { n, effectiveRate, trend, settings } = intel;
+  const targetRate = settings.targetLaborRate;
+
+  if (n === 0) return { label: "Needs More Data", tone: "neutral", detail: "No measured jobs with logged labor yet. Run timers on this service to build a benchmark." };
+  if (n < 3) return { label: "Learning", tone: "neutral", detail: `Early estimate from ${n} measured job${n === 1 ? "" : "s"} — not enough data to price against with confidence.` };
+  if (effectiveRate == null) return { label: "Needs More Data", tone: "neutral", detail: "Measured times exist, but no priced jobs yet to calculate an effective rate." };
+
+  let label; let tone; let detail;
+  if (effectiveRate >= targetRate && trend === "improved") {
+    label = "Efficiency Improved"; tone = "good";
+    detail = `Median time dropped while the price held — effective rate rose to ${formatCurrency(effectiveRate)}/hr against a ${formatCurrency(targetRate)}/hr target. Faster work is margin, not a reason to lower the price.`;
+  } else if (effectiveRate < targetRate * 0.7) {
+    label = "Review Recommended"; tone = "warn";
+    detail = `Effective rate ${formatCurrency(effectiveRate)}/hr is well under the ${formatCurrency(targetRate)}/hr target at the current median time. Worth reviewing the price or the time it takes.`;
+  } else if (effectiveRate < targetRate) {
+    label = "Below Target at Current Median Time"; tone = "warn";
+    detail = `At the median time this job earns ${formatCurrency(effectiveRate)}/hr vs the ${formatCurrency(targetRate)}/hr target.`;
+  } else if (effectiveRate >= targetRate * 1.2) {
+    label = "Strong Margin"; tone = "good";
+    detail = `Effective rate ${formatCurrency(effectiveRate)}/hr comfortably clears the ${formatCurrency(targetRate)}/hr target.`;
+  } else {
+    label = "Price Covers Target"; tone = "good";
+    detail = `The published price covers the ${formatCurrency(targetRate)}/hr target at the current median time.`;
+  }
+  return { label, tone, detail };
+}
+
+/* Published price + display for the service an order maps to. Used by the Order
+   Detail economics card as a non-destructive quote suggestion. */
+function getPublishedPriceForOrder(order) {
+  const services = pricingStateCache && Array.isArray(pricingStateCache.services) ? pricingStateCache.services : null;
+  if (!services) return null;
+  const key = attributeOrderToServiceKey(order, services);
+  if (!key) return null;
+  const svc = services.find((s) => s.serviceKey === key);
+  if (!svc || !svc.isActive || !svc.publishedAt) return null;
+  return { serviceName: svc.serviceName, display: svc.display, basePrice: svc.basePrice, premiumPrice: svc.premiumPrice };
+}
+
+async function warmPricingCache() {
+  if (pricingStateCache) return;
+  if (!isAuthenticated()) return;
+  try {
+    const data = await postJson({ action: "listServicePricing" }, true);
+    if (data && data.ok !== false) pricingStateCache = data;
+  } catch {}
+}
+setTimeout(warmPricingCache, 3000);
+
+async function renderPricingView() {
+  const panel = document.getElementById("pricingPanel");
+  if (!panel) return;
+  ensurePricingDelegation();
+  panel.innerHTML = `<div class="dashboard-card money-empty muted">Loading pricing…</div>`;
+
+  await warmLaborSummaryCache();
+  await warmExpensesCache();
+
+  let loadError = "";
+  try {
+    const data = await postJson({ action: "listServicePricing" }, true);
+    if (data && data.ok !== false) pricingStateCache = data;
+    else loadError = (data && data.error) || "Pricing could not be loaded.";
+  } catch (err) {
+    if (!pricingStateCache) loadError = err?.message || "Pricing could not be loaded.";
+  }
+
+  if (activeView !== "pricing") return;
+  panel.innerHTML = renderPricingViewContent(loadError);
+}
+
+function renderPricingViewContent(loadError) {
+  const state = pricingStateCache || { services: [], settings: {} };
+  const services = Array.isArray(state.services) ? state.services : [];
+  const settings = getPricingSettings();
+  const count = document.getElementById("pricingCount");
+
+  const laborByOrder = {};
+  (Array.isArray(moneyLaborSummaryCache) ? moneyLaborSummaryCache : []).forEach((s) => {
+    const k = String(s.orderNumber || "");
+    if (!k) return;
+    laborByOrder[k] = (laborByOrder[k] || 0) + (Number(s.durationMinutes) || 0);
+  });
+
+  const published = services.filter((s) => s.isPublic && s.isActive && s.publishedAt).length;
+  const withDrafts = services.filter((s) => s.draft && s.draft.differs).length;
+  const lastUpdate = services.reduce((max, s) => {
+    const t = s.publishedAt ? new Date(s.publishedAt).getTime() : 0;
+    return t > max ? t : max;
+  }, 0);
+  const needsData = services.filter((s) => {
+    if (!(s.analyticsMappings || []).length) return false;
+    const intel = computeServicePricingIntel(s, services, laborByOrder);
+    return intel.n < 3;
+  }).length;
+
+  if (count) count.textContent = `${services.length} service${services.length === 1 ? "" : "s"}`;
+
+  const errorHtml = loadError ? `<div class="money-error">${escapeHtml(loadError)}</div>` : "";
+
+  const statsHtml = `
+    <div class="dashboard-grid money-stat-grid">
+      ${renderDashboardMetricCard("Published", String(published), { sub: "Public & active" })}
+      ${renderDashboardMetricCard("Unpublished drafts", String(withDrafts), { sub: withDrafts ? "Awaiting publish" : "All live" })}
+      ${renderDashboardMetricCard("Last published", lastUpdate ? customerDisplayDate(new Date(lastUpdate).toISOString()) : "—")}
+      ${renderDashboardMetricCard("Needs more data", String(needsData), { sub: "Under 3 measured jobs" })}
+    </div>
+  `;
+
+  const settingsHtml = renderPricingSettingsCard(settings);
+
+  const relacing = services.filter((s) => s.category === "relacing");
+  const additional = services.filter((s) => s.category !== "relacing");
+
+  const groupHtml = (title, list) => list.length ? `
+    <div class="pricing-group">
+      <h3 class="money-card-title pricing-group-title">${escapeHtml(title)}</h3>
+      ${list.map((s) => renderServicePricingCard(s, services, laborByOrder)).join("")}
+    </div>
+  ` : "";
+
+  return `
+    <div class="dashboard-shell pricing-shell">
+      ${errorHtml}
+      ${statsHtml}
+      ${settingsHtml}
+      ${groupHtml("Relacing Services", relacing)}
+      ${groupHtml("Additional Glove Services", additional)}
+      ${renderPricingCreateCard()}
+    </div>
+  `;
+}
+
+function renderPricingSettingsCard(settings) {
+  return `
+    <div class="dashboard-card pricing-settings-card">
+      <h3 class="money-card-title">Pricing Settings</h3>
+      <p class="muted pricing-settings-note">Inputs for the target-price estimate. They never change recorded labor or historical prices.</p>
+      <div class="pricing-settings-grid">
+        <label class="pricing-field">
+          <span class="pricing-field-label">Target labor rate ($/hr)</span>
+          <input id="pricingSettingRate" type="number" min="0" step="1" inputmode="decimal" value="${escapeAttr(String(settings.targetLaborRate))}">
+        </label>
+        <label class="pricing-field">
+          <span class="pricing-field-label">Minimum shop charge ($)</span>
+          <input id="pricingSettingMin" type="number" min="0" step="1" inputmode="decimal" value="${escapeAttr(String(settings.minShopCharge))}">
+        </label>
+        <label class="pricing-field">
+          <span class="pricing-field-label">Rounding increment ($)</span>
+          <input id="pricingSettingRound" type="number" min="1" step="1" inputmode="decimal" value="${escapeAttr(String(settings.roundingIncrement))}">
+        </label>
+      </div>
+      <div class="pricing-actions">
+        <button class="secondary" type="button" data-pricing-action="save-settings">Save Settings</button>
+      </div>
+    </div>
+  `;
+}
+
+function pricingPill(text, tone) {
+  return `<span class="pricing-pill pricing-pill-${tone}">${escapeHtml(text)}</span>`;
+}
+
+function renderServicePricingCard(service, services, laborByOrder) {
+  const expanded = pricingExpandedKey === service.serviceKey;
+  const draft = service.draft;
+  const draftDiffers = !!(draft && draft.differs);
+  const intel = computeServicePricingIntel(service, services, laborByOrder);
+
+  const statusPills = [
+    draftDiffers ? pricingPill("Draft", "warn") : pricingPill("Live", "good"),
+    service.isPublic ? pricingPill("Public", "neutral") : pricingPill("Hidden", "muted"),
+    service.isActive ? pricingPill("Active", "neutral") : pricingPill("Inactive", "muted")
+  ].join("");
+
+  const draftPriceHtml = draftDiffers
+    ? `<span class="pricing-card-draftprice">→ ${escapeHtml(draft.display)} <span class="muted">draft</span></span>`
+    : "";
+
+  const suggestionChip = intel.suggestedPrice != null
+    ? `<span class="pricing-card-suggest muted">Suggested ${escapeHtml(formatCurrency(intel.suggestedPrice))} · ${escapeHtml(intel.confidence)}</span>`
+    : `<span class="pricing-card-suggest muted">${escapeHtml(intel.confidence)}${intel.jobCount ? ` · ${intel.jobCount} job${intel.jobCount === 1 ? "" : "s"}` : ""}</span>`;
+
+  return `
+    <div class="dashboard-card pricing-card${expanded ? " is-expanded" : ""}" data-pricing-card="${escapeAttr(service.serviceKey)}">
+      <button class="pricing-card-head" type="button" data-pricing-action="toggle" data-service="${escapeAttr(service.serviceKey)}" aria-expanded="${expanded ? "true" : "false"}">
+        <span class="pricing-card-headmain">
+          <span class="pricing-card-name">${escapeHtml(service.serviceName)}</span>
+          <span class="pricing-card-meta">${pricingTypeLabel(service.pricingType)}</span>
+        </span>
+        <span class="pricing-card-headside">
+          <span class="pricing-card-price">${escapeHtml(service.display)}</span>
+          ${draftPriceHtml}
+          <span class="pricing-card-chevron" aria-hidden="true">${expanded ? "▾" : "▸"}</span>
+        </span>
+      </button>
+      <div class="pricing-card-pills">${statusPills}${suggestionChip}</div>
+      ${expanded ? renderServicePricingEditor(service, intel) : ""}
+    </div>
+  `;
+}
+
+function renderServicePricingEditor(service, intel) {
+  const f = service.draft ? service.draft.fields : {
+    serviceName: service.serviceName,
+    category: service.category,
+    shortDescription: service.shortDescription,
+    bulletDetails: service.bulletDetails,
+    pricingType: service.pricingType,
+    basePrice: service.basePrice,
+    premiumPrice: service.premiumPrice,
+    priceSuffix: service.priceSuffix,
+    displayOverride: service.displayOverride,
+    isPublic: service.isPublic,
+    isActive: service.isActive,
+    sortOrder: service.sortOrder
+  };
+  const draftNote = service.draft ? service.draft.note : "";
+  const history = pricingHistoryCache[service.serviceKey];
+
+  return `
+    <div class="pricing-editor" data-service="${escapeAttr(service.serviceKey)}">
+      <div class="pricing-editor-grid">
+        <label class="pricing-field pricing-field-wide">
+          <span class="pricing-field-label">Service name</span>
+          <input id="pricingEditName" data-pricing-field type="text" value="${escapeAttr(f.serviceName || "")}">
+        </label>
+        <label class="pricing-field">
+          <span class="pricing-field-label">Category</span>
+          <select id="pricingEditCategory" data-pricing-field>
+            <option value="relacing"${f.category === "relacing" ? " selected" : ""}>Relacing Services</option>
+            <option value="additional"${f.category !== "relacing" ? " selected" : ""}>Additional Glove Services</option>
+          </select>
+        </label>
+        <label class="pricing-field">
+          <span class="pricing-field-label">Pricing type</span>
+          <select id="pricingEditType" data-pricing-field>
+            ${PRICING_TYPE_OPTIONS.map(([v, label]) => `<option value="${v}"${f.pricingType === v ? " selected" : ""}>${escapeHtml(label)}</option>`).join("")}
+          </select>
+        </label>
+        <label class="pricing-field">
+          <span class="pricing-field-label">Base / starting price ($)</span>
+          <input id="pricingEditBase" data-pricing-field type="number" min="0" step="1" inputmode="decimal" value="${escapeAttr(f.basePrice != null ? String(f.basePrice) : "")}">
+        </label>
+        <label class="pricing-field">
+          <span class="pricing-field-label">Premium price ($)</span>
+          <input id="pricingEditPremium" data-pricing-field type="number" min="0" step="1" inputmode="decimal" value="${escapeAttr(f.premiumPrice != null ? String(f.premiumPrice) : "")}">
+        </label>
+        <label class="pricing-field">
+          <span class="pricing-field-label">Price suffix</span>
+          <input id="pricingEditSuffix" data-pricing-field type="text" placeholder="e.g. each" value="${escapeAttr(f.priceSuffix || "")}">
+        </label>
+        <label class="pricing-field">
+          <span class="pricing-field-label">Sort order</span>
+          <input id="pricingEditSort" data-pricing-field type="number" step="1" inputmode="numeric" value="${escapeAttr(String(f.sortOrder != null ? f.sortOrder : 0))}">
+        </label>
+        <label class="pricing-field pricing-field-wide">
+          <span class="pricing-field-label">Manual display override <span class="muted">(optional — wins over generated text)</span></span>
+          <input id="pricingEditOverride" data-pricing-field type="text" placeholder="e.g. $90–$110" value="${escapeAttr(f.displayOverride || "")}">
+        </label>
+        <label class="pricing-field pricing-field-wide">
+          <span class="pricing-field-label">Short description <span class="muted">(internal / quote context)</span></span>
+          <input id="pricingEditShort" data-pricing-field type="text" value="${escapeAttr(f.shortDescription || "")}">
+        </label>
+        <label class="pricing-field pricing-field-wide">
+          <span class="pricing-field-label">Public bullet details <span class="muted">(one per line)</span></span>
+          <textarea id="pricingEditBullets" data-pricing-field rows="5">${escapeHtml((f.bulletDetails || []).join("\n"))}</textarea>
+        </label>
+        <div class="pricing-field pricing-toggles">
+          <label class="pricing-toggle">
+            <input id="pricingEditPublic" data-pricing-field type="checkbox"${f.isPublic !== false ? " checked" : ""}>
+            <span>Public <span class="muted">(shows on website)</span></span>
+          </label>
+          <label class="pricing-toggle">
+            <input id="pricingEditActive" data-pricing-field type="checkbox"${f.isActive !== false ? " checked" : ""}>
+            <span>Active <span class="muted">(offered for new quotes)</span></span>
+          </label>
+        </div>
+        <label class="pricing-field pricing-field-wide">
+          <span class="pricing-field-label">Draft note / reason <span class="muted">(optional, recorded in history)</span></span>
+          <input id="pricingEditNote" type="text" value="${escapeAttr(draftNote || "")}">
+        </label>
+      </div>
+
+      <div class="pricing-preview">
+        <span class="pricing-preview-label">Website preview</span>
+        <div class="pricing-preview-body">${renderPricingPreviewInner(f)}</div>
+      </div>
+
+      ${renderServicePricingIntelBlock(service, intel)}
+
+      <div class="pricing-actions pricing-editor-actions">
+        <button class="secondary" type="button" data-pricing-action="save-draft" data-service="${escapeAttr(service.serviceKey)}">Save Draft</button>
+        ${service.draft ? `<button class="secondary pricing-danger" type="button" data-pricing-action="discard-draft" data-service="${escapeAttr(service.serviceKey)}">Discard Draft</button>` : ""}
+        <button type="button" class="pricing-publish" data-pricing-action="publish" data-service="${escapeAttr(service.serviceKey)}">Publish Changes</button>
+      </div>
+
+      <div class="pricing-history">
+        ${history
+          ? renderPricingHistoryList(service.serviceKey, history)
+          : `<button class="pricing-link" type="button" data-pricing-action="load-history" data-service="${escapeAttr(service.serviceKey)}">View price history</button>`}
+      </div>
+    </div>
+  `;
+}
+
+function renderPricingPreviewInner(fields) {
+  const bullets = (fields.bulletDetails || []).filter(Boolean);
+  return `
+    <article class="pricing-preview-item">
+      <div class="pricing-preview-heading">
+        <h4>${escapeHtml(fields.serviceName || "Service")}</h4>
+        <span class="pricing-preview-price">${escapeHtml(pricingDisplayText(fields))}</span>
+      </div>
+      ${bullets.length ? `<ul>${bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}</ul>` : ""}
+    </article>
+  `;
+}
+
+function renderServicePricingIntelBlock(service, intel) {
+  const interp = pricingInterpretation(service, intel);
+  const rows = [
+    ["Published price", service.display],
+    ["Average charged", intel.avgCharged != null ? formatCurrency(intel.avgCharged) : "—"],
+    ["Median labor time", intel.medianMinutes != null ? formatLaborDuration(intel.medianMinutes) : "—"],
+    ["Average materials", intel.avgMaterials != null ? formatCurrency(intel.avgMaterials) : "—"],
+    ["Effective labor rate", intel.effectiveRate != null ? `${formatCurrency(intel.effectiveRate)}/hr` : "—"],
+    ["Target labor rate", `${formatCurrency(intel.settings.targetLaborRate)}/hr`],
+    ["Raw target-price estimate", intel.rawEstimate != null ? formatCurrency(intel.rawEstimate) : "—"],
+    ["Rounded suggestion", intel.suggestedPrice != null ? `${formatCurrency(intel.suggestedPrice)}${intel.minChargeApplied ? " (min charge)" : ""}` : "—"],
+    ["Measured jobs", String(intel.n)],
+    ["Pricing confidence", intel.confidence],
+    ["Recent time trend", PRICING_TREND_LABELS[intel.trend] || "—"]
+  ];
+
+  return `
+    <div class="pricing-intel">
+      <div class="pricing-intel-head">
+        <span class="pricing-intel-title">Pricing intelligence</span>
+        ${pricingPill(interp.label, interp.tone)}
+      </div>
+      <dl class="pricing-intel-grid">
+        ${rows.map(([k, v]) => `<div class="pricing-intel-row"><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd></div>`).join("")}
+      </dl>
+      <p class="pricing-intel-note muted">${escapeHtml(interp.detail)}</p>
+      <p class="pricing-intel-note muted">Suggestions never overwrite the published price. Getting faster raises your effective rate — that is efficiency, not a reason to cut the price.</p>
+    </div>
+  `;
+}
+
+function renderPricingHistoryList(serviceKey, history) {
+  if (!history.length) return `<p class="muted pricing-history-empty">No published history yet.</p>`;
+  return `
+    <div class="pricing-history-list">
+      <span class="pricing-history-title">Price history</span>
+      ${history.map((h) => `
+        <div class="pricing-history-row">
+          <div class="pricing-history-main">
+            <span class="pricing-history-change">${h.previousDisplay ? `${escapeHtml(h.previousDisplay)} → ` : ""}${escapeHtml(h.newDisplay || "")}</span>
+            <span class="pricing-history-date muted">${h.publishedAt ? escapeHtml(customerDisplayDate(h.publishedAt)) : ""}</span>
+          </div>
+          ${h.note ? `<span class="pricing-history-note muted">${escapeHtml(h.note)}</span>` : ""}
+          <button class="pricing-link" type="button" data-pricing-action="restore" data-revision="${escapeAttr(h.id)}" data-service="${escapeAttr(serviceKey)}">Restore as draft</button>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderPricingCreateCard() {
+  if (!pricingCreating) {
+    return `
+      <div class="pricing-create-toggle">
+        <button class="pricing-link" type="button" data-pricing-action="new-toggle">+ New service</button>
+      </div>
+    `;
+  }
+  return `
+    <div class="dashboard-card pricing-create-card">
+      <h3 class="money-card-title">New Service</h3>
+      <p class="muted">Creates a hidden, inactive service. Edit and publish it when it is ready to go live.</p>
+      <div class="pricing-settings-grid">
+        <label class="pricing-field pricing-field-wide">
+          <span class="pricing-field-label">Service name</span>
+          <input id="pricingNewName" type="text" placeholder="e.g. Steaming & Reshaping">
+        </label>
+        <label class="pricing-field">
+          <span class="pricing-field-label">Category</span>
+          <select id="pricingNewCategory">
+            <option value="additional">Additional Glove Services</option>
+            <option value="relacing">Relacing Services</option>
+          </select>
+        </label>
+      </div>
+      <div class="pricing-actions">
+        <button type="button" data-pricing-action="create">Create Service</button>
+        <button class="secondary" type="button" data-pricing-action="new-cancel">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+function collectPricingEditor() {
+  const q = (id) => document.getElementById(id);
+  const bulletsRaw = q("pricingEditBullets")?.value || "";
+  return {
+    serviceName: q("pricingEditName")?.value || "",
+    category: q("pricingEditCategory")?.value || "additional",
+    shortDescription: q("pricingEditShort")?.value || "",
+    bulletDetails: bulletsRaw.split("\n").map((s) => s.trim()).filter(Boolean),
+    pricingType: q("pricingEditType")?.value || "fixed",
+    basePrice: q("pricingEditBase")?.value || "",
+    premiumPrice: q("pricingEditPremium")?.value || "",
+    priceSuffix: q("pricingEditSuffix")?.value || "",
+    displayOverride: q("pricingEditOverride")?.value || "",
+    isPublic: !!q("pricingEditPublic")?.checked,
+    isActive: !!q("pricingEditActive")?.checked,
+    sortOrder: q("pricingEditSort")?.value || "0",
+    note: q("pricingEditNote")?.value || ""
+  };
+}
+
+/* True when the editor's current values match the live published row exactly —
+   used to keep "Publish" from writing a no-op history record. */
+function pricingEditorMatchesLive(service) {
+  const f = collectPricingEditor();
+  const norm = (s) => String(s == null ? "" : s).trim();
+  const num = (v) => { const s = String(v).replace(/[^\d.-]/g, ""); return s === "" ? null : Number(s); };
+  if (norm(f.serviceName) !== norm(service.serviceName)) return false;
+  if (f.category !== service.category) return false;
+  if (norm(f.shortDescription) !== norm(service.shortDescription)) return false;
+  const fb = f.bulletDetails.map((x) => x.trim());
+  const lb = (service.bulletDetails || []).map((x) => String(x).trim());
+  if (fb.length !== lb.length || fb.some((v, i) => v !== lb[i])) return false;
+  if (f.pricingType !== service.pricingType) return false;
+  if (num(f.basePrice) !== (service.basePrice == null ? null : Number(service.basePrice))) return false;
+  if (num(f.premiumPrice) !== (service.premiumPrice == null ? null : Number(service.premiumPrice))) return false;
+  if (norm(f.priceSuffix) !== norm(service.priceSuffix)) return false;
+  if (norm(f.displayOverride) !== norm(service.displayOverride)) return false;
+  if (!!f.isPublic !== !!service.isPublic) return false;
+  if (!!f.isActive !== !!service.isActive) return false;
+  if ((Number(f.sortOrder) || 0) !== (Number(service.sortOrder) || 0)) return false;
+  return true;
+}
+
+function ensurePricingDelegation() {
+  if (pricingDelegated) return;
+  const panel = document.getElementById("pricingPanel");
+  if (!panel) return;
+  pricingDelegated = true;
+  panel.addEventListener("click", onPricingClick);
+  panel.addEventListener("input", onPricingInput);
+  document.getElementById("pricingRefreshBtn")?.addEventListener("click", () => {
+    pricingStateCache = null;
+    renderPricingView();
+  });
+}
+
+function onPricingInput(e) {
+  if (!e.target.matches("[data-pricing-field]")) return;
+  const preview = document.querySelector(".pricing-preview-body");
+  if (preview) preview.innerHTML = renderPricingPreviewInner(collectPricingEditor());
+}
+
+async function onPricingClick(e) {
+  const btn = e.target.closest("[data-pricing-action]");
+  if (!btn) return;
+  const action = btn.dataset.pricingAction;
+  const serviceKey = btn.dataset.service || "";
+
+  if (action === "toggle") {
+    pricingExpandedKey = pricingExpandedKey === serviceKey ? null : serviceKey;
+    renderPricingView();
+    return;
+  }
+
+  if (action === "save-settings") {
+    const rate = document.getElementById("pricingSettingRate")?.value;
+    const min = document.getElementById("pricingSettingMin")?.value;
+    const round = document.getElementById("pricingSettingRound")?.value;
+    btn.disabled = true;
+    const res = await postJson({ action: "saveShopSettings", targetLaborRate: rate, minShopCharge: min, roundingIncrement: round }, true);
+    btn.disabled = false;
+    if (!res.ok) { alert(res.error || "Settings could not be saved."); return; }
+    if (pricingStateCache) pricingStateCache.settings = res.settings;
+    renderPricingView();
+    return;
+  }
+
+  if (action === "save-draft") {
+    const fields = collectPricingEditor();
+    if (!fields.serviceName.trim()) { alert("Service name is required."); return; }
+    btn.disabled = true;
+    const res = await postJson({ action: "saveServicePricingDraft", serviceKey, ...fields }, true);
+    btn.disabled = false;
+    if (!res.ok) { alert(res.error || "Draft could not be saved."); return; }
+    pricingStateCache = null;
+    renderPricingView();
+    return;
+  }
+
+  if (action === "discard-draft") {
+    if (!confirm("Discard this draft and keep the live published pricing?")) return;
+    const res = await postJson({ action: "discardServicePricingDraft", serviceKey }, true);
+    if (!res.ok) { alert(res.error || "Draft could not be discarded."); return; }
+    pricingStateCache = null;
+    renderPricingView();
+    return;
+  }
+
+  if (action === "publish") {
+    const state = pricingStateCache || { services: [] };
+    const service = (state.services || []).find((s) => s.serviceKey === serviceKey);
+    if (service && !service.draft && pricingEditorMatchesLive(service)) {
+      alert("No changes to publish. Edit a field or save a draft first.");
+      return;
+    }
+    if (!confirm("Publish these pricing changes to the public website? Customers will see the new price. This does not change any existing order.")) return;
+    const fields = collectPricingEditor();
+    btn.disabled = true;
+    const saved = await postJson({ action: "saveServicePricingDraft", serviceKey, ...fields }, true);
+    if (!saved.ok) { btn.disabled = false; alert(saved.error || "Could not save before publishing."); return; }
+    const res = await postJson({ action: "publishServicePricing", serviceKey, note: fields.note }, true);
+    btn.disabled = false;
+    if (!res.ok) { alert(res.error || "Publish failed."); return; }
+    pricingStateCache = null;
+    delete pricingHistoryCache[serviceKey];
+    renderPricingView();
+    return;
+  }
+
+  if (action === "load-history") {
+    const res = await postJson({ action: "listServicePricingHistory", serviceKey }, true);
+    if (!res.ok) { alert(res.error || "History could not be loaded."); return; }
+    pricingHistoryCache[serviceKey] = res.history || [];
+    renderPricingView();
+    return;
+  }
+
+  if (action === "restore") {
+    const revisionId = btn.dataset.revision;
+    if (!confirm("Restore this revision as a new draft? Review it, then publish to make it live.")) return;
+    const res = await postJson({ action: "restoreServicePricingRevision", revisionId }, true);
+    if (!res.ok) { alert(res.error || "Restore failed."); return; }
+    pricingStateCache = null;
+    pricingExpandedKey = serviceKey;
+    renderPricingView();
+    return;
+  }
+
+  if (action === "new-toggle") { pricingCreating = true; renderPricingView(); return; }
+  if (action === "new-cancel") { pricingCreating = false; renderPricingView(); return; }
+
+  if (action === "create") {
+    const name = document.getElementById("pricingNewName")?.value || "";
+    const category = document.getElementById("pricingNewCategory")?.value || "additional";
+    if (!name.trim()) { alert("Service name is required."); return; }
+    btn.disabled = true;
+    const res = await postJson({ action: "createServicePricing", serviceName: name, category }, true);
+    btn.disabled = false;
+    if (!res.ok) { alert(res.error || "Service could not be created."); return; }
+    pricingCreating = false;
+    pricingStateCache = null;
+    if (res.service) pricingExpandedKey = res.service.serviceKey;
+    renderPricingView();
+    return;
+  }
+}
+
+/* =========================
    ORDER TEMPLATES (Phase 1.4) — admin New Order only.
    Prefills the typical job shapes from the real price list (SHOP_PRICING /
    services page tiers). Templates never touch customer fields or lace color,
@@ -13955,3 +14786,25 @@ function renderReachCard() {
     </div>
   `;
 }
+
+/* =========================
+   PREVIEW BADGE
+   Shown only when /api/env reports a non-production deployment. The signal is
+   server-side (MURPHOS_ENV / branch), so this never appears in production.
+========================= */
+(function showPreviewBadge() {
+  fetch("/api/env", { cache: "no-store" })
+    .then((r) => r.json())
+    .then((d) => {
+      if (!d || d.preview !== true) return;
+      if (document.querySelector(".mm-preview-badge")) return;
+      const badge = document.createElement("div");
+      badge.className = "mm-preview-badge";
+      badge.setAttribute("role", "status");
+      badge.setAttribute("aria-label", "Preview environment");
+      badge.textContent = "PREVIEW";
+      (document.body || document.documentElement).appendChild(badge);
+      document.documentElement.classList.add("mm-is-preview");
+    })
+    .catch(() => { /* no badge if the signal is unavailable */ });
+})();

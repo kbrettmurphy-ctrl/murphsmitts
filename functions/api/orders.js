@@ -1,4 +1,6 @@
 import { sendWebPushToAll } from "./_webpush.js";
+import { formatServiceDisplayPrice } from "./_pricing.js";
+import { isPreviewEnvironment } from "./_env.js";
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -1590,6 +1592,306 @@ export async function onRequest(context) {
       });
       if (!resp.ok) return json({ ok: false, error: "Expense could not be deleted." }, 200, jsonHeaders);
       return json({ ok: true }, 200, jsonHeaders);
+    }
+
+    /* =========================
+       SERVICE PRICING (Pricing Management)
+       Live rows in service_pricing are what the public site reads. Editing
+       only ever writes a draft revision; publishing copies the draft into the
+       live row and turns that revision into an immutable history record.
+    ========================= */
+    if (action === "listServicePricing") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+
+      const rowsResp = await supabaseFetch(env, `/rest/v1/service_pricing?select=*&order=category.asc,sort_order.asc`);
+      if (!rowsResp.ok) return json({ ok: false, error: "Pricing could not be loaded." }, 200, jsonHeaders);
+      const rows = Array.isArray(rowsResp.data) ? rowsResp.data : [];
+
+      const draftsResp = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?select=*&status=eq.draft`);
+      const drafts = draftsResp.ok && Array.isArray(draftsResp.data) ? draftsResp.data : [];
+      const draftByService = {};
+      drafts.forEach((d) => { draftByService[String(d.service_pricing_id)] = d; });
+
+      const jobTypesResp = await supabaseFetch(env, `/rest/v1/service_pricing_job_types?select=*`);
+      const jobTypes = jobTypesResp.ok && Array.isArray(jobTypesResp.data) ? jobTypesResp.data : [];
+      const mappingsByService = {};
+      jobTypes.forEach((j) => {
+        const key = String(j.service_pricing_id);
+        (mappingsByService[key] = mappingsByService[key] || []).push({
+          gloveType: j.glove_type || null,
+          services: j.services || null,
+          trapeze: j.trapeze === true
+        });
+      });
+
+      const services = rows.map((row) => {
+        const service = mapServicePricingRow(row);
+        service.analyticsMappings = mappingsByService[String(row.id)] || [];
+        const draftRow = draftByService[String(row.id)];
+        if (draftRow && draftRow.data && typeof draftRow.data === "object") {
+          const data = draftRow.data;
+          service.draft = {
+            revisionId: draftRow.id,
+            note: draftRow.note || "",
+            display: formatServiceDisplayPrice(data),
+            fields: mapPricingSnapshotToClient(data),
+            differs: pricingSnapshotsDiffer(liveSnapshotFromRow(row), data),
+            createdAt: draftRow.created_at
+          };
+        } else {
+          service.draft = null;
+        }
+        return service;
+      });
+
+      const settings = await fetchShopSettings(env);
+      return json({ ok: true, services, settings }, 200, jsonHeaders);
+    }
+
+    if (action === "saveServicePricingDraft") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+
+      const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
+      if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
+
+      const built = buildPricingDraftData(body);
+      if (!built.ok) return json({ ok: false, error: built.error }, 200, jsonHeaders);
+
+      const note = cleanText(body.note);
+      const existing = await fetchServicePricingDraft(env, service.id);
+      if (existing) {
+        const patch = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(existing.id)}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ data: built.data, note, created_at: new Date().toISOString() })
+        });
+        if (!patch.ok) return json({ ok: false, error: "Draft could not be saved." }, 200, jsonHeaders);
+      } else {
+        const insert = await supabaseFetch(env, `/rest/v1/service_pricing_revisions`, {
+          method: "POST",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({
+            service_pricing_id: service.id,
+            service_key: service.service_key,
+            status: "draft",
+            data: built.data,
+            note
+          })
+        });
+        if (!insert.ok) return json({ ok: false, error: "Draft could not be saved." }, 200, jsonHeaders);
+      }
+      return json({ ok: true, display: formatServiceDisplayPrice(built.data) }, 200, jsonHeaders);
+    }
+
+    if (action === "discardServicePricingDraft") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
+      if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
+      const del = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?service_pricing_id=eq.${encodeURIComponent(service.id)}&status=eq.draft`, {
+        method: "DELETE", headers: { Prefer: "return=minimal" }
+      });
+      if (!del.ok) return json({ ok: false, error: "Draft could not be discarded." }, 200, jsonHeaders);
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
+    if (action === "publishServicePricing") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+
+      const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
+      if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
+
+      const draft = await fetchServicePricingDraft(env, service.id);
+      if (!draft || !draft.data || typeof draft.data !== "object") {
+        return json({ ok: false, error: "No draft to publish." }, 200, jsonHeaders);
+      }
+
+      const data = draft.data;
+      const previousDisplay = formatServiceDisplayPrice(service);
+      const newDisplay = formatServiceDisplayPrice(data);
+      const nowIso = new Date().toISOString();
+
+      const liveUpdate = {
+        service_name: data.service_name,
+        category: data.category,
+        short_description: data.short_description ?? null,
+        bullet_details: Array.isArray(data.bullet_details) ? data.bullet_details : [],
+        pricing_type: data.pricing_type,
+        base_price: data.base_price ?? null,
+        premium_price: data.premium_price ?? null,
+        price_suffix: data.price_suffix ?? null,
+        display_override: data.display_override ?? null,
+        is_public: data.is_public !== false,
+        is_active: data.is_active !== false,
+        sort_order: Number.isFinite(Number(data.sort_order)) ? Math.round(Number(data.sort_order)) : 0,
+        updated_at: nowIso,
+        published_at: nowIso
+      };
+
+      const patchLive = await supabaseFetch(env, `/rest/v1/service_pricing?id=eq.${encodeURIComponent(service.id)}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify(liveUpdate)
+      });
+      if (!patchLive.ok) return json({ ok: false, error: "Publish failed while updating live pricing." }, 200, jsonHeaders);
+
+      const promote = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(draft.id)}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          status: "published",
+          previous_display: previousDisplay,
+          new_display: newDisplay,
+          note: cleanText(body.note) || draft.note || null,
+          published_at: nowIso
+        })
+      });
+      if (!promote.ok) return json({ ok: false, error: "Publish saved pricing but failed to record history." }, 200, jsonHeaders);
+
+      const updatedRow = Array.isArray(patchLive.data) ? patchLive.data[0] : null;
+      return json({
+        ok: true,
+        service: updatedRow ? mapServicePricingRow(updatedRow) : null,
+        previousDisplay,
+        newDisplay
+      }, 200, jsonHeaders);
+    }
+
+    if (action === "listServicePricingHistory") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const key = cleanText(body.serviceKey);
+      let path = `/rest/v1/service_pricing_revisions?select=*&status=eq.published&order=published_at.desc&limit=200`;
+      if (key) path += `&service_key=eq.${encodeURIComponent(key)}`;
+      const resp = await supabaseFetch(env, path);
+      if (!resp.ok) return json({ ok: false, error: "History could not be loaded." }, 200, jsonHeaders);
+      const history = (resp.data || []).map((r) => ({
+        id: r.id,
+        serviceKey: r.service_key,
+        previousDisplay: r.previous_display || "",
+        newDisplay: r.new_display || "",
+        note: r.note || "",
+        publishedAt: r.published_at,
+        fields: r.data && typeof r.data === "object" ? mapPricingSnapshotToClient(r.data) : null
+      }));
+      return json({ ok: true, history }, 200, jsonHeaders);
+    }
+
+    if (action === "restoreServicePricingRevision") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const revisionId = cleanText(body.revisionId);
+      if (!revisionId) return json({ ok: false, error: "Missing revision id." }, 200, jsonHeaders);
+
+      const revResp = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?select=*&id=eq.${encodeURIComponent(revisionId)}&limit=1`);
+      const revision = revResp.ok && Array.isArray(revResp.data) ? revResp.data[0] : null;
+      if (!revision || !revision.data) return json({ ok: false, error: "Revision not found." }, 200, jsonHeaders);
+
+      const restoredAt = revision.published_at ? new Date(revision.published_at).toLocaleDateString("en-US") : "a prior revision";
+      const note = `Restored from ${restoredAt}`;
+      const existing = await fetchServicePricingDraft(env, revision.service_pricing_id);
+      if (existing) {
+        const patch = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(existing.id)}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ data: revision.data, note, created_at: new Date().toISOString() })
+        });
+        if (!patch.ok) return json({ ok: false, error: "Restore failed." }, 200, jsonHeaders);
+      } else {
+        const insert = await supabaseFetch(env, `/rest/v1/service_pricing_revisions`, {
+          method: "POST",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({
+            service_pricing_id: revision.service_pricing_id,
+            service_key: revision.service_key,
+            status: "draft",
+            data: revision.data,
+            note
+          })
+        });
+        if (!insert.ok) return json({ ok: false, error: "Restore failed." }, 200, jsonHeaders);
+      }
+      return json({ ok: true }, 200, jsonHeaders);
+    }
+
+    if (action === "createServicePricing") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+
+      const serviceName = cleanText(body.serviceName);
+      if (!serviceName) return json({ ok: false, error: "Service name is required." }, 200, jsonHeaders);
+
+      let serviceKey = cleanText(body.serviceKey);
+      if (!serviceKey) {
+        serviceKey = serviceName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48);
+      }
+      if (!/^[a-z0-9_]+$/.test(serviceKey)) {
+        return json({ ok: false, error: "Service key must be lowercase letters, numbers, and underscores." }, 200, jsonHeaders);
+      }
+
+      const existing = await fetchServicePricingByKey(env, serviceKey);
+      if (existing) return json({ ok: false, error: "A service with that key already exists." }, 200, jsonHeaders);
+
+      const category = ["relacing", "additional"].includes(String(body.category)) ? String(body.category) : "additional";
+      const rowsResp = await supabaseFetch(env, `/rest/v1/service_pricing?select=sort_order`);
+      const maxSort = rowsResp.ok && Array.isArray(rowsResp.data)
+        ? rowsResp.data.reduce((m, r) => Math.max(m, Number(r.sort_order) || 0), 0)
+        : 0;
+
+      /* New services start hidden + inactive with no published_at, so they can
+         never leak to the public endpoint before the owner publishes them. */
+      const insert = await supabaseFetch(env, `/rest/v1/service_pricing`, {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          service_key: serviceKey,
+          service_name: serviceName,
+          category,
+          bullet_details: [],
+          pricing_type: ["fixed", "range", "starting_at", "per_item", "variable", "tiered"].includes(String(body.pricingType)) ? String(body.pricingType) : "fixed",
+          is_public: false,
+          is_active: false,
+          sort_order: maxSort + 10
+        })
+      });
+      if (!insert.ok) return json({ ok: false, error: "Service could not be created." }, 200, jsonHeaders);
+      const created = Array.isArray(insert.data) ? insert.data[0] : null;
+      return json({ ok: true, service: created ? mapServicePricingRow(created) : null }, 200, jsonHeaders);
+    }
+
+    if (action === "getShopSettings") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+      const settings = await fetchShopSettings(env);
+      return json({ ok: true, settings }, 200, jsonHeaders);
+    }
+
+    if (action === "saveShopSettings") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) return json(auth, 200, jsonHeaders);
+
+      const updates = [];
+      const targetRate = cleanNumeric(body.targetLaborRate);
+      const minCharge = cleanNumeric(body.minShopCharge);
+      const rounding = cleanNumeric(body.roundingIncrement);
+      if (targetRate !== null && targetRate > 0) updates.push({ key: "target_labor_rate", value: targetRate });
+      if (minCharge !== null && minCharge >= 0) updates.push({ key: "min_shop_charge", value: minCharge });
+      if (rounding !== null && rounding > 0) updates.push({ key: "rounding_increment", value: rounding });
+
+      if (!updates.length) return json({ ok: false, error: "No valid settings to save." }, 200, jsonHeaders);
+
+      const nowIso = new Date().toISOString();
+      const resp = await supabaseFetch(env, `/rest/v1/shop_settings?on_conflict=key`, {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify(updates.map((u) => ({ ...u, updated_at: nowIso })))
+      });
+      if (!resp.ok) return json({ ok: false, error: "Settings could not be saved." }, 200, jsonHeaders);
+      const settings = await fetchShopSettings(env);
+      return json({ ok: true, settings }, 200, jsonHeaders);
     }
 
     if (action === "setGalleryPhotoCover") {
@@ -5448,6 +5750,10 @@ Whenever you're ready to move forward, just reply here and I'll pick right back 
 }
 
 async function sendBrandedEmail(env, { to, subject, plainBody, htmlBody }) {
+  if (isPreviewEnvironment(env)) {
+    console.log(`[preview] Suppressed email to ${to}: ${subject}`);
+    return { ok: true, suppressed: true };
+  }
   const from = env.RESEND_FROM || `${BRAND_NAME} <orders@murphsmitts.com>`;
   const replyTo = env.RESEND_REPLY_TO || undefined;
 
@@ -5510,6 +5816,10 @@ function mapSmsMessage(row) {
 }
 
 async function sendTwilioSms(env, to, body, mediaUrl = null) {
+  if (isPreviewEnvironment(env)) {
+    console.log(`[preview] Suppressed SMS to ${to}`);
+    return { ok: true, suppressed: true };
+  }
   const accountSid = env.TWILIO_ACCOUNT_SID;
   const form = new URLSearchParams();
   form.set("To", to);
@@ -6323,6 +6633,160 @@ function toBoolean(value) {
   if (value === true) return true;
   const v = String(value || "").trim().toLowerCase();
   return v === "true" || v === "yes" || v === "1" || v === "checked";
+}
+
+/* =========================
+   SERVICE PRICING HELPERS
+========================= */
+const PRICING_TYPES = new Set(["fixed", "range", "starting_at", "per_item", "variable", "tiered"]);
+const PRICING_CATEGORIES = new Set(["relacing", "additional"]);
+const PRICING_SNAPSHOT_FIELDS = [
+  "service_name", "category", "short_description", "bullet_details", "pricing_type",
+  "base_price", "premium_price", "price_suffix", "display_override", "is_public", "is_active", "sort_order"
+];
+
+async function fetchServicePricingByKey(env, serviceKey) {
+  if (!serviceKey) return null;
+  const resp = await supabaseFetch(env, `/rest/v1/service_pricing?select=*&service_key=eq.${encodeURIComponent(serviceKey)}&limit=1`);
+  return resp.ok && Array.isArray(resp.data) ? (resp.data[0] || null) : null;
+}
+
+async function fetchServicePricingDraft(env, servicePricingId) {
+  const resp = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?select=*&service_pricing_id=eq.${encodeURIComponent(servicePricingId)}&status=eq.draft&limit=1`);
+  return resp.ok && Array.isArray(resp.data) ? (resp.data[0] || null) : null;
+}
+
+async function fetchShopSettings(env) {
+  const defaults = { targetLaborRate: 45, minShopCharge: 30, roundingIncrement: 5 };
+  const resp = await supabaseFetch(env, `/rest/v1/shop_settings?select=key,value`);
+  if (!resp.ok || !Array.isArray(resp.data)) return defaults;
+  const map = {};
+  resp.data.forEach((r) => { map[r.key] = r.value != null ? Number(r.value) : null; });
+  return {
+    targetLaborRate: Number.isFinite(map.target_labor_rate) ? map.target_labor_rate : defaults.targetLaborRate,
+    minShopCharge: Number.isFinite(map.min_shop_charge) ? map.min_shop_charge : defaults.minShopCharge,
+    roundingIncrement: map.rounding_increment > 0 ? map.rounding_increment : defaults.roundingIncrement
+  };
+}
+
+function mapServicePricingRow(row) {
+  return {
+    id: row.id,
+    serviceKey: row.service_key,
+    serviceName: row.service_name,
+    category: row.category || "additional",
+    shortDescription: row.short_description || "",
+    bulletDetails: Array.isArray(row.bullet_details) ? row.bullet_details.map((b) => String(b)) : [],
+    pricingType: row.pricing_type || "fixed",
+    basePrice: row.base_price != null ? Number(row.base_price) : null,
+    premiumPrice: row.premium_price != null ? Number(row.premium_price) : null,
+    priceSuffix: row.price_suffix || "",
+    displayOverride: row.display_override || "",
+    isPublic: row.is_public !== false,
+    isActive: row.is_active !== false,
+    sortOrder: row.sort_order != null ? Number(row.sort_order) : 0,
+    display: formatServiceDisplayPrice(row),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    publishedAt: row.published_at
+  };
+}
+
+/* Draft/revision snapshots are stored in DB (snake_case) shape. Map to the
+   camelCase shape the admin client edits. */
+function mapPricingSnapshotToClient(data) {
+  return {
+    serviceName: data.service_name || "",
+    category: data.category || "additional",
+    shortDescription: data.short_description || "",
+    bulletDetails: Array.isArray(data.bullet_details) ? data.bullet_details.map((b) => String(b)) : [],
+    pricingType: data.pricing_type || "fixed",
+    basePrice: data.base_price != null ? Number(data.base_price) : null,
+    premiumPrice: data.premium_price != null ? Number(data.premium_price) : null,
+    priceSuffix: data.price_suffix || "",
+    displayOverride: data.display_override || "",
+    isPublic: data.is_public !== false,
+    isActive: data.is_active !== false,
+    sortOrder: data.sort_order != null ? Number(data.sort_order) : 0
+  };
+}
+
+/* Canonical snapshot (snake_case) from a live DB row, for draft-vs-live diffs. */
+function liveSnapshotFromRow(row) {
+  return {
+    service_name: row.service_name || "",
+    category: row.category || "additional",
+    short_description: cleanText(row.short_description),
+    bullet_details: Array.isArray(row.bullet_details) ? row.bullet_details.map((b) => String(b)) : [],
+    pricing_type: row.pricing_type || "fixed",
+    base_price: row.base_price != null ? Number(row.base_price) : null,
+    premium_price: row.premium_price != null ? Number(row.premium_price) : null,
+    price_suffix: cleanText(row.price_suffix),
+    display_override: cleanText(row.display_override),
+    is_public: row.is_public !== false,
+    is_active: row.is_active !== false,
+    sort_order: row.sort_order != null ? Number(row.sort_order) : 0
+  };
+}
+
+/* Validate + normalize admin editor input into a canonical draft snapshot. */
+function buildPricingDraftData(body) {
+  const name = cleanText(body.serviceName);
+  if (!name) return { ok: false, error: "Service name is required." };
+
+  const category = PRICING_CATEGORIES.has(String(body.category)) ? String(body.category) : "additional";
+  const pricingType = PRICING_TYPES.has(String(body.pricingType)) ? String(body.pricingType) : "fixed";
+
+  let bullets = [];
+  if (Array.isArray(body.bulletDetails)) {
+    bullets = body.bulletDetails.map((b) => String(b).trim()).filter(Boolean).slice(0, 20);
+  }
+
+  const data = {
+    service_name: name,
+    category,
+    short_description: cleanText(body.shortDescription),
+    bullet_details: bullets,
+    pricing_type: pricingType,
+    base_price: cleanNumeric(body.basePrice),
+    premium_price: cleanNumeric(body.premiumPrice),
+    price_suffix: cleanText(body.priceSuffix),
+    display_override: cleanText(body.displayOverride),
+    is_public: body.isPublic !== false,
+    is_active: body.isActive !== false,
+    sort_order: Number.isFinite(Number(body.sortOrder)) ? Math.round(Number(body.sortOrder)) : 0
+  };
+  return { ok: true, data };
+}
+
+/* True if two pricing snapshots differ on any editable field. Normalizes
+   null/"" and array contents so a draft equal to live reads as "no change". */
+function pricingSnapshotsDiffer(a, b) {
+  for (const field of PRICING_SNAPSHOT_FIELDS) {
+    if (field === "bullet_details") {
+      const av = Array.isArray(a[field]) ? a[field].map(String) : [];
+      const bv = Array.isArray(b[field]) ? b[field].map(String) : [];
+      if (av.length !== bv.length || av.some((v, i) => v !== bv[i])) return true;
+      continue;
+    }
+    let av = a[field];
+    let bv = b[field];
+    if (field === "short_description" || field === "price_suffix" || field === "display_override") {
+      av = av == null || av === "" ? null : String(av);
+      bv = bv == null || bv === "" ? null : String(bv);
+    } else if (field === "base_price" || field === "premium_price") {
+      av = av == null || av === "" ? null : Number(av);
+      bv = bv == null || bv === "" ? null : Number(bv);
+    } else if (field === "is_public" || field === "is_active") {
+      av = av !== false;
+      bv = bv !== false;
+    } else if (field === "sort_order") {
+      av = Number(av) || 0;
+      bv = Number(bv) || 0;
+    }
+    if (av !== bv) return true;
+  }
+  return false;
 }
 
 function normalizeStatus(value) {

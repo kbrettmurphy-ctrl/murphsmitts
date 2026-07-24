@@ -7,6 +7,7 @@ As-built baseline reviewed 2026-07-19.
 | Public marketing | Responsive Jekyll pages, shared navigation/footer, lightboxes, FAQ/service/process content |
 | Service request | Multi-glove intake, conditional shipping address, live active lace choices, SMS consent, post-submit multi-photo upload |
 | Public inventory | Active lace availability with in/out-of-stock display |
+| Public pricing | Published service prices/names/bullets from MurphOS with a static approved-price fallback |
 | Public gallery | Sectioned photos, order albums, covers, lightbox, descriptor/order-backed search, query deep links |
 | Public store | Non-hidden glove listings, sold state, primary/hover photos, detail slider, purchase/contact action |
 | Public tracking | Token lookup, six-stage timeline, exception notes, promise/completion date, carrier links, curated finished photos |
@@ -16,7 +17,8 @@ As-built baseline reviewed 2026-07-19.
 | Calendar | Received/estimated/completed scheduling with unscheduled work |
 | Map | Shipped-order markers, persisted/fallback geocoding, quality handling, unmapped errors, detail deep links |
 | Labor | Phase timers, one open session per order, pause/resume/stop, notes, history, dashboard controls, summaries |
-| Money | Job economics, effective rate, suggested pricing from measured work, rollups, labor coverage, phase hours, expenses, monthly P&L |
+| Money | Job economics, effective rate, suggested pricing from measured work, rollups, labor coverage, phase hours, expenses, monthly P&L, per-service pricing intelligence |
+| Pricing | GUI-managed public service prices; draft/publish workflow, price history, rollback, business settings (target rate/min charge/rounding), pricing intelligence, add/hide/deactivate services |
 | Inventory admin | Add/edit/deactivate/restore, thresholds/alerts, low-stock banner, usage-delta adjustments |
 | Gallery admin | Upload/link/describe/cover/move/hide/restore/delete and search/filter |
 | Store admin | Listing CRUD, status/featured/order, photo upload and primary/hover roles |

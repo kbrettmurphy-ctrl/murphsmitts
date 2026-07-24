@@ -21,6 +21,7 @@ The browser never receives the Supabase service-role key. Most admin operations 
 | Public site | root HTML, `_layouts/`, `_includes/`, `assets/` | Marketing pages, shared navigation/lightbox, service request form, lace availability |
 | Public store | `for-sale/`, `/api/gloves-for-sale` | Read-only glove listings and photo galleries |
 | Public tracking | `track/`, `/api/track` | Token-gated, customer-safe order progress and curated finished photos |
+| Public pricing | `services/`, `/api/public/service-pricing`, `functions/api/_pricing.js` | Read-only published service prices with a static approved-price fallback |
 | Admin shell | `admin/index.html`, `admin/admin.css`, `assets/vendor/leaflet/1.9.4/` | SPA views, presentation, and locally served map library/assets |
 | Admin behavior | `admin/admin.js` | Authentication UI, demo sandbox, orders, dashboard, customers, calendar, map, labor, money, inventory, gallery, store, messages, users, PWA update/push behavior |
 | Admin API | `functions/api/orders.js` | Signed sessions, WebAuthn, action dispatch, database/storage writes, notifications, geocoding, job logic |
@@ -32,7 +33,7 @@ The browser never receives the Supabase service-role key. Most admin operations 
 
 ## Admin SPA
 
-The admin is a single HTML/CSS/JavaScript application, not a framework build. Its views are Clubhouse, Orders and Order Detail, Customers, Calendar, Map, Money, Lace Inventory, Gallery, Gloves For Sale, Messages, and admin-only Users. The browser stores the signed session token and role in `localStorage`. Demo users operate entirely against an in-browser seeded sandbox; the API independently rejects demo tokens for real-data actions.
+The admin is a single HTML/CSS/JavaScript application, not a framework build. Its views are Clubhouse, Orders and Order Detail, Customers, Calendar, Map, Money, Pricing, Lace Inventory, Gallery, Gloves For Sale, Messages, and admin-only Users. The browser stores the signed session token and role in `localStorage`. Demo users operate entirely against an in-browser seeded sandbox; the API independently rejects demo tokens for real-data actions.
 
 `admin/admin.js` owns both rendering and business presentation logic. `functions/api/orders.js` repeats security-sensitive validation and server-side calculations where required. This duplication is intentional in the current system but is a maintenance risk recorded in `TECHNICAL_DEBT.md`.
 
@@ -42,6 +43,7 @@ Logout removes the session token and role plus persisted order/address caches an
 
 - Functions call Supabase REST and Storage with server-side environment bindings.
 - Public lace and store endpoints expose selected active/non-hidden records.
+- Public pricing (`/api/public/service-pricing`) exposes only published, public services (name, category, bullets, display price); `is_active` governs internal quote availability, not website visibility, so it is not a public filter. Drafts, internal notes, and raw price fields never leave the server. The public loader caches a validated last-known-good snapshot in `localStorage` and falls back to static markup only when both live and cached pricing are unavailable. See `.docs/murphos/PRICING_MANAGEMENT.md`.
 - Public tracking requires a 64-hex per-order token and returns only first name, order/glove identifiers, status/stage, dates, shipment tracking, and gallery photos linked to that order.
 - Gallery listing and glove search expose public gallery URLs plus linkage/search descriptors, not customer contact data.
 - `orders.glove_photos` is a JSON array in current writes, with defensive support for legacy serialized JSON text.

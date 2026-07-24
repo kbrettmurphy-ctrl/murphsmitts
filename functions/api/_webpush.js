@@ -3,6 +3,8 @@
    using only WebCrypto. Subscriptions live in public.push_subscriptions;
    dead endpoints (404/410) are pruned automatically. */
 
+import { isPreviewEnvironment } from "./_env.js";
+
 function b64uToBytes(s) {
   const b = String(s || "").replace(/-/g, "+").replace(/_/g, "/") + "===".slice((String(s || "").length + 3) % 4);
   const bin = atob(b);
@@ -127,6 +129,10 @@ async function supa(env, path, options = {}) {
 /* Send a notification to every registered device. Never throws. */
 export async function sendWebPushToAll(env, { title, body, url }) {
   try {
+    if (isPreviewEnvironment(env)) {
+      console.log(`[preview] Suppressed web push: ${title}`);
+      return;
+    }
     if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return;
     const list = await supa(env, `/rest/v1/push_subscriptions?select=*`);
     if (!list.ok || !Array.isArray(list.data) || !list.data.length) return;

@@ -1024,6 +1024,182 @@ if (document.readyState === "loading") {
 }
 
 // =========================
+// Public service pricing (Pricing Management)
+// Fallback order:
+//   1. Live published pricing from /api/public/service-pricing (render + cache
+//      as last-known-good).
+//   2. If the API fails or is invalid, the validated last-known-good snapshot
+//      from localStorage.
+//   3. Only if both are unavailable, the static approved-price markup already
+//      in the page.
+// Only public, published data from the endpoint is ever cached (never drafts).
+// Malformed or outdated-schema storage is ignored, never breaking the page, and
+// customers never see a technical error — fallbacks are logged to the console.
+// These cache helpers mirror functions/api/_pricing.js (this file is a classic
+// script, not a module).
+// =========================
+var SERVICE_PRICING_CACHE_KEY = "mm.servicePricing.v1";
+var SERVICE_PRICING_CACHE_VERSION = 1;
+
+function isValidPublicService(svc) {
+  return !!svc &&
+    typeof svc.serviceKey === "string" && svc.serviceKey !== "" &&
+    typeof svc.name === "string" && svc.name !== "" &&
+    typeof svc.price === "string" && svc.price !== "" &&
+    Array.isArray(svc.bullets);
+}
+
+// Renderable only if a non-empty array of well-formed services — an empty or
+// malformed payload must never wipe the page.
+function isValidServicesPayload(arr) {
+  return Array.isArray(arr) && arr.length > 0 && arr.every(isValidPublicService);
+}
+
+// Reduce a service to exactly the public fields that may be cached — no
+// internal notes, raw price columns, draft state, or secrets.
+function normalizeServiceForCache(svc) {
+  return {
+    serviceKey: String(svc && svc.serviceKey || ""),
+    name: String(svc && svc.name || ""),
+    category: svc && svc.category === "relacing" ? "relacing" : "additional",
+    shortDescription: String(svc && svc.shortDescription || ""),
+    bullets: svc && Array.isArray(svc.bullets) ? svc.bullets.map(function (b) { return String(b); }) : [],
+    pricingType: String(svc && svc.pricingType || "fixed"),
+    price: String(svc && svc.price || ""),
+    sortOrder: svc && isFinite(Number(svc.sortOrder)) ? Number(svc.sortOrder) : 0
+  };
+}
+
+function saveServicePricingSnapshot(services) {
+  try {
+    var payload = {
+      version: SERVICE_PRICING_CACHE_VERSION,
+      savedAt: new Date().toISOString(),
+      services: services.map(normalizeServiceForCache)
+    };
+    window.localStorage.setItem(SERVICE_PRICING_CACHE_KEY, JSON.stringify(payload));
+  } catch (err) {
+    // Storage may be unavailable (private mode / quota). Non-fatal.
+    console.warn("Could not save the pricing snapshot.", err);
+  }
+}
+
+function readServicePricingSnapshot() {
+  try {
+    var raw = window.localStorage.getItem(SERVICE_PRICING_CACHE_KEY);
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    if (!obj || obj.version !== SERVICE_PRICING_CACHE_VERSION || !isValidServicesPayload(obj.services)) {
+      return null;
+    }
+    return obj;
+  } catch (err) {
+    return null;
+  }
+}
+
+function initPublicServicePricing() {
+  var containers = {
+    relacing: document.querySelector('[data-service-list="relacing"]'),
+    additional: document.querySelector('[data-service-list="additional"]')
+  };
+  var staticArticles = Array.prototype.slice.call(document.querySelectorAll("[data-service-key]"));
+  if (!staticArticles.length && !containers.relacing && !containers.additional) return;
+
+  function escapeServiceHtml(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  // Bullets are plain text. The only HTML we inject is a controlled anchor for
+  // the "lace color or colors" phrase, so the deep link into #lace-colors is
+  // preserved without allowing arbitrary markup.
+  function bulletToHtml(text) {
+    return escapeServiceHtml(text).replace(
+      /lace color or colors/i,
+      '<a href="#lace-colors" class="content-link">$&</a>'
+    );
+  }
+
+  function updateServiceArticle(article, service) {
+    var heading = article.querySelector("h3");
+    var price = article.querySelector(".service-price");
+    var list = article.querySelector("ul");
+    if (heading) heading.textContent = service.name;
+    if (price) price.textContent = service.price;
+    if (list && Array.isArray(service.bullets) && service.bullets.length) {
+      list.innerHTML = service.bullets.map(function (b) { return "<li>" + bulletToHtml(b) + "</li>"; }).join("");
+    }
+    article.hidden = false;
+  }
+
+  function buildServiceArticle(service) {
+    var article = document.createElement("article");
+    article.className = "service-item";
+    article.setAttribute("data-service-key", service.serviceKey);
+    article.innerHTML =
+      '<div class="service-item-heading"><h3></h3><p class="service-price"></p></div><ul></ul>';
+    return article;
+  }
+
+  // Apply a validated services array to the page: update in place, add any
+  // newly published service, and hide anything the source no longer includes.
+  function renderServices(services) {
+    var byKey = {};
+    staticArticles.forEach(function (a) { byKey[a.getAttribute("data-service-key")] = a; });
+    var present = {};
+
+    services.forEach(function (service) {
+      present[service.serviceKey] = true;
+      var container = containers[service.category] || containers.additional || containers.relacing;
+      var article = byKey[service.serviceKey];
+      if (!article) {
+        if (!container) return;
+        article = buildServiceArticle(service);
+      }
+      updateServiceArticle(article, service);
+      if (container) container.appendChild(article); // reflow to published order
+    });
+
+    staticArticles.forEach(function (a) {
+      if (!present[a.getAttribute("data-service-key")]) a.hidden = true;
+    });
+  }
+
+  fetch("/api/public/service-pricing", { cache: "no-store" })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (!data || !data.ok || !isValidServicesPayload(data.services)) {
+        throw new Error("Malformed or empty pricing response.");
+      }
+      renderServices(data.services);
+      // A successful response always replaces the previous stored snapshot.
+      saveServicePricingSnapshot(data.services);
+    })
+    .catch(function (err) {
+      var snapshot = readServicePricingSnapshot();
+      if (snapshot) {
+        console.warn("Live pricing unavailable; using last-known-good snapshot saved " + snapshot.savedAt + ".", err);
+        renderServices(snapshot.services);
+        return;
+      }
+      // Both live and cached pricing unavailable — keep the static approved
+      // prices already in the page. Never show customers a technical error.
+      console.error("Service pricing unavailable and no valid snapshot; using static fallback prices.", err);
+    });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initPublicServicePricing);
+} else {
+  initPublicServicePricing();
+}
+
+// =========================
 // Lace tap toggle (mobile)
 // =========================
 (() => {
@@ -1100,4 +1276,25 @@ if (document.readyState === "loading") {
   } else {
     initHeaderState();
   }
+})();
+
+// =========================
+// Preview environment badge (public site)
+// Injected only when /api/env reports a non-production deployment. The signal
+// is server-side, so this never appears on the production website.
+// =========================
+(function () {
+  fetch("/api/env", { cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d || d.preview !== true) return;
+      if (document.querySelector(".mm-preview-badge")) return;
+      var badge = document.createElement("div");
+      badge.className = "mm-preview-badge";
+      badge.setAttribute("role", "status");
+      badge.setAttribute("aria-label", "Preview environment");
+      badge.textContent = "PREVIEW";
+      (document.body || document.documentElement).appendChild(badge);
+    })
+    .catch(function () { /* no badge if the signal is unavailable */ });
 })();

@@ -1,4 +1,5 @@
 import { sendWebPushToAll } from "./_webpush.js";
+import { isPreviewEnvironment } from "./_env.js";
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -548,6 +549,10 @@ ${msg}`;
 }
 
 async function sendPushoverNotification(env, { orderNumber, name, gloveType, services }) {
+  if (isPreviewEnvironment(env)) {
+    console.log(`[preview] Suppressed Pushover alert: New Order #${orderNumber}`);
+    return;
+  }
   try {
     const res = await fetch("https://api.pushover.net/1/messages.json", {
       method: "POST",
@@ -798,6 +803,10 @@ If you ever need another glove cleaned up, relaced, or tuned up, you know where 
 }
 
 async function sendBrandedEmail(env, { to, subject, plainBody, htmlBody }) {
+  if (isPreviewEnvironment(env)) {
+    console.log(`[preview] Suppressed email to ${to}: ${subject}`);
+    return { ok: true, suppressed: true };
+  }
   const from = env.RESEND_FROM || "Murph's Mitt Maintenance <orders@murphsmitts.com>";
   const replyTo = env.RESEND_REPLY_TO || undefined;
 
@@ -931,6 +940,10 @@ async function sendReceivedText(env, row) {
 }
 
 async function sendTwilioText(env, to, body) {
+  if (isPreviewEnvironment(env)) {
+    console.log(`[preview] Suppressed SMS to ${to}`);
+    return { ok: true, suppressed: true };
+  }
   const accountSid = env.TWILIO_ACCOUNT_SID;
   const authToken = env.TWILIO_AUTH_TOKEN;
   const messagingServiceSid = env.TWILIO_MESSAGING_SERVICE_SID;

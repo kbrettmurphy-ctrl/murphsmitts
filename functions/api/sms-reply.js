@@ -1,4 +1,5 @@
 import { sendWebPushToAll } from "./_webpush.js";
+import { isPreviewEnvironment } from "./_env.js";
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -227,6 +228,10 @@ async function storeOutboundMessage(env, { to, body, orderNumber, customerName }
 }
 
 async function notifyOwner(env, title, message) {
+  if (isPreviewEnvironment(env)) {
+    console.log(`[preview] Suppressed Pushover alert: ${title}`);
+    return;
+  }
   if (!env.PUSHOVER_APP_TOKEN || !env.PUSHOVER_USER_KEY) return;
 
   try {
