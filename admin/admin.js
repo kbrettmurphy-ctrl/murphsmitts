@@ -3604,10 +3604,10 @@ function renderMoneyViewContent(sessions, loadError) {
   });
 
   /* Rollups only count orders with labor logged; the rest appear only in
-     the coverage stat. Jobs under 15 logged minutes are excluded from the
-     rollups and best/worst too — a 3-minute test session otherwise prints
-     a $4,000/hr artifact. */
-  const MIN_ROLLUP_LABOR_MINUTES = 15;
+     the coverage stat. Jobs under 1 logged minute are excluded from the
+     rollups and best/worst too — a sub-minute fat-finger start/stop
+     otherwise prints a wild $/hr artifact. Real short jobs still count. */
+  const MIN_ROLLUP_LABOR_MINUTES = 1;
   const logged = rows.filter(r => r.econ.laborMinutes > 0);
   const withLabor = logged.filter(r => r.econ.laborMinutes >= MIN_ROLLUP_LABOR_MINUTES);
   const excludedCount = logged.length - withLabor.length;
@@ -3626,7 +3626,7 @@ function renderMoneyViewContent(sessions, loadError) {
   const statsHtml = `
     <div class="dashboard-grid money-stat-grid">
       ${renderDashboardMetricCard("Effective $/hr", overallRate !== null ? `${formatCurrency(overallRate)}/hr` : "—", { sub: "Jobs with labor + price" })}
-      ${renderDashboardMetricCard("Jobs with labor", `${withLabor.length} of ${rows.length}`, { sub: excludedCount ? `Ready to Go / Completed · ${excludedCount} under 15m excluded` : "Ready to Go / Completed" })}
+      ${renderDashboardMetricCard("Jobs with labor", `${withLabor.length} of ${rows.length}`, { sub: excludedCount ? `Ready to Go / Completed · ${excludedCount} under 1m excluded` : "Ready to Go / Completed" })}
       ${renderDashboardMetricCard("Total labor", formatLaborDuration(totalLaborMinutes))}
       ${renderDashboardMetricCard("Materials cost", formatCurrency(totalMaterials), { sub: "Jobs with labor" })}
     </div>
