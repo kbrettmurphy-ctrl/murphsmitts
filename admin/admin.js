@@ -3656,6 +3656,22 @@ function isMoneyEligibleOrder(order) {
   return normalizeStatus(order?.status) === "ready to go" || isCompletedOrder(order);
 }
 
+/* Global Pricing Intelligence cutoff. Orders 0001–0080 stay fully visible
+   everywhere (Orders, Money, drill-downs), but they are early/noisy data and
+   are excluded from ALL pricing-intelligence calculations and sample counts.
+   Analytics starts at order #0081. */
+const PRICING_INTEL_MIN_ORDER = 81;
+
+function orderNumberValue(order) {
+  const digits = String(order?.orderNumber || "").replace(/\D/g, "");
+  return digits ? parseInt(digits, 10) : NaN;
+}
+
+function isAfterPricingCutoff(order) {
+  const num = orderNumberValue(order);
+  return Number.isFinite(num) && num >= PRICING_INTEL_MIN_ORDER;
+}
+
 function renderMoneyViewContent(sessions, loadError) {
   const laborByOrder = {};
   (Array.isArray(sessions) ? sessions : []).forEach(session => {
@@ -13564,42 +13580,47 @@ function orderPricingTier(order) {
 /* Core intelligence for one disjoint set of jobs. Callers pass an already-split
    order list so tiers are computed independently. */
 function computeTierIntel(attributed, laborByOrder, settings) {
-  /* The measured set = exactly the jobs behind the "Measured jobs" count and
-     the drill-down (money-eligible, this tier, with >= 1 logged minute). Every
-     stat below is computed over THIS set so the numbers reconcile with the
-     orders you can click through to. */
-  const measured = attributed
-    .map((o) => ({
-      orderNumber: String(o.orderNumber || ""),
-      minutes: laborByOrder[String(o.orderNumber)] || 0,
-      materials: getOrderMaterialsCost(o).total,
-      price: orderChargedPrice(o), // null for blank/$0 gift jobs
-      date: o.dateCompleted || o.createdAt || o.timestampSubmitted || ""
-    }))
-    .filter((j) => j.minutes >= 1);
+  /* Each metric uses its own population, and each population has its own
+     clickable count so the numbers are transparent:
+     - PAID:          all non-archived paid jobs, regardless of timer data
+                      (blank/$0 gift jobs are not "paid"). Feeds Average charged.
+     - MEASURED:      all jobs with >= 1 logged minute, gifts included.
+                      Feeds Median time, Average materials, and Target estimate.
+     - PAID+MEASURED: the intersection. Feeds Effective labor rate. */
+  const withMeta = attributed.map((o) => ({
+    orderNumber: String(o.orderNumber || ""),
+    minutes: laborByOrder[String(o.orderNumber)] || 0,
+    materials: getOrderMaterialsCost(o).total,
+    price: orderChargedPrice(o), // null for blank/$0 gift jobs
+    date: o.dateCompleted || o.createdAt || o.timestampSubmitted || ""
+  }));
 
+  // PAID — all paid jobs (no timer requirement). Feeds Average charged.
+  const paid = withMeta.filter((j) => j.price != null);
+  const paidCount = paid.length;
+  const paidOrderNumbers = paid.map((j) => j.orderNumber).filter(Boolean);
+  /* Average charged = plain mean of the estimated price on the paid jobs. No
+     materials subtracted, no allocation/discounting — the exact order price. */
+  const avgCharged = paidCount ? paid.reduce((s, j) => s + j.price, 0) / paidCount : null;
+
+  // MEASURED — jobs with logged labor, gifts included. Feeds time + estimate.
+  const measured = withMeta.filter((j) => j.minutes >= 1);
   const n = measured.length;
-  const orderNumbers = measured.map((j) => j.orderNumber).filter(Boolean);
+  const measuredOrderNumbers = measured.map((j) => j.orderNumber).filter(Boolean);
   const medianMinutes = n ? pricingMedian(measured.map((j) => j.minutes)) : null;
   const avgMaterials = n ? measured.reduce((s, j) => s + j.materials, 0) / n : null;
 
-  /* The paid subset: measured jobs with a real (positive) estimated price.
-     Blank/$0 gift jobs are excluded from BOTH the total and the denominator. */
-  const paid = measured.filter((j) => j.price != null);
-  const paidCount = paid.length;
-
-  /* Average charged = plain mean of the estimated price on the paid jobs. No
-     materials subtracted, no allocation/discounting — the exact price shown on
-     each order. */
-  const avgCharged = paidCount ? paid.reduce((s, j) => s + j.price, 0) / paidCount : null;
-
-  /* Effective labor rate = (price − materials) ÷ logged hours over the same
-     paid jobs. (This one DOES net out materials — it is a labor rate, not the
-     charged price.) */
-  const netSum = paid.reduce((s, j) => s + (j.price - j.materials), 0);
-  const hoursSum = paid.reduce((s, j) => s + j.minutes / 60, 0);
+  // PAID + MEASURED — the rate needs both a price and logged time.
+  const paidMeasured = measured.filter((j) => j.price != null);
+  const paidMeasuredCount = paidMeasured.length;
+  const paidMeasuredOrderNumbers = paidMeasured.map((j) => j.orderNumber).filter(Boolean);
+  /* Effective labor rate = (price − materials) ÷ logged hours. Nets out
+     materials — it is a labor rate, not the charged price. */
+  const netSum = paidMeasured.reduce((s, j) => s + (j.price - j.materials), 0);
+  const hoursSum = paidMeasured.reduce((s, j) => s + j.minutes / 60, 0);
   const effectiveRate = hoursSum > 0 ? netSum / hoursSum : null;
 
+  // Target estimate uses the measured population (time + materials).
   let rawEstimate = null;
   let suggestedPrice = null;
   let minChargeApplied = false;
@@ -13613,9 +13634,12 @@ function computeTierIntel(attributed, laborByOrder, settings) {
   const trend = pricingTimeTrend(measured);
 
   return {
-    n,
+    n,                       // measured count — drives confidence, interpretation, estimate
     paidCount,
-    orderNumbers,
+    paidMeasuredCount,
+    measuredOrderNumbers,
+    paidOrderNumbers,
+    paidMeasuredOrderNumbers,
     jobCount: attributed.length,
     avgCharged,
     medianMinutes,
@@ -13636,8 +13660,10 @@ function computeTierIntel(attributed, laborByOrder, settings) {
    median and vice versa. Non-tiered services return a single tier. */
 function computeServicePricingIntel(service, services, laborByOrder) {
   const settings = getPricingSettings();
+  /* Cutoff (#0081+) applies to the whole attributed set, so every population
+     and every clickable count below already excludes orders 0001–0080. */
   const attributed = allOrders.filter(
-    (o) => isMoneyEligibleOrder(o) && attributeOrderToServiceKey(o, services) === service.serviceKey
+    (o) => isMoneyEligibleOrder(o) && isAfterPricingCutoff(o) && attributeOrderToServiceKey(o, services) === service.serviceKey
   );
 
   const isTiered = service.pricingType === "tiered";
@@ -14016,24 +14042,26 @@ function renderServicePricingIntelBlock(service, intel) {
 
   const tierBlocks = intel.tiers.map((tier) => {
     const interp = pricingTierInterpretation(tier, settings);
-    /* The measured-jobs count links to the exact orders behind it. */
     const tierName = tier.label ? `${service.serviceName} · ${tier.label.split("·")[0].trim()}` : service.serviceName;
-    const jobsCell = tier.n > 0 && tier.orderNumbers && tier.orderNumbers.length
-      ? { html: `<button type="button" class="pricing-jobs-link" data-jobs="${escapeAttr(tier.orderNumbers.join(","))}" data-context="${escapeAttr(tierName)}">${tier.n}</button>` }
-      : String(tier.n);
-    const avgChargedCell = tier.avgCharged != null
-      ? { html: `${escapeHtml(formatCurrency(tier.avgCharged))} <span class="muted pricing-intel-sub">· ${tier.paidCount} paid</span>` }
-      : "—";
+
+    /* Each population gets a clickable sample count next to the metric it feeds,
+       so you can see and open exactly which orders produced each number. */
+    const drill = (count, nums, label) => (count > 0 && nums && nums.length)
+      ? `<button type="button" class="pricing-jobs-link pricing-jobs-link--sub" data-jobs="${escapeAttr(nums.join(","))}" data-context="${escapeAttr(`${tierName} · ${label}`)}">${count} ${escapeHtml(label)}</button>`
+      : `<span class="muted pricing-intel-sub">${count} ${escapeHtml(label)}</span>`;
+
+    const withSamples = (valueStr, count, nums, label) =>
+      ({ html: `${escapeHtml(valueStr)} <span class="pricing-intel-samples">${drill(count, nums, label)}</span>` });
+
     const rows = [
       ["Published price", tier.publishedPrice != null ? formatCurrency(tier.publishedPrice) : (service.display || "—")],
-      ["Average charged", avgChargedCell],
-      ["Median labor time", tier.medianMinutes != null ? formatLaborDuration(tier.medianMinutes) : "—"],
+      ["Average charged", withSamples(tier.avgCharged != null ? formatCurrency(tier.avgCharged) : "—", tier.paidCount, tier.paidOrderNumbers, "paid")],
+      ["Median labor time", withSamples(tier.medianMinutes != null ? formatLaborDuration(tier.medianMinutes) : "—", tier.n, tier.measuredOrderNumbers, "measured")],
       ["Average materials", tier.avgMaterials != null ? formatCurrency(tier.avgMaterials) : "—"],
-      ["Effective labor rate", tier.effectiveRate != null ? `${formatCurrency(tier.effectiveRate)}/hr` : "—"],
+      ["Effective labor rate", withSamples(tier.effectiveRate != null ? `${formatCurrency(tier.effectiveRate)}/hr` : "—", tier.paidMeasuredCount, tier.paidMeasuredOrderNumbers, "paid+measured")],
       ["Target labor rate", `${formatCurrency(settings.targetLaborRate)}/hr`],
       ["Raw target-price estimate", tier.rawEstimate != null ? formatCurrency(tier.rawEstimate) : "—"],
       ["Rounded suggestion", tier.suggestedPrice != null ? `${formatCurrency(tier.suggestedPrice)}${tier.minChargeApplied ? " (min charge)" : ""}` : "—"],
-      ["Measured jobs", jobsCell],
       ["Pricing confidence", tier.confidence],
       ["Recent time trend", PRICING_TREND_LABELS[tier.trend] || "—"]
     ];
@@ -14055,7 +14083,8 @@ function renderServicePricingIntelBlock(service, intel) {
     <div class="pricing-intel">
       ${intel.isTiered ? `<p class="pricing-intel-note muted pricing-intel-tiernote">Standard and premium jobs are measured independently.</p>` : ""}
       ${tierBlocks}
-      <p class="pricing-intel-note muted">Suggestions never overwrite the published price. Getting faster raises your effective rate — that is efficiency, not a reason to cut the price.</p>
+      <p class="pricing-intel-note muted">Average charged uses all paid jobs; median time &amp; estimate use all measured jobs (gifts included); effective rate uses paid + measured jobs. Tap a count to see those orders.</p>
+      <p class="pricing-intel-note muted">Pricing intelligence starts at order #${String(PRICING_INTEL_MIN_ORDER).padStart(4, "0")} — earlier orders stay in your history but are excluded here. Suggestions never overwrite the published price.</p>
     </div>
   `;
 }

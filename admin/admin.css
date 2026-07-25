@@ -8408,6 +8408,9 @@ details.pricing-section[open] > .pricing-section-summary{border-bottom:1px solid
   text-decoration-color:rgba(9,47,77,.4);
 }
 .pricing-jobs-link:hover{text-decoration-color:var(--navy)}
+/* Smaller inline sample-count links next to each metric value */
+.pricing-jobs-link--sub{font-size:.66rem; font-weight:400}
+.pricing-intel-samples{white-space:nowrap}
 
 /* Removable "Pricing Intelligence" filter chip above the Orders list —
    compact, matching the standard MurphOS chip (.reach-chip) sizing. */
