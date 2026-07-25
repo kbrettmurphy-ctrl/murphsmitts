@@ -5658,6 +5658,9 @@ async function refreshActiveViewFromPull() {
     } else if (activeView === "gloves-sale") {
       if (document.getElementById("saveSaleGloveBtn")) return;
       await loadSaleGloves();
+    } else if (activeView === "pricing") {
+      pricingStateCache = null;
+      await renderPricingView();
     }
     // Upload has no safe data-only refresh; staged photos are intentionally preserved.
   } catch {
@@ -13967,10 +13970,6 @@ function ensurePricingDelegation() {
   pricingDelegated = true;
   panel.addEventListener("click", onPricingClick);
   panel.addEventListener("input", onPricingInput);
-  document.getElementById("pricingRefreshBtn")?.addEventListener("click", () => {
-    pricingStateCache = null;
-    renderPricingView();
-  });
 }
 
 function onPricingInput(e) {
