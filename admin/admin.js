@@ -3630,9 +3630,29 @@ function renderMoneyPricingCard(laborByOrder) {
   `;
 }
 
+/* Archived/cancelled orders were voided — they never count toward money
+   rollups or pricing intelligence. (There is no separate "archived" status yet;
+   cancelled is today's archive, and an `archived` flag/status is honored if it
+   ever appears.) */
+function isArchivedOrder(order) {
+  const status = normalizeStatus(order?.status);
+  return order?.archived === true || status === "archived" || status === "cancelled";
+}
+
+/* The estimated/charged price for analytics, or null when there is none. Blank
+   or $0 gift jobs are treated as no-charge so they never drag down average
+   charged price or effective labor rate (their labor time still counts). */
+function orderChargedPrice(order) {
+  if (order?.priceQuoted == null || order.priceQuoted === "") return null;
+  const p = Number(order.priceQuoted);
+  return Number.isFinite(p) && p > 0 ? p : null;
+}
+
 /* Money view only counts finished work — in-progress orders have
-   partial labor logged and would skew every rate. */
+   partial labor logged and would skew every rate. Archived/cancelled orders
+   are excluded entirely. */
 function isMoneyEligibleOrder(order) {
+  if (isArchivedOrder(order)) return false;
   return normalizeStatus(order?.status) === "ready to go" || isCompletedOrder(order);
 }
 
@@ -5453,6 +5473,24 @@ function sortOrders(list) {
 function applyFilters() {
   const q = searchInput.value.trim();
   const isSearching = !!q;
+
+  /* Pricing-intelligence drill-down: show exactly the orders behind a tier's
+     Measured jobs count, with a removable chip. A search exits this mode. */
+  if (isSearching) pricingIntelFilter = null;
+  if (pricingIntelFilter && !isSearching && isOrderFilterView(activeView)) {
+    const wanted = new Set(pricingIntelFilter.orderNumbers.map(String));
+    const list = allOrders.filter(order => wanted.has(String(order.orderNumber)));
+    sortOrders(list);
+    renderOrders(list);
+    viewTitle.textContent = "Orders";
+    orderCount.textContent = `Pricing Intelligence · ${list.length}`;
+    renderPricingIntelChip(list.length);
+    syncOrderFilterUI();
+    syncSearchUI();
+    return;
+  }
+  hidePricingIntelChip();
+
   let list = (isSearching ? allOrders : getViewOrders()).slice();
 
   if (isSearching) {
@@ -5475,6 +5513,55 @@ function applyFilters() {
   syncOrderFilterUI();
   syncSearchUI();
 }
+
+/* Open the Orders view filtered to a pricing-intelligence tier's exact jobs. */
+function openPricingIntelOrders(orderNumbers, context) {
+  const nums = (orderNumbers || []).map(n => String(n).trim()).filter(Boolean);
+  if (!nums.length) return;
+  pricingIntelFilter = { orderNumbers: nums, context: context || "" };
+  if (searchInput) searchInput.value = "";
+  searchExpanded = false;
+  setActiveView("current");
+}
+
+function clearPricingIntelFilter({ reapply = false } = {}) {
+  if (!pricingIntelFilter) return;
+  pricingIntelFilter = null;
+  if (reapply && isOrderFilterView(activeView)) applyFilters();
+  else hidePricingIntelChip();
+}
+
+function renderPricingIntelChip(count) {
+  const bar = document.getElementById("pricingIntelChip");
+  if (!bar || !pricingIntelFilter) return;
+  const ctx = pricingIntelFilter.context ? ` · ${escapeHtml(pricingIntelFilter.context)}` : "";
+  bar.innerHTML = `
+    <span class="pricing-chip">
+      <span class="pricing-chip-label">Pricing Intelligence${ctx} · ${count} job${count === 1 ? "" : "s"}</span>
+      <button type="button" class="pricing-chip-remove" data-pricing-chip-remove aria-label="Remove Pricing Intelligence filter">×</button>
+    </span>
+  `;
+  bar.hidden = false;
+}
+
+function hidePricingIntelChip() {
+  const bar = document.getElementById("pricingIntelChip");
+  if (bar) { bar.hidden = true; bar.innerHTML = ""; }
+}
+
+/* Delegated: a Measured-jobs count (Pricing view or Money view) opens the
+   Orders drill-down; the chip's × removes it. */
+document.addEventListener("click", (e) => {
+  const jobsLink = e.target.closest(".pricing-jobs-link");
+  if (jobsLink) {
+    const nums = (jobsLink.dataset.jobs || "").split(",").map(s => s.trim()).filter(Boolean);
+    openPricingIntelOrders(nums, jobsLink.dataset.context || "");
+    return;
+  }
+  if (e.target.closest("[data-pricing-chip-remove]")) {
+    clearPricingIntelFilter({ reapply: true });
+  }
+});
 
 function isMobileViewport() {
   return window.matchMedia("(max-width: 899px)").matches;
@@ -12288,6 +12375,7 @@ orderFilterButtons.forEach(btn => {
     const nextFilter = btn.dataset.orderFilter;
     if (!isOrderFilterView(nextFilter)) return;
 
+    pricingIntelFilter = null; // choosing a status filter exits the drill-down
     orderFiltersExpanded = false;
     setActiveView(nextFilter);
   });
@@ -12505,6 +12593,7 @@ document.querySelector(".side-nav")?.addEventListener("click", (e) => {
   const navBtn = e.target.closest(".nav-link[data-view]");
 
   if (navBtn) {
+    pricingIntelFilter = null; // any nav choice exits the pricing drill-down
     setActiveView(navBtn.dataset.view);
   }
 });
@@ -13336,6 +13425,9 @@ let pricingExpandedKey = null;     // which service card is open in the editor
 let pricingHistoryCache = {};      // serviceKey -> [history rows]
 let pricingCreating = false;       // "new service" mini-form visible
 let pricingDelegated = false;
+/* Orders drill-down from a pricing-intelligence "Measured jobs" count:
+   { orderNumbers: string[], context: string } or null. */
+let pricingIntelFilter = null;
 
 /* Client mirror of functions/api/_pricing.js formatServiceDisplayPrice — keep
    the two in sync. Generates the public price string from structured fields. */
@@ -13472,27 +13564,30 @@ function orderPricingTier(order) {
 /* Core intelligence for one disjoint set of jobs. Callers pass an already-split
    order list so tiers are computed independently. */
 function computeTierIntel(attributed, laborByOrder, settings) {
-  const priced = attributed.filter((o) => {
-    const p = Number(o.priceQuoted);
-    return o.priceQuoted != null && o.priceQuoted !== "" && Number.isFinite(p);
-  });
-  const avgCharged = priced.length
-    ? priced.reduce((s, o) => s + Number(o.priceQuoted), 0) / priced.length
-    : null;
+  /* Average charged: only jobs with a real (positive) price — blank/$0 gift
+     jobs are excluded so they don't drag the average down. */
+  const priced = attributed
+    .map((o) => orderChargedPrice(o))
+    .filter((p) => p != null);
+  const avgCharged = priced.length ? priced.reduce((s, p) => s + p, 0) / priced.length : null;
 
   const measured = attributed
     .map((o) => ({
+      orderNumber: String(o.orderNumber || ""),
       minutes: laborByOrder[String(o.orderNumber)] || 0,
       materials: getOrderMaterialsCost(o).total,
-      price: (o.priceQuoted != null && o.priceQuoted !== "" && Number.isFinite(Number(o.priceQuoted))) ? Number(o.priceQuoted) : null,
+      price: orderChargedPrice(o), // null for blank/$0 gift jobs
       date: o.dateCompleted || o.createdAt || o.timestampSubmitted || ""
     }))
     .filter((j) => j.minutes >= 1);
 
   const n = measured.length;
+  const orderNumbers = measured.map((j) => j.orderNumber).filter(Boolean);
   const medianMinutes = n ? pricingMedian(measured.map((j) => j.minutes)) : null;
   const avgMaterials = n ? measured.reduce((s, j) => s + j.materials, 0) / n : null;
 
+  /* Effective rate: only measured jobs that also carry a real price. Gift jobs
+     (price null) contribute their time to the median but never to the rate. */
   const rated = measured.filter((j) => j.price != null);
   const netSum = rated.reduce((s, j) => s + (j.price - j.materials), 0);
   const hoursSum = rated.reduce((s, j) => s + j.minutes / 60, 0);
@@ -13512,6 +13607,7 @@ function computeTierIntel(attributed, laborByOrder, settings) {
 
   return {
     n,
+    orderNumbers,
     jobCount: attributed.length,
     avgCharged,
     medianMinutes,
@@ -13912,6 +14008,11 @@ function renderServicePricingIntelBlock(service, intel) {
 
   const tierBlocks = intel.tiers.map((tier) => {
     const interp = pricingTierInterpretation(tier, settings);
+    /* The measured-jobs count links to the exact orders behind it. */
+    const tierName = tier.label ? `${service.serviceName} · ${tier.label.split("·")[0].trim()}` : service.serviceName;
+    const jobsCell = tier.n > 0 && tier.orderNumbers && tier.orderNumbers.length
+      ? { html: `<button type="button" class="pricing-jobs-link" data-jobs="${escapeAttr(tier.orderNumbers.join(","))}" data-context="${escapeAttr(tierName)}">${tier.n}</button>` }
+      : String(tier.n);
     const rows = [
       ["Published price", tier.publishedPrice != null ? formatCurrency(tier.publishedPrice) : (service.display || "—")],
       ["Average charged", tier.avgCharged != null ? formatCurrency(tier.avgCharged) : "—"],
@@ -13921,7 +14022,7 @@ function renderServicePricingIntelBlock(service, intel) {
       ["Target labor rate", `${formatCurrency(settings.targetLaborRate)}/hr`],
       ["Raw target-price estimate", tier.rawEstimate != null ? formatCurrency(tier.rawEstimate) : "—"],
       ["Rounded suggestion", tier.suggestedPrice != null ? `${formatCurrency(tier.suggestedPrice)}${tier.minChargeApplied ? " (min charge)" : ""}` : "—"],
-      ["Measured jobs", String(tier.n)],
+      ["Measured jobs", jobsCell],
       ["Pricing confidence", tier.confidence],
       ["Recent time trend", PRICING_TREND_LABELS[tier.trend] || "—"]
     ];
@@ -13932,7 +14033,7 @@ function renderServicePricingIntelBlock(service, intel) {
           ${pricingPill(interp.label, interp.tone)}
         </div>
         <dl class="pricing-intel-grid">
-          ${rows.map(([k, v]) => `<div class="pricing-intel-row"><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd></div>`).join("")}
+          ${rows.map(([k, v]) => `<div class="pricing-intel-row"><dt>${escapeHtml(k)}</dt><dd>${(v && typeof v === "object" && v.html) ? v.html : escapeHtml(String(v))}</dd></div>`).join("")}
         </dl>
         <p class="pricing-intel-note muted">${escapeHtml(interp.detail)}</p>
       </div>
