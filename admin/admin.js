@@ -13564,13 +13564,10 @@ function orderPricingTier(order) {
 /* Core intelligence for one disjoint set of jobs. Callers pass an already-split
    order list so tiers are computed independently. */
 function computeTierIntel(attributed, laborByOrder, settings) {
-  /* Average charged: only jobs with a real (positive) price — blank/$0 gift
-     jobs are excluded so they don't drag the average down. */
-  const priced = attributed
-    .map((o) => orderChargedPrice(o))
-    .filter((p) => p != null);
-  const avgCharged = priced.length ? priced.reduce((s, p) => s + p, 0) / priced.length : null;
-
+  /* The measured set = exactly the jobs behind the "Measured jobs" count and
+     the drill-down (money-eligible, this tier, with >= 1 logged minute). Every
+     stat below is computed over THIS set so the numbers reconcile with the
+     orders you can click through to. */
   const measured = attributed
     .map((o) => ({
       orderNumber: String(o.orderNumber || ""),
@@ -13586,11 +13583,21 @@ function computeTierIntel(attributed, laborByOrder, settings) {
   const medianMinutes = n ? pricingMedian(measured.map((j) => j.minutes)) : null;
   const avgMaterials = n ? measured.reduce((s, j) => s + j.materials, 0) / n : null;
 
-  /* Effective rate: only measured jobs that also carry a real price. Gift jobs
-     (price null) contribute their time to the median but never to the rate. */
-  const rated = measured.filter((j) => j.price != null);
-  const netSum = rated.reduce((s, j) => s + (j.price - j.materials), 0);
-  const hoursSum = rated.reduce((s, j) => s + j.minutes / 60, 0);
+  /* The paid subset: measured jobs with a real (positive) estimated price.
+     Blank/$0 gift jobs are excluded from BOTH the total and the denominator. */
+  const paid = measured.filter((j) => j.price != null);
+  const paidCount = paid.length;
+
+  /* Average charged = plain mean of the estimated price on the paid jobs. No
+     materials subtracted, no allocation/discounting — the exact price shown on
+     each order. */
+  const avgCharged = paidCount ? paid.reduce((s, j) => s + j.price, 0) / paidCount : null;
+
+  /* Effective labor rate = (price − materials) ÷ logged hours over the same
+     paid jobs. (This one DOES net out materials — it is a labor rate, not the
+     charged price.) */
+  const netSum = paid.reduce((s, j) => s + (j.price - j.materials), 0);
+  const hoursSum = paid.reduce((s, j) => s + j.minutes / 60, 0);
   const effectiveRate = hoursSum > 0 ? netSum / hoursSum : null;
 
   let rawEstimate = null;
@@ -13607,6 +13614,7 @@ function computeTierIntel(attributed, laborByOrder, settings) {
 
   return {
     n,
+    paidCount,
     orderNumbers,
     jobCount: attributed.length,
     avgCharged,
@@ -14013,9 +14021,12 @@ function renderServicePricingIntelBlock(service, intel) {
     const jobsCell = tier.n > 0 && tier.orderNumbers && tier.orderNumbers.length
       ? { html: `<button type="button" class="pricing-jobs-link" data-jobs="${escapeAttr(tier.orderNumbers.join(","))}" data-context="${escapeAttr(tierName)}">${tier.n}</button>` }
       : String(tier.n);
+    const avgChargedCell = tier.avgCharged != null
+      ? { html: `${escapeHtml(formatCurrency(tier.avgCharged))} <span class="muted pricing-intel-sub">· ${tier.paidCount} paid</span>` }
+      : "—";
     const rows = [
       ["Published price", tier.publishedPrice != null ? formatCurrency(tier.publishedPrice) : (service.display || "—")],
-      ["Average charged", tier.avgCharged != null ? formatCurrency(tier.avgCharged) : "—"],
+      ["Average charged", avgChargedCell],
       ["Median labor time", tier.medianMinutes != null ? formatLaborDuration(tier.medianMinutes) : "—"],
       ["Average materials", tier.avgMaterials != null ? formatCurrency(tier.avgMaterials) : "—"],
       ["Effective labor rate", tier.effectiveRate != null ? `${formatCurrency(tier.effectiveRate)}/hr` : "—"],

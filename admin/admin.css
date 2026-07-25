@@ -8409,23 +8409,27 @@ details.pricing-section[open] > .pricing-section-summary{border-bottom:1px solid
 }
 .pricing-jobs-link:hover{text-decoration-color:var(--navy)}
 
-/* Removable "Pricing Intelligence" filter chip above the Orders list */
-.pricing-chip-row{padding:8px 14px 0}
+/* Removable "Pricing Intelligence" filter chip above the Orders list —
+   compact, matching the standard MurphOS chip (.reach-chip) sizing. */
+.pricing-chip-row{display:flex; flex-wrap:wrap; gap:6px; padding:8px 14px 10px}
 .pricing-chip-row[hidden]{display:none}
 .pricing-chip{
-  display:inline-flex; align-items:center; gap:8px; max-width:100%;
-  padding:5px 6px 5px 12px; border-radius:999px;
-  background:rgba(9,47,77,.09); color:var(--navy);
-  font-size:.76rem; font-weight:600;
+  display:inline-flex; align-items:center; gap:6px; max-width:100%;
+  padding:3px 4px 3px 10px; border-radius:999px;
+  background:rgba(9,47,77,.07); color:var(--navy);
+  font-size:.72rem; font-weight:550; line-height:1.5;
 }
 .pricing-chip-label{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .pricing-chip-remove{
   display:inline-flex; align-items:center; justify-content:center;
-  width:20px; height:20px; border-radius:50%; flex:0 0 auto;
-  border:0; background:rgba(9,47,77,.14); color:var(--navy);
-  font-size:.95rem; line-height:1; cursor:pointer;
+  width:16px; height:16px; border-radius:50%; flex:0 0 auto;
+  border:0; background:rgba(9,47,77,.12); color:var(--navy);
+  font-size:.8rem; line-height:1; cursor:pointer;
 }
-.pricing-chip-remove:hover{background:rgba(9,47,77,.24)}
+.pricing-chip-remove:hover{background:rgba(9,47,77,.2)}
+
+/* Small muted qualifier inside an intel value (e.g. "· 5 paid") */
+.pricing-intel-sub{font-size:.66rem; font-weight:400}
 
 /* Preview environment badge — only injected in non-production deployments */
 .mm-preview-badge{
