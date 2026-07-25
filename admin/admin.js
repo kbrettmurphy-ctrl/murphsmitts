@@ -13636,15 +13636,15 @@ function renderPricingViewContent(loadError) {
     </div>
   ` : "";
 
+  /* Rendered directly into #pricingPanel (.money-panel) — the same grid
+     container the Money view uses, so the gutters/width/spacing match exactly. */
   return `
-    <div class="dashboard-shell pricing-shell">
-      ${errorHtml}
-      ${statsHtml}
-      ${settingsHtml}
-      ${groupHtml("Relacing Services", relacing)}
-      ${groupHtml("Additional Glove Services", additional)}
-      ${renderPricingCreateCard()}
-    </div>
+    ${errorHtml}
+    ${statsHtml}
+    ${settingsHtml}
+    ${groupHtml("Relacing Services", relacing)}
+    ${groupHtml("Additional Glove Services", additional)}
+    ${renderPricingCreateCard()}
   `;
 }
 

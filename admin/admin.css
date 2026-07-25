@@ -8168,9 +8168,9 @@ body.has-notifications .topbar-menu-btn::after{
 /* =========================================================================
    PRICING MANAGEMENT (Pricing view) — scoped, appended. Reuses the shared
    .dashboard-card / .dashboard-metric / .money-card language.
+   Pricing renders into #pricingPanel (.money-view > .money-panel) — the exact
+   Money-view wrapper — so header, gutters, width, and spacing match Money.
    ========================================================================= */
-.pricing-shell{gap:12px}
-
 .pricing-group{display:grid; gap:8px}
 .pricing-group-title{margin:6px 2px 0}
 
