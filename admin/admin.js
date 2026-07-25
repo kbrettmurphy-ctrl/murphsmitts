@@ -3606,8 +3606,11 @@ function renderMoneyPricingCard(laborByOrder) {
       <p class="muted pricing-money-note">Published price vs measured labor and materials. Prices are managed in the Pricing view — this is analysis only.</p>
       <div class="pricing-money-list">
         ${rows.map(({ s, intel }) => {
-          const interp = pricingInterpretation(s, intel);
-          const rateText = intel.effectiveRate != null ? `${formatCurrency(intel.effectiveRate)}/hr` : "—";
+          /* Summarize with the best-populated tier so the collapsed row shows a
+             meaningful rate; the expanded block breaks tiers out in full. */
+          const primary = intel.tiers.slice().sort((a, b) => b.n - a.n)[0] || intel.tiers[0];
+          const interp = pricingTierInterpretation(primary, intel.settings);
+          const rateText = primary && primary.effectiveRate != null ? `${formatCurrency(primary.effectiveRate)}/hr` : "—";
           return `
             <details class="pricing-money-item">
               <summary class="pricing-money-summary">
@@ -13455,12 +13458,20 @@ const PRICING_TREND_LABELS = {
 
 /* Core pricing intelligence for one service. Keeps published price, average
    charged price, target rate, and effective rate strictly separate. */
-function computeServicePricingIntel(service, services, laborByOrder) {
-  const settings = getPricingSettings();
-  const attributed = allOrders.filter(
-    (o) => isMoneyEligibleOrder(o) && attributeOrderToServiceKey(o, services) === service.serviceKey
-  );
+/* Which tier a job belongs to for a tiered service: a fielder's glove without a
+   trapeze web is the standard/base tier; catcher's mitts, first base mitts, and
+   trapeze/modified-trapeze fielders are the premium tier. A job lands in exactly
+   ONE tier, so standard and premium never double-count each other. */
+function orderPricingTier(order) {
+  const glove = String(order?.gloveType || "");
+  if (glove === "Catchers Mitt" || glove === "First Base Mitt") return "premium";
+  if (glove === "Fielders Glove" && orderHasTrapezeWeb(order)) return "premium";
+  return "standard";
+}
 
+/* Core intelligence for one disjoint set of jobs. Callers pass an already-split
+   order list so tiers are computed independently. */
+function computeTierIntel(attributed, laborByOrder, settings) {
   const priced = attributed.filter((o) => {
     const p = Number(o.priceQuoted);
     return o.priceQuoted != null && o.priceQuoted !== "" && Number.isFinite(p);
@@ -13510,15 +13521,49 @@ function computeServicePricingIntel(service, services, laborByOrder) {
     suggestedPrice,
     minChargeApplied,
     trend,
-    settings,
     confidence: pricingConfidenceLabel(n)
   };
 }
 
-/* Interpretation copy — never "under/over target". Getting faster on a fixed
-   price is efficiency, not a reason to cut the price. */
-function pricingInterpretation(service, intel) {
-  const { n, effectiveRate, trend, settings } = intel;
+/* Tiered services (Standard Full Service, Full Relace) get INDEPENDENT
+   intelligence per tier — standard fielder's jobs and premium
+   (catcher's / first base / trapeze) jobs are computed from disjoint sets, each
+   against its own published price, so a premium job never skews the standard
+   median and vice versa. Non-tiered services return a single tier. */
+function computeServicePricingIntel(service, services, laborByOrder) {
+  const settings = getPricingSettings();
+  const attributed = allOrders.filter(
+    (o) => isMoneyEligibleOrder(o) && attributeOrderToServiceKey(o, services) === service.serviceKey
+  );
+
+  const isTiered = service.pricingType === "tiered";
+  const tierDefs = isTiered
+    ? [
+        { key: "standard", label: "Standard · fielder's glove", price: service.basePrice, match: (o) => orderPricingTier(o) === "standard" },
+        { key: "premium", label: "Premium · catcher's / first base / trapeze", price: service.premiumPrice, match: (o) => orderPricingTier(o) === "premium" }
+      ]
+    : [
+        { key: "single", label: "", price: service.basePrice, match: () => true }
+      ];
+
+  const tiers = tierDefs.map((def) => Object.assign(
+    { key: def.key, label: def.label, publishedPrice: def.price },
+    computeTierIntel(attributed.filter(def.match), laborByOrder, settings)
+  ));
+
+  return {
+    isTiered,
+    tiers,
+    settings,
+    totalN: tiers.reduce((s, t) => s + t.n, 0),
+    totalJobCount: attributed.length
+  };
+}
+
+/* Interpretation copy for one tier — never "under/over target". Getting faster
+   on a fixed price is efficiency, not a reason to cut the price. */
+function pricingTierInterpretation(tier, settings) {
+  const { n, effectiveRate, trend } = tier;
   const targetRate = settings.targetLaborRate;
 
   if (n === 0) return { label: "Needs More Data", tone: "neutral", detail: "No measured jobs with logged labor yet. Run timers on this service to build a benchmark." };
@@ -13611,7 +13656,8 @@ function renderPricingViewContent(loadError) {
   const needsData = services.filter((s) => {
     if (!(s.analyticsMappings || []).length) return false;
     const intel = computeServicePricingIntel(s, services, laborByOrder);
-    return intel.n < 3;
+    /* Tiered services need each tier to have data; flag if any tier is thin. */
+    return intel.tiers.some((t) => t.n < 3);
   }).length;
 
   if (count) count.textContent = `${services.length} service${services.length === 1 ? "" : "s"}`;
@@ -13697,9 +13743,10 @@ function renderServicePricingCard(service, services, laborByOrder) {
     ? `<span class="pricing-card-draftprice">→ ${escapeHtml(draft.display)} <span class="muted">draft</span></span>`
     : "";
 
-  const suggestionChip = intel.suggestedPrice != null
-    ? `<span class="pricing-card-suggest muted">Suggested ${escapeHtml(formatCurrency(intel.suggestedPrice))} · ${escapeHtml(intel.confidence)}</span>`
-    : `<span class="pricing-card-suggest muted">${escapeHtml(intel.confidence)}${intel.jobCount ? ` · ${intel.jobCount} job${intel.jobCount === 1 ? "" : "s"}` : ""}</span>`;
+  const suggestedTiers = intel.tiers.filter((t) => t.suggestedPrice != null);
+  const suggestionChip = suggestedTiers.length
+    ? `<span class="pricing-card-suggest muted">Suggested ${suggestedTiers.map((t) => `${intel.isTiered ? (t.key === "standard" ? "std " : "prem ") : ""}${escapeHtml(formatCurrency(t.suggestedPrice))}`).join(" · ")}</span>`
+    : `<span class="pricing-card-suggest muted">${escapeHtml(pricingConfidenceLabel(intel.totalN))}${intel.totalJobCount ? ` · ${intel.totalJobCount} job${intel.totalJobCount === 1 ? "" : "s"}` : ""}</span>`;
 
   return `
     <div class="dashboard-card pricing-card${expanded ? " is-expanded" : ""}" data-pricing-card="${escapeAttr(service.serviceKey)}">
@@ -13737,88 +13784,111 @@ function renderServicePricingEditor(service, intel) {
   };
   const draftNote = service.draft ? service.draft.note : "";
   const history = pricingHistoryCache[service.serviceKey];
+  const key = escapeAttr(service.serviceKey);
 
   return `
-    <div class="pricing-editor" data-service="${escapeAttr(service.serviceKey)}">
-      <div class="pricing-editor-grid">
-        <label class="pricing-field pricing-field-wide">
-          <span class="pricing-field-label">Service name</span>
-          <input id="pricingEditName" data-pricing-field type="text" value="${escapeAttr(f.serviceName || "")}">
-        </label>
-        <label class="pricing-field">
-          <span class="pricing-field-label">Category</span>
-          <select id="pricingEditCategory" data-pricing-field>
-            <option value="relacing"${f.category === "relacing" ? " selected" : ""}>Relacing Services</option>
-            <option value="additional"${f.category !== "relacing" ? " selected" : ""}>Additional Glove Services</option>
-          </select>
-        </label>
-        <label class="pricing-field">
-          <span class="pricing-field-label">Pricing type</span>
-          <select id="pricingEditType" data-pricing-field>
-            ${PRICING_TYPE_OPTIONS.map(([v, label]) => `<option value="${v}"${f.pricingType === v ? " selected" : ""}>${escapeHtml(label)}</option>`).join("")}
-          </select>
-        </label>
-        <label class="pricing-field">
-          <span class="pricing-field-label">Base / starting price ($)</span>
-          <input id="pricingEditBase" data-pricing-field type="number" min="0" step="1" inputmode="decimal" value="${escapeAttr(f.basePrice != null ? String(f.basePrice) : "")}">
-        </label>
-        <label class="pricing-field">
-          <span class="pricing-field-label">Premium price ($)</span>
-          <input id="pricingEditPremium" data-pricing-field type="number" min="0" step="1" inputmode="decimal" value="${escapeAttr(f.premiumPrice != null ? String(f.premiumPrice) : "")}">
-        </label>
-        <label class="pricing-field">
-          <span class="pricing-field-label">Price suffix</span>
-          <input id="pricingEditSuffix" data-pricing-field type="text" placeholder="e.g. each" value="${escapeAttr(f.priceSuffix || "")}">
-        </label>
-        <label class="pricing-field">
-          <span class="pricing-field-label">Sort order</span>
-          <input id="pricingEditSort" data-pricing-field type="number" step="1" inputmode="numeric" value="${escapeAttr(String(f.sortOrder != null ? f.sortOrder : 0))}">
-        </label>
-        <label class="pricing-field pricing-field-wide">
-          <span class="pricing-field-label">Manual display override <span class="muted">(optional — wins over generated text)</span></span>
-          <input id="pricingEditOverride" data-pricing-field type="text" placeholder="e.g. $90–$110" value="${escapeAttr(f.displayOverride || "")}">
-        </label>
-        <label class="pricing-field pricing-field-wide">
-          <span class="pricing-field-label">Short description <span class="muted">(internal / quote context)</span></span>
-          <input id="pricingEditShort" data-pricing-field type="text" value="${escapeAttr(f.shortDescription || "")}">
-        </label>
-        <label class="pricing-field pricing-field-wide">
-          <span class="pricing-field-label">Public bullet details <span class="muted">(one per line)</span></span>
-          <textarea id="pricingEditBullets" data-pricing-field rows="5">${escapeHtml((f.bulletDetails || []).join("\n"))}</textarea>
-        </label>
-        <div class="pricing-field pricing-toggles">
-          <label class="pricing-toggle">
-            <input id="pricingEditPublic" data-pricing-field type="checkbox"${f.isPublic !== false ? " checked" : ""}>
-            <span>Public <span class="muted">(shows on website)</span></span>
+    <div class="pricing-editor" data-service="${key}">
+
+      <div class="pricing-section pricing-section-open">
+        <div class="pricing-section-title">Price &amp; Status</div>
+        <div class="pricing-editor-grid">
+          <label class="pricing-field pricing-field-wide">
+            <span class="pricing-field-label">Service name</span>
+            <input id="pricingEditName" data-pricing-field type="text" value="${escapeAttr(f.serviceName || "")}">
           </label>
-          <label class="pricing-toggle">
-            <input id="pricingEditActive" data-pricing-field type="checkbox"${f.isActive !== false ? " checked" : ""}>
-            <span>Active <span class="muted">(offered for new quotes)</span></span>
+          <label class="pricing-field">
+            <span class="pricing-field-label">Category</span>
+            <select id="pricingEditCategory" data-pricing-field>
+              <option value="relacing"${f.category === "relacing" ? " selected" : ""}>Relacing Services</option>
+              <option value="additional"${f.category !== "relacing" ? " selected" : ""}>Additional Glove Services</option>
+            </select>
           </label>
+          <label class="pricing-field">
+            <span class="pricing-field-label">Pricing type</span>
+            <select id="pricingEditType" data-pricing-field>
+              ${PRICING_TYPE_OPTIONS.map(([v, label]) => `<option value="${v}"${f.pricingType === v ? " selected" : ""}>${escapeHtml(label)}</option>`).join("")}
+            </select>
+          </label>
+          <label class="pricing-field">
+            <span class="pricing-field-label">Base / starting price ($)</span>
+            <input id="pricingEditBase" data-pricing-field type="number" min="0" step="1" inputmode="decimal" value="${escapeAttr(f.basePrice != null ? String(f.basePrice) : "")}">
+          </label>
+          <label class="pricing-field">
+            <span class="pricing-field-label">Premium price ($)</span>
+            <input id="pricingEditPremium" data-pricing-field type="number" min="0" step="1" inputmode="decimal" value="${escapeAttr(f.premiumPrice != null ? String(f.premiumPrice) : "")}">
+          </label>
+          <label class="pricing-field">
+            <span class="pricing-field-label">Price suffix</span>
+            <input id="pricingEditSuffix" data-pricing-field type="text" placeholder="e.g. each" value="${escapeAttr(f.priceSuffix || "")}">
+          </label>
+          <label class="pricing-field">
+            <span class="pricing-field-label">Sort order</span>
+            <input id="pricingEditSort" data-pricing-field type="number" step="1" inputmode="numeric" value="${escapeAttr(String(f.sortOrder != null ? f.sortOrder : 0))}">
+          </label>
+          <label class="pricing-field pricing-field-wide">
+            <span class="pricing-field-label">Manual display override <span class="muted">(optional — wins over generated text)</span></span>
+            <input id="pricingEditOverride" data-pricing-field type="text" placeholder="e.g. $90–$110" value="${escapeAttr(f.displayOverride || "")}">
+          </label>
+          <div class="pricing-field pricing-field-wide pricing-toggles">
+            <label class="pricing-toggle">
+              <input id="pricingEditPublic" data-pricing-field type="checkbox"${f.isPublic !== false ? " checked" : ""}>
+              <span>Public <span class="muted">(shows on website)</span></span>
+            </label>
+            <label class="pricing-toggle">
+              <input id="pricingEditActive" data-pricing-field type="checkbox"${f.isActive !== false ? " checked" : ""}>
+              <span>Active <span class="muted">(offered for new quotes)</span></span>
+            </label>
+          </div>
         </div>
-        <label class="pricing-field pricing-field-wide">
-          <span class="pricing-field-label">Draft note / reason <span class="muted">(optional, recorded in history)</span></span>
-          <input id="pricingEditNote" type="text" value="${escapeAttr(draftNote || "")}">
-        </label>
       </div>
 
-      <div class="pricing-preview">
-        <span class="pricing-preview-label">Website preview</span>
-        <div class="pricing-preview-body">${renderPricingPreviewInner(f)}</div>
-      </div>
+      <details class="pricing-section">
+        <summary class="pricing-section-summary">Website Content</summary>
+        <div class="pricing-section-body">
+          <div class="pricing-editor-grid">
+            <label class="pricing-field pricing-field-wide">
+              <span class="pricing-field-label">Short description <span class="muted">(internal / quote context)</span></span>
+              <input id="pricingEditShort" data-pricing-field type="text" value="${escapeAttr(f.shortDescription || "")}">
+            </label>
+            <label class="pricing-field pricing-field-wide">
+              <span class="pricing-field-label">Public bullet details <span class="muted">(one per line)</span></span>
+              <textarea id="pricingEditBullets" data-pricing-field rows="5">${escapeHtml((f.bulletDetails || []).join("\n"))}</textarea>
+            </label>
+          </div>
+          <div class="pricing-preview">
+            <span class="pricing-preview-label">Website preview</span>
+            <div class="pricing-preview-body">${renderPricingPreviewInner(f)}</div>
+          </div>
+        </div>
+      </details>
 
-      ${renderServicePricingIntelBlock(service, intel)}
+      <details class="pricing-section">
+        <summary class="pricing-section-summary">Pricing Intelligence</summary>
+        <div class="pricing-section-body">
+          ${renderServicePricingIntelBlock(service, intel)}
+        </div>
+      </details>
+
+      <details class="pricing-section">
+        <summary class="pricing-section-summary">Price History</summary>
+        <div class="pricing-section-body">
+          <div class="pricing-history" data-pricing-history-body="${key}">
+            ${history
+              ? renderPricingHistoryList(service.serviceKey, history)
+              : `<button class="pricing-link" type="button" data-pricing-action="load-history" data-service="${key}">View price history</button>`}
+          </div>
+        </div>
+      </details>
+
+      <label class="pricing-field pricing-field-wide pricing-editor-note">
+        <span class="pricing-field-label">Draft note / reason <span class="muted">(optional, recorded in history)</span></span>
+        <input id="pricingEditNote" type="text" value="${escapeAttr(draftNote || "")}">
+      </label>
 
       <div class="pricing-actions pricing-editor-actions">
-        <button class="secondary" type="button" data-pricing-action="save-draft" data-service="${escapeAttr(service.serviceKey)}">Save Draft</button>
-        ${service.draft ? `<button class="secondary pricing-danger" type="button" data-pricing-action="discard-draft" data-service="${escapeAttr(service.serviceKey)}">Discard Draft</button>` : ""}
-        <button type="button" class="pricing-publish" data-pricing-action="publish" data-service="${escapeAttr(service.serviceKey)}">Publish Changes</button>
-      </div>
-
-      <div class="pricing-history">
-        ${history
-          ? renderPricingHistoryList(service.serviceKey, history)
-          : `<button class="pricing-link" type="button" data-pricing-action="load-history" data-service="${escapeAttr(service.serviceKey)}">View price history</button>`}
+        <button class="secondary" type="button" data-pricing-action="save-draft" data-service="${key}">Save Draft</button>
+        ${service.draft ? `<button class="secondary pricing-danger" type="button" data-pricing-action="discard-draft" data-service="${key}">Discard Draft</button>` : ""}
+        <button type="button" class="pricing-publish" data-pricing-action="publish" data-service="${key}">Publish Changes</button>
       </div>
     </div>
   `;
@@ -13838,31 +13908,41 @@ function renderPricingPreviewInner(fields) {
 }
 
 function renderServicePricingIntelBlock(service, intel) {
-  const interp = pricingInterpretation(service, intel);
-  const rows = [
-    ["Published price", service.display],
-    ["Average charged", intel.avgCharged != null ? formatCurrency(intel.avgCharged) : "—"],
-    ["Median labor time", intel.medianMinutes != null ? formatLaborDuration(intel.medianMinutes) : "—"],
-    ["Average materials", intel.avgMaterials != null ? formatCurrency(intel.avgMaterials) : "—"],
-    ["Effective labor rate", intel.effectiveRate != null ? `${formatCurrency(intel.effectiveRate)}/hr` : "—"],
-    ["Target labor rate", `${formatCurrency(intel.settings.targetLaborRate)}/hr`],
-    ["Raw target-price estimate", intel.rawEstimate != null ? formatCurrency(intel.rawEstimate) : "—"],
-    ["Rounded suggestion", intel.suggestedPrice != null ? `${formatCurrency(intel.suggestedPrice)}${intel.minChargeApplied ? " (min charge)" : ""}` : "—"],
-    ["Measured jobs", String(intel.n)],
-    ["Pricing confidence", intel.confidence],
-    ["Recent time trend", PRICING_TREND_LABELS[intel.trend] || "—"]
-  ];
+  const settings = intel.settings;
+
+  const tierBlocks = intel.tiers.map((tier) => {
+    const interp = pricingTierInterpretation(tier, settings);
+    const rows = [
+      ["Published price", tier.publishedPrice != null ? formatCurrency(tier.publishedPrice) : (service.display || "—")],
+      ["Average charged", tier.avgCharged != null ? formatCurrency(tier.avgCharged) : "—"],
+      ["Median labor time", tier.medianMinutes != null ? formatLaborDuration(tier.medianMinutes) : "—"],
+      ["Average materials", tier.avgMaterials != null ? formatCurrency(tier.avgMaterials) : "—"],
+      ["Effective labor rate", tier.effectiveRate != null ? `${formatCurrency(tier.effectiveRate)}/hr` : "—"],
+      ["Target labor rate", `${formatCurrency(settings.targetLaborRate)}/hr`],
+      ["Raw target-price estimate", tier.rawEstimate != null ? formatCurrency(tier.rawEstimate) : "—"],
+      ["Rounded suggestion", tier.suggestedPrice != null ? `${formatCurrency(tier.suggestedPrice)}${tier.minChargeApplied ? " (min charge)" : ""}` : "—"],
+      ["Measured jobs", String(tier.n)],
+      ["Pricing confidence", tier.confidence],
+      ["Recent time trend", PRICING_TREND_LABELS[tier.trend] || "—"]
+    ];
+    return `
+      <div class="pricing-intel-tier">
+        <div class="pricing-intel-head">
+          <span class="pricing-intel-title">${escapeHtml(tier.label || "Measured performance")}</span>
+          ${pricingPill(interp.label, interp.tone)}
+        </div>
+        <dl class="pricing-intel-grid">
+          ${rows.map(([k, v]) => `<div class="pricing-intel-row"><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd></div>`).join("")}
+        </dl>
+        <p class="pricing-intel-note muted">${escapeHtml(interp.detail)}</p>
+      </div>
+    `;
+  }).join("");
 
   return `
     <div class="pricing-intel">
-      <div class="pricing-intel-head">
-        <span class="pricing-intel-title">Pricing intelligence</span>
-        ${pricingPill(interp.label, interp.tone)}
-      </div>
-      <dl class="pricing-intel-grid">
-        ${rows.map(([k, v]) => `<div class="pricing-intel-row"><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd></div>`).join("")}
-      </dl>
-      <p class="pricing-intel-note muted">${escapeHtml(interp.detail)}</p>
+      ${intel.isTiered ? `<p class="pricing-intel-note muted pricing-intel-tiernote">Standard and premium jobs are measured independently.</p>` : ""}
+      ${tierBlocks}
       <p class="pricing-intel-note muted">Suggestions never overwrite the published price. Getting faster raises your effective rate — that is efficiency, not a reason to cut the price.</p>
     </div>
   `;
@@ -14046,10 +14126,15 @@ async function onPricingClick(e) {
   }
 
   if (action === "load-history") {
+    btn.disabled = true;
     const res = await postJson({ action: "listServicePricingHistory", serviceKey }, true);
-    if (!res.ok) { alert(res.error || "History could not be loaded."); return; }
+    if (!res.ok) { btn.disabled = false; alert(res.error || "History could not be loaded."); return; }
     pricingHistoryCache[serviceKey] = res.history || [];
-    renderPricingView();
+    /* Targeted swap so the open Price History section stays open (a full
+       re-render would collapse it). */
+    const body = document.querySelector(`[data-pricing-history-body="${serviceKey}"]`);
+    if (body) body.innerHTML = renderPricingHistoryList(serviceKey, pricingHistoryCache[serviceKey]);
+    else renderPricingView();
     return;
   }
 

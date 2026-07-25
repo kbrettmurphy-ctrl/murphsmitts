@@ -8290,7 +8290,34 @@ body.has-notifications .topbar-menu-btn::after{
 .pricing-pill-muted{background:rgba(9,47,77,.06); color:rgba(9,47,77,.55)}
 
 /* Editor */
-.pricing-editor{display:grid; gap:12px; padding-top:6px; border-top:1px solid rgba(9,47,77,.1)}
+.pricing-editor{display:grid; gap:10px; padding-top:6px; border-top:1px solid rgba(9,47,77,.1)}
+
+/* Editor sections — Price & Status is always open; the rest are collapsible. */
+.pricing-section{
+  border:1px solid rgba(9,47,77,.1);
+  border-radius:12px;
+  background:rgba(255,253,249,.55);
+  overflow:hidden;
+}
+.pricing-section-open{padding:11px 12px; display:grid; gap:10px}
+.pricing-section-title{
+  font-size:.72rem; font-weight:650; letter-spacing:.03em; text-transform:uppercase;
+  color:rgba(9,47,77,.6);
+}
+.pricing-section-summary{
+  display:flex; align-items:center; gap:8px;
+  padding:10px 12px; cursor:pointer; list-style:none;
+  font-size:.82rem; font-weight:600; color:var(--navy);
+}
+.pricing-section-summary::-webkit-details-marker{display:none}
+.pricing-section-summary::before{content:"▸"; color:rgba(9,47,77,.5); font-size:.7rem}
+details.pricing-section[open] > .pricing-section-summary::before{content:"▾"}
+details.pricing-section[open] > .pricing-section-summary{border-bottom:1px solid rgba(9,47,77,.08)}
+.pricing-section-body{padding:11px 12px; display:grid; gap:12px; min-width:0}
+/* The section already provides the container chrome — flatten the inner block. */
+.pricing-section-body > .pricing-intel{border:0; border-radius:0; background:transparent; padding:0}
+.pricing-editor-note{margin-top:2px}
+
 .pricing-editor-grid{
   display:grid;
   grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
@@ -8337,6 +8364,10 @@ body.has-notifications .topbar-menu-btn::after{
 .pricing-intel-row dt{font-size:.72rem; color:rgba(9,47,77,.6)}
 .pricing-intel-row dd{margin:0; font-size:.76rem; font-weight:600; color:var(--navy); font-variant-numeric:tabular-nums; text-align:right}
 .pricing-intel-note{margin:0; font-size:.72rem; line-height:1.4}
+/* Per-tier blocks: standard and premium are visually separated */
+.pricing-intel-tier{display:grid; gap:8px}
+.pricing-intel-tier + .pricing-intel-tier{padding-top:10px; border-top:1px dashed rgba(9,47,77,.16)}
+.pricing-intel-tiernote{font-weight:600; color:rgba(9,47,77,.6)}
 
 /* History */
 .pricing-history{padding-top:2px}
@@ -8421,4 +8452,18 @@ body.has-notifications .topbar-menu-btn::after{
 @media (max-width:520px){
   .pricing-card-name{white-space:normal}
   .pricing-intel-row dd{text-align:right}
+}
+
+/* Phones: stack every pricing grid to one column so long labels never clip or
+   force horizontal overflow. Tablets/desktop keep the multi-column layout. */
+@media (max-width:560px){
+  /* Editor + intel grids carry long labels — stack to one column on phones so
+     nothing clips. (Settings grid keeps its existing layout: short labels.) */
+  .pricing-editor-grid,
+  .pricing-intel-grid{
+    grid-template-columns:1fr;
+  }
+  /* Stack the tier label above its status pill so long labels never get
+     squeezed beside a wide pill. */
+  .pricing-intel-head{flex-direction:column; align-items:flex-start; gap:4px}
 }
