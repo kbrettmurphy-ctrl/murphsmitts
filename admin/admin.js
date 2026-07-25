@@ -13577,48 +13577,151 @@ function orderPricingTier(order) {
   return "standard";
 }
 
-/* Core intelligence for one disjoint set of jobs. Callers pass an already-split
-   order list so tiers are computed independently. */
-function computeTierIntel(attributed, laborByOrder, settings) {
-  /* Each metric uses its own population, and each population has its own
-     clickable count so the numbers are transparent:
-     - PAID:          all non-archived paid jobs, regardless of timer data
-                      (blank/$0 gift jobs are not "paid"). Feeds Average charged.
-     - MEASURED:      all jobs with >= 1 logged minute, gifts included.
+/* ===== Add-ons =====
+   Palm Padding, Loop Replacement, and Web Replacement are add-ons. A combined
+   job (base service + add-on) is split into components so neither contaminates
+   the other. Only Palm Padding has reliable annotations — a structured service,
+   a dedicated "Palm Pad" labor phase, a known $20 price, and an identifiable
+   $1.25 material. Loop/Web live in free-text with no phase or known price, so
+   their components are marked UNALLOCATED rather than guessed. */
+const ADDON_SERVICE_KEYS = new Set(["palm_padding", "loop_replacement", "web_replacement"]);
+const PALM_PAD_PHASE = "Palm Pad";
+
+function orderAddonKeys(order) {
+  const keys = [];
+  if (orderHasPalmPadService(order)) keys.push("palm_padding");
+  const other = String(parseServicesValue(order?.servicesRequested || "").otherText || "").toLowerCase();
+  if (/\b(loop|thumb|pinky)\b/.test(other)) keys.push("loop_replacement");
+  if (/\bweb\b/.test(other)) keys.push("web_replacement");
+  return keys;
+}
+
+/* Base (non-add-on) service an order maps to, or null for an add-on-only job. */
+function attributeOrderToBaseServiceKey(order, services) {
+  return attributeOrderToServiceKey(order, services.filter((s) => !ADDON_SERVICE_KEYS.has(s.serviceKey)));
+}
+
+/* Palm Pad phase minutes per order, from the labor cache. */
+function buildPalmPadMinutesByOrder() {
+  const map = {};
+  (Array.isArray(moneyLaborSummaryCache) ? moneyLaborSummaryCache : []).forEach((s) => {
+    if (String(s.phase || "") !== PALM_PAD_PHASE) return;
+    const k = String(s.orderNumber || "");
+    if (k) map[k] = (map[k] || 0) + (Number(s.durationMinutes) || 0);
+  });
+  return map;
+}
+
+/* Allocate one order's revenue / labor / materials to a single service (base or
+   add-on), splitting a combined job without double-counting. Returns an
+   allocation { order, orderNumber, date, revenue, revenueUnallocated, minutes,
+   minutesUnallocated, materials, materialsUnallocated }:
+   - revenue: allocated dollars, or null (gift/no-charge OR unallocated).
+   - revenueUnallocated: true only when a price existed but couldn't be split.
+   - minutes: allocated minutes (0 if none logged).
+   - minutesUnallocated: true when labor exists but can't be attributed. */
+function allocateOrderForService(order, service, totalMinutes, palmPadMinutes) {
+  const orderNumber = String(order.orderNumber || "");
+  const date = order.dateCompleted || order.createdAt || order.timestampSubmitted || "";
+  const total = orderChargedPrice(order); // positive price, or null (gift/blank)
+  const mats = getOrderMaterialsCost(order);
+  const key = service.serviceKey;
+
+  if (key === "palm_padding") {
+    return {
+      order, orderNumber, date,
+      revenue: total != null ? SHOP_PRICING.palmPadAddOn : null, // gift order → no palm-pad revenue
+      revenueUnallocated: false,
+      minutes: palmPadMinutes,
+      minutesUnallocated: palmPadMinutes <= 0 && totalMinutes > 0, // present but no Palm Pad phase → can't measure it
+      materials: mats.palmPadCost,
+      materialsUnallocated: false
+    };
+  }
+
+  if (ADDON_SERVICE_KEYS.has(key)) {
+    // Loop / Web: no reliable price, phase, or tracked material — all unallocated.
+    return {
+      order, orderNumber, date,
+      revenue: null, revenueUnallocated: total != null,
+      minutes: 0, minutesUnallocated: totalMinutes > 0,
+      materials: null, materialsUnallocated: false
+    };
+  }
+
+  // Base service: subtract the separable add-on components.
+  const addons = orderAddonKeys(order);
+  const hasPalmPad = addons.includes("palm_padding");
+  const hasUnseparable = addons.includes("loop_replacement") || addons.includes("web_replacement");
+
+  let revenue = null, revenueUnallocated = false;
+  if (total == null) {
+    revenue = null;                       // gift — no revenue (not "unallocated")
+  } else if (hasUnseparable) {
+    revenueUnallocated = true;            // can't subtract an unknown add-on price
+  } else {
+    revenue = total - (hasPalmPad ? SHOP_PRICING.palmPadAddOn : 0);
+  }
+
+  let minutes = 0, minutesUnallocated = false;
+  if (totalMinutes <= 0) {
+    minutes = 0;                          // no labor logged (not "unallocated")
+  } else if (hasUnseparable) {
+    minutesUnallocated = true;            // add-on labor has no phase to remove
+  } else if (hasPalmPad && palmPadMinutes <= 0) {
+    minutesUnallocated = true;            // palm pad present but not phased — can't separate
+  } else {
+    minutes = totalMinutes - (hasPalmPad ? palmPadMinutes : 0);
+  }
+
+  // Materials: palm-pad material is identifiable; the rest is the base's. Loop/
+  // Web materials aren't tracked, so they aren't in mats.total anyway.
+  const materials = mats.total - (hasPalmPad ? mats.palmPadCost : 0);
+
+  return { order, orderNumber, date, revenue, revenueUnallocated, minutes, minutesUnallocated, materials, materialsUnallocated: false };
+}
+
+/* Core intelligence for one already-allocated set of components (one tier).
+   Every metric uses its own population, and each population has its own
+   clickable count so the numbers are transparent. */
+function computeTierIntel(allocations, settings) {
+  /* Populations (each with its own clickable count):
+     - PAID:          allocations with real (positive) allocated revenue,
+                      regardless of timer data. Feeds Average charged.
+     - MEASURED:      allocations with >= 1 allocated minute, gifts included.
                       Feeds Median time, Average materials, and Target estimate.
-     - PAID+MEASURED: the intersection. Feeds Effective labor rate. */
-  const withMeta = attributed.map((o) => ({
-    orderNumber: String(o.orderNumber || ""),
-    minutes: laborByOrder[String(o.orderNumber)] || 0,
-    materials: getOrderMaterialsCost(o).total,
-    price: orderChargedPrice(o), // null for blank/$0 gift jobs
-    date: o.dateCompleted || o.createdAt || o.timestampSubmitted || ""
-  }));
+     - PAID+MEASURED: the intersection (also needs allocated materials).
+                      Feeds Effective labor rate.
+     - UNALLOCATED:   components that couldn't be split reliably. */
 
-  // PAID — all paid jobs (no timer requirement). Feeds Average charged.
-  const paid = withMeta.filter((j) => j.price != null);
+  // PAID — allocated revenue > 0.
+  const paid = allocations.filter((a) => a.revenue != null && a.revenue > 0);
   const paidCount = paid.length;
-  const paidOrderNumbers = paid.map((j) => j.orderNumber).filter(Boolean);
-  /* Average charged = plain mean of the estimated price on the paid jobs. No
-     materials subtracted, no allocation/discounting — the exact order price. */
-  const avgCharged = paidCount ? paid.reduce((s, j) => s + j.price, 0) / paidCount : null;
+  const paidOrderNumbers = paid.map((a) => a.orderNumber).filter(Boolean);
+  const avgCharged = paidCount ? paid.reduce((s, a) => s + a.revenue, 0) / paidCount : null;
 
-  // MEASURED — jobs with logged labor, gifts included. Feeds time + estimate.
-  const measured = withMeta.filter((j) => j.minutes >= 1);
+  // MEASURED — allocated labor >= 1 minute (gifts included).
+  const measured = allocations.filter((a) => !a.minutesUnallocated && a.minutes >= 1);
   const n = measured.length;
-  const measuredOrderNumbers = measured.map((j) => j.orderNumber).filter(Boolean);
-  const medianMinutes = n ? pricingMedian(measured.map((j) => j.minutes)) : null;
-  const avgMaterials = n ? measured.reduce((s, j) => s + j.materials, 0) / n : null;
+  const measuredOrderNumbers = measured.map((a) => a.orderNumber).filter(Boolean);
+  const medianMinutes = n ? pricingMedian(measured.map((a) => a.minutes)) : null;
+  const measWithMat = measured.filter((a) => a.materials != null && !a.materialsUnallocated);
+  const avgMaterials = measWithMat.length ? measWithMat.reduce((s, a) => s + a.materials, 0) / measWithMat.length : null;
 
-  // PAID + MEASURED — the rate needs both a price and logged time.
-  const paidMeasured = measured.filter((j) => j.price != null);
+  // PAID + MEASURED — needs a price, logged time, and allocated materials.
+  const paidMeasured = measured.filter((a) => a.revenue != null && a.revenue > 0 && a.materials != null && !a.materialsUnallocated);
   const paidMeasuredCount = paidMeasured.length;
-  const paidMeasuredOrderNumbers = paidMeasured.map((j) => j.orderNumber).filter(Boolean);
-  /* Effective labor rate = (price − materials) ÷ logged hours. Nets out
-     materials — it is a labor rate, not the charged price. */
-  const netSum = paidMeasured.reduce((s, j) => s + (j.price - j.materials), 0);
-  const hoursSum = paidMeasured.reduce((s, j) => s + j.minutes / 60, 0);
+  const paidMeasuredOrderNumbers = paidMeasured.map((a) => a.orderNumber).filter(Boolean);
+  /* Effective labor rate = (allocated revenue − allocated materials) ÷ logged
+     hours. Nets out materials — it is a labor rate, not the charged price. */
+  const netSum = paidMeasured.reduce((s, a) => s + (a.revenue - a.materials), 0);
+  const hoursSum = paidMeasured.reduce((s, a) => s + a.minutes / 60, 0);
   const effectiveRate = hoursSum > 0 ? netSum / hoursSum : null;
+
+  // UNALLOCATED — components (revenue or time) we couldn't separate reliably.
+  const unallocated = allocations.filter((a) => a.revenueUnallocated || a.minutesUnallocated);
+  const unallocatedCount = unallocated.length;
+  const unallocatedOrderNumbers = [...new Set(unallocated.map((a) => a.orderNumber).filter(Boolean))];
 
   // Target estimate uses the measured population (time + materials).
   let rawEstimate = null;
@@ -13637,10 +13740,12 @@ function computeTierIntel(attributed, laborByOrder, settings) {
     n,                       // measured count — drives confidence, interpretation, estimate
     paidCount,
     paidMeasuredCount,
+    unallocatedCount,
     measuredOrderNumbers,
     paidOrderNumbers,
     paidMeasuredOrderNumbers,
-    jobCount: attributed.length,
+    unallocatedOrderNumbers,
+    jobCount: allocations.length,
     avgCharged,
     medianMinutes,
     avgMaterials,
@@ -13660,13 +13765,27 @@ function computeTierIntel(attributed, laborByOrder, settings) {
    median and vice versa. Non-tiered services return a single tier. */
 function computeServicePricingIntel(service, services, laborByOrder) {
   const settings = getPricingSettings();
-  /* Cutoff (#0081+) applies to the whole attributed set, so every population
-     and every clickable count below already excludes orders 0001–0080. */
-  const attributed = allOrders.filter(
-    (o) => isMoneyEligibleOrder(o) && isAfterPricingCutoff(o) && attributeOrderToServiceKey(o, services) === service.serviceKey
-  );
+  const palmPadByOrder = buildPalmPadMinutesByOrder();
+  const isAddon = ADDON_SERVICE_KEYS.has(service.serviceKey);
 
-  const isTiered = service.pricingType === "tiered";
+  /* Cutoff (#0081+) applies to the whole set, so every population and count
+     below already excludes orders 0001–0080. Add-on intelligence uses EVERY
+     qualifying order that contains the add-on (combined or standalone); base
+     services use the orders whose primary base service is this one, with each
+     add-on's share removed. */
+  const eligible = allOrders.filter((o) => isMoneyEligibleOrder(o) && isAfterPricingCutoff(o));
+  const relevant = isAddon
+    ? eligible.filter((o) => orderAddonKeys(o).includes(service.serviceKey))
+    : eligible.filter((o) => attributeOrderToBaseServiceKey(o, services) === service.serviceKey);
+
+  const allocations = relevant.map((o) => allocateOrderForService(
+    o, service,
+    laborByOrder[String(o.orderNumber)] || 0,
+    palmPadByOrder[String(o.orderNumber)] || 0
+  ));
+
+  // Add-ons are never tiered; base tiered services split standard vs premium.
+  const isTiered = service.pricingType === "tiered" && !isAddon;
   const tierDefs = isTiered
     ? [
         { key: "standard", label: "Standard · fielder's glove", price: service.basePrice, match: (o) => orderPricingTier(o) === "standard" },
@@ -13678,7 +13797,7 @@ function computeServicePricingIntel(service, services, laborByOrder) {
 
   const tiers = tierDefs.map((def) => Object.assign(
     { key: def.key, label: def.label, publishedPrice: def.price },
-    computeTierIntel(attributed.filter(def.match), laborByOrder, settings)
+    computeTierIntel(allocations.filter((a) => def.match(a.order)), settings)
   ));
 
   return {
@@ -13686,7 +13805,7 @@ function computeServicePricingIntel(service, services, laborByOrder) {
     tiers,
     settings,
     totalN: tiers.reduce((s, t) => s + t.n, 0),
-    totalJobCount: attributed.length
+    totalJobCount: allocations.length
   };
 }
 
@@ -14065,6 +14184,9 @@ function renderServicePricingIntelBlock(service, intel) {
       ["Pricing confidence", tier.confidence],
       ["Recent time trend", PRICING_TREND_LABELS[tier.trend] || "—"]
     ];
+    if (tier.unallocatedCount > 0) {
+      rows.push(["Unallocated", { html: drill(tier.unallocatedCount, tier.unallocatedOrderNumbers, "orders") }]);
+    }
     return `
       <div class="pricing-intel-tier">
         <div class="pricing-intel-head">
@@ -14084,6 +14206,7 @@ function renderServicePricingIntelBlock(service, intel) {
       ${intel.isTiered ? `<p class="pricing-intel-note muted pricing-intel-tiernote">Standard and premium jobs are measured independently.</p>` : ""}
       ${tierBlocks}
       <p class="pricing-intel-note muted">Average charged uses all paid jobs; median time &amp; estimate use all measured jobs (gifts included); effective rate uses paid + measured jobs. Tap a count to see those orders.</p>
+      <p class="pricing-intel-note muted">Combined jobs are split between the base service and each add-on (Palm Padding, Loop, Web) without double-counting; a component that can't be separated reliably is counted as Unallocated instead of guessed.</p>
       <p class="pricing-intel-note muted">Pricing intelligence starts at order #${String(PRICING_INTEL_MIN_ORDER).padStart(4, "0")} — earlier orders stay in your history but are excluded here. Suggestions never overwrite the published price.</p>
     </div>
   `;
