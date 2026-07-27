@@ -4235,6 +4235,7 @@ const WEB_TYPE_OPTIONS = [
   "Modified Trapeze Web",
   "Trapeze Web",
   "Single Post Web",
+  "Two-Piece Web",
   "Other / Not Sure"
 ];
 
