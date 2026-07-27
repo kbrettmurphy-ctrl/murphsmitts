@@ -51,6 +51,16 @@ export async function onRequest(context) {
   }
 
   const status = String(order.status || "Received");
+  let stage = STAGE_MAP[status] || 1;
+
+  /* "On Hold" is a pause that can happen at any point in the workflow, so a
+     fixed stage misleads — an order held right after the estimate must not look
+     like it is "in the shop". Use the furthest stage the order actually reached,
+     read from its status-change history. */
+  if (status === "On Hold") {
+    stage = await furthestReachedStage(env, order.order_number);
+  }
+
   return new Response(JSON.stringify({
     ok: true,
     firstName: String(order.customer_name || "").trim().split(/\s+/)[0] || "there",
@@ -58,7 +68,7 @@ export async function onRequest(context) {
     brandModel: order.brand_model || "",
     gloveType: order.glove_type || "",
     status,
-    stage: STAGE_MAP[status] || 1,
+    stage,
     shipped: /shipped/i.test(String(order.drop_off_method || "")),
     estimatedCompletion: order.estimated_completion,
     dateCompleted: order.date_completed,
@@ -66,6 +76,28 @@ export async function onRequest(context) {
     carrier: order.carrier || "",
     photos
   }), { status: 200, headers });
+}
+
+/* Furthest forward stage an order actually reached, from its status-change
+   history (order_activity rows store event_detail as "Old Status -> New
+   Status"). Pause states ("On Hold") are ignored. Falls back to stage 1 when
+   there is no recorded progress. */
+async function furthestReachedStage(env, orderNumber) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/order_activity?order_number=eq.${encodeURIComponent(orderNumber)}&event_type=eq.status_changed&select=event_detail`
+  );
+  const rows = resp.ok && Array.isArray(resp.data) ? resp.data : [];
+  let max = 0;
+  for (const row of rows) {
+    for (const part of String(row.event_detail || "").split("->")) {
+      const s = part.trim();
+      if (!s || s === "On Hold") continue;
+      const st = STAGE_MAP[s];
+      if (st && st > max) max = st;
+    }
+  }
+  return max || 1;
 }
 
 async function supabaseFetch(env, path, options = {}) {
