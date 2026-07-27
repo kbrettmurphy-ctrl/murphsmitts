@@ -3170,7 +3170,8 @@ const SHOP_PRICING = {
   cleanConditionBase: 50,
   laceRepairBase: 40, // varies in practice — measured data supersedes once the bucket fills
   trapezeUpcharge: 20, // fielders w/ Trapeze or Modified Trapeze web
-  palmPadAddOn: 20
+  palmPadAddOn: 20,
+  loopReplacement: 30 // per loop (thumb or pinky); web replacement varies — priced manually
 };
 
 function getOrderSelectedServices(order) {
@@ -3189,6 +3190,27 @@ function orderHasCleaningService(order) {
 
 function orderHasPalmPadService(order) {
   return getOrderSelectedServices(order).includes("ShockTec Air2Gel Palm Pad");
+}
+
+/* Loop replacements ($30 each): thumb and pinky are independent selections, so
+   a job can have 0, 1, or 2. Falls back to the free-text "Other" box for older
+   orders recorded before these were structured checkboxes. */
+function orderLoopCount(order) {
+  const selected = getOrderSelectedServices(order);
+  let count = 0;
+  if (selected.includes("Thumb Loop Replacement")) count += 1;
+  if (selected.includes("Pinky Loop Replacement")) count += 1;
+  if (count === 0) {
+    const other = String(parseServicesValue(order?.servicesRequested || "").otherText || "").toLowerCase();
+    if (/\b(loop|thumb|pinky)\b/.test(other)) count = 1;
+  }
+  return count;
+}
+
+function orderHasWebReplacement(order) {
+  if (getOrderSelectedServices(order).includes("Web Replacement")) return true;
+  const other = String(parseServicesValue(order?.servicesRequested || "").otherText || "").toLowerCase();
+  return /\bweb\b/.test(other);
 }
 
 function orderHasTrapezeWeb(order) {
@@ -3422,34 +3444,53 @@ function getSuggestedPrice(order) {
   const hasRelace = orderHasRelacingService(order);
   const hasClean = orderHasCleaningService(order);
   const hasLaceRepair = getOrderSelectedServices(order).includes("Lace Repair");
+  const loopCount = orderLoopCount(order);
+  const hasWeb = orderHasWebReplacement(order);
 
-  let price = null;
+  let price = 0;
+  let priced = false;
   const parts = [];
 
   if (hasRelace) {
-    /* Full Service (clean + condition + relace) vs Full Relace (relace only). */
+    /* Relace bundles clean into "Full Service" and supersedes a lace repair. */
     const fullService = hasClean;
     const table = fullService ? SHOP_PRICING.fullServiceBase : SHOP_PRICING.fullRelaceBase;
-    price = table[gloveType] ?? table["Fielders Glove"];
-    parts.push(`${fullService ? "Full service" : "Full relace"}: ${formatCurrency(price)}`);
+    const base = table[gloveType] ?? table["Fielders Glove"];
+    price += base; priced = true;
+    parts.push(`${fullService ? "Full service" : "Full relace"}: ${formatCurrency(base)}`);
     if (gloveType === "Fielders Glove" && orderHasTrapezeWeb(order)) {
       price += SHOP_PRICING.trapezeUpcharge;
       parts.push(`Trapeze web: +${formatCurrency(SHOP_PRICING.trapezeUpcharge)}`);
     }
-  } else if (hasClean) {
-    price = SHOP_PRICING.cleanConditionBase;
-    parts.push(`Clean & condition: ${formatCurrency(price)}`);
-  } else if (hasLaceRepair) {
-    price = SHOP_PRICING.laceRepairBase;
-    parts.push(`Lace repair: ${formatCurrency(price)} (varies)`);
+  } else {
+    /* Non-relace primaries are independent services — sum whatever's selected
+       (e.g. Clean & Condition + Lace Repair), not one-or-the-other. */
+    if (hasClean) {
+      price += SHOP_PRICING.cleanConditionBase; priced = true;
+      parts.push(`Clean & condition: ${formatCurrency(SHOP_PRICING.cleanConditionBase)}`);
+    }
+    if (hasLaceRepair) {
+      price += SHOP_PRICING.laceRepairBase; priced = true;
+      parts.push(`Lace repair: ${formatCurrency(SHOP_PRICING.laceRepairBase)} (varies)`);
+    }
   }
 
-  if (price === null) return null;
-
+  /* Add-ons. */
   if (orderHasPalmPadService(order)) {
-    price += SHOP_PRICING.palmPadAddOn;
+    price += SHOP_PRICING.palmPadAddOn; priced = true;
     parts.push(`Palm pad: +${formatCurrency(SHOP_PRICING.palmPadAddOn)}`);
   }
+  if (loopCount > 0) {
+    const loop = loopCount * SHOP_PRICING.loopReplacement;
+    price += loop; priced = true;
+    parts.push(`Loop replacement ×${loopCount}: +${formatCurrency(loop)}`);
+  }
+  if (hasWeb) {
+    /* Web replacement varies by web type — recorded, priced by hand. */
+    parts.push(`Web replacement: prices vary — add manually`);
+  }
+
+  if (!priced) return null;
 
   return { price, parts };
 }
@@ -4249,7 +4290,10 @@ const SERVICE_OPTIONS = [
   "Cleaning + Conditioning",
   "Cleaning + Conditioning + Relacing",
   "Lace Repair",
-  "ShockTec Air2Gel Palm Pad"
+  "ShockTec Air2Gel Palm Pad",
+  "Thumb Loop Replacement",
+  "Pinky Loop Replacement",
+  "Web Replacement"
 ];
 
 /* Lace color options come from the live lace inventory — same source, labels,
@@ -13591,9 +13635,8 @@ const PALM_PAD_PHASE = "Palm Pad";
 function orderAddonKeys(order) {
   const keys = [];
   if (orderHasPalmPadService(order)) keys.push("palm_padding");
-  const other = String(parseServicesValue(order?.servicesRequested || "").otherText || "").toLowerCase();
-  if (/\b(loop|thumb|pinky)\b/.test(other)) keys.push("loop_replacement");
-  if (/\bweb\b/.test(other)) keys.push("web_replacement");
+  if (orderLoopCount(order) > 0) keys.push("loop_replacement");
+  if (orderHasWebReplacement(order)) keys.push("web_replacement");
   return keys;
 }
 
@@ -13640,8 +13683,22 @@ function allocateOrderForService(order, service, totalMinutes, palmPadMinutes) {
     };
   }
 
+  if (key === "loop_replacement") {
+    // $30 per loop is a known price, so revenue IS separable. Loop labor has no
+    // dedicated phase, so its time stays unallocated.
+    const loopCount = orderLoopCount(order);
+    return {
+      order, orderNumber, date,
+      revenue: total != null ? loopCount * SHOP_PRICING.loopReplacement : null,
+      revenueUnallocated: false,
+      minutes: 0,
+      minutesUnallocated: totalMinutes > 0,
+      materials: null, materialsUnallocated: false
+    };
+  }
+
   if (ADDON_SERVICE_KEYS.has(key)) {
-    // Loop / Web: no reliable price, phase, or tracked material — all unallocated.
+    // Web Replacement: price varies, no phase, no tracked material — unallocated.
     return {
       order, orderNumber, date,
       revenue: null, revenueUnallocated: total != null,
@@ -13650,25 +13707,28 @@ function allocateOrderForService(order, service, totalMinutes, palmPadMinutes) {
     };
   }
 
-  // Base service: subtract the separable add-on components.
+  // Base service: subtract the SEPARABLE add-on components (palm pad + loop).
   const addons = orderAddonKeys(order);
   const hasPalmPad = addons.includes("palm_padding");
-  const hasUnseparable = addons.includes("loop_replacement") || addons.includes("web_replacement");
+  const hasLoop = addons.includes("loop_replacement");
+  const hasWeb = addons.includes("web_replacement");
+  const loopCount = hasLoop ? orderLoopCount(order) : 0;
+  const separableAddonRevenue = (hasPalmPad ? SHOP_PRICING.palmPadAddOn : 0) + loopCount * SHOP_PRICING.loopReplacement;
 
   let revenue = null, revenueUnallocated = false;
   if (total == null) {
     revenue = null;                       // gift — no revenue (not "unallocated")
-  } else if (hasUnseparable) {
-    revenueUnallocated = true;            // can't subtract an unknown add-on price
+  } else if (hasWeb) {
+    revenueUnallocated = true;            // web price is unknown — can't split it off
   } else {
-    revenue = total - (hasPalmPad ? SHOP_PRICING.palmPadAddOn : 0);
+    revenue = total - separableAddonRevenue;
   }
 
   let minutes = 0, minutesUnallocated = false;
   if (totalMinutes <= 0) {
     minutes = 0;                          // no labor logged (not "unallocated")
-  } else if (hasUnseparable) {
-    minutesUnallocated = true;            // add-on labor has no phase to remove
+  } else if (hasWeb || hasLoop) {
+    minutesUnallocated = true;            // web/loop labor has no phase to remove
   } else if (hasPalmPad && palmPadMinutes <= 0) {
     minutesUnallocated = true;            // palm pad present but not phased — can't separate
   } else {
