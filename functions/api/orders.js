@@ -3657,13 +3657,16 @@ async function createOrderAction(env, body) {
         phoneNumber,
         emailAddress,
         dropOffMethod,
-        tracking_token: (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, ""),
         status: cleanText(input.status) || "Received",
         paid: cleanText(input.paid) || "Unpaid",
         smsOptIn
       }),
       timestamp_submitted: new Date().toISOString(),
       order_number: nextOrderNumber,
+      /* Written directly, NOT through mapUpdatesToDb — that mapper is a
+         whitelist with no tracking_token entry, so passing it there silently
+         dropped it and admin-created orders never got a tracker token. */
+      tracking_token: (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, ""),
       glove_photos: [],
       shipping_cost: null,
       tracking_number: null,
