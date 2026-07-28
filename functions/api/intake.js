@@ -525,7 +525,7 @@ ${msg}`;
     : "";
 
   const afterThanks =
-`${trackUrl ? `\nTrack your glove anytime: ${trackUrl}\n\n` : ""}${THANKS_LINE}
+`${trackUrl ? `\nFollow your glove's progress anytime: ${trackUrl}\n\n` : ""}${THANKS_LINE}
 
 -Brett`;
 
@@ -876,7 +876,7 @@ function wrapEmailHtmlSplit(beforeThanks, afterThanks, includeReview, trackUrl) 
     ${includeReview ? reviewHtml() : ""}
     ${trackUrl ? `
     <div style="margin:20px 0;">
-      <a href="${trackUrl}" style="display:inline-block; background:#092f4d; color:#ffffff; text-decoration:none; font-weight:bold; font-size:12px; padding:7px 15px; border-radius:999px;">Track your glove</a>
+      <a href="${trackUrl}" style="display:inline-block; background:#092f4d; color:#ffffff; text-decoration:none; font-weight:bold; font-size:12px; padding:7px 15px; border-radius:999px;">Follow the progress</a>
     </div>` : ""}
     <div style="white-space:pre-wrap; margin:16px 0 0;">${escapeHtml(afterThanks)}</div>
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px; border-top:1px solid #e6e1d6; width:100%;"><tr>
@@ -912,7 +912,7 @@ async function sendReceivedText(env, row) {
     `Murph's Mitts: Got your request (#${orderNum})!\n\n` +
     `I'll look it over and send an estimate by email. ` +
     `Feel free to reply here with photos of the glove — helps me size up the work.` +
-    (row.tracking_token ? `\n\nTrack it anytime:\nhttps://murphsmitts.com/track/?t=${row.tracking_token}` : "");
+    (row.tracking_token ? `\n\nFollow your glove's progress:\nhttps://murphsmitts.com/track/?t=${row.tracking_token}` : "");
 
   const sent = await sendTwilioText(env, to, body);
 

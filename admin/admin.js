@@ -2963,9 +2963,9 @@ function renderStatusDelivery(order) {
         </div>
       </div>
       <div class="status-delivery-actions">
-        <button id="resendStatusEmailBtn" class="secondary status-delivery-btn" type="button" ${emailAvailable ? "" : "disabled"}>Send Email Again</button>
-        <button id="resendStatusTextBtn" class="secondary status-delivery-btn" type="button" ${textAvailable ? "" : "disabled"}>Send Text Again</button>
-        <button id="copyTrackingLinkBtn" class="secondary status-delivery-btn" type="button" ${order.trackingToken ? "" : "disabled"}>Copy Tracking Link</button>
+        <button id="resendStatusEmailBtn" class="secondary status-delivery-btn" type="button" ${emailAvailable ? "" : "disabled"}>Resend Email</button>
+        <button id="resendStatusTextBtn" class="secondary status-delivery-btn" type="button" ${textAvailable ? "" : "disabled"}>Resend Text</button>
+        <button id="copyTrackingLinkBtn" class="secondary status-delivery-btn" type="button" ${order.trackingToken ? "" : "disabled"}>Status Link</button>
       </div>
       <p id="statusDeliveryMessage" class="status-delivery-message" aria-live="polite"></p>
     </div>
@@ -15110,10 +15110,10 @@ document.addEventListener("click", async (e) => {
     e.target.textContent = "Copied!";
     setTimeout(() => {
       const btn = document.getElementById("copyTrackingLinkBtn");
-      if (btn) btn.textContent = "Copy Tracking Link";
+      if (btn) btn.textContent = "Status Link";
     }, 1600);
   } catch {
-    window.prompt("Tracking link:", url);
+    window.prompt("Status link:", url);
   }
 });
 

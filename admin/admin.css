@@ -3509,13 +3509,15 @@ button.dashboard-metric:active{
   gap:8px;
 }
 
-.status-delivery-btn{
+/* Higher specificity (0,2,0) is required to beat button.secondary (0,1,1),
+   including its desktop @media override — otherwise these size props are dead. */
+.status-delivery-actions .status-delivery-btn{
   width:auto;
-  min-height:34px;
-  padding:0 11px;
-  border-radius:12px;
-  font-size:.82rem;
-  font-weight:700;
+  min-height:30px;
+  padding:4px 12px;
+  border-radius:10px;
+  font-size:.78rem;
+  font-weight:500;
 }
 
 .status-delivery-btn:disabled{
