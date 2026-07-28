@@ -7646,15 +7646,15 @@ body.has-notifications .topbar-menu-btn::after{
   background:rgba(9,47,77,.06);
 }
 
-/* Gallery uploader/manager inputs: compact — 16px floor only for iOS focus-zoom */
-#galleryUploadOrderInput,
+/* Gallery manager search: compact — 16px floor only for iOS focus-zoom.
+   (The uploader's "Link to Order #" input intentionally uses the standard
+   .detail-block input sizing so it matches the Gallery Section select above it.) */
 .gallery-manager-search{
   font-size:16px;
   padding:7px 10px;
   min-height:0;
   line-height:1.3;
 }
-#galleryUploadOrderInput::placeholder,
 .gallery-manager-search::placeholder{
   font-size:0.85em;
 }
