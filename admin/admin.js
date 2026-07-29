@@ -3436,9 +3436,31 @@ function ensureOrderEconomicsDelegation() {
   });
 }
 
-/* Rule-based quote suggestion from SHOP_PRICING only — never derived
-   from historical quoted prices. The price table is swappable: a
-   future sprint will replace it with measured timer data. */
+/* Published price for one service_key from the Pricing Management cache
+   (the same live `service_pricing` data the public Services page reads), or
+   null when pricing isn't loaded yet or the service is missing / inactive /
+   unpublished. `tier` ("premium" | anything else) selects the premium column
+   for tiered services (catcher's/first-base mitts and trapeze fielders).
+   is_active gates internal quote availability, so an inactive service falls
+   through to the SHOP_PRICING constant rather than suggesting nothing. */
+function getLiveServicePrice(serviceKey, tier) {
+  const services = pricingStateCache && Array.isArray(pricingStateCache.services) ? pricingStateCache.services : null;
+  if (!services) return null;
+  const svc = services.find((s) => s.serviceKey === serviceKey);
+  if (!svc || svc.isActive === false || !svc.publishedAt) return null;
+  const base = Number(svc.basePrice);
+  const premium = Number(svc.premiumPrice);
+  if (tier === "premium" && Number.isFinite(premium)) return premium;
+  return Number.isFinite(base) ? base : null;
+}
+
+/* Rule-based quote suggestion. Prices come from the live Pricing Management
+   data (pricingStateCache) so the suggestion tracks whatever Brett has
+   published on the Services page — one source of truth. SHOP_PRICING is only a
+   fallback for the brief window before that cache warms, or if a service is
+   inactive/unpublished. Never derived from historical quoted prices. The
+   measured-labor engine still takes precedence upstream (getEffectiveSuggestion)
+   once a job type has enough timed data. */
 function getSuggestedPrice(order) {
   const gloveType = String(order?.gloveType || "");
   const hasRelace = orderHasRelacingService(order);
@@ -3452,36 +3474,56 @@ function getSuggestedPrice(order) {
   const parts = [];
 
   if (hasRelace) {
-    /* Relace bundles clean into "Full Service" and supersedes a lace repair. */
+    /* Relace bundles clean into "Full Service" and supersedes a lace repair.
+       Tier picks standard vs premium: catcher's/first-base mitts and trapeze
+       fielders are premium — the published premium price already folds in the
+       upcharge, so there's no separate trapeze line on the live path. */
     const fullService = hasClean;
-    const table = fullService ? SHOP_PRICING.fullServiceBase : SHOP_PRICING.fullRelaceBase;
-    const base = table[gloveType] ?? table["Fielders Glove"];
-    price += base; priced = true;
-    parts.push(`${fullService ? "Full service" : "Full relace"}: ${formatCurrency(base)}`);
-    if (gloveType === "Fielders Glove" && orderHasTrapezeWeb(order)) {
-      price += SHOP_PRICING.trapezeUpcharge;
-      parts.push(`Trapeze web: +${formatCurrency(SHOP_PRICING.trapezeUpcharge)}`);
+    const tier = orderPricingTier(order);
+    const serviceKey = fullService ? "standard_full_service" : "full_relace";
+    const live = getLiveServicePrice(serviceKey, tier);
+    if (live != null) {
+      price += live; priced = true;
+      parts.push(`${fullService ? "Full service" : "Full relace"} (${tier}): ${formatCurrency(live)}`);
+    } else {
+      /* Fallback: hardcoded table + explicit trapeze upcharge (legacy). */
+      const table = fullService ? SHOP_PRICING.fullServiceBase : SHOP_PRICING.fullRelaceBase;
+      const base = table[gloveType] ?? table["Fielders Glove"];
+      price += base; priced = true;
+      parts.push(`${fullService ? "Full service" : "Full relace"}: ${formatCurrency(base)}`);
+      if (gloveType === "Fielders Glove" && orderHasTrapezeWeb(order)) {
+        price += SHOP_PRICING.trapezeUpcharge;
+        parts.push(`Trapeze web: +${formatCurrency(SHOP_PRICING.trapezeUpcharge)}`);
+      }
     }
   } else {
     /* Non-relace primaries are independent services — sum whatever's selected
        (e.g. Clean & Condition + Lace Repair), not one-or-the-other. */
     if (hasClean) {
-      price += SHOP_PRICING.cleanConditionBase; priced = true;
-      parts.push(`Clean & condition: ${formatCurrency(SHOP_PRICING.cleanConditionBase)}`);
+      const live = getLiveServicePrice("clean_condition", "standard");
+      const p = live != null ? live : SHOP_PRICING.cleanConditionBase;
+      price += p; priced = true;
+      parts.push(`Clean & condition: ${formatCurrency(p)}`);
     }
     if (hasLaceRepair) {
-      price += SHOP_PRICING.laceRepairBase; priced = true;
-      parts.push(`Lace repair: ${formatCurrency(SHOP_PRICING.laceRepairBase)} (varies)`);
+      const live = getLiveServicePrice("lace_repair", "standard");
+      const p = live != null ? live : SHOP_PRICING.laceRepairBase;
+      price += p; priced = true;
+      parts.push(`Lace repair: ${formatCurrency(p)} (varies)`);
     }
   }
 
   /* Add-ons. */
   if (orderHasPalmPadService(order)) {
-    price += SHOP_PRICING.palmPadAddOn; priced = true;
-    parts.push(`Palm pad: +${formatCurrency(SHOP_PRICING.palmPadAddOn)}`);
+    const live = getLiveServicePrice("palm_padding", "standard");
+    const p = live != null ? live : SHOP_PRICING.palmPadAddOn;
+    price += p; priced = true;
+    parts.push(`Palm pad: +${formatCurrency(p)}`);
   }
   if (loopCount > 0) {
-    const loop = loopCount * SHOP_PRICING.loopReplacement;
+    const live = getLiveServicePrice("loop_replacement", "standard");
+    const unit = live != null ? live : SHOP_PRICING.loopReplacement;
+    const loop = loopCount * unit;
     price += loop; priced = true;
     parts.push(`Loop replacement ×${loopCount}: +${formatCurrency(loop)}`);
   }
