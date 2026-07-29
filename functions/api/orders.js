@@ -5567,6 +5567,9 @@ async function sendStatusEmail(env, row, statusDisplay) {
   const msg = statusMessageSmart(order, statusDisplay);
 
   const isCompleted = status === "completed";
+  // At "ready to go" the glove is finished (just awaiting pickup/shipment), so
+  // the tracker link reads like Completed rather than mid-progress.
+  const isFinished = isCompleted || status === "ready to go";
 
   const beforeThanks =
 `Hey${firstName ? " " + firstName : ""},
@@ -5583,7 +5586,7 @@ ${msg}`.trimEnd();
     : "";
 
   const afterThanks =
-`${trackUrl ? `\n${isCompleted ? "See your finished glove" : "Follow your glove's progress anytime"}: ${trackUrl}\n\n` : ""}${THANKS_LINE}
+`${trackUrl ? `\n${isFinished ? "See your finished glove" : "Follow your glove's progress anytime"}: ${trackUrl}\n\n` : ""}${THANKS_LINE}
 
 -Brett`;
 
@@ -5865,7 +5868,7 @@ async function sendStatusText(env, row, statusDisplay) {
   const orderNum = String(order.orderNumber || "").trim() || "(unknown)";
 
   const body = `Murph's Mitts: Order #${orderNum} update — ${statusDisplay}\n\n${smsMessageSmart(order, status)}`
-    + (row.tracking_token ? `\n\n${status === "completed" ? "See your finished glove" : "Follow your glove's progress"}:\nhttps://murphsmitts.com/track/?t=${row.tracking_token}` : "");
+    + (row.tracking_token ? `\n\n${(status === "completed" || status === "ready to go") ? "See your finished glove" : "Follow your glove's progress"}:\nhttps://murphsmitts.com/track/?t=${row.tracking_token}` : "");
 
   const accountSid = env.TWILIO_ACCOUNT_SID;
   const authToken = env.TWILIO_AUTH_TOKEN;
@@ -6144,7 +6147,7 @@ function wrapReadyToGoEmailHtml(order, { firstName, orderNum, statusDisplay, tra
 
     ${paymentHtml}
 
-    ${emailTrackButtonHtml(trackUrl)}
+    ${emailTrackButtonHtml(trackUrl, "See your finished glove")}
 
     <p>${escapeHtml(THANKS_LINE)}</p>
 
