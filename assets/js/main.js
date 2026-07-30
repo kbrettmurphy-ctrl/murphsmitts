@@ -783,21 +783,32 @@ function initPublicLaceInventory() {
     ["tan - indian", "Indian Tan"],
     ["tan - japan", "Japan Tan"]
   ]);
-  const SORT_ORDER = new Map([
-    ["black", 10],
-    ["gray", 20],
-    ["tan - camel", 30],
-    ["tan - indian", 40],
-    ["tan - japan", 50],
-    ["brown - chocolate", 60],
-    ["blue - carolina", 80],
-    ["blue - royal", 90],
-    ["blue - navy", 100],
-    ["red", 110],
-    ["red - dark", 120],
-    ["orange", 130],
-    ["yellow", 140]
-  ]);
+  /* Group colors by family (the part before "-" in "Tan - Cheyenne"), families
+     ordered by this list, plain color before its variants, then A-Z. Mirrors the
+     admin sort so a new "Family - Specific" color slots in with no code change. */
+  const CATEGORY_ORDER = [
+    "black", "gray", "grey", "white",
+    "tan", "brown",
+    "blue", "green",
+    "red", "orange", "yellow", "purple"
+  ];
+
+  function categoryRank(normalized) {
+    const cat = String(normalized || "").split(" - ")[0].trim();
+    const idx = CATEGORY_ORDER.indexOf(cat);
+    return { idx: idx === -1 ? CATEGORY_ORDER.length : idx, cat };
+  }
+
+  function compareLaceColors(a, b) {
+    const ra = categoryRank(a.normalized);
+    const rb = categoryRank(b.normalized);
+    if (ra.idx !== rb.idx) return ra.idx - rb.idx;
+    if (ra.cat !== rb.cat) return ra.cat.localeCompare(rb.cat);
+    const aVariant = a.normalized.includes(" - ");
+    const bVariant = b.normalized.includes(" - ");
+    if (aVariant !== bVariant) return aVariant ? 1 : -1;
+    return a.label.localeCompare(b.label);
+  }
 
   function normalizeColor(value) {
     return String(value || "")
@@ -1003,12 +1014,7 @@ function initPublicLaceInventory() {
 
     return colors
       .filter(Boolean)
-      .sort((a, b) => {
-        const aOrder = SORT_ORDER.get(a.normalized) ?? 1000;
-        const bOrder = SORT_ORDER.get(b.normalized) ?? 1000;
-        if (aOrder !== bOrder) return aOrder - bOrder;
-        return a.label.localeCompare(b.label);
-      });
+      .sort(compareLaceColors);
   }
 
   getCustomerLaceColors()
