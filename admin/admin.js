@@ -2537,11 +2537,13 @@ function summarizeLace(order) {
   const parts = [];
   const primary = String(order.primaryLaceColor || order.lacePrimary || "").trim();
   const secondary = String(order.secondaryLaceColor || order.laceAccent || "").trim();
+  const custom = String(order.customColorRequest || order.customLaceNotes || "").trim();
   const primaryUsed = order.primaryLaceUsed;
   const secondaryUsed = order.secondaryLaceUsed;
 
   if (primary) parts.push(adminLaceLabel(primary));
   if (secondary) parts.push(adminLaceLabel(secondary));
+  if (!primary && !secondary && custom) parts.push(`Custom: ${custom}`);
   if (primaryUsed !== null && primaryUsed !== undefined && primaryUsed !== "") {
     parts.push(`${primaryUsed} primary used`);
   }
@@ -2702,11 +2704,13 @@ function summarizeLaceFromForm() {
   const parts = [];
   const primary = String(document.getElementById("editPrimaryLaceColor")?.value || "").trim();
   const secondary = String(document.getElementById("editSecondaryLaceColor")?.value || "").trim();
+  const custom = String(document.getElementById("editCustomColorRequest")?.value || "").trim();
   const primaryUsed = String(document.getElementById("editPrimaryLaceUsed")?.value || "").trim();
   const secondaryUsed = String(document.getElementById("editSecondaryLaceUsed")?.value || "").trim();
 
   if (primary) parts.push(adminLaceLabel(primary));
   if (secondary) parts.push(adminLaceLabel(secondary));
+  if (!primary && !secondary && custom) parts.push(`Custom: ${custom}`);
   if (primaryUsed) parts.push(`${primaryUsed} primary used`);
   if (secondaryUsed) parts.push(`${secondaryUsed} secondary used`);
 
