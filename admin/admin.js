@@ -3569,7 +3569,8 @@ function buildMoneyRollup(items, keyFn, { sortByLabelDesc = false } = {}) {
     const netSum = priced.reduce((s, i) => s + i.econ.net, 0);
     const pricedHours = priced.reduce((s, i) => s + i.econ.laborMinutes, 0) / 60;
     const rate = pricedHours > 0 ? netSum / pricedHours : null;
-    return { label, jobs, avgPrice, avgMaterials, avgMinutes, rate };
+    const orderNumbers = groupItems.map(i => String(i.order.orderNumber || "")).filter(Boolean);
+    return { label, jobs, avgPrice, avgMaterials, avgMinutes, rate, orderNumbers };
   });
 
   rows.sort(sortByLabelDesc
@@ -3592,7 +3593,9 @@ function renderMoneyRollupTable(title, firstColumn, rows) {
             ${rows.map(row => `
               <tr>
                 <td>${escapeHtml(row.label)}</td>
-                <td>${row.jobs}</td>
+                <td>${row.orderNumbers && row.orderNumbers.length
+                  ? `<button type="button" class="pricing-jobs-link" data-jobs="${escapeAttr(row.orderNumbers.join(","))}" data-context="${escapeAttr(row.label)}" data-chip-label="${escapeAttr(title)}">${row.jobs}</button>`
+                  : row.jobs}</td>
                 <td>${row.avgPrice !== null ? escapeHtml(formatCurrency(row.avgPrice)) : "—"}</td>
                 <td>${escapeHtml(formatCurrency(row.avgMaterials))}</td>
                 <td>${escapeHtml(formatLaborDuration(row.avgMinutes))}</td>
@@ -5585,10 +5588,10 @@ function applyFilters() {
 }
 
 /* Open the Orders view filtered to a pricing-intelligence tier's exact jobs. */
-function openPricingIntelOrders(orderNumbers, context) {
+function openPricingIntelOrders(orderNumbers, context, chipLabel) {
   const nums = (orderNumbers || []).map(n => String(n).trim()).filter(Boolean);
   if (!nums.length) return;
-  pricingIntelFilter = { orderNumbers: nums, context: context || "" };
+  pricingIntelFilter = { orderNumbers: nums, context: context || "", chipLabel: chipLabel || "" };
   if (searchInput) searchInput.value = "";
   searchExpanded = false;
   setActiveView("current");
@@ -5604,11 +5607,12 @@ function clearPricingIntelFilter({ reapply = false } = {}) {
 function renderPricingIntelChip(count) {
   const bar = document.getElementById("pricingIntelChip");
   if (!bar || !pricingIntelFilter) return;
+  const prefix = pricingIntelFilter.chipLabel || "Pricing Intelligence";
   const ctx = pricingIntelFilter.context ? ` · ${escapeHtml(pricingIntelFilter.context)}` : "";
   bar.innerHTML = `
     <span class="pricing-chip">
-      <span class="pricing-chip-label">Pricing Intelligence${ctx} · ${count} job${count === 1 ? "" : "s"}</span>
-      <button type="button" class="pricing-chip-remove" data-pricing-chip-remove aria-label="Remove Pricing Intelligence filter">×</button>
+      <span class="pricing-chip-label">${escapeHtml(prefix)}${ctx} · ${count} job${count === 1 ? "" : "s"}</span>
+      <button type="button" class="pricing-chip-remove" data-pricing-chip-remove aria-label="Remove filter">×</button>
     </span>
   `;
   bar.hidden = false;
@@ -5625,7 +5629,7 @@ document.addEventListener("click", (e) => {
   const jobsLink = e.target.closest(".pricing-jobs-link");
   if (jobsLink) {
     const nums = (jobsLink.dataset.jobs || "").split(",").map(s => s.trim()).filter(Boolean);
-    openPricingIntelOrders(nums, jobsLink.dataset.context || "");
+    openPricingIntelOrders(nums, jobsLink.dataset.context || "", jobsLink.dataset.chipLabel || "");
     return;
   }
   if (e.target.closest("[data-pricing-chip-remove]")) {
