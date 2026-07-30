@@ -18,7 +18,7 @@ export async function onRequest(context) {
     }
 
     const res = await fetch(
-      `${env.SUPABASE_URL}/rest/v1/lace_inventory?select=color,quantity_on_hand,active&active=eq.true`,
+      `${env.SUPABASE_URL}/rest/v1/lace_inventory?select=color,quantity_on_hand,active,photo_url&active=eq.true`,
       {
         headers: {
           apikey: env.SUPABASE_SERVICE_ROLE_KEY,

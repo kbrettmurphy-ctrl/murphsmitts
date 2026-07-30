@@ -2311,6 +2311,31 @@ export async function onRequest(context) {
       );
     }
 
+    if (action === "uploadLacePhoto") {
+      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+      if (!auth.ok) {
+        return json(auth, 200, jsonHeaders);
+      }
+
+      const color = cleanText(body.color);
+      const filename = cleanText(body.filename);
+      const contentType = cleanText(body.contentType) || "image/jpeg";
+      const dataUrl = cleanText(body.dataUrl);
+
+      if (!color || !filename || !dataUrl) {
+        return json({ ok: false, error: "Missing color, filename or image data." }, 200, jsonHeaders);
+      }
+      if (!contentType.startsWith("image/")) {
+        return json({ ok: false, error: "Only image uploads are allowed." }, 200, jsonHeaders);
+      }
+
+      const uploaded = await uploadLacePhoto(env, { color, filename, contentType, dataUrl });
+      if (!uploaded.ok) {
+        return json({ ok: false, error: "Lace photo upload failed.", details: uploaded.error }, 200, jsonHeaders);
+      }
+      return json({ ok: true, url: uploaded.url, path: uploaded.path }, 200, jsonHeaders);
+    }
+
     if (action === "uploadSaleGlovePhoto") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
 
@@ -4189,6 +4214,10 @@ function buildInventoryPayload(input, columns, options = {}) {
     if (columns.has("active")) payload.active = input.active !== false;
   }
 
+  if ("photoUrl" in input || "photo_url" in input) {
+    if (columns.has("photo_url")) payload.photo_url = cleanText(input.photoUrl ?? input.photo_url);
+  }
+
   return payload;
 }
 
@@ -5168,6 +5197,59 @@ async function deleteGalleryStorageObject(env, photoPath) {
       ok: false,
       error: err?.message || String(err)
     };
+  }
+}
+
+/* Upload a lace swatch photo to the public "lace" bucket and return its URL.
+   Mirrors uploadSaleGlovePhoto; keyed by color slug rather than a DB row, so it
+   works for a brand-new color before its inventory row is created. */
+async function uploadLacePhoto(env, { color, filename, contentType, dataUrl }) {
+  try {
+    const base64 = String(dataUrl || "").split(",").pop();
+    if (!base64) return { ok: false, error: "Invalid image data." };
+
+    const bytes = base64ToUint8Array(base64);
+    const ext = extensionFromContentType(contentType, filename);
+    const cleanName = safeStorageName(filename).replace(/\.[a-z0-9]+$/i, "");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const safeSlug = String(color || "lace")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "") || "lace";
+
+    const path = `${safeSlug}/${stamp}-${cleanName}.${ext}`;
+
+    const uploadResp = await fetch(
+      `${env.SUPABASE_URL}/storage/v1/object/lace/${path}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": contentType,
+          "x-upsert": "true"
+        },
+        body: bytes
+      }
+    );
+
+    const uploadText = await uploadResp.text();
+    if (!uploadResp.ok) {
+      let error = uploadText;
+      try { error = JSON.parse(uploadText); } catch {}
+      return { ok: false, error };
+    }
+
+    return {
+      ok: true,
+      path,
+      url: `${env.SUPABASE_URL}/storage/v1/object/public/lace/${path}`
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
   }
 }
 

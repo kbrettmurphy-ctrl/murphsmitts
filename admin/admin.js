@@ -878,7 +878,8 @@ function demoApi(body) {
         quantity_on_hand: Number(body.quantityOnHand) || 0,
         reorder_at: Number(body.reorderAt) || 4,
         active: body.active !== false,
-        reorder_alert_enabled: body.reorderAlertEnabled !== false
+        reorder_alert_enabled: body.reorderAlertEnabled !== false,
+        photo_url: body.photoUrl || null
       });
       return demoResult();
     case "updateInventoryItem": {
@@ -890,6 +891,7 @@ function demoApi(body) {
         if ("reorderAlertEnabled" in u) item.reorder_alert_enabled = !!u.reorderAlertEnabled;
         if ("color" in u) item.color = u.color;
         if ("active" in u) item.active = !!u.active;
+        if ("photoUrl" in u) item.photo_url = u.photoUrl;
       }
       return demoResult();
     }
@@ -8279,6 +8281,7 @@ function getWorkflowFormSize(actionKey) {
 
 function getInventoryFormSize(action) {
   if (action === "add") return "large";
+  if (action === "photo") return "large";
   if (action === "set") return "compact";
   return "small";
 }
@@ -11009,6 +11012,7 @@ function renderInventory(rows) {
         <div class="inventory-color">
           ${renderInventorySwatch(colorName)}
           <span class="inventory-color-name">${escapeHtml(colorName ? adminLaceLabel(colorName) : "Unknown")}</span>
+          ${item.active !== false && !String(item.photo_url || "").trim() ? `<span class="inventory-needs-photo" title="No swatch photo — hidden from customers">No photo</span>` : ""}
         </div>
         <span class="inventory-status-pill">${escapeHtml(status.label)}</span>
       </div>
@@ -11204,6 +11208,7 @@ function openInventoryActions(item, source) {
     : `
       <button class="workflow-action-btn" type="button" data-inventory-action="set">Set Quantity <span class="workflow-menu-chevron">›</span></button>
       <button class="workflow-action-btn" type="button" data-inventory-action="alertSettings">Alert Settings <span class="workflow-menu-chevron">›</span></button>
+      <button class="workflow-action-btn" type="button" data-inventory-action="photo">Set Photo <span class="workflow-menu-chevron">›</span></button>
       <button class="workflow-action-btn" type="button" data-inventory-action="rename">Edit Lace Color <span class="workflow-menu-chevron">›</span></button>
       <button class="workflow-action-btn danger" type="button" data-inventory-action="deactivate">Deactivate / Hide Color</button>
     `;
@@ -11250,7 +11255,7 @@ function handleInventoryAction(item, action, button) {
 }
 
 function inventoryActionHasForm(action) {
-  return action === "set" || action === "alertSettings" || action === "rename";
+  return action === "set" || action === "alertSettings" || action === "rename" || action === "photo";
 }
 
 function renderInventoryActionForm(item, action, button) {
@@ -11262,6 +11267,7 @@ function renderInventoryActionForm(item, action, button) {
     add: "Add lace color",
     set: "Set quantity",
     alertSettings: "Alert settings",
+    photo: "Set photo",
     rename: "Edit lace color"
   };
 
@@ -11281,6 +11287,19 @@ function renderInventoryActionForm(item, action, button) {
       <input id="inventoryReorderAtInput" type="number" min="0" step="1" inputmode="numeric" value="4" />
       <label class="inventory-check-row"><input id="inventoryAlertEnabledInput" type="checkbox" checked /> <span>Alert enabled</span></label>
       <label class="inventory-check-row"><input id="inventoryActiveInput" type="checkbox" checked /> <span>Active</span></label>
+      <label for="inventoryPhotoInput">Swatch photo <span class="muted">(optional)</span></label>
+      <input id="inventoryPhotoInput" type="file" accept="image/*" />
+      <p class="workflow-form-helper">Hidden from customers until it has a photo.</p>
+    `;
+  } else if (action === "photo") {
+    const photoUrl = String(item?.photo_url || "").trim();
+    fields = `
+      <div class="inventory-photo-current">${photoUrl
+        ? `<img src="${escapeAttr(photoUrl)}" alt="" class="inventory-photo-thumb" />`
+        : `<span class="muted">No photo yet — this color is hidden from customers until one is added.</span>`}</div>
+      <label for="inventoryPhotoInput">Swatch photo</label>
+      <input id="inventoryPhotoInput" type="file" accept="image/*" />
+      <p class="workflow-form-helper">Shown on the services page and the order form.</p>
     `;
   } else if (action === "set") {
     fields = `
@@ -11393,14 +11412,21 @@ async function saveInventoryAction(item, action, formEl) {
       if (!color) throw new Error("Enter a lace color.");
       if (inventoryColorExists(color)) throw new Error("That lace color already exists.");
 
+      const photoUrl = await uploadLaceInventoryPhoto(color); // null when none chosen
+
       await postJson({
         action: "createInventoryItem",
         color,
         quantityOnHand: readInventoryInteger("inventoryQtyInput"),
         reorderAt: readInventoryInteger("inventoryReorderAtInput"),
         reorderAlertEnabled: document.getElementById("inventoryAlertEnabledInput")?.checked === true,
-        active: document.getElementById("inventoryActiveInput")?.checked === true
+        active: document.getElementById("inventoryActiveInput")?.checked === true,
+        ...(photoUrl ? { photoUrl } : {})
       }, true);
+    } else if (action === "photo") {
+      const photoUrl = await uploadLaceInventoryPhoto(item.color);
+      if (!photoUrl) throw new Error("Choose a photo to upload.");
+      await updateInventoryItem(item, { photoUrl });
     } else if (action === "set") {
       await updateInventoryItem(item, {
         quantityOnHand: readInventoryInteger("inventoryQtyInput")
@@ -11437,6 +11463,27 @@ async function updateInventoryItem(item, updates) {
     color: item.color,
     updates
   }, true);
+}
+
+/* Upload the staged swatch photo (if any) to the lace bucket, return its URL or
+   null. Throws on a non-image pick or a failed upload. */
+async function uploadLaceInventoryPhoto(color) {
+  const input = document.getElementById("inventoryPhotoInput");
+  const file = input?.files?.[0];
+  if (!file) return null;
+  if (!(file.type || "").startsWith("image/")) throw new Error("Choose an image file.");
+  const dataUrl = await fileToDataUrl(file);
+  const res = await postJson({
+    action: "uploadLacePhoto",
+    color,
+    filename: file.name,
+    contentType: file.type || "image/jpeg",
+    dataUrl
+  }, true);
+  if (!res || res.ok === false || !res.url) {
+    throw new Error(res && res.error ? String(res.error) : "Photo upload failed.");
+  }
+  return res.url;
 }
 
 async function deactivateInventoryItem(item, button) {

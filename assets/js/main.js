@@ -852,7 +852,14 @@ function initPublicLaceInventory() {
     });
   }
 
-  async function resolvePhotoSource(color) {
+  async function resolvePhotoSource(color, photoUrl) {
+    // Prefer the admin-uploaded photo from the inventory; fall back to the
+    // legacy bundled files at /assets/img/lace/<slug> for older colors.
+    if (photoUrl) {
+      const loaded = await loadImage(photoUrl);
+      if (loaded) return loaded;
+    }
+
     const slug = photoSlugForColor(color);
     if (!slug) return "";
 
@@ -982,7 +989,7 @@ function initPublicLaceInventory() {
 
       seen.add(normalized);
 
-      const photo = await resolvePhotoSource(value);
+      const photo = await resolvePhotoSource(value, item.photo_url);
       if (!photo) return null;
 
       return {

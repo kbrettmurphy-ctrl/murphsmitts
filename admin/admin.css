@@ -3539,6 +3539,29 @@ button.dashboard-metric:active{
   min-width:0;
 }
 
+/* Lace inventory photo: "No photo" chip on rows + Set Photo form thumbnail. */
+.inventory-needs-photo{
+  font-size:.62rem;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.02em;
+  color:#8a6d3b;
+  background:rgba(138,109,59,.12);
+  border-radius:6px;
+  padding:1px 6px;
+  white-space:nowrap;
+}
+.inventory-photo-current{
+  margin-bottom:6px;
+}
+.inventory-photo-thumb{
+  max-width:120px;
+  max-height:120px;
+  border-radius:8px;
+  border:1px solid rgba(9,47,77,.15);
+  object-fit:cover;
+}
+
 .status-delivery-message{
   min-height:16px;
   margin:0;
