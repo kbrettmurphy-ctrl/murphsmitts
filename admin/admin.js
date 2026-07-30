@@ -4321,21 +4321,33 @@ const ADMIN_LACE_LABEL_OVERRIDES = new Map([
   ["tan - indian", "Indian Tan"],
   ["tan - japan", "Japan Tan"]
 ]);
-const ADMIN_LACE_SORT_ORDER = new Map([
-  ["black", 10],
-  ["gray", 20],
-  ["tan - camel", 30],
-  ["tan - indian", 40],
-  ["tan - japan", 50],
-  ["brown - chocolate", 60],
-  ["blue - carolina", 80],
-  ["blue - royal", 90],
-  ["blue - navy", 100],
-  ["red", 110],
-  ["red - dark", 120],
-  ["orange", 130],
-  ["yellow", 140]
-]);
+/* Lace colors are grouped by family (the part before "-" in "Tan - Cheyenne"),
+   families ordered by this list, plain colors before their variants, then A→Z.
+   This replaces a hard-coded per-color rank so a NEW color slots into its family
+   with no code change — just name it "Family - Specific" in the inventory. */
+const ADMIN_LACE_CATEGORY_ORDER = [
+  "black", "gray", "grey", "white",
+  "tan", "brown",
+  "blue", "green",
+  "red", "orange", "yellow", "purple"
+];
+
+function adminLaceCategoryRank(normalized) {
+  const cat = String(normalized || "").split(" - ")[0].trim();
+  const idx = ADMIN_LACE_CATEGORY_ORDER.indexOf(cat);
+  return { idx: idx === -1 ? ADMIN_LACE_CATEGORY_ORDER.length : idx, cat };
+}
+
+function compareAdminLaceColors(a, b) {
+  const ra = adminLaceCategoryRank(a.normalized);
+  const rb = adminLaceCategoryRank(b.normalized);
+  if (ra.idx !== rb.idx) return ra.idx - rb.idx;          // known families in list order
+  if (ra.cat !== rb.cat) return ra.cat.localeCompare(rb.cat); // unknown families A→Z
+  const aVariant = a.normalized.includes(" - ");
+  const bVariant = b.normalized.includes(" - ");
+  if (aVariant !== bVariant) return aVariant ? 1 : -1;    // plain color before its variants
+  return a.label.localeCompare(b.label);                  // then A→Z within the family
+}
 
 let adminLaceOptionsCache = null;
 let adminLaceOptionsPromise = null;
@@ -4376,12 +4388,7 @@ function loadAdminLaceOptions() {
           seen.add(normalized);
           items.push({ value, normalized, label: adminLaceLabel(value) });
         }
-        items.sort((a, b) => {
-          const ao = ADMIN_LACE_SORT_ORDER.get(a.normalized) ?? 1000;
-          const bo = ADMIN_LACE_SORT_ORDER.get(b.normalized) ?? 1000;
-          if (ao !== bo) return ao - bo;
-          return a.label.localeCompare(b.label);
-        });
+        items.sort(compareAdminLaceColors);
         adminLaceOptionsCache = items;
         refreshAdminLaceSelects();
         return items;
