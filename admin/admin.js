@@ -2543,7 +2543,7 @@ function summarizeLace(order) {
 
   if (primary) parts.push(adminLaceLabel(primary));
   if (secondary) parts.push(adminLaceLabel(secondary));
-  if (!primary && !secondary && custom) parts.push(`Custom: ${custom}`);
+  if (!primary && !secondary && custom) parts.push(custom);
   if (primaryUsed !== null && primaryUsed !== undefined && primaryUsed !== "") {
     parts.push(`${primaryUsed} primary used`);
   }
@@ -2710,7 +2710,7 @@ function summarizeLaceFromForm() {
 
   if (primary) parts.push(adminLaceLabel(primary));
   if (secondary) parts.push(adminLaceLabel(secondary));
-  if (!primary && !secondary && custom) parts.push(`Custom: ${custom}`);
+  if (!primary && !secondary && custom) parts.push(custom);
   if (primaryUsed) parts.push(`${primaryUsed} primary used`);
   if (secondaryUsed) parts.push(`${secondaryUsed} secondary used`);
 
