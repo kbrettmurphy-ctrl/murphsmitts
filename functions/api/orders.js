@@ -4795,6 +4795,8 @@ function mapOrderFromDb(row) {
     dateReceived: row.date_received,
     estimatedCompletion: row.estimated_completion,
     priceQuoted: row.price_quoted,
+    customAddonAmount: row.custom_addon_amount,
+    customAddonLabel: row.custom_addon_label,
     lacePiecesUsed: row.lace_pieces_used != null ? Number(row.lace_pieces_used) : null,
     shippingCost: row.shipping_cost,
     paid: row.paid,
@@ -4891,6 +4893,8 @@ function mapUpdatesToDb(updates) {
   if ("referralSource" in updates) out.referral_source = cleanText(updates.referralSource);
 
   if ("priceQuoted" in updates) out.price_quoted = cleanNumeric(updates.priceQuoted);
+  if ("customAddonAmount" in updates) out.custom_addon_amount = cleanNumeric(updates.customAddonAmount);
+  if ("customAddonLabel" in updates) out.custom_addon_label = cleanText(updates.customAddonLabel);
   if ("lacePiecesUsed" in updates) {
     const lacePieces = cleanNumeric(updates.lacePiecesUsed);
     out.lace_pieces_used = lacePieces === null ? null : Math.round(lacePieces);

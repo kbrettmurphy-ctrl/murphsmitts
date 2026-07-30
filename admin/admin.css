@@ -3525,6 +3525,20 @@ button.dashboard-metric:active{
   cursor:not-allowed;
 }
 
+/* Custom Add-On field (Order Detail, internal): amount + short label on one row. */
+.custom-addon-row{
+  display:flex;
+  gap:8px;
+}
+.custom-addon-row #editCustomAddonAmount{
+  flex:0 0 34%;
+  min-width:0;
+}
+.custom-addon-row #editCustomAddonLabel{
+  flex:1 1 auto;
+  min-width:0;
+}
+
 .status-delivery-message{
   min-height:16px;
   margin:0;

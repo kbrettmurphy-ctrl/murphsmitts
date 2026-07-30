@@ -3213,6 +3213,15 @@ function orderHasWebReplacement(order) {
   return /\bweb\b/.test(other);
 }
 
+/* Admin-declared custom add-on dollar amount ($ of the order price that is a
+   negotiated one-off, not part of the base service). Positive number, or null
+   when unset. Carved out of the base in pricing intelligence; the matching
+   labor is timed under the "Custom Work" phase. */
+function orderCustomAddonAmount(order) {
+  const n = Number(order?.customAddonAmount);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 function orderHasTrapezeWeb(order) {
   return String(order?.webType || "").toLowerCase().includes("trapeze");
 }
@@ -6191,6 +6200,15 @@ function renderOrderDetail(order) {
             ${(() => { const p = getPublishedPriceForOrder(order); return p ? `<div class="price-suggest-hint muted">Published ${escapeHtml(p.serviceName)}: ${escapeHtml(p.display)}</div>` : ""; })()}
           </div>
 
+          <div class="detail-block">
+            <div class="label">Custom Add-On <span class="muted">· internal</span></div>
+            <div class="custom-addon-row">
+              <input id="editCustomAddonAmount" type="text" inputmode="decimal" placeholder="$0.00" />
+              <input id="editCustomAddonLabel" type="text" placeholder="e.g. Web hole mod" maxlength="60" />
+            </div>
+            <div class="price-suggest-hint muted">Carved out of the price so it doesn't skew the base service. Time it under the "Custom Work" phase.</div>
+          </div>
+
           <div id="editShippingCostWrap" class="detail-block ${isLocal ? "is-hidden" : ""}">
             <div class="label">Shipping Cost</div>
             <input id="editShippingCost" type="text" inputmode="decimal" placeholder="$0.00" />
@@ -6395,6 +6413,8 @@ function renderOrderDetail(order) {
   document.getElementById("editStatus").value = order.status || "Received";
   document.getElementById("editPaid").value = normalizeText(order.paid) === "paid" ? "Paid" : "Unpaid";
   document.getElementById("editPriceQuoted").value = formatMoneyForInput(order.priceQuoted);
+  document.getElementById("editCustomAddonAmount").value = formatMoneyForInput(order.customAddonAmount);
+  document.getElementById("editCustomAddonLabel").value = order.customAddonLabel || "";
   document.getElementById("editShippingCost").value = formatMoneyForInput(order.shippingCost);
 
   const totalDue =
@@ -7434,12 +7454,15 @@ async function saveCurrentOrderFromForm() {
 
   const parsedPrice = parseMoneyInput(val("editPriceQuoted"));
   const parsedShipping = parseMoneyInput(val("editShippingCost"));
+  const parsedCustomAddon = parseMoneyInput(val("editCustomAddonAmount"));
 
   const updates = {
     status: newStatus,
     paid: val("editPaid"),
     phoneNumber: formatPhoneForInput(val("editPhoneNumber")),
     priceQuoted: parsedPrice === "" ? null : parsedPrice,
+    customAddonAmount: parsedCustomAddon === "" ? null : parsedCustomAddon,
+    customAddonLabel: emptyToNull(val("editCustomAddonLabel")),
     shippingCost: parsedShipping === "" ? null : parsedShipping,
     dateReceived: emptyToNull(val("editDateReceived")),
     estimatedCompletion: emptyToNull(val("editEstimatedCompletion")),
@@ -13636,7 +13659,10 @@ function orderAddonKeys(order) {
   const keys = [];
   if (orderHasPalmPadService(order)) keys.push("palm_padding");
   if (orderLoopCount(order) > 0) keys.push("loop_replacement");
-  if (orderHasWebReplacement(order)) keys.push("web_replacement");
+  /* A declared custom add-on supersedes the free-text "web" inference: the
+     manual amount + Custom Work phase already account for that bespoke work, so
+     the order is cleanly separable rather than an unpriceable web add-on. */
+  if (orderHasWebReplacement(order) && orderCustomAddonAmount(order) == null) keys.push("web_replacement");
   return keys;
 }
 
@@ -13656,6 +13682,18 @@ function buildPalmPadMinutesByOrder() {
   return map;
 }
 
+/* Custom Work phase minutes per order — the bespoke time carved out of the base
+   when an order has a declared custom add-on. Same shape as the Palm Pad map. */
+function buildCustomWorkMinutesByOrder() {
+  const map = {};
+  (Array.isArray(moneyLaborSummaryCache) ? moneyLaborSummaryCache : []).forEach((s) => {
+    if (String(s.phase || "") !== LABOR_CUSTOM_PHASE) return;
+    const k = String(s.orderNumber || "");
+    if (k) map[k] = (map[k] || 0) + (Number(s.durationMinutes) || 0);
+  });
+  return map;
+}
+
 /* Allocate one order's revenue / labor / materials to a single service (base or
    add-on), splitting a combined job without double-counting. Returns an
    allocation { order, orderNumber, date, revenue, revenueUnallocated, minutes,
@@ -13664,7 +13702,7 @@ function buildPalmPadMinutesByOrder() {
    - revenueUnallocated: true only when a price existed but couldn't be split.
    - minutes: allocated minutes (0 if none logged).
    - minutesUnallocated: true when labor exists but can't be attributed. */
-function allocateOrderForService(order, service, totalMinutes, palmPadMinutes) {
+function allocateOrderForService(order, service, totalMinutes, palmPadMinutes, customWorkMinutes) {
   const orderNumber = String(order.orderNumber || "");
   const date = order.dateCompleted || order.createdAt || order.timestampSubmitted || "";
   const total = orderChargedPrice(order); // positive price, or null (gift/blank)
@@ -13707,13 +13745,19 @@ function allocateOrderForService(order, service, totalMinutes, palmPadMinutes) {
     };
   }
 
-  // Base service: subtract the SEPARABLE add-on components (palm pad + loop).
+  // Base service: subtract the SEPARABLE add-on components (palm pad + loop +
+  // any admin-declared custom add-on).
   const addons = orderAddonKeys(order);
   const hasPalmPad = addons.includes("palm_padding");
   const hasLoop = addons.includes("loop_replacement");
   const hasWeb = addons.includes("web_replacement");
   const loopCount = hasLoop ? orderLoopCount(order) : 0;
-  const separableAddonRevenue = (hasPalmPad ? SHOP_PRICING.palmPadAddOn : 0) + loopCount * SHOP_PRICING.loopReplacement;
+  const customAddon = orderCustomAddonAmount(order) || 0; // $ carved out, 0 if none
+  const customMinutes = customAddon > 0 ? (Number(customWorkMinutes) || 0) : 0;
+  const separableAddonRevenue =
+    (hasPalmPad ? SHOP_PRICING.palmPadAddOn : 0)
+    + loopCount * SHOP_PRICING.loopReplacement
+    + customAddon;
 
   let revenue = null, revenueUnallocated = false;
   if (total == null) {
@@ -13721,7 +13765,7 @@ function allocateOrderForService(order, service, totalMinutes, palmPadMinutes) {
   } else if (hasWeb) {
     revenueUnallocated = true;            // web price is unknown — can't split it off
   } else {
-    revenue = total - separableAddonRevenue;
+    revenue = total - separableAddonRevenue; // includes the declared custom add-on
   }
 
   let minutes = 0, minutesUnallocated = false;
@@ -13732,7 +13776,8 @@ function allocateOrderForService(order, service, totalMinutes, palmPadMinutes) {
   } else if (hasPalmPad && palmPadMinutes <= 0) {
     minutesUnallocated = true;            // palm pad present but not phased — can't separate
   } else {
-    minutes = totalMinutes - (hasPalmPad ? palmPadMinutes : 0);
+    // Custom Work minutes are carved out just like the Palm Pad phase.
+    minutes = totalMinutes - (hasPalmPad ? palmPadMinutes : 0) - customMinutes;
   }
 
   // Materials: palm-pad material is identifiable; the rest is the base's. Loop/
@@ -13827,6 +13872,7 @@ function computeTierIntel(allocations, settings) {
 function computeServicePricingIntel(service, services, laborByOrder) {
   const settings = getPricingSettings();
   const palmPadByOrder = buildPalmPadMinutesByOrder();
+  const customWorkByOrder = buildCustomWorkMinutesByOrder();
   const isAddon = ADDON_SERVICE_KEYS.has(service.serviceKey);
 
   /* Cutoff (#0081+) applies to the whole set, so every population and count
@@ -13842,7 +13888,8 @@ function computeServicePricingIntel(service, services, laborByOrder) {
   const allocations = relevant.map((o) => allocateOrderForService(
     o, service,
     laborByOrder[String(o.orderNumber)] || 0,
-    palmPadByOrder[String(o.orderNumber)] || 0
+    palmPadByOrder[String(o.orderNumber)] || 0,
+    customWorkByOrder[String(o.orderNumber)] || 0
   ));
 
   // Add-ons are never tiered; base tiered services split standard vs premium.
