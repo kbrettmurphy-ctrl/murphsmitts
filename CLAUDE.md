@@ -93,6 +93,8 @@ Before finishing:
 ```
 node --check admin/admin.js
 node --check functions/api/orders.js   # if touched
+node scripts/action-dispatch-selftest.mjs  # dispatcher/auth characterization
+node scripts/pricing-selftest.mjs
 git diff --check
 git status --short
 ```
