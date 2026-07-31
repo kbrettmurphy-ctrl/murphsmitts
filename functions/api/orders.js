@@ -111,6 +111,14 @@ const ACTIONS = {
     auth: "session", demo: "deny", handler: handleListMessages,
     effects: ["db:sms_messages:read"], bindings: { required: ["CORE"], optional: [] }
   },
+  sendMessageReply: {
+    auth: "session", demo: "deny", handler: handleSendMessageReply,
+    effects: ["storage:order-photos:write", "external:sms:send", "db:sms_messages:write"],
+    bindings: {
+      required: ["CORE", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_MESSAGING_SERVICE_SID"],
+      optional: ["ENV-SIGNAL"]
+    }
+  },
   markMessagesRead: {
     auth: "session", demo: "deny", handler: handleMarkMessagesRead,
     effects: ["db:sms_messages:write"], bindings: { required: ["CORE"], optional: [] }
@@ -252,6 +260,10 @@ const ACTIONS = {
     auth: "session", demo: "deny", handler: handleGeocodeAddresses,
     effects: ["external:geocoding:read"], bindings: { required: ["CORE"], optional: [] }
   },
+  uploadGalleryPhoto: {
+    auth: "session", demo: "deny", handler: handleUploadGalleryPhoto,
+    effects: ["storage:gallery:write"], bindings: { required: ["CORE"], optional: [] }
+  },
   listExpenses: {
     auth: "session", demo: "deny", handler: handleListExpenses,
     effects: ["db:shop_expenses:read"], bindings: { required: ["CORE"], optional: [] }
@@ -281,6 +293,34 @@ const ACTIONS = {
     auth: "session", demo: "deny", handler: handleSaveShopSettings,
     effects: ["db:shop_settings:write", "db:shop_settings:read"], bindings: { required: ["CORE"], optional: [] }
   },
+  setGalleryPhotoCover: {
+    auth: "session", demo: "deny", handler: handleSetGalleryPhotoCover,
+    effects: ["db:gallery_photo_links:read", "db:gallery_photo_links:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  setGalleryPhotoOrder: {
+    auth: "session", demo: "deny", handler: handleSetGalleryPhotoOrder,
+    effects: ["db:orders:read", "db:gallery_photo_links:write", "db:gallery_photo_links:delete"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  moveGalleryPhoto: {
+    auth: "session", demo: "deny", handler: handleMoveGalleryPhoto,
+    effects: ["storage:gallery:move", "db:gallery_photo_links:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  hideGalleryPhoto: {
+    auth: "session", demo: "deny", handler: handleHideGalleryPhoto,
+    effects: ["storage:gallery:move"], bindings: { required: ["CORE"], optional: [] }
+  },
+  restoreGalleryPhoto: {
+    auth: "session", demo: "deny", handler: handleRestoreGalleryPhoto,
+    effects: ["storage:gallery:move"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteGalleryPhoto: {
+    auth: "session", demo: "deny", handler: handleDeleteGalleryPhoto,
+    effects: ["storage:gallery:delete", "db:gallery_photo_links:delete"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
   listSaleGloves: {
     auth: "session", demo: "deny", handler: handleListSaleGloves,
     effects: ["db:gloves_for_sale:read"], bindings: { required: ["CORE"], optional: [] }
@@ -301,9 +341,33 @@ const ACTIONS = {
     auth: "session", demo: "deny", handler: handleDeleteSaleGlove,
     effects: ["db:gloves_for_sale:delete"], bindings: { required: ["CORE"], optional: [] }
   },
+  uploadLacePhoto: {
+    auth: "session", demo: "deny", handler: handleUploadLacePhoto,
+    effects: ["storage:lace:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  uploadSaleGlovePhoto: {
+    auth: "session", demo: "deny", handler: handleUploadSaleGlovePhoto,
+    effects: [
+      "db:gloves_for_sale:read", "db:glove_sale_photos:read",
+      "storage:gloves-for-sale:write", "db:glove_sale_photos:write"
+    ],
+    bindings: { required: ["CORE"], optional: [] }
+  },
   listSaleGlovePhotos: {
     auth: "session", demo: "deny", handler: handleListSaleGlovePhotos,
     effects: ["db:glove_sale_photos:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  setSalePhotoPrimary: {
+    auth: "session", demo: "deny", handler: handleSetSalePhotoPrimary,
+    effects: ["db:glove_sale_photos:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  setSalePhotoHover: {
+    auth: "session", demo: "deny", handler: handleSetSalePhotoHover,
+    effects: ["db:glove_sale_photos:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteSaleGlovePhoto: {
+    auth: "session", demo: "deny", handler: handleDeleteSaleGlovePhoto,
+    effects: ["db:glove_sale_photos:delete"], bindings: { required: ["CORE"], optional: [] }
   },
   searchPublicGloves: {
     auth: "public", demo: "deny", handler: handleSearchPublicGloves,
@@ -486,64 +550,6 @@ export async function onRequest(context) {
       });
     }
 
-    if (action === "sendMessageReply") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const to = toE164US(body.phoneNumber);
-      const text = cleanText(body.body);
-      const mediaDataUrl = String(body.mediaDataUrl || "");
-      if (!to) return json({ ok: false, error: "Invalid phone number." }, 200, jsonHeaders);
-      if (!text && !mediaDataUrl) return json({ ok: false, error: "Enter a message." }, 200, jsonHeaders);
-      if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
-        return json({ ok: false, error: "Twilio is not configured." }, 200, jsonHeaders);
-      }
-
-      let mediaUrl = null;
-      if (mediaDataUrl.startsWith("data:image/")) {
-        const contentType = mediaDataUrl.slice(5, mediaDataUrl.indexOf(";"));
-        const b64 = mediaDataUrl.slice(mediaDataUrl.indexOf(",") + 1);
-        const bin = atob(b64);
-        const bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        const ext = contentType.includes("png") ? "png" : "jpg";
-        const path = `sms-out/${Date.now()}.${ext}`;
-        const up = await fetch(`${env.SUPABASE_URL}/storage/v1/object/order-photos/${path}`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-            "Content-Type": contentType,
-            "x-upsert": "true"
-          },
-          body: bytes
-        });
-        if (!up.ok) return json({ ok: false, error: "Photo upload failed." }, 200, jsonHeaders);
-        mediaUrl = `${env.SUPABASE_URL}/storage/v1/object/public/order-photos/${path}`;
-      }
-
-      const sent = await sendTwilioSms(env, to, text, mediaUrl);
-      if (!sent.ok) {
-        return json({ ok: false, error: "Message failed to send.", details: sent.error }, 200, jsonHeaders);
-      }
-
-      await supabaseFetch(env, `/rest/v1/sms_messages`, {
-        method: "POST",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({
-          direction: "out",
-          phone_number: to,
-          customer_name: cleanText(body.customerName) || null,
-          order_number: cleanText(body.orderNumber) || null,
-          body: text,
-          media_urls: mediaUrl ? [mediaUrl] : null,
-          twilio_sid: sent.sid || null,
-          read: true
-        })
-      });
-
-      return json({ ok: true }, 200, jsonHeaders);
-    }
 
     if (action === "webauthnRegisterOptions") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
@@ -673,68 +679,6 @@ export async function onRequest(context) {
       );
     }
 
-    if (action === "uploadGalleryPhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const filename = cleanText(body.filename);
-      const contentType = cleanText(body.contentType) || "image/jpeg";
-      const dataUrl = cleanText(body.dataUrl);
-      const section = cleanText(body.section) || "fielding-gloves";
-
-      if (!filename || !dataUrl) {
-        return json(
-          {
-            ok: false,
-            error: "Missing filename or image data."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      if (!contentType.startsWith("image/")) {
-        return json(
-          {
-            ok: false,
-            error: "Only image uploads are allowed."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const uploaded = await uploadGalleryPhoto(env, {
-        section,
-        filename,
-        contentType,
-        dataUrl
-      });
-
-      if (!uploaded.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Gallery upload failed.",
-            details: uploaded.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          url: uploaded.url,
-          path: uploaded.path
-        },
-        200,
-        jsonHeaders
-      );
-    }
 
     /* =========================
        SERVICE PRICING (Pricing Management)
@@ -935,523 +879,6 @@ export async function onRequest(context) {
       return json({ ok: true, service: created ? mapServicePricingRow(created) : null }, 200, jsonHeaders);
     }
 
-    if (action === "setGalleryPhotoCover") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const url = cleanText(body.url);
-      if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
-
-      const link = await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}&select=order_number&limit=1`);
-      const row = link.ok && Array.isArray(link.data) ? link.data[0] : null;
-      if (!row?.order_number) {
-        return json({ ok: false, error: "Photo must be linked to an order first." }, 200, jsonHeaders);
-      }
-
-      /* One cover per album: clear the order's flag, then set this photo. */
-      await supabaseFetch(env, `/rest/v1/gallery_photo_links?order_number=eq.${encodeURIComponent(row.order_number)}`, {
-        method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_cover: false })
-      });
-      const set = await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}`, {
-        method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_cover: true })
-      });
-      if (!set.ok) return json({ ok: false, error: "Could not set the cover." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "setGalleryPhotoOrder") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const url = cleanText(body.url);
-      const orderNumber = cleanText(body.orderNumber);
-      if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
-
-      /* Orderless "shop glove" description: descriptors make the photo
-         searchable without an order (personal/family/sold gloves). */
-      const d = body.descriptors && typeof body.descriptors === "object" ? body.descriptors : null;
-      const descriptors = {
-        brand_model: cleanText(d?.brandModel) || null,
-        glove_type: cleanText(d?.gloveType) || null,
-        web_type: cleanText(d?.webType) || null,
-        primary_lace_color: cleanText(d?.primaryLaceColor) || null,
-        secondary_lace_color: cleanText(d?.secondaryLaceColor) || null
-      };
-      const hasDescriptors = Object.values(descriptors).some(Boolean);
-
-      if (!orderNumber && !hasDescriptors) {
-        await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}`, {
-          method: "DELETE", headers: { Prefer: "return=minimal" }
-        });
-        return json({ ok: true, cleared: true }, 200, jsonHeaders);
-      }
-
-      if (orderNumber) {
-        const found = await fetchOrderByNumber(env, orderNumber);
-        if (!found.ok || !found.data) {
-          return json({ ok: false, error: `Order #${orderNumber} not found.` }, 200, jsonHeaders);
-        }
-      }
-
-      /* Linking to an order clears descriptors and vice versa. */
-      const row = orderNumber
-        ? {
-            photo_url: url,
-            photo_path: cleanText(body.path) || null,
-            order_number: orderNumber,
-            brand_model: null,
-            glove_type: null,
-            web_type: null,
-            primary_lace_color: null,
-            secondary_lace_color: null
-          }
-        : {
-            photo_url: url,
-            photo_path: cleanText(body.path) || null,
-            order_number: null,
-            ...descriptors
-          };
-
-      const resp = await supabaseFetch(env, `/rest/v1/gallery_photo_links?on_conflict=photo_url`, {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify(row)
-      });
-      if (!resp.ok) return json({ ok: false, error: "Could not save the link." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "moveGalleryPhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const photoPath = cleanText(body.path);
-      const oldUrl = cleanText(body.url);
-      const targetSection = safeGallerySection(cleanText(body.section));
-      const parsed = parseGalleryPhotoPath(photoPath);
-      if (!parsed.ok) return json({ ok: false, error: "Invalid gallery photo path." }, 200, jsonHeaders);
-      if (parsed.section === targetSection) {
-        return json({ ok: false, error: "Photo is already in that section." }, 200, jsonHeaders);
-      }
-
-      const destinationPath = parsed.hidden
-        ? `_hidden/${targetSection}/${parsed.name}`
-        : `${targetSection}/${parsed.name}`;
-      const moved = await moveGalleryStorageObject(env, photoPath, destinationPath);
-      if (!moved.ok) return json({ ok: false, error: moved.error || "Move failed." }, 200, jsonHeaders);
-
-      const photo = galleryPhotoFromPath(env, destinationPath, parsed.hidden);
-
-      /* The URL changes with the path — keep the album link attached. */
-      if (oldUrl) {
-        await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(oldUrl)}`, {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ photo_url: photo.url, photo_path: photo.path })
-        });
-      }
-
-      return json({ ok: true, photo }, 200, jsonHeaders);
-    }
-
-    if (action === "hideGalleryPhoto" || action === "restoreGalleryPhoto" || action === "deleteGalleryPhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const photoPath = cleanText(body.path);
-      const result = action === "hideGalleryPhoto"
-        ? await hideGalleryPhoto(env, photoPath)
-        : action === "restoreGalleryPhoto"
-          ? await restoreGalleryPhoto(env, photoPath)
-          : await deleteGalleryPhoto(env, photoPath);
-
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: result.error || "Gallery photo action failed."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          photo: result.photo || null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "uploadLacePhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const color = cleanText(body.color);
-      const filename = cleanText(body.filename);
-      const contentType = cleanText(body.contentType) || "image/jpeg";
-      const dataUrl = cleanText(body.dataUrl);
-
-      if (!color || !filename || !dataUrl) {
-        return json({ ok: false, error: "Missing color, filename or image data." }, 200, jsonHeaders);
-      }
-      if (!contentType.startsWith("image/")) {
-        return json({ ok: false, error: "Only image uploads are allowed." }, 200, jsonHeaders);
-      }
-
-      const uploaded = await uploadLacePhoto(env, { color, filename, contentType, dataUrl });
-      if (!uploaded.ok) {
-        return json({ ok: false, error: "Lace photo upload failed.", details: uploaded.error }, 200, jsonHeaders);
-      }
-      return json({ ok: true, url: uploaded.url, path: uploaded.path }, 200, jsonHeaders);
-    }
-
-    if (action === "uploadSaleGlovePhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const gloveId = cleanText(body.gloveId);
-      const filename = cleanText(body.filename);
-      const contentType = cleanText(body.contentType) || "image/jpeg";
-      const dataUrl = cleanText(body.dataUrl);
-
-      if (!gloveId || !filename || !dataUrl) {
-        return json(
-          {
-            ok: false,
-            error: "Missing gloveId, filename or image data."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      if (!contentType.startsWith("image/")) {
-        return json(
-          {
-            ok: false,
-            error: "Only image uploads are allowed."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const gloveResp = await supabaseFetch(
-        env,
-        `/rest/v1/gloves_for_sale?select=id,slug&id=eq.${encodeURIComponent(gloveId)}&limit=1`
-      );
-
-      if (!gloveResp.ok || !Array.isArray(gloveResp.data) || !gloveResp.data[0]) {
-        return json(
-          {
-            ok: false,
-            error: "Glove not found.",
-            details: gloveResp.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const glove = gloveResp.data[0];
-
-      const uploaded = await uploadSaleGlovePhoto(env, {
-        slug: glove.slug,
-        filename,
-        contentType,
-        dataUrl
-      });
-
-      if (!uploaded.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Glove photo upload failed.",
-            details: uploaded.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const countResp = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?select=id&glove_id=eq.${encodeURIComponent(gloveId)}`
-      );
-
-      const sortOrder = Array.isArray(countResp.data)
-        ? countResp.data.length
-        : 0;
-
-      const photoInsert = await supabaseFetch(
-        env,
-        "/rest/v1/glove_sale_photos",
-        {
-          method: "POST",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify({
-            glove_id: gloveId,
-            url: uploaded.url,
-            filename,
-            sort_order: sortOrder
-          })
-        }
-      );
-
-      if (!photoInsert.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Photo uploaded but database insert failed.",
-            details: photoInsert.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          photo: photoInsert.data?.[0] || null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "setSalePhotoPrimary") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const gloveId = cleanText(body.gloveId);
-      const photoId = cleanText(body.photoId);
-
-      if (!gloveId || !photoId) {
-        return json(
-          {
-            ok: false,
-            error: "Missing gloveId or photoId."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const clearPrimary = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?glove_id=eq.${encodeURIComponent(gloveId)}`,
-        {
-          method: "PATCH",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify({
-            is_primary: false
-          })
-        }
-      );
-
-      if (!clearPrimary.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to clear existing primary photo.",
-            details: clearPrimary.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const setPrimary = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?id=eq.${encodeURIComponent(photoId)}&glove_id=eq.${encodeURIComponent(gloveId)}`,
-        {
-          method: "PATCH",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify({
-            is_primary: true
-          })
-        }
-      );
-
-      if (!setPrimary.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to set primary photo.",
-            details: setPrimary.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          photo: Array.isArray(setPrimary.data) ? setPrimary.data[0] : null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "setSalePhotoHover") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const gloveId = cleanText(body.gloveId);
-      const photoId = cleanText(body.photoId);
-
-      if (!gloveId || !photoId) {
-        return json(
-          {
-            ok: false,
-            error: "Missing gloveId or photoId."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const clearHover = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?glove_id=eq.${encodeURIComponent(gloveId)}`,
-        {
-          method: "PATCH",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify({
-            is_hover: false
-          })
-        }
-      );
-
-      if (!clearHover.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to clear existing hover photo.",
-            details: clearHover.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const setHover = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?id=eq.${encodeURIComponent(photoId)}&glove_id=eq.${encodeURIComponent(gloveId)}`,
-        {
-          method: "PATCH",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify({
-            is_hover: true
-          })
-        }
-      );
-
-      if (!setHover.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to set hover photo.",
-            details: setHover.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          photo: Array.isArray(setHover.data) ? setHover.data[0] : null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "deleteSaleGlovePhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const gloveId = cleanText(body.gloveId);
-      const photoId = cleanText(body.photoId);
-
-      if (!gloveId || !photoId) {
-        return json(
-          {
-            ok: false,
-            error: "Missing gloveId or photoId."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-    
-      const del = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?id=eq.${encodeURIComponent(photoId)}&glove_id=eq.${encodeURIComponent(gloveId)}`,
-        {
-          method: "DELETE",
-          headers: {
-            Prefer: "return=representation"
-          }
-        }
-      );
-    
-      if (!del.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to delete glove photo.",
-            details: del.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-    
-      return json(
-        {
-          ok: true,
-          deleted: true,
-          photo: Array.isArray(del.data) ? del.data[0] : null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
     return json(
       {
         ok: false,
@@ -1545,6 +972,62 @@ async function handleListMessages({ env, jsonHeaders }) {
   );
   if (!resp.ok) return json({ ok: false, error: "Could not load messages." }, 200, jsonHeaders);
   return json({ ok: true, messages: (resp.data || []).map(mapSmsMessage) }, 200, jsonHeaders);
+}
+
+async function handleSendMessageReply({ env, body, jsonHeaders }) {
+  const to = toE164US(body.phoneNumber);
+  const text = cleanText(body.body);
+  const mediaDataUrl = String(body.mediaDataUrl || "");
+  if (!to) return json({ ok: false, error: "Invalid phone number." }, 200, jsonHeaders);
+  if (!text && !mediaDataUrl) return json({ ok: false, error: "Enter a message." }, 200, jsonHeaders);
+  if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
+    return json({ ok: false, error: "Twilio is not configured." }, 200, jsonHeaders);
+  }
+
+  let mediaUrl = null;
+  if (mediaDataUrl.startsWith("data:image/")) {
+    const contentType = mediaDataUrl.slice(5, mediaDataUrl.indexOf(";"));
+    const b64 = mediaDataUrl.slice(mediaDataUrl.indexOf(",") + 1);
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const ext = contentType.includes("png") ? "png" : "jpg";
+    const path = `sms-out/${Date.now()}.${ext}`;
+    const up = await fetch(`${env.SUPABASE_URL}/storage/v1/object/order-photos/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": contentType,
+        "x-upsert": "true"
+      },
+      body: bytes
+    });
+    if (!up.ok) return json({ ok: false, error: "Photo upload failed." }, 200, jsonHeaders);
+    mediaUrl = `${env.SUPABASE_URL}/storage/v1/object/public/order-photos/${path}`;
+  }
+
+  const sent = await sendTwilioSms(env, to, text, mediaUrl);
+  if (!sent.ok) {
+    return json({ ok: false, error: "Message failed to send.", details: sent.error }, 200, jsonHeaders);
+  }
+
+  await supabaseFetch(env, `/rest/v1/sms_messages`, {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      direction: "out",
+      phone_number: to,
+      customer_name: cleanText(body.customerName) || null,
+      order_number: cleanText(body.orderNumber) || null,
+      body: text,
+      media_urls: mediaUrl ? [mediaUrl] : null,
+      twilio_sid: sent.sid || null,
+      read: true
+    })
+  });
+
+  return json({ ok: true }, 200, jsonHeaders);
 }
 
 async function handleListOrders({ env, jsonHeaders }) {
@@ -1958,6 +1441,24 @@ async function handleGeocodeAddresses({ body, jsonHeaders }) {
   return json({ ok: true, results }, 200, jsonHeaders);
 }
 
+async function handleUploadGalleryPhoto({ env, body, jsonHeaders }) {
+  const filename = cleanText(body.filename);
+  const contentType = cleanText(body.contentType) || "image/jpeg";
+  const dataUrl = cleanText(body.dataUrl);
+  const section = cleanText(body.section) || "fielding-gloves";
+  if (!filename || !dataUrl) {
+    return json({ ok: false, error: "Missing filename or image data." }, 200, jsonHeaders);
+  }
+  if (!contentType.startsWith("image/")) {
+    return json({ ok: false, error: "Only image uploads are allowed." }, 200, jsonHeaders);
+  }
+  const uploaded = await uploadGalleryPhoto(env, { section, filename, contentType, dataUrl });
+  if (!uploaded.ok) {
+    return json({ ok: false, error: "Gallery upload failed.", details: uploaded.error }, 200, jsonHeaders);
+  }
+  return json({ ok: true, url: uploaded.url, path: uploaded.path }, 200, jsonHeaders);
+}
+
 async function handleListExpenses({ env, jsonHeaders }) {
   const resp = await supabaseFetch(
     env,
@@ -2097,6 +1598,115 @@ async function handleSaveShopSettings({ env, body, jsonHeaders }) {
   return json({ ok: true, settings }, 200, jsonHeaders);
 }
 
+async function handleSetGalleryPhotoCover({ env, body, jsonHeaders }) {
+  const url = cleanText(body.url);
+  if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
+  const link = await supabaseFetch(
+    env,
+    `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}&select=order_number&limit=1`
+  );
+  const row = link.ok && Array.isArray(link.data) ? link.data[0] : null;
+  if (!row?.order_number) {
+    return json({ ok: false, error: "Photo must be linked to an order first." }, 200, jsonHeaders);
+  }
+  await supabaseFetch(env, `/rest/v1/gallery_photo_links?order_number=eq.${encodeURIComponent(row.order_number)}`, {
+    method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_cover: false })
+  });
+  const set = await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}`, {
+    method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_cover: true })
+  });
+  if (!set.ok) return json({ ok: false, error: "Could not set the cover." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleSetGalleryPhotoOrder({ env, body, jsonHeaders }) {
+  const url = cleanText(body.url);
+  const orderNumber = cleanText(body.orderNumber);
+  if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
+  const d = body.descriptors && typeof body.descriptors === "object" ? body.descriptors : null;
+  const descriptors = {
+    brand_model: cleanText(d?.brandModel) || null,
+    glove_type: cleanText(d?.gloveType) || null,
+    web_type: cleanText(d?.webType) || null,
+    primary_lace_color: cleanText(d?.primaryLaceColor) || null,
+    secondary_lace_color: cleanText(d?.secondaryLaceColor) || null
+  };
+  const hasDescriptors = Object.values(descriptors).some(Boolean);
+  if (!orderNumber && !hasDescriptors) {
+    await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}`, {
+      method: "DELETE", headers: { Prefer: "return=minimal" }
+    });
+    return json({ ok: true, cleared: true }, 200, jsonHeaders);
+  }
+  if (orderNumber) {
+    const found = await fetchOrderByNumber(env, orderNumber);
+    if (!found.ok || !found.data) {
+      return json({ ok: false, error: `Order #${orderNumber} not found.` }, 200, jsonHeaders);
+    }
+  }
+  const row = orderNumber
+    ? {
+        photo_url: url, photo_path: cleanText(body.path) || null, order_number: orderNumber,
+        brand_model: null, glove_type: null, web_type: null,
+        primary_lace_color: null, secondary_lace_color: null
+      }
+    : {
+        photo_url: url, photo_path: cleanText(body.path) || null, order_number: null, ...descriptors
+      };
+  const resp = await supabaseFetch(env, `/rest/v1/gallery_photo_links?on_conflict=photo_url`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(row)
+  });
+  if (!resp.ok) return json({ ok: false, error: "Could not save the link." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleMoveGalleryPhoto({ env, body, jsonHeaders }) {
+  const photoPath = cleanText(body.path);
+  const oldUrl = cleanText(body.url);
+  const targetSection = safeGallerySection(cleanText(body.section));
+  const parsed = parseGalleryPhotoPath(photoPath);
+  if (!parsed.ok) return json({ ok: false, error: "Invalid gallery photo path." }, 200, jsonHeaders);
+  if (parsed.section === targetSection) {
+    return json({ ok: false, error: "Photo is already in that section." }, 200, jsonHeaders);
+  }
+  const destinationPath = parsed.hidden
+    ? `_hidden/${targetSection}/${parsed.name}`
+    : `${targetSection}/${parsed.name}`;
+  const moved = await moveGalleryStorageObject(env, photoPath, destinationPath);
+  if (!moved.ok) return json({ ok: false, error: moved.error || "Move failed." }, 200, jsonHeaders);
+  const photo = galleryPhotoFromPath(env, destinationPath, parsed.hidden);
+  if (oldUrl) {
+    await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(oldUrl)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ photo_url: photo.url, photo_path: photo.path })
+    });
+  }
+  return json({ ok: true, photo }, 200, jsonHeaders);
+}
+
+async function handleGalleryPhotoStorageAction({ env, body, jsonHeaders }, operation) {
+  const result = await operation(env, cleanText(body.path));
+  if (!result.ok) {
+    return json({ ok: false, error: result.error || "Gallery photo action failed." }, 200, jsonHeaders);
+  }
+  return json({ ok: true, photo: result.photo || null }, 200, jsonHeaders);
+}
+
+async function handleHideGalleryPhoto(ctx) {
+  return handleGalleryPhotoStorageAction(ctx, hideGalleryPhoto);
+}
+
+async function handleRestoreGalleryPhoto(ctx) {
+  return handleGalleryPhotoStorageAction(ctx, restoreGalleryPhoto);
+}
+
+async function handleDeleteGalleryPhoto(ctx) {
+  return handleGalleryPhotoStorageAction(ctx, deleteGalleryPhoto);
+}
+
 async function handleListSaleGloves({ env, jsonHeaders }) {
   const supa = await supabaseFetch(env, `/rest/v1/gloves_for_sale?select=*&order=sort_order.asc,created_at.desc`);
   if (!supa.ok) {
@@ -2220,6 +1830,69 @@ async function handleDeleteSaleGlove({ env, body, jsonHeaders }) {
   return json({ ok: true, deleted: true, id }, 200, jsonHeaders);
 }
 
+async function handleUploadLacePhoto({ env, body, jsonHeaders }) {
+  const color = cleanText(body.color);
+  const filename = cleanText(body.filename);
+  const contentType = cleanText(body.contentType) || "image/jpeg";
+  const dataUrl = cleanText(body.dataUrl);
+  if (!color || !filename || !dataUrl) {
+    return json({ ok: false, error: "Missing color, filename or image data." }, 200, jsonHeaders);
+  }
+  if (!contentType.startsWith("image/")) {
+    return json({ ok: false, error: "Only image uploads are allowed." }, 200, jsonHeaders);
+  }
+  const uploaded = await uploadLacePhoto(env, { color, filename, contentType, dataUrl });
+  if (!uploaded.ok) {
+    return json({ ok: false, error: "Lace photo upload failed.", details: uploaded.error }, 200, jsonHeaders);
+  }
+  return json({ ok: true, url: uploaded.url, path: uploaded.path }, 200, jsonHeaders);
+}
+
+async function handleUploadSaleGlovePhoto({ env, body, jsonHeaders }) {
+  const gloveId = cleanText(body.gloveId);
+  const filename = cleanText(body.filename);
+  const contentType = cleanText(body.contentType) || "image/jpeg";
+  const dataUrl = cleanText(body.dataUrl);
+  if (!gloveId || !filename || !dataUrl) {
+    return json({ ok: false, error: "Missing gloveId, filename or image data." }, 200, jsonHeaders);
+  }
+  if (!contentType.startsWith("image/")) {
+    return json({ ok: false, error: "Only image uploads are allowed." }, 200, jsonHeaders);
+  }
+  const gloveResp = await supabaseFetch(
+    env,
+    `/rest/v1/gloves_for_sale?select=id,slug&id=eq.${encodeURIComponent(gloveId)}&limit=1`
+  );
+  if (!gloveResp.ok || !Array.isArray(gloveResp.data) || !gloveResp.data[0]) {
+    return json({ ok: false, error: "Glove not found.", details: gloveResp.error }, 200, jsonHeaders);
+  }
+  const glove = gloveResp.data[0];
+  const uploaded = await uploadSaleGlovePhoto(env, {
+    slug: glove.slug, filename, contentType, dataUrl
+  });
+  if (!uploaded.ok) {
+    return json({ ok: false, error: "Glove photo upload failed.", details: uploaded.error }, 200, jsonHeaders);
+  }
+  const countResp = await supabaseFetch(
+    env,
+    `/rest/v1/glove_sale_photos?select=id&glove_id=eq.${encodeURIComponent(gloveId)}`
+  );
+  const sortOrder = Array.isArray(countResp.data) ? countResp.data.length : 0;
+  const photoInsert = await supabaseFetch(env, "/rest/v1/glove_sale_photos", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      glove_id: gloveId, url: uploaded.url, filename, sort_order: sortOrder
+    })
+  });
+  if (!photoInsert.ok) {
+    return json({
+      ok: false, error: "Photo uploaded but database insert failed.", details: photoInsert.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, photo: photoInsert.data?.[0] || null }, 200, jsonHeaders);
+}
+
 async function handleListSaleGlovePhotos({ env, body, jsonHeaders }) {
   const gloveId = cleanText(body.gloveId);
   if (!gloveId) return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
@@ -2235,6 +1908,79 @@ async function handleListSaleGlovePhotos({ env, body, jsonHeaders }) {
     }, 200, jsonHeaders);
   }
   return json({ ok: true, photos: photos.data || [] }, 200, jsonHeaders);
+}
+
+async function handleSetSalePhotoFlag({ env, body, jsonHeaders }, config) {
+  const gloveId = cleanText(body.gloveId);
+  const photoId = cleanText(body.photoId);
+  if (!gloveId || !photoId) {
+    return json({ ok: false, error: "Missing gloveId or photoId." }, 200, jsonHeaders);
+  }
+  const clear = await supabaseFetch(
+    env,
+    `/rest/v1/glove_sale_photos?glove_id=eq.${encodeURIComponent(gloveId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ [config.field]: false })
+    }
+  );
+  if (!clear.ok) {
+    return json({ ok: false, error: config.clearError, details: clear.error }, 200, jsonHeaders);
+  }
+  const set = await supabaseFetch(
+    env,
+    `/rest/v1/glove_sale_photos?id=eq.${encodeURIComponent(photoId)}&glove_id=eq.${encodeURIComponent(gloveId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ [config.field]: true })
+    }
+  );
+  if (!set.ok) {
+    return json({ ok: false, error: config.setError, details: set.error }, 200, jsonHeaders);
+  }
+  return json({
+    ok: true,
+    photo: Array.isArray(set.data) ? set.data[0] : null
+  }, 200, jsonHeaders);
+}
+
+async function handleSetSalePhotoPrimary(ctx) {
+  return handleSetSalePhotoFlag(ctx, {
+    field: "is_primary",
+    clearError: "Failed to clear existing primary photo.",
+    setError: "Failed to set primary photo."
+  });
+}
+
+async function handleSetSalePhotoHover(ctx) {
+  return handleSetSalePhotoFlag(ctx, {
+    field: "is_hover",
+    clearError: "Failed to clear existing hover photo.",
+    setError: "Failed to set hover photo."
+  });
+}
+
+async function handleDeleteSaleGlovePhoto({ env, body, jsonHeaders }) {
+  const gloveId = cleanText(body.gloveId);
+  const photoId = cleanText(body.photoId);
+  if (!gloveId || !photoId) {
+    return json({ ok: false, error: "Missing gloveId or photoId." }, 200, jsonHeaders);
+  }
+  const del = await supabaseFetch(
+    env,
+    `/rest/v1/glove_sale_photos?id=eq.${encodeURIComponent(photoId)}&glove_id=eq.${encodeURIComponent(gloveId)}`,
+    { method: "DELETE", headers: { Prefer: "return=representation" } }
+  );
+  if (!del.ok) {
+    return json({ ok: false, error: "Failed to delete glove photo.", details: del.error }, 200, jsonHeaders);
+  }
+  return json({
+    ok: true,
+    deleted: true,
+    photo: Array.isArray(del.data) ? del.data[0] : null
+  }, 200, jsonHeaders);
 }
 
 async function handleSearchPublicGloves({ env, body, jsonHeaders }) {

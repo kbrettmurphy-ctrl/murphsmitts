@@ -1100,6 +1100,267 @@ await test("webauthnLoginVerify verifies ES256, updates count, and issues owner 
   equal(failed.fetchCalls.length, 1);
 });
 
+console.log("Registry-backed storage and gallery workflows");
+
+const stageTenActions = [
+  "sendMessageReply", "uploadGalleryPhoto", "setGalleryPhotoCover",
+  "setGalleryPhotoOrder", "moveGalleryPhoto", "hideGalleryPhoto",
+  "restoreGalleryPhoto", "deleteGalleryPhoto", "uploadLacePhoto",
+  "uploadSaleGlovePhoto", "setSalePhotoPrimary", "setSalePhotoHover",
+  "deleteSaleGlovePhoto"
+];
+
+await test("Stage 10 actions centralize authorization and demo denial", async () => {
+  const { owner, demo } = await sessionTokens();
+  for (const action of stageTenActions) {
+    const missing = await invoke({ body: { action } });
+    deepEqual(missing.json, { ok: false, error: "Missing session token." }, action);
+    equal(missing.fetchCalls.length, 0, action);
+    await assertDemoDenied(action, demo);
+    const valid = await invoke({
+      body: { action, _token: owner },
+      fetchMock: emptySupabaseFetch
+    });
+    equal(valid.response.status, 200, action);
+    equal(valid.json?.error === "Missing session token.", false, action);
+  }
+});
+
+await test("sendMessageReply preserves validation, SMS ordering, and outgoing log", async () => {
+  const { owner } = await sessionTokens();
+  const env = {
+    ...CORE_ENV,
+    TWILIO_ACCOUNT_SID: "AC123",
+    TWILIO_AUTH_TOKEN: "secret",
+    TWILIO_MESSAGING_SERVICE_SID: "MG123"
+  };
+  const invalid = await invoke({
+    body: { action: "sendMessageReply", _token: owner, phoneNumber: "bad", body: "Hi" }
+  });
+  deepEqual(invalid.json, { ok: false, error: "Invalid phone number." });
+  const blank = await invoke({
+    body: { action: "sendMessageReply", _token: owner, phoneNumber: "555-867-5309" }
+  });
+  deepEqual(blank.json, { ok: false, error: "Enter a message." });
+  const unconfigured = await invoke({
+    body: {
+      action: "sendMessageReply", _token: owner,
+      phoneNumber: "555-867-5309", body: "Hello"
+    }
+  });
+  deepEqual(unconfigured.json, { ok: false, error: "Twilio is not configured." });
+
+  const sent = await invoke({
+    env,
+    body: {
+      action: "sendMessageReply", _token: owner, phoneNumber: "(555) 867-5309",
+      body: "  Hello  ", customerName: " Customer ", orderNumber: " 0169 "
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) {
+        ok(String(input).includes("/Accounts/AC123/Messages.json"));
+        equal(init.method, "POST");
+        const form = new URLSearchParams(init.body);
+        equal(form.get("To"), "+15558675309");
+        equal(form.get("MessagingServiceSid"), "MG123");
+        equal(form.get("Body"), "Hello");
+        equal(form.has("MediaUrl"), false);
+        return jsonResponse({ sid: "SM123" });
+      }
+      ok(String(input).includes("/rest/v1/sms_messages"));
+      equal(init.method, "POST");
+      equal(init.headers.Prefer, "return=minimal");
+      deepEqual(JSON.parse(init.body), {
+        direction: "out", phone_number: "+15558675309", customer_name: "Customer",
+        order_number: "0169", body: "Hello", media_urls: null,
+        twilio_sid: "SM123", read: true
+      });
+      return jsonResponse(null);
+    }
+  });
+  deepEqual(sent.json, { ok: true });
+  equal(sent.fetchCalls.length, 2);
+});
+
+await test("media, gallery, and lace uploads preserve storage-only behavior", async () => {
+  const { owner } = await sessionTokens();
+  const twilioEnv = {
+    ...CORE_ENV,
+    TWILIO_ACCOUNT_SID: "AC123",
+    TWILIO_AUTH_TOKEN: "secret",
+    TWILIO_MESSAGING_SERVICE_SID: "MG123"
+  };
+  const mms = await invoke({
+    env: twilioEnv,
+    body: {
+      action: "sendMessageReply", _token: owner, phoneNumber: "5558675309",
+      mediaDataUrl: "data:image/png;base64,QQ=="
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) {
+        ok(String(input).includes("/storage/v1/object/order-photos/sms-out/"));
+        ok(String(input).endsWith(".png"));
+        equal(init.headers["Content-Type"], "image/png");
+        return new Response("", { status: 200 });
+      }
+      if (callNumber === 2) {
+        const form = new URLSearchParams(init.body);
+        ok(form.get("MediaUrl").includes("/public/order-photos/sms-out/"));
+        return jsonResponse({ sid: "SM-MMS" });
+      }
+      return jsonResponse(null);
+    }
+  });
+  equal(mms.json.ok, true);
+  equal(mms.fetchCalls.length, 3);
+
+  for (const [action, body, bucket, pathPart] of [
+    ["uploadGalleryPhoto", {
+      filename: " My Photo.PNG ", contentType: "image/png",
+      dataUrl: "data:image/png;base64,QQ==", section: "not-a-section"
+    }, "gallery", "/fielding-gloves/"],
+    ["uploadLacePhoto", {
+      color: " Hot Pink!! ", filename: " Lace Photo.JPG ",
+      contentType: "image/jpeg", dataUrl: "data:image/jpeg;base64,QQ=="
+    }, "lace", "/hot-pink/"]
+  ]) {
+    const result = await invoke({
+      body: { action, _token: owner, ...body },
+      fetchMock(input, init) {
+        ok(String(input).includes(`/storage/v1/object/${bucket}${pathPart}`));
+        equal(init.method, "POST");
+        equal(init.headers["x-upsert"], "true");
+        return new Response("", { status: 200 });
+      }
+    });
+    equal(result.json.ok, true, action);
+    equal(result.fetchCalls.length, 1, action);
+    equal(result.fetchCalls[0].url.includes("/rest/v1/"), false, action);
+  }
+});
+
+await test("gallery management preserves non-transactional request ordering", async () => {
+  const { owner } = await sessionTokens();
+  const cover = await invoke({
+    body: {
+      action: "setGalleryPhotoCover", _token: owner,
+      url: "https://supabase.invalid/storage/v1/object/public/gallery/fielding-gloves/a.jpg"
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse([{ order_number: "0169" }]);
+      equal(init.method, "PATCH");
+      if (callNumber === 2) {
+        ok(String(input).includes("order_number=eq.0169"));
+        deepEqual(JSON.parse(init.body), { is_cover: false });
+        return new Response("ignored", { status: 500 });
+      }
+      ok(String(input).includes("photo_url=eq."));
+      deepEqual(JSON.parse(init.body), { is_cover: true });
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(cover.json, { ok: true });
+  equal(cover.fetchCalls.length, 3);
+
+  const moved = await invoke({
+    body: {
+      action: "moveGalleryPhoto", _token: owner, path: "fielding-gloves/a.jpg",
+      section: "catchers-mitts", url: "https://old.invalid/a.jpg"
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) {
+        ok(String(input).endsWith("/storage/v1/object/move"));
+        deepEqual(JSON.parse(init.body), {
+          bucketId: "gallery",
+          sourceKey: "fielding-gloves/a.jpg",
+          destinationKey: "catchers-mitts/a.jpg"
+        });
+        return new Response("", { status: 200 });
+      }
+      ok(String(input).includes("/rest/v1/gallery_photo_links"));
+      return new Response("ignored", { status: 500 });
+    }
+  });
+  equal(moved.json.ok, true);
+  equal(moved.fetchCalls.length, 2);
+
+  for (const [action, path, sourceKey, destinationKey] of [
+    ["hideGalleryPhoto", "fielding-gloves/a.jpg", "fielding-gloves/a.jpg", "_hidden/fielding-gloves/a.jpg"],
+    ["restoreGalleryPhoto", "_hidden/fielding-gloves/a.jpg", "_hidden/fielding-gloves/a.jpg", "fielding-gloves/a.jpg"]
+  ]) {
+    const result = await invoke({
+      body: { action, _token: owner, path },
+      fetchMock(input, init) {
+        ok(String(input).endsWith("/storage/v1/object/move"));
+        deepEqual(JSON.parse(init.body), { bucketId: "gallery", sourceKey, destinationKey });
+        return new Response("", { status: 200 });
+      }
+    });
+    equal(result.json.ok, true);
+    equal(result.fetchCalls.length, 1);
+  }
+});
+
+await test("sale photo workflows preserve storage/DB order and constrained mutations", async () => {
+  const { owner } = await sessionTokens();
+  const uploaded = await invoke({
+    body: {
+      action: "uploadSaleGlovePhoto", _token: owner, gloveId: "g1",
+      filename: "front.jpg", contentType: "image/jpeg",
+      dataUrl: "data:image/jpeg;base64,QQ=="
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse([{ id: "g1", slug: "pro-glove" }]);
+      if (callNumber === 2) {
+        ok(String(input).includes("/storage/v1/object/gloves-for-sale/pro-glove/"));
+        return new Response("", { status: 200 });
+      }
+      if (callNumber === 3) return jsonResponse([{ id: "old1" }, { id: "old2" }]);
+      const row = JSON.parse(init.body);
+      deepEqual(row, {
+        glove_id: "g1", url: row.url, filename: "front.jpg", sort_order: 2
+      });
+      return jsonResponse([{ id: "p3", ...row }]);
+    }
+  });
+  equal(uploaded.json.ok, true);
+  equal(uploaded.fetchCalls.length, 4);
+
+  for (const [action, field] of [
+    ["setSalePhotoPrimary", "is_primary"],
+    ["setSalePhotoHover", "is_hover"]
+  ]) {
+    const result = await invoke({
+      body: { action, _token: owner, gloveId: "g1", photoId: "p1" },
+      fetchMock(input, init, callNumber) {
+        equal(init.method, "PATCH");
+        deepEqual(JSON.parse(init.body), { [field]: callNumber === 2 });
+        if (callNumber === 2) {
+          ok(String(input).includes("id=eq.p1&glove_id=eq.g1"));
+          return jsonResponse([{ id: "p1", glove_id: "g1", [field]: true }]);
+        }
+        return jsonResponse([]);
+      }
+    });
+    equal(result.json.ok, true);
+    equal(result.fetchCalls.length, 2);
+  }
+
+  const deleted = await invoke({
+    body: {
+      action: "deleteSaleGlovePhoto", _token: owner, gloveId: "g1", photoId: "p1"
+    },
+    fetchMock(input, init) {
+      ok(String(input).includes("id=eq.p1&glove_id=eq.g1"));
+      equal(init.method, "DELETE");
+      return jsonResponse([{ id: "p1", glove_id: "g1" }]);
+    }
+  });
+  equal(deleted.json.ok, true);
+  equal(deleted.fetchCalls.length, 1);
+  equal(deleted.fetchCalls[0].url.includes("/storage/"), false);
+});
+
 console.log("Registry-backed order workflow actions");
 
 const stageNineActions = [
@@ -2298,7 +2559,7 @@ await test("current database role overrides ordinary token role", async () => {
 
 console.log("Action registry and legacy source inventory");
 
-await test("55 registry actions plus 21 legacy actions match the plan", async () => {
+await test("68 registry actions plus 8 legacy actions match the plan", async () => {
   const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
   const plan = fs.readFileSync(new URL("../.docs/V1_2_ACTION_REGISTRY_PLAN.md", import.meta.url), "utf8");
   const dispatcher = source.split("/* =========================\n   RESPONSE HELPERS")[0];
@@ -2327,6 +2588,7 @@ await test("55 registry actions plus 21 legacy actions match the plan", async ()
     "savePushSubscription",
     "sendTestPush",
     "listMessages",
+    "sendMessageReply",
     "markMessagesRead",
     "deleteMessage",
     "deleteMessageThread",
@@ -2355,6 +2617,7 @@ await test("55 registry actions plus 21 legacy actions match the plan", async ()
     "resendStatusText",
     "updateOrder",
     "geocodeAddresses",
+    "uploadGalleryPhoto",
     "listExpenses",
     "createExpense",
     "deleteExpense",
@@ -2362,12 +2625,23 @@ await test("55 registry actions plus 21 legacy actions match the plan", async ()
     "listServicePricingHistory",
     "getShopSettings",
     "saveShopSettings",
+    "setGalleryPhotoCover",
+    "setGalleryPhotoOrder",
+    "moveGalleryPhoto",
+    "hideGalleryPhoto",
+    "restoreGalleryPhoto",
+    "deleteGalleryPhoto",
     "listSaleGloves",
     "getSaleGlove",
     "createSaleGlove",
     "updateSaleGlove",
     "deleteSaleGlove",
+    "uploadLacePhoto",
+    "uploadSaleGlovePhoto",
     "listSaleGlovePhotos",
+    "setSalePhotoPrimary",
+    "setSalePhotoHover",
+    "deleteSaleGlovePhoto",
     "searchPublicGloves",
     "listGalleryPhotos"
   ];
@@ -2384,6 +2658,7 @@ await test("55 registry actions plus 21 legacy actions match the plan", async ()
     ["savePushSubscription", "deny"],
     ["sendTestPush", "deny"],
     ["listMessages", "deny"],
+    ["sendMessageReply", "deny"],
     ["markMessagesRead", "deny"],
     ["deleteMessage", "deny"],
     ["deleteMessageThread", "deny"],
@@ -2412,6 +2687,7 @@ await test("55 registry actions plus 21 legacy actions match the plan", async ()
     ["resendStatusText", "deny"],
     ["updateOrder", "deny"],
     ["geocodeAddresses", "deny"],
+    ["uploadGalleryPhoto", "deny"],
     ["listExpenses", "deny"],
     ["createExpense", "deny"],
     ["deleteExpense", "deny"],
@@ -2419,12 +2695,23 @@ await test("55 registry actions plus 21 legacy actions match the plan", async ()
     ["listServicePricingHistory", "deny"],
     ["getShopSettings", "deny"],
     ["saveShopSettings", "deny"],
+    ["setGalleryPhotoCover", "deny"],
+    ["setGalleryPhotoOrder", "deny"],
+    ["moveGalleryPhoto", "deny"],
+    ["hideGalleryPhoto", "deny"],
+    ["restoreGalleryPhoto", "deny"],
+    ["deleteGalleryPhoto", "deny"],
     ["listSaleGloves", "deny"],
     ["getSaleGlove", "deny"],
     ["createSaleGlove", "deny"],
     ["updateSaleGlove", "deny"],
     ["deleteSaleGlove", "deny"],
+    ["uploadLacePhoto", "deny"],
+    ["uploadSaleGlovePhoto", "deny"],
     ["listSaleGlovePhotos", "deny"],
+    ["setSalePhotoPrimary", "deny"],
+    ["setSalePhotoHover", "deny"],
+    ["deleteSaleGlovePhoto", "deny"],
     ["searchPublicGloves", "deny"],
     ["listGalleryPhotos", "deny"]
   ]);
@@ -2436,7 +2723,7 @@ await test("55 registry actions plus 21 legacy actions match the plan", async ()
   }
 
   deepEqual(registryActions, expectedRegistryActions);
-  equal(registryActions.length, 55);
+  equal(registryActions.length, 68);
   equal(
     (dispatcher.match(/return dispatchRegisteredAction\(registeredAction,/g) || []).length,
     1,
@@ -2457,6 +2744,7 @@ await test("55 registry actions plus 21 legacy actions match the plan", async ()
       ? "admin"
       : [
           "listMessages", "listOrders", "listInventory", "getOrder",
+          "sendMessageReply",
           "listOrderActivity", "listOrdersWithActivity", "listLaborSessions",
           "listOpenLaborSessions", "listLaborSummary", "geocodeAddresses",
           "listExpenses", "listServicePricing", "listServicePricingHistory",
@@ -2469,6 +2757,10 @@ await test("55 registry actions plus 21 legacy actions match the plan", async ()
           "updateSaleGlove", "deleteSaleGlove", "deleteOrder",
           "uploadOrderPhoto", "removeOrderPhoto", "createOrder",
           "resendStatusEmail", "resendStatusText", "updateOrder"
+          , "uploadGalleryPhoto", "setGalleryPhotoCover", "setGalleryPhotoOrder",
+          "moveGalleryPhoto", "hideGalleryPhoto", "restoreGalleryPhoto",
+          "deleteGalleryPhoto", "uploadLacePhoto", "uploadSaleGlovePhoto",
+          "setSalePhotoPrimary", "setSalePhotoHover", "deleteSaleGlovePhoto"
         ].includes(action) ? "session" : "public";
     if (action === "listGalleryPhotos") {
       ok(
@@ -2554,8 +2846,25 @@ await test("55 registry actions plus 21 legacy actions match the plan", async ()
       `${handler} relies on centralized authorization`
     );
   }
-  equal(legacyActions.length, 21);
-  equal(new Set(legacyActions).size, 21);
+  for (const handler of [
+    "handleSendMessageReply", "handleUploadGalleryPhoto", "handleSetGalleryPhotoCover",
+    "handleSetGalleryPhotoOrder", "handleMoveGalleryPhoto", "handleHideGalleryPhoto",
+    "handleRestoreGalleryPhoto", "handleDeleteGalleryPhoto", "handleUploadLacePhoto",
+    "handleUploadSaleGlovePhoto", "handleSetSalePhotoPrimary",
+    "handleSetSalePhotoHover", "handleDeleteSaleGlovePhoto"
+  ]) {
+    const handlerSource = source.match(
+      new RegExp(`async function ${handler}\\([\\s\\S]*?(?=\\nasync function )`)
+    );
+    ok(handlerSource, `${handler} is present`);
+    equal(
+      /validateTokenFromBody|body(?:\._token|\["_token"\]|\['_token'\])/.test(handlerSource[0]),
+      false,
+      `${handler} relies on centralized authorization`
+    );
+  }
+  equal(legacyActions.length, 8);
+  equal(new Set(legacyActions).size, 8);
   equal(plannedActions.length, 76);
   deepEqual(legacyActions, plannedLegacyActions);
   deepEqual([...legacyCounts.entries()].filter(([, count]) => count !== 1), []);
