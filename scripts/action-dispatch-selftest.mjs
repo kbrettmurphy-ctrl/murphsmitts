@@ -3145,6 +3145,16 @@ await test("all 76 documented actions are registry-backed with no legacy chain",
   ok(registryMatch, "ACTIONS registry is present");
   const registryActions = [...registryMatch[1].matchAll(/^  ([A-Za-z][A-Za-z0-9]*): \{/gm)]
     .map(match => match[1]);
+  const registryEntryStarts = [...registryMatch[1].matchAll(/^  ([A-Za-z][A-Za-z0-9]*): \{/gm)];
+  const registryEntries = registryEntryStarts.map((match, index) => ({
+    action: match[1],
+    source: registryMatch[1].slice(
+      match.index,
+      index + 1 < registryEntryStarts.length
+        ? registryEntryStarts[index + 1].index
+        : registryMatch[1].length
+    )
+  }));
 
   const legacyActions = [];
   for (const block of dispatcher.matchAll(/if\s*\(([^)]*\baction ===[^)]*)\)\s*\{/g)) {
@@ -3318,6 +3328,32 @@ await test("all 76 documented actions are registry-backed with no legacy chain",
 
   deepEqual(registryActions, expectedRegistryActions);
   equal(registryActions.length, 76);
+  const registeredHandlers = [];
+  for (const entry of registryEntries) {
+    ok(/\bauth\s*:/.test(entry.source), `${entry.action} has auth metadata`);
+    ok(/\bdemo\s*:/.test(entry.source), `${entry.action} has demo metadata`);
+    ok(/\beffects\s*:\s*\[/.test(entry.source), `${entry.action} has effects metadata`);
+    ok(/\bbindings\s*:\s*\{/.test(entry.source), `${entry.action} has bindings metadata`);
+    ok(/\brequired\s*:\s*\[/.test(entry.source), `${entry.action} has required bindings`);
+    ok(/\boptional\s*:\s*\[/.test(entry.source), `${entry.action} has optional bindings`);
+    const handler = entry.source.match(/\bhandler\s*:\s*(handle[A-Za-z0-9]+)/)?.[1];
+    ok(handler, `${entry.action} has a named handler`);
+    registeredHandlers.push(handler);
+    ok(
+      new RegExp(`async function ${handler}\\s*\\(`).test(source),
+      `${entry.action} handler resolves`
+    );
+    const handlerSource = source.match(
+      new RegExp(`async function ${handler}\\([\\s\\S]*?(?=\\nasync function |\\/\\* =========================)`)
+    );
+    ok(handlerSource, `${entry.action} handler source is inspectable`);
+    equal(
+      /validateTokenFromBody|body(?:\._token|\["_token"\]|\['_token'\])/.test(handlerSource[0]),
+      false,
+      `${entry.action} handler does not validate _token`
+    );
+  }
+  equal(new Set(registeredHandlers).size, registeredHandlers.length);
   equal(
     (dispatcher.match(/return dispatchRegisteredAction\(registeredAction,/g) || []).length,
     1,
