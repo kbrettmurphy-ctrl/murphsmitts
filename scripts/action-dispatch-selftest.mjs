@@ -1100,6 +1100,221 @@ await test("webauthnLoginVerify verifies ES256, updates count, and issues owner 
   equal(failed.fetchCalls.length, 1);
 });
 
+console.log("Registry-backed read actions");
+
+const stageSevenSessionActions = [
+  "listMessages", "listOrders", "listInventory", "getOrder",
+  "listOrderActivity", "listOrdersWithActivity", "listLaborSessions",
+  "listOpenLaborSessions", "listLaborSummary", "geocodeAddresses",
+  "listExpenses", "listServicePricing", "listServicePricingHistory",
+  "getShopSettings", "listSaleGloves", "getSaleGlove", "listSaleGlovePhotos"
+];
+
+await test("Stage 7 session actions reject before external I/O and deny demo tokens", async () => {
+  const { demo } = await sessionTokens();
+  for (const action of stageSevenSessionActions) {
+    const missing = await invoke({ body: { action } });
+    deepEqual(missing.json, { ok: false, error: "Missing session token." }, action);
+    equal(missing.fetchCalls.length, 0, action);
+    await assertDemoDenied(action, demo);
+  }
+});
+
+await test("valid sessions reach every Stage 7 session handler", async () => {
+  const { owner } = await sessionTokens();
+  for (const action of stageSevenSessionActions) {
+    const result = await invoke({
+      body: { action, _token: owner, items: [] },
+      fetchMock: emptySupabaseFetch
+    });
+    equal(result.response.status, 200, action);
+    equal(
+      ["Missing session token.", "Invalid session token.", "Session expired."].includes(result.json?.error),
+      false,
+      `${action} passed centralized session authorization`
+    );
+  }
+});
+
+await test("message, inventory, expense, and store reads preserve queries and mappings", async () => {
+  const { owner } = await sessionTokens();
+  const messages = await invoke({
+    body: { action: "listMessages", _token: owner },
+    fetchMock(input) {
+      ok(String(input).includes("order=created_at.desc&limit=300"));
+      return jsonResponse([{
+        id: "m1", direction: null, phone_number: "+15550000000",
+        customer_name: "Customer", order_number: "0169", body: "Hello",
+        media_urls: null, read: true, created_at: "2026-01-01"
+      }]);
+    }
+  });
+  deepEqual(messages.json.messages[0], {
+    id: "m1", direction: "in", phoneNumber: "+15550000000",
+    customerName: "Customer", orderNumber: "0169", body: "Hello",
+    mediaUrls: [], read: true, createdAt: "2026-01-01"
+  });
+  const inventory = await invoke({
+    body: { action: "listInventory", _token: owner },
+    fetchMock(input) {
+      ok(String(input).includes("order=color.asc"));
+      return jsonResponse([{ color: "Black", quantity: 4 }]);
+    }
+  });
+  deepEqual(inventory.json.inventory, [{ color: "Black", quantity: 4 }]);
+  const expenses = await invoke({
+    body: { action: "listExpenses", _token: owner },
+    fetchMock(input) {
+      ok(String(input).includes("order=expense_date.desc,created_at.desc&limit=500"));
+      return jsonResponse([{ id: "e1", amount: "12.50", quantity: "2" }]);
+    }
+  });
+  equal(expenses.json.expenses[0].amount, 12.5);
+  equal(expenses.json.expenses[0].quantity, 2);
+  const gloves = await invoke({
+    body: { action: "listSaleGloves", _token: owner },
+    fetchMock(input) {
+      ok(String(input).includes("order=sort_order.asc,created_at.desc"));
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(gloves.json, { ok: true, gloves: [] });
+  const photos = await invoke({
+    body: { action: "listSaleGlovePhotos", _token: owner, gloveId: "g 1" },
+    fetchMock(input) {
+      ok(String(input).includes("glove_id=eq.g%201"));
+      ok(String(input).includes("order=sort_order.asc,id.asc"));
+      return jsonResponse([{ id: "p1" }]);
+    }
+  });
+  deepEqual(photos.json, { ok: true, photos: [{ id: "p1" }] });
+});
+
+await test("order, activity, and labor reads preserve validation and query semantics", async () => {
+  const { owner } = await sessionTokens();
+  const missing = await invoke({ body: { action: "getOrder", _token: owner } });
+  deepEqual(missing.json, { ok: false, error: "Missing orderNumber." });
+  const notFound = await invoke({
+    body: { action: "getOrder", _token: owner, orderNumber: " 0169 " },
+    fetchMock(input) {
+      ok(String(input).includes("order_number=eq.0169"));
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(notFound.json, { ok: false, error: "Order not found." });
+  const activity = await invoke({
+    body: { action: "listOrderActivity", _token: owner, orderNumber: "0169" },
+    fetchMock(input) {
+      ok(String(input).includes("order=created_at.desc&limit=50"));
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(activity.json, { ok: true, activity: [] });
+  const index = await invoke({
+    body: { action: "listOrdersWithActivity", _token: owner },
+    fetchMock(input) {
+      ok(String(input).includes("event_type=neq.order_created_manual"));
+      return jsonResponse([
+        { order_number: "0169" }, { order_number: "0169" }, { order_number: "0170" }
+      ]);
+    }
+  });
+  deepEqual(index.json, { ok: true, orderNumbers: ["0169", "0170"] });
+  const summary = await invoke({
+    body: { action: "listLaborSummary", _token: owner },
+    fetchMock(input) {
+      ok(String(input).includes("ended_at=not.is.null"));
+      return jsonResponse([{ order_number: "0169", phase: "Full Service", duration_minutes: "75", ended_at: "done" }]);
+    }
+  });
+  deepEqual(summary.json.sessions[0], {
+    orderNumber: "0169", phase: "Full Service", durationMinutes: 75, endedAt: "done"
+  });
+});
+
+await test("pricing, history, settings defaults, and empty geocoding remain unchanged", async () => {
+  const { owner } = await sessionTokens();
+  const pricing = await invoke({
+    body: { action: "listServicePricing", _token: owner },
+    fetchMock: () => jsonResponse([])
+  });
+  deepEqual(pricing.json.services, []);
+  equal(typeof pricing.json.settings.targetLaborRate, "number");
+  equal(pricing.fetchCalls.length, 4);
+  const history = await invoke({
+    body: { action: "listServicePricingHistory", _token: owner, serviceKey: "full service" },
+    fetchMock(input) {
+      ok(String(input).includes("limit=200&service_key=eq.full%20service"));
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(history.json, { ok: true, history: [] });
+  const settings = await invoke({
+    body: { action: "getShopSettings", _token: owner },
+    fetchMock: () => jsonResponse([])
+  });
+  equal(typeof settings.json.settings.roundingIncrement, "number");
+  const geocode = await invoke({
+    body: { action: "geocodeAddresses", _token: owner, items: [] }
+  });
+  deepEqual(geocode.json, { ok: true, results: [] });
+  equal(geocode.fetchCalls.length, 0);
+});
+
+await test("a remaining legacy write action still dispatches successfully", async () => {
+  const { owner } = await sessionTokens();
+  const result = await invoke({
+    body: { action: "markMessagesRead", _token: owner },
+    fetchMock(input, init) {
+      ok(String(input).includes("sms_messages?read=eq.false"));
+      equal(init.method, "PATCH");
+      deepEqual(JSON.parse(init.body), { read: true });
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(result.json, { ok: true });
+});
+
+await test("public glove search preserves threshold, all-term matching, cap, and safe fields", async () => {
+  const short = await invoke({ body: { action: "searchPublicGloves", q: " a " } });
+  deepEqual(short.json, { ok: true, gloves: [] });
+  equal(short.fetchCalls.length, 0);
+  const rows = Array.from({ length: 30 }, (_, index) => ({
+    photo_url: `https://gallery.invalid/${index}.jpg`,
+    order_number: null,
+    brand_model: "Wilson A2000",
+    glove_type: "Infield",
+    web_type: "I-web",
+    primary_lace_color: "Black",
+    secondary_lace_color: null,
+    customer_name: "must-not-leak"
+  }));
+  const result = await invoke({
+    body: { action: "searchPublicGloves", q: " WILSON black " },
+    fetchMock: () => jsonResponse(rows)
+  });
+  equal(result.json.gloves.length, 24);
+  deepEqual(Object.keys(result.json.gloves[0]).sort(), [
+    "brandModel", "gloveType", "laceColors", "photos", "webType"
+  ]);
+  equal(JSON.stringify(result.json).includes("must-not-leak"), false);
+  equal(result.json.source, "gallery");
+});
+
+await test("geocoding retains caps, fallback order, pacing, and no storage writes", async () => {
+  const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
+  const helper = source.match(/async function geocodeAddresses\([\s\S]*?(?=\nasync function geocodeMissingOrderAddresses)/);
+  const candidates = source.match(/async function geocodeCandidateAddresses\([\s\S]*?(?=\nasync function geocodeWithCensus)/);
+  ok(helper);
+  ok(candidates);
+  ok(helper[0].includes(".slice(0, 250)"));
+  ok(helper[0].includes("await delayMs(1000)"));
+  ok(candidates[0].indexOf("geocodeWithCensus") < candidates[0].indexOf("geocodeWithNominatim"));
+  ok(candidates[0].includes("await delayMs(1000)"));
+  equal(/supabaseFetch|storage\/v1/.test(helper[0]), false);
+  ok(source.includes(".filter(Boolean).slice(0, 8)"));
+});
+
 console.log("Conditional gallery authentication");
 
 async function visibleGallery(body) {
@@ -1134,6 +1349,51 @@ await test("listGalleryPhotos includeHidden false is public", async () => {
   const result = await visibleGallery({ action: "listGalleryPhotos", includeHidden: false });
   assertEmptyVisibleGallery(result);
   equal(result.fetchCalls.length, 6);
+});
+
+await test("gallery preserves configured links, covers, and hidden-only descriptors", async () => {
+  const linkedUrl = "https://supabase.invalid/storage/v1/object/public/gallery/fielding-gloves/linked.jpg";
+  const describedUrl = "https://supabase.invalid/storage/v1/object/public/gallery/fielding-gloves/shop.jpg";
+  const links = [
+    { photo_url: linkedUrl, order_number: "0169", is_cover: true },
+    {
+      photo_url: describedUrl,
+      order_number: null,
+      brand_model: "Wilson A2000",
+      glove_type: "Infield",
+      web_type: "I-web",
+      primary_lace_color: "Black",
+      secondary_lace_color: "Tan"
+    }
+  ];
+  const publicResult = await invoke({
+    body: { action: "listGalleryPhotos" },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse(links);
+      equal(init.method, "POST");
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(publicResult.json.photoLinks, { [linkedUrl]: "0169" });
+  deepEqual(publicResult.json.photoCovers, { [linkedUrl]: true });
+  deepEqual(publicResult.json.photoGloveMeta, {});
+
+  const { owner } = await sessionTokens();
+  const hiddenResult = await invoke({
+    body: { action: "listGalleryPhotos", includeHidden: true, _token: owner },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse(links);
+      equal(init.method, "POST");
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(hiddenResult.json.photoGloveMeta[describedUrl], {
+    brandModel: "Wilson A2000",
+    gloveType: "Infield",
+    webType: "I-web",
+    primaryLaceColor: "Black",
+    secondaryLaceColor: "Tan"
+  });
 });
 
 await test("listGalleryPhotos hidden without token fails before I/O", async () => {
@@ -1540,7 +1800,7 @@ await test("current database role overrides ordinary token role", async () => {
 
 console.log("Action registry and legacy source inventory");
 
-await test("11 registry actions plus 65 legacy actions match the plan", async () => {
+await test("30 registry actions plus 46 legacy actions match the plan", async () => {
   const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
   const plan = fs.readFileSync(new URL("../.docs/V1_2_ACTION_REGISTRY_PLAN.md", import.meta.url), "utf8");
   const dispatcher = source.split("/* =========================\n   RESPONSE HELPERS")[0];
@@ -1566,8 +1826,27 @@ await test("11 registry actions plus 65 legacy actions match the plan", async ()
     "updateUser",
     "deleteUser",
     "getPushPublicKey",
+    "listMessages",
+    "listOrders",
+    "listInventory",
+    "getOrder",
+    "listOrderActivity",
+    "listOrdersWithActivity",
     "webauthnLoginOptions",
-    "webauthnLoginVerify"
+    "webauthnLoginVerify",
+    "listLaborSessions",
+    "listOpenLaborSessions",
+    "listLaborSummary",
+    "geocodeAddresses",
+    "listExpenses",
+    "listServicePricing",
+    "listServicePricingHistory",
+    "getShopSettings",
+    "listSaleGloves",
+    "getSaleGlove",
+    "listSaleGlovePhotos",
+    "searchPublicGloves",
+    "listGalleryPhotos"
   ];
   const expectedDemoPolicies = new Map([
     ["login", "allow"],
@@ -1579,8 +1858,27 @@ await test("11 registry actions plus 65 legacy actions match the plan", async ()
     ["updateUser", "deny"],
     ["deleteUser", "deny"],
     ["getPushPublicKey", "deny"],
+    ["listMessages", "deny"],
+    ["listOrders", "deny"],
+    ["listInventory", "deny"],
+    ["getOrder", "deny"],
+    ["listOrderActivity", "deny"],
+    ["listOrdersWithActivity", "deny"],
     ["webauthnLoginOptions", "allow"],
-    ["webauthnLoginVerify", "allow"]
+    ["webauthnLoginVerify", "allow"],
+    ["listLaborSessions", "deny"],
+    ["listOpenLaborSessions", "deny"],
+    ["listLaborSummary", "deny"],
+    ["geocodeAddresses", "deny"],
+    ["listExpenses", "deny"],
+    ["listServicePricing", "deny"],
+    ["listServicePricingHistory", "deny"],
+    ["getShopSettings", "deny"],
+    ["listSaleGloves", "deny"],
+    ["getSaleGlove", "deny"],
+    ["listSaleGlovePhotos", "deny"],
+    ["searchPublicGloves", "deny"],
+    ["listGalleryPhotos", "deny"]
   ]);
   const registryActionSet = new Set(expectedRegistryActions);
   const plannedLegacyActions = plannedActions.filter(action => !registryActionSet.has(action));
@@ -1590,7 +1888,7 @@ await test("11 registry actions plus 65 legacy actions match the plan", async ()
   }
 
   deepEqual(registryActions, expectedRegistryActions);
-  equal(registryActions.length, 11);
+  equal(registryActions.length, 30);
   equal(
     (dispatcher.match(/return dispatchRegisteredAction\(registeredAction,/g) || []).length,
     1,
@@ -1607,10 +1905,25 @@ await test("11 registry actions plus 65 legacy actions match the plan", async ()
   );
   for (const action of expectedRegistryActions) {
     equal(legacyActions.includes(action), false);
-    const expectedAuth = adminUserActions.includes(action) ? "admin" : "public";
+    const expectedAuth = adminUserActions.includes(action)
+      ? "admin"
+      : [
+          "listMessages", "listOrders", "listInventory", "getOrder",
+          "listOrderActivity", "listOrdersWithActivity", "listLaborSessions",
+          "listOpenLaborSessions", "listLaborSummary", "geocodeAddresses",
+          "listExpenses", "listServicePricing", "listServicePricingHistory",
+          "getShopSettings", "listSaleGloves", "getSaleGlove", "listSaleGlovePhotos"
+        ].includes(action) ? "session" : "public";
+    if (action === "listGalleryPhotos") {
+      ok(
+        /listGalleryPhotos: \{[\s\S]*?body\.includeHidden === true \? "session" : "public"/.test(registryMatch[1]),
+        "listGalleryPhotos retains strict conditional authorization"
+      );
+      continue;
+    }
     ok(
       new RegExp(
-        `^  ${action}: \\{\\n    auth: "${expectedAuth}",\\n    demo: "${expectedDemoPolicies.get(action)}",`,
+        `^  ${action}: \\{[\\s\\S]*?auth: "${expectedAuth}",[\\s\\S]*?demo: "${expectedDemoPolicies.get(action)}",`,
         "m"
       ).test(registryMatch[1]),
       `${action} retains its authorization and demo policy`
@@ -1634,8 +1947,26 @@ await test("11 registry actions plus 65 legacy actions match the plan", async ()
       `${handler} does not revalidate the token`
     );
   }
-  equal(legacyActions.length, 65);
-  equal(new Set(legacyActions).size, 65);
+  for (const handler of [
+    "handleListMessages", "handleListOrders", "handleListInventory", "handleGetOrder",
+    "handleListOrderActivity", "handleListOrdersWithActivity", "handleListLaborSessions",
+    "handleListOpenLaborSessions", "handleListLaborSummary", "handleGeocodeAddresses",
+    "handleListExpenses", "handleListServicePricing", "handleListServicePricingHistory",
+    "handleGetShopSettings", "handleListSaleGloves", "handleGetSaleGlove",
+    "handleListSaleGlovePhotos", "handleSearchPublicGloves", "handleListGalleryPhotos"
+  ]) {
+    const handlerSource = source.match(
+      new RegExp(`async function ${handler}\\([\\s\\S]*?(?=\\nasync function )`)
+    );
+    ok(handlerSource, `${handler} is present`);
+    equal(
+      /validateTokenFromBody|body(?:\._token|\["_token"\]|\['_token'\])/.test(handlerSource[0]),
+      false,
+      `${handler} relies on centralized authorization`
+    );
+  }
+  equal(legacyActions.length, 46);
+  equal(new Set(legacyActions).size, 46);
   equal(plannedActions.length, 76);
   deepEqual(legacyActions, plannedLegacyActions);
   deepEqual([...legacyCounts.entries()].filter(([, count]) => count !== 1), []);

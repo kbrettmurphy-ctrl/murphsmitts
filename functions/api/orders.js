@@ -98,6 +98,30 @@ const ACTIONS = {
       optional: ["VAPID_PUBLIC_KEY"]
     }
   },
+  listMessages: {
+    auth: "session", demo: "deny", handler: handleListMessages,
+    effects: ["db:sms_messages:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listOrders: {
+    auth: "session", demo: "deny", handler: handleListOrders,
+    effects: ["db:orders:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listInventory: {
+    auth: "session", demo: "deny", handler: handleListInventory,
+    effects: ["db:lace_inventory:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  getOrder: {
+    auth: "session", demo: "deny", handler: handleGetOrder,
+    effects: ["db:orders:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listOrderActivity: {
+    auth: "session", demo: "deny", handler: handleListOrderActivity,
+    effects: ["db:order_activity:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listOrdersWithActivity: {
+    auth: "session", demo: "deny", handler: handleListOrdersWithActivity,
+    effects: ["db:order_activity:read"], bindings: { required: ["CORE"], optional: [] }
+  },
   webauthnLoginOptions: {
     auth: "public",
     demo: "allow",
@@ -117,6 +141,61 @@ const ACTIONS = {
       required: ["CORE"],
       optional: ["WEBAUTHN_ORIGIN", "WEBAUTHN_RP_ID"]
     }
+  },
+  listLaborSessions: {
+    auth: "session", demo: "deny", handler: handleListLaborSessions,
+    effects: ["db:order_labor_sessions:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listOpenLaborSessions: {
+    auth: "session", demo: "deny", handler: handleListOpenLaborSessions,
+    effects: ["db:order_labor_sessions:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listLaborSummary: {
+    auth: "session", demo: "deny", handler: handleListLaborSummary,
+    effects: ["db:order_labor_sessions:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  geocodeAddresses: {
+    auth: "session", demo: "deny", handler: handleGeocodeAddresses,
+    effects: ["external:geocoding:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listExpenses: {
+    auth: "session", demo: "deny", handler: handleListExpenses,
+    effects: ["db:shop_expenses:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listServicePricing: {
+    auth: "session", demo: "deny", handler: handleListServicePricing,
+    effects: ["db:service_pricing:read", "db:service_pricing_revisions:read", "db:service_job_types:read", "db:shop_settings:read"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  listServicePricingHistory: {
+    auth: "session", demo: "deny", handler: handleListServicePricingHistory,
+    effects: ["db:service_pricing_revisions:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  getShopSettings: {
+    auth: "session", demo: "deny", handler: handleGetShopSettings,
+    effects: ["db:shop_settings:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listSaleGloves: {
+    auth: "session", demo: "deny", handler: handleListSaleGloves,
+    effects: ["db:gloves_for_sale:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  getSaleGlove: {
+    auth: "session", demo: "deny", handler: handleGetSaleGlove,
+    effects: ["db:gloves_for_sale:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listSaleGlovePhotos: {
+    auth: "session", demo: "deny", handler: handleListSaleGlovePhotos,
+    effects: ["db:glove_sale_photos:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  searchPublicGloves: {
+    auth: "public", demo: "deny", handler: handleSearchPublicGloves,
+    effects: ["db:gallery_photo_links:read", "db:orders:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listGalleryPhotos: {
+    auth: ({ body }) => body.includeHidden === true ? "session" : "public",
+    demo: "deny", handler: handleListGalleryPhotos,
+    effects: ["db:gallery_photo_links:read", "storage:gallery:list"],
+    bindings: { required: ["CORE"], optional: [] }
   }
 };
 
@@ -316,17 +395,6 @@ export async function onRequest(context) {
       return json({ ok: true }, 200, jsonHeaders);
     }
 
-    if (action === "listMessages") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const resp = await supabaseFetch(
-        env,
-        `/rest/v1/sms_messages?select=*&order=created_at.desc&limit=300`
-      );
-      if (!resp.ok) return json({ ok: false, error: "Could not load messages." }, 200, jsonHeaders);
-      return json({ ok: true, messages: (resp.data || []).map(mapSmsMessage) }, 200, jsonHeaders);
-    }
-
     if (action === "markMessagesRead") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) return json(auth, 200, jsonHeaders);
@@ -431,72 +499,6 @@ export async function onRequest(context) {
       return json({ ok: true }, 200, jsonHeaders);
     }
 
-    if (action === "listOrders") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const supa = await supabaseFetch(
-        env,
-        `/rest/v1/orders?select=*&order=order_number.desc`
-      );
-
-      if (!supa.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to load orders from Supabase.",
-            details: supa.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          orders: (supa.data || []).map(mapOrderFromDb)
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "listInventory") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const supa = await supabaseFetch(
-        env,
-        `/rest/v1/lace_inventory?select=*&order=color.asc`
-      );
-
-      if (!supa.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to load lace inventory from Supabase.",
-            details: supa.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          inventory: supa.data || []
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
     if (action === "createInventoryItem") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -515,95 +517,6 @@ export async function onRequest(context) {
 
       const result = await updateInventoryItem(env, body);
       return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "getOrder") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const orderNumber = String(body.orderNumber || "").trim();
-      if (!orderNumber) {
-        return json(
-          {
-            ok: false,
-            error: "Missing orderNumber."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const existing = await fetchOrderByNumber(env, orderNumber);
-      if (!existing.ok || !existing.data) {
-        return json(
-          {
-            ok: false,
-            error: "Order not found."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          order: mapOrderFromDb(existing.data)
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "listOrderActivity") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const orderNumber = cleanText(body.orderNumber);
-      if (!orderNumber) {
-        return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
-      }
-
-      const result = await listOrderActivity(env, orderNumber);
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Activity could not be loaded.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, activity: result.activity }, 200, jsonHeaders);
-    }
-
-    if (action === "listOrdersWithActivity") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await listOrdersWithActivity(env);
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Activity index could not be loaded.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, orderNumbers: result.orderNumbers }, 200, jsonHeaders);
     }
 
     if (action === "webauthnRegisterOptions") {
@@ -715,33 +628,6 @@ export async function onRequest(context) {
       return json({ ok: true }, 200, jsonHeaders);
     }
 
-    if (action === "listLaborSessions") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const orderNumber = cleanText(body.orderNumber);
-      if (!orderNumber) {
-        return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
-      }
-
-      const result = await listLaborSessions(env, orderNumber);
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Labor sessions could not be loaded.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, sessions: result.sessions }, 200, jsonHeaders);
-    }
-
     if (action === "startLaborSession") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -808,54 +694,6 @@ export async function onRequest(context) {
       }
 
       return json({ ok: true, session: result.session }, 200, jsonHeaders);
-    }
-
-    if (action === "listOpenLaborSessions") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await fetchOpenLaborSessions(env);
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Open labor sessions could not be loaded.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        { ok: true, sessions: result.data.map(mapLaborSessionFromDb) },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "listLaborSummary") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await fetchLaborSummary(env);
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Labor summary could not be loaded.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, sessions: result.sessions }, 200, jsonHeaders);
     }
 
     if (action === "pauseLaborSession") {
@@ -1309,25 +1147,6 @@ export async function onRequest(context) {
       );
     }
 
-    if (action === "geocodeAddresses") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const items = Array.isArray(body.items) ? body.items : [];
-      const results = await geocodeAddresses(items);
-
-      return json(
-        {
-          ok: true,
-          results
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
     if (action === "geocodeMissingOrderAddresses") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) {
@@ -1410,25 +1229,6 @@ export async function onRequest(context) {
       );
     }
 
-    if (action === "listExpenses") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const resp = await supabaseFetch(env, `/rest/v1/shop_expenses?select=*&order=expense_date.desc,created_at.desc&limit=500`);
-      if (!resp.ok) return json({ ok: false, error: "Expenses could not be loaded." }, 200, jsonHeaders);
-      return json({
-        ok: true,
-        expenses: (resp.data || []).map(row => ({
-          id: row.id,
-          expenseDate: row.expense_date,
-          category: row.category,
-          description: row.description,
-          amount: row.amount != null ? Number(row.amount) : 0,
-          quantity: row.quantity != null ? Number(row.quantity) : null,
-          unitKind: row.unit_kind
-        }))
-      }, 200, jsonHeaders);
-    }
-
     if (action === "createExpense") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) return json(auth, 200, jsonHeaders);
@@ -1473,55 +1273,6 @@ export async function onRequest(context) {
        only ever writes a draft revision; publishing copies the draft into the
        live row and turns that revision into an immutable history record.
     ========================= */
-    if (action === "listServicePricing") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const rowsResp = await supabaseFetch(env, `/rest/v1/service_pricing?select=*&order=category.asc,sort_order.asc`);
-      if (!rowsResp.ok) return json({ ok: false, error: "Pricing could not be loaded." }, 200, jsonHeaders);
-      const rows = Array.isArray(rowsResp.data) ? rowsResp.data : [];
-
-      const draftsResp = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?select=*&status=eq.draft`);
-      const drafts = draftsResp.ok && Array.isArray(draftsResp.data) ? draftsResp.data : [];
-      const draftByService = {};
-      drafts.forEach((d) => { draftByService[String(d.service_pricing_id)] = d; });
-
-      const jobTypesResp = await supabaseFetch(env, `/rest/v1/service_pricing_job_types?select=*`);
-      const jobTypes = jobTypesResp.ok && Array.isArray(jobTypesResp.data) ? jobTypesResp.data : [];
-      const mappingsByService = {};
-      jobTypes.forEach((j) => {
-        const key = String(j.service_pricing_id);
-        (mappingsByService[key] = mappingsByService[key] || []).push({
-          gloveType: j.glove_type || null,
-          services: j.services || null,
-          trapeze: j.trapeze === true
-        });
-      });
-
-      const services = rows.map((row) => {
-        const service = mapServicePricingRow(row);
-        service.analyticsMappings = mappingsByService[String(row.id)] || [];
-        const draftRow = draftByService[String(row.id)];
-        if (draftRow && draftRow.data && typeof draftRow.data === "object") {
-          const data = draftRow.data;
-          service.draft = {
-            revisionId: draftRow.id,
-            note: draftRow.note || "",
-            display: formatServiceDisplayPrice(data),
-            fields: mapPricingSnapshotToClient(data),
-            differs: pricingSnapshotsDiffer(liveSnapshotFromRow(row), data),
-            createdAt: draftRow.created_at
-          };
-        } else {
-          service.draft = null;
-        }
-        return service;
-      });
-
-      const settings = await fetchShopSettings(env);
-      return json({ ok: true, services, settings }, 200, jsonHeaders);
-    }
-
     if (action === "saveServicePricingDraft") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) return json(auth, 200, jsonHeaders);
@@ -1633,26 +1384,6 @@ export async function onRequest(context) {
       }, 200, jsonHeaders);
     }
 
-    if (action === "listServicePricingHistory") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const key = cleanText(body.serviceKey);
-      let path = `/rest/v1/service_pricing_revisions?select=*&status=eq.published&order=published_at.desc&limit=200`;
-      if (key) path += `&service_key=eq.${encodeURIComponent(key)}`;
-      const resp = await supabaseFetch(env, path);
-      if (!resp.ok) return json({ ok: false, error: "History could not be loaded." }, 200, jsonHeaders);
-      const history = (resp.data || []).map((r) => ({
-        id: r.id,
-        serviceKey: r.service_key,
-        previousDisplay: r.previous_display || "",
-        newDisplay: r.new_display || "",
-        note: r.note || "",
-        publishedAt: r.published_at,
-        fields: r.data && typeof r.data === "object" ? mapPricingSnapshotToClient(r.data) : null
-      }));
-      return json({ ok: true, history }, 200, jsonHeaders);
-    }
-
     if (action === "restoreServicePricingRevision") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) return json(auth, 200, jsonHeaders);
@@ -1733,13 +1464,6 @@ export async function onRequest(context) {
       if (!insert.ok) return json({ ok: false, error: "Service could not be created." }, 200, jsonHeaders);
       const created = Array.isArray(insert.data) ? insert.data[0] : null;
       return json({ ok: true, service: created ? mapServicePricingRow(created) : null }, 200, jsonHeaders);
-    }
-
-    if (action === "getShopSettings") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const settings = await fetchShopSettings(env);
-      return json({ ok: true, settings }, 200, jsonHeaders);
     }
 
     if (action === "saveShopSettings") {
@@ -1912,98 +1636,6 @@ export async function onRequest(context) {
         {
           ok: true,
           photo: result.photo || null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "listSaleGloves") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const supa = await supabaseFetch(
-        env,
-        `/rest/v1/gloves_for_sale?select=*&order=sort_order.asc,created_at.desc`
-      );
-
-      if (!supa.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to load gloves for sale from Supabase.",
-            details: supa.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          gloves: (supa.data || []).map(mapSaleGloveFromDb)
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "getSaleGlove") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const id = cleanText(body.id);
-
-      if (!id) {
-        return json(
-          {
-            ok: false,
-            error: "Missing glove id."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const supa = await supabaseFetch(
-        env,
-        `/rest/v1/gloves_for_sale?select=*&id=eq.${encodeURIComponent(id)}&limit=1`
-      );
-
-      if (!supa.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to load glove listing.",
-            details: supa.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const row = Array.isArray(supa.data) ? supa.data[0] : null;
-
-      if (!row) {
-        return json(
-          {
-            ok: false,
-            error: "Glove listing not found."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          glove: mapSaleGloveFromDb(row)
         },
         200,
         jsonHeaders
@@ -2329,53 +1961,6 @@ export async function onRequest(context) {
       );
     }
 
-    if (action === "listSaleGlovePhotos") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const gloveId = cleanText(body.gloveId);
-
-      if (!gloveId) {
-        return json(
-          {
-            ok: false,
-            error: "Missing glove id."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const photos = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?glove_id=eq.${encodeURIComponent(gloveId)}&select=*&order=sort_order.asc,id.asc`
-      );
-
-      if (!photos.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to load glove photos.",
-            details: photos.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          photos: photos.data || []
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
     if (action === "setSalePhotoPrimary") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
 
@@ -2597,177 +2182,6 @@ export async function onRequest(context) {
       );
     }
 
-    if (action === "searchPublicGloves") {
-      /* Public glove search for the website gallery. Returns ONLY glove
-         fields + photos — never customer name/contact/address. */
-      const q = String(body.q || "").trim().toLowerCase();
-      if (q.length < 2) return json({ ok: true, gloves: [] }, 200, jsonHeaders);
-
-      const terms = q.split(/\s+/).filter(Boolean);
-      const gloves = [];
-
-      /* Source: curated gallery photos, either linked to an order (searchable
-         via the order's fields) or carrying their own shop-glove descriptors. */
-      const links = await supabaseFetch(
-        env,
-        `/rest/v1/gallery_photo_links?select=photo_url,order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
-      );
-      const linkRows = (links.ok && Array.isArray(links.data)) ? links.data : [];
-
-      const byOrder = new Map();
-      /* Shop gloves described directly on the photo link. No grouping: two
-         distinct gloves can share identical descriptors, so every described
-         photo is its own result. */
-      for (const l of linkRows) {
-        if (l.order_number) {
-          if (!byOrder.has(l.order_number)) byOrder.set(l.order_number, []);
-          byOrder.get(l.order_number).push(l.photo_url);
-          continue;
-        }
-        const fields = [l.brand_model, l.glove_type, l.web_type, l.primary_lace_color, l.secondary_lace_color];
-        if (!fields.some(Boolean)) continue;
-        if (gloves.length >= 24) continue;
-        const hay = fields.map(v => String(v || "").toLowerCase()).join(" ");
-        if (!terms.every(t => hay.includes(t))) continue;
-        gloves.push({
-          brandModel: l.brand_model || "",
-          gloveType: l.glove_type || "",
-          webType: l.web_type || "",
-          laceColors: [l.primary_lace_color, l.secondary_lace_color].filter(Boolean),
-          photos: [l.photo_url]
-        });
-      }
-
-      if (byOrder.size && gloves.length < 24) {
-        const nums = [...byOrder.keys()].map(n => `"${String(n).replace(/"/g, "")}"`).join(",");
-        const ordersResp = await supabaseFetch(
-          env,
-          `/rest/v1/orders?select=order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color,custom_color_request,services_requested&order_number=in.(${encodeURIComponent(nums)})`
-        );
-        for (const row of (ordersResp.ok && Array.isArray(ordersResp.data)) ? ordersResp.data : []) {
-          const hay = [
-            row.brand_model, row.glove_type, row.web_type,
-            row.primary_lace_color, row.secondary_lace_color,
-            row.custom_color_request, row.services_requested
-          ].map(v => String(v || "").toLowerCase()).join(" ");
-          if (!terms.every(t => hay.includes(t))) continue;
-          gloves.push({
-            brandModel: row.brand_model || "",
-            gloveType: row.glove_type || "",
-            webType: row.web_type || "",
-            laceColors: [row.primary_lace_color, row.secondary_lace_color].filter(Boolean),
-            photos: (byOrder.get(row.order_number) || []).slice(0, 4)
-          });
-          if (gloves.length >= 24) break;
-        }
-      }
-
-      /* Curated linked gallery photos only — customer intake/SMS photos
-         (orders.glove_photos) must never appear in public search results. */
-      return json({ ok: true, gloves, source: "gallery" }, 200, jsonHeaders);
-    }
-
-    if (action === "listGalleryPhotos") {
-      const includeHidden = body.includeHidden === true;
-
-      if (includeHidden) {
-        const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-        if (!auth.ok) {
-          return json(auth, 200, jsonHeaders);
-        }
-      }
-
-      const sections = [
-        "fielding-gloves",
-        "catchers-mitts",
-        "first-base-mitts",
-        "custom-color-relaces",
-        "vintage"
-      ];
-
-      const gallery = {};
-      const hiddenGallery = {};
-
-      /* photoLinks (photo -> order number) ships publicly so the gallery can
-         group a glove's photos into one album; descriptors stay admin-only. */
-      let photoLinks = {};
-      let photoCovers = {};
-      let photoGloveMeta = {};
-      {
-        const links = await supabaseFetch(
-          env,
-          `/rest/v1/gallery_photo_links?select=photo_url,order_number,is_cover,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
-        );
-        if (links.ok && Array.isArray(links.data)) {
-          for (const l of links.data) {
-            if (l.is_cover) photoCovers[l.photo_url] = true;
-            if (l.order_number) {
-              photoLinks[l.photo_url] = l.order_number;
-              continue;
-            }
-            if (includeHidden) {
-              photoGloveMeta[l.photo_url] = {
-                brandModel: l.brand_model || "",
-                gloveType: l.glove_type || "",
-                webType: l.web_type || "",
-                primaryLaceColor: l.primary_lace_color || "",
-                secondaryLaceColor: l.secondary_lace_color || ""
-              };
-            }
-          }
-        }
-      }
-
-      for (const section of sections) {
-        const listed = await listGallerySection(env, section);
-
-        if (!listed.ok) {
-          return json(
-            {
-              ok: false,
-              error: `Failed to load gallery section: ${section}`,
-              details: listed.error
-            },
-            200,
-            jsonHeaders
-          );
-        }
-
-        gallery[section] = listed.photos;
-
-        if (includeHidden) {
-          const hidden = await listGallerySection(env, section, { hidden: true });
-
-          if (!hidden.ok) {
-            return json(
-              {
-                ok: false,
-                error: `Failed to load hidden gallery section: ${section}`,
-                details: hidden.error
-              },
-              200,
-              jsonHeaders
-            );
-          }
-
-          hiddenGallery[section] = hidden.photos;
-        }
-      }
-
-      return json(
-        {
-          ok: true,
-          gallery,
-          photoLinks,
-          photoCovers,
-          photoGloveMeta,
-          hiddenGallery
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
     return json(
       {
         ok: false,
@@ -2786,6 +2200,380 @@ export async function onRequest(context) {
       jsonHeaders
     );
   }
+}
+
+async function handleListMessages({ env, jsonHeaders }) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/sms_messages?select=*&order=created_at.desc&limit=300`
+  );
+  if (!resp.ok) return json({ ok: false, error: "Could not load messages." }, 200, jsonHeaders);
+  return json({ ok: true, messages: (resp.data || []).map(mapSmsMessage) }, 200, jsonHeaders);
+}
+
+async function handleListOrders({ env, jsonHeaders }) {
+  const supa = await supabaseFetch(env, `/rest/v1/orders?select=*&order=order_number.desc`);
+  if (!supa.ok) {
+    return json({
+      ok: false,
+      error: "Failed to load orders from Supabase.",
+      details: supa.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, orders: (supa.data || []).map(mapOrderFromDb) }, 200, jsonHeaders);
+}
+
+async function handleListInventory({ env, jsonHeaders }) {
+  const supa = await supabaseFetch(env, `/rest/v1/lace_inventory?select=*&order=color.asc`);
+  if (!supa.ok) {
+    return json({
+      ok: false,
+      error: "Failed to load lace inventory from Supabase.",
+      details: supa.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, inventory: supa.data || [] }, 200, jsonHeaders);
+}
+
+async function handleGetOrder({ env, body, jsonHeaders }) {
+  const orderNumber = String(body.orderNumber || "").trim();
+  if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+  const existing = await fetchOrderByNumber(env, orderNumber);
+  if (!existing.ok || !existing.data) {
+    return json({ ok: false, error: "Order not found." }, 200, jsonHeaders);
+  }
+  return json({ ok: true, order: mapOrderFromDb(existing.data) }, 200, jsonHeaders);
+}
+
+async function handleListOrderActivity({ env, body, jsonHeaders }) {
+  const orderNumber = cleanText(body.orderNumber);
+  if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+  const result = await listOrderActivity(env, orderNumber);
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Activity could not be loaded.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, activity: result.activity }, 200, jsonHeaders);
+}
+
+async function handleListOrdersWithActivity({ env, jsonHeaders }) {
+  const result = await listOrdersWithActivity(env);
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Activity index could not be loaded.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, orderNumbers: result.orderNumbers }, 200, jsonHeaders);
+}
+
+async function handleListLaborSessions({ env, body, jsonHeaders }) {
+  const orderNumber = cleanText(body.orderNumber);
+  if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+  const result = await listLaborSessions(env, orderNumber);
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Labor sessions could not be loaded.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, sessions: result.sessions }, 200, jsonHeaders);
+}
+
+async function handleListOpenLaborSessions({ env, jsonHeaders }) {
+  const result = await fetchOpenLaborSessions(env);
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Open labor sessions could not be loaded.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, sessions: result.data.map(mapLaborSessionFromDb) }, 200, jsonHeaders);
+}
+
+async function handleListLaborSummary({ env, jsonHeaders }) {
+  const result = await fetchLaborSummary(env);
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Labor summary could not be loaded.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, sessions: result.sessions }, 200, jsonHeaders);
+}
+
+async function handleGeocodeAddresses({ body, jsonHeaders }) {
+  const items = Array.isArray(body.items) ? body.items : [];
+  const results = await geocodeAddresses(items);
+  return json({ ok: true, results }, 200, jsonHeaders);
+}
+
+async function handleListExpenses({ env, jsonHeaders }) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/shop_expenses?select=*&order=expense_date.desc,created_at.desc&limit=500`
+  );
+  if (!resp.ok) return json({ ok: false, error: "Expenses could not be loaded." }, 200, jsonHeaders);
+  return json({
+    ok: true,
+    expenses: (resp.data || []).map(row => ({
+      id: row.id,
+      expenseDate: row.expense_date,
+      category: row.category,
+      description: row.description,
+      amount: row.amount != null ? Number(row.amount) : 0,
+      quantity: row.quantity != null ? Number(row.quantity) : null,
+      unitKind: row.unit_kind
+    }))
+  }, 200, jsonHeaders);
+}
+
+async function handleListServicePricing({ env, jsonHeaders }) {
+  const rowsResp = await supabaseFetch(env, `/rest/v1/service_pricing?select=*&order=category.asc,sort_order.asc`);
+  if (!rowsResp.ok) return json({ ok: false, error: "Pricing could not be loaded." }, 200, jsonHeaders);
+  const rows = Array.isArray(rowsResp.data) ? rowsResp.data : [];
+  const draftsResp = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?select=*&status=eq.draft`);
+  const drafts = draftsResp.ok && Array.isArray(draftsResp.data) ? draftsResp.data : [];
+  const draftByService = {};
+  drafts.forEach((d) => { draftByService[String(d.service_pricing_id)] = d; });
+  const jobTypesResp = await supabaseFetch(env, `/rest/v1/service_pricing_job_types?select=*`);
+  const jobTypes = jobTypesResp.ok && Array.isArray(jobTypesResp.data) ? jobTypesResp.data : [];
+  const mappingsByService = {};
+  jobTypes.forEach((j) => {
+    const key = String(j.service_pricing_id);
+    (mappingsByService[key] = mappingsByService[key] || []).push({
+      gloveType: j.glove_type || null,
+      services: j.services || null,
+      trapeze: j.trapeze === true
+    });
+  });
+  const services = rows.map((row) => {
+    const service = mapServicePricingRow(row);
+    service.analyticsMappings = mappingsByService[String(row.id)] || [];
+    const draftRow = draftByService[String(row.id)];
+    if (draftRow && draftRow.data && typeof draftRow.data === "object") {
+      const data = draftRow.data;
+      service.draft = {
+        revisionId: draftRow.id,
+        note: draftRow.note || "",
+        display: formatServiceDisplayPrice(data),
+        fields: mapPricingSnapshotToClient(data),
+        differs: pricingSnapshotsDiffer(liveSnapshotFromRow(row), data),
+        createdAt: draftRow.created_at
+      };
+    } else {
+      service.draft = null;
+    }
+    return service;
+  });
+  const settings = await fetchShopSettings(env);
+  return json({ ok: true, services, settings }, 200, jsonHeaders);
+}
+
+async function handleListServicePricingHistory({ env, body, jsonHeaders }) {
+  const key = cleanText(body.serviceKey);
+  let path = `/rest/v1/service_pricing_revisions?select=*&status=eq.published&order=published_at.desc&limit=200`;
+  if (key) path += `&service_key=eq.${encodeURIComponent(key)}`;
+  const resp = await supabaseFetch(env, path);
+  if (!resp.ok) return json({ ok: false, error: "History could not be loaded." }, 200, jsonHeaders);
+  const history = (resp.data || []).map((r) => ({
+    id: r.id,
+    serviceKey: r.service_key,
+    previousDisplay: r.previous_display || "",
+    newDisplay: r.new_display || "",
+    note: r.note || "",
+    publishedAt: r.published_at,
+    fields: r.data && typeof r.data === "object" ? mapPricingSnapshotToClient(r.data) : null
+  }));
+  return json({ ok: true, history }, 200, jsonHeaders);
+}
+
+async function handleGetShopSettings({ env, jsonHeaders }) {
+  const settings = await fetchShopSettings(env);
+  return json({ ok: true, settings }, 200, jsonHeaders);
+}
+
+async function handleListSaleGloves({ env, jsonHeaders }) {
+  const supa = await supabaseFetch(env, `/rest/v1/gloves_for_sale?select=*&order=sort_order.asc,created_at.desc`);
+  if (!supa.ok) {
+    return json({
+      ok: false,
+      error: "Failed to load gloves for sale from Supabase.",
+      details: supa.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, gloves: (supa.data || []).map(mapSaleGloveFromDb) }, 200, jsonHeaders);
+}
+
+async function handleGetSaleGlove({ env, body, jsonHeaders }) {
+  const id = cleanText(body.id);
+  if (!id) return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
+  const supa = await supabaseFetch(
+    env,
+    `/rest/v1/gloves_for_sale?select=*&id=eq.${encodeURIComponent(id)}&limit=1`
+  );
+  if (!supa.ok) {
+    return json({
+      ok: false,
+      error: "Failed to load glove listing.",
+      details: supa.error
+    }, 200, jsonHeaders);
+  }
+  const row = Array.isArray(supa.data) ? supa.data[0] : null;
+  if (!row) return json({ ok: false, error: "Glove listing not found." }, 200, jsonHeaders);
+  return json({ ok: true, glove: mapSaleGloveFromDb(row) }, 200, jsonHeaders);
+}
+
+async function handleListSaleGlovePhotos({ env, body, jsonHeaders }) {
+  const gloveId = cleanText(body.gloveId);
+  if (!gloveId) return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
+  const photos = await supabaseFetch(
+    env,
+    `/rest/v1/glove_sale_photos?glove_id=eq.${encodeURIComponent(gloveId)}&select=*&order=sort_order.asc,id.asc`
+  );
+  if (!photos.ok) {
+    return json({
+      ok: false,
+      error: "Failed to load glove photos.",
+      details: photos.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, photos: photos.data || [] }, 200, jsonHeaders);
+}
+
+async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
+  /* Public glove search returns only glove fields and curated gallery photos,
+     never customer name, contact, address, or intake photos. */
+  const q = String(body.q || "").trim().toLowerCase();
+  if (q.length < 2) return json({ ok: true, gloves: [] }, 200, jsonHeaders);
+  const terms = q.split(/\s+/).filter(Boolean);
+  const gloves = [];
+  const links = await supabaseFetch(
+    env,
+    `/rest/v1/gallery_photo_links?select=photo_url,order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
+  );
+  const linkRows = (links.ok && Array.isArray(links.data)) ? links.data : [];
+  const byOrder = new Map();
+  for (const l of linkRows) {
+    if (l.order_number) {
+      if (!byOrder.has(l.order_number)) byOrder.set(l.order_number, []);
+      byOrder.get(l.order_number).push(l.photo_url);
+      continue;
+    }
+    const fields = [l.brand_model, l.glove_type, l.web_type, l.primary_lace_color, l.secondary_lace_color];
+    if (!fields.some(Boolean)) continue;
+    if (gloves.length >= 24) continue;
+    const hay = fields.map(v => String(v || "").toLowerCase()).join(" ");
+    if (!terms.every(t => hay.includes(t))) continue;
+    gloves.push({
+      brandModel: l.brand_model || "",
+      gloveType: l.glove_type || "",
+      webType: l.web_type || "",
+      laceColors: [l.primary_lace_color, l.secondary_lace_color].filter(Boolean),
+      photos: [l.photo_url]
+    });
+  }
+  if (byOrder.size && gloves.length < 24) {
+    const nums = [...byOrder.keys()].map(n => `"${String(n).replace(/"/g, "")}"`).join(",");
+    const ordersResp = await supabaseFetch(
+      env,
+      `/rest/v1/orders?select=order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color,custom_color_request,services_requested&order_number=in.(${encodeURIComponent(nums)})`
+    );
+    for (const row of (ordersResp.ok && Array.isArray(ordersResp.data)) ? ordersResp.data : []) {
+      const hay = [
+        row.brand_model, row.glove_type, row.web_type,
+        row.primary_lace_color, row.secondary_lace_color,
+        row.custom_color_request, row.services_requested
+      ].map(v => String(v || "").toLowerCase()).join(" ");
+      if (!terms.every(t => hay.includes(t))) continue;
+      gloves.push({
+        brandModel: row.brand_model || "",
+        gloveType: row.glove_type || "",
+        webType: row.web_type || "",
+        laceColors: [row.primary_lace_color, row.secondary_lace_color].filter(Boolean),
+        photos: (byOrder.get(row.order_number) || []).slice(0, 4)
+      });
+      if (gloves.length >= 24) break;
+    }
+  }
+  return json({ ok: true, gloves, source: "gallery" }, 200, jsonHeaders);
+}
+
+async function handleListGalleryPhotos({ env, body, jsonHeaders }) {
+  const includeHidden = body.includeHidden === true;
+  const sections = [
+    "fielding-gloves",
+    "catchers-mitts",
+    "first-base-mitts",
+    "custom-color-relaces",
+    "vintage"
+  ];
+  const gallery = {};
+  const hiddenGallery = {};
+  let photoLinks = {};
+  let photoCovers = {};
+  let photoGloveMeta = {};
+  {
+    const links = await supabaseFetch(
+      env,
+      `/rest/v1/gallery_photo_links?select=photo_url,order_number,is_cover,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
+    );
+    if (links.ok && Array.isArray(links.data)) {
+      for (const l of links.data) {
+        if (l.is_cover) photoCovers[l.photo_url] = true;
+        if (l.order_number) {
+          photoLinks[l.photo_url] = l.order_number;
+          continue;
+        }
+        if (includeHidden) {
+          photoGloveMeta[l.photo_url] = {
+            brandModel: l.brand_model || "",
+            gloveType: l.glove_type || "",
+            webType: l.web_type || "",
+            primaryLaceColor: l.primary_lace_color || "",
+            secondaryLaceColor: l.secondary_lace_color || ""
+          };
+        }
+      }
+    }
+  }
+  for (const section of sections) {
+    const listed = await listGallerySection(env, section);
+    if (!listed.ok) {
+      return json({
+        ok: false,
+        error: `Failed to load gallery section: ${section}`,
+        details: listed.error
+      }, 200, jsonHeaders);
+    }
+    gallery[section] = listed.photos;
+    if (includeHidden) {
+      const hidden = await listGallerySection(env, section, { hidden: true });
+      if (!hidden.ok) {
+        return json({
+          ok: false,
+          error: `Failed to load hidden gallery section: ${section}`,
+          details: hidden.error
+        }, 200, jsonHeaders);
+      }
+      hiddenGallery[section] = hidden.photos;
+    }
+  }
+  return json({
+    ok: true,
+    gallery,
+    photoLinks,
+    photoCovers,
+    photoGloveMeta,
+    hiddenGallery
+  }, 200, jsonHeaders);
 }
 
 async function handleLogin({ env, body, jsonHeaders }) {
