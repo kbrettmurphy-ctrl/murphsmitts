@@ -1760,6 +1760,80 @@ async function endActiveBenchWork({ switchToOrder = "" } = {}) {
   }
 }
 
+async function resolveBenchInterval(bench, resolution) {
+  if (!bench || benchFocusBusy) return;
+  let phase = "";
+  if (resolution === "labor_recorded") {
+    phase = await chooseBenchLaborPhase("Assign Bench Work time");
+    if (!phase) return;
+  } else {
+    const confirmed = await openBenchChoiceSheet({
+      title: "Discard Bench Work time?",
+      message: "This interval will remain in history but will not count as labor.",
+      actions: [{ label: "Discard", value: "discard", danger: true }, { label: "Cancel", value: "" }]
+    });
+    if (confirmed !== "discard") return;
+  }
+  benchFocusBusy = true;
+  try {
+    await postJson({ action: "resolveBenchWork", benchSessionId: bench.id, resolution, phase }, true);
+    broadcastBenchFocusChange();
+    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+    if (activeView === "dashboard") renderHomeDashboard();
+  } catch (error) {
+    alert(error.message || "Bench Work could not be resolved.");
+    await refreshBenchFocusState();
+  } finally {
+    benchFocusBusy = false;
+  }
+}
+
+async function openImmediateBenchResolution(bench) {
+  const choice = await openBenchChoiceSheet({
+    title: "Bench Work ended without labor.",
+    message: `#${bench.orderNumber} · ${formatBenchElapsed(bench.startedAt, bench.endedAt)}`,
+    actions: [
+      { label: "Assign Time", value: "labor_recorded" },
+      { label: "Discard", value: "discarded", danger: true },
+      { label: "Resolve Later", value: "" }
+    ]
+  });
+  if (choice) resolveBenchInterval(bench, choice);
+}
+
+function openUnresolvedBenchList() {
+  closeBenchChoiceSheet();
+  const sheet = document.createElement("div");
+  sheet.className = "bench-choice-sheet bench-unresolved-sheet";
+  sheet.innerHTML = `<div class="bench-choice-panel" role="dialog" aria-modal="false">
+    <div class="bench-choice-title">Bench Work time to review</div>
+    <div class="bench-unresolved-list">${benchFocusState.unresolved.map(bench => {
+      const order = allOrders.find(item => String(item.orderNumber) === String(bench.orderNumber)) || {};
+      return `<article class="bench-unresolved-row">
+        <div><strong>#${escapeHtml(bench.orderNumber)} · ${escapeHtml(order.customerName || "Customer")}</strong>
+        <span>${escapeHtml(formatLaborDateTime(bench.startedAt))} – ${escapeHtml(formatLaborDateTime(bench.endedAt))}</span>
+        <span>${escapeHtml(formatBenchElapsed(bench.startedAt, bench.endedAt))}</span></div>
+        <div class="bench-unresolved-actions">
+          <button type="button" data-unresolved-assign="${escapeAttr(bench.id)}">Assign</button>
+          <button type="button" class="is-danger" data-unresolved-discard="${escapeAttr(bench.id)}">Discard</button>
+        </div>
+      </article>`;
+    }).join("")}</div>
+    <div class="bench-choice-actions"><button type="button" data-unresolved-close>Close</button></div>
+  </div>`;
+  sheet.addEventListener("click", event => {
+    if (event.target.closest("[data-unresolved-close]")) return sheet.remove();
+    const assign = event.target.closest("[data-unresolved-assign]");
+    const discard = event.target.closest("[data-unresolved-discard]");
+    const id = assign?.dataset.unresolvedAssign || discard?.dataset.unresolvedDiscard;
+    if (!id) return;
+    const bench = benchFocusState.unresolved.find(item => item.id === id);
+    sheet.remove();
+    resolveBenchInterval(bench, assign ? "labor_recorded" : "discarded");
+  });
+  document.body.appendChild(sheet);
+}
+
 async function startBenchWorkFromDashboard(orderNumber, options = {}) {
   if (benchFocusBusy) return;
   benchFocusBusy = true;
@@ -2454,6 +2528,11 @@ function wireHomeDashboardActions() {
 
     if (e.target.closest("[data-bench-end]")) {
       endActiveBenchWork();
+      return;
+    }
+
+    if (e.target.closest("[data-bench-unresolved-open]")) {
+      openUnresolvedBenchList();
       return;
     }
 
