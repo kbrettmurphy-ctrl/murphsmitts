@@ -3137,6 +3137,25 @@ await test("current database role overrides ordinary token role", async () => {
 
 console.log("Action registry and legacy source inventory");
 
+await test("v1.3 Bench Focus action names are reserved but not active in the baseline", async () => {
+  const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
+  const registryMatch = source.match(/const ACTIONS = \{([\s\S]*?)\n\};/);
+  ok(registryMatch, "ACTIONS registry is present");
+  for (const action of [
+    "getBenchFocus",
+    "startBenchWork",
+    "snoozeBenchReminder",
+    "endBenchWork",
+    "resolveBenchWork"
+  ]) {
+    equal(
+      new RegExp(`^  ${action}: \\{`, "m").test(registryMatch[1]),
+      false,
+      `${action} is not active before its production stage`
+    );
+  }
+});
+
 await test("all 76 documented actions are registry-backed with no legacy chain", async () => {
   const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
   const plan = fs.readFileSync(new URL("../.docs/V1_2_ACTION_REGISTRY_PLAN.md", import.meta.url), "utf8");
