@@ -235,6 +235,15 @@ const ACTIONS = {
     auth: "session", demo: "deny", handler: handleUpdateLaborSessionNotes,
     effects: ["db:order_labor_sessions:read", "db:order_labor_sessions:write"], bindings: { required: ["CORE"], optional: [] }
   },
+  getBenchFocus: {
+    auth: "session", demo: "deny", handler: handleGetBenchFocus,
+    effects: ["db:bench_work_sessions:read", "db:order_labor_sessions:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  startBenchWork: {
+    auth: "session", demo: "deny", handler: handleStartBenchWork,
+    effects: ["db:orders:read", "db:bench_work_sessions:write", "db:order_labor_sessions:read", "db:order_labor_sessions:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
   deleteOrder: {
     auth: "session", demo: "deny", handler: handleDeleteOrder,
     effects: ["db:orders:delete"], bindings: { required: ["CORE"], optional: [] }
@@ -942,6 +951,42 @@ async function handleUpdateLaborSessionNotes({ env, body, jsonHeaders }) {
     }, 200, jsonHeaders);
   }
   return json({ ok: true, session: result.session }, 200, jsonHeaders);
+}
+
+async function handleGetBenchFocus({ env, jsonHeaders }) {
+  const result = await getBenchFocusState(env);
+  if (!result.ok) {
+    return json({ ok: false, error: result.error || "Bench Focus could not be loaded.", details: result.details }, 200, jsonHeaders);
+  }
+  return json({ ok: true, ...result.state, serverNow: new Date().toISOString() }, 200, jsonHeaders);
+}
+
+async function handleStartBenchWork({ env, body, jsonHeaders, auth }) {
+  const orderNumber = cleanText(body.orderNumber);
+  if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+  const pausedAction = cleanText(body.pausedAction) || "prompt";
+  const otherRunningAction = cleanText(body.otherRunningAction) || "prompt";
+  if (!["prompt", "resume_attach", "leave", "cancel"].includes(pausedAction)) {
+    return json({ ok: false, error: "Invalid paused labor choice." }, 200, jsonHeaders);
+  }
+  if (!["prompt", "pause", "stop"].includes(otherRunningAction)) {
+    return json({ ok: false, error: "Invalid running labor choice." }, 200, jsonHeaders);
+  }
+  const result = await callBenchRpc(env, "start_bench_work", {
+    p_order_number: orderNumber,
+    p_created_by: auth?.payload?.email || (auth?.owner ? "owner" : "admin"),
+    p_confirm_status_override: body.confirmStatusOverride === true,
+    p_paused_action: pausedAction,
+    p_other_running_action: otherRunningAction
+  });
+  if (!result.ok) return json(result, 200, jsonHeaders);
+  await logOrderActivity(env, {
+    orderNumber,
+    eventType: "bench_work_started",
+    eventLabel: "Bench Work started",
+    metadata: { benchWorkSessionId: result.bench?.id || null }
+  });
+  return json(result, 200, jsonHeaders);
 }
 
 async function handleDeleteOrder({ env, body, jsonHeaders }) {
@@ -2684,7 +2729,71 @@ function mapLaborSessionFromDb(row) {
     pauseAccumulatedSeconds: Number(row.pause_accumulated_seconds) || 0,
     notes: row.notes,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    benchWorkSessionId: row.bench_work_session_id ?? null,
+    startedFromBench: row.started_from_bench === true
+  };
+}
+
+function mapBenchWorkFromDb(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    orderNumber: row.order_number,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    resolution: row.resolution,
+    backdateConsumedAt: row.backdate_consumed_at,
+    reminderSnoozedUntil: row.reminder_snoozed_until,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
     updatedAt: row.updated_at
+  };
+}
+
+function unwrapBenchRpcData(data) {
+  const value = Array.isArray(data) ? data[0] : data;
+  return value && typeof value === "object" ? value : { ok: false, error: "Invalid Bench Focus response." };
+}
+
+async function callBenchRpc(env, name, payload) {
+  const response = await supabaseFetch(env, `/rest/v1/rpc/${name}`, {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) return { ok: false, error: "Bench Focus could not be updated.", details: response.error };
+  const result = unwrapBenchRpcData(response.data);
+  if (result.bench) result.bench = mapBenchWorkFromDb(result.bench);
+  if (result.session) result.session = mapLaborSessionFromDb(result.session);
+  return result;
+}
+
+async function getBenchFocusState(env) {
+  const [activeResult, unresolvedResult] = await Promise.all([
+    supabaseFetch(env, "/rest/v1/bench_work_sessions?select=*&ended_at=is.null&limit=1"),
+    supabaseFetch(env, "/rest/v1/bench_work_sessions?select=*&ended_at=not.is.null&resolution=eq.pending&order=ended_at.desc")
+  ]);
+  if (!activeResult.ok) return { ok: false, error: "Bench Focus could not be loaded.", details: activeResult.error };
+  if (!unresolvedResult.ok) return { ok: false, error: "Unresolved Bench Work could not be loaded.", details: unresolvedResult.error };
+  const activeRow = Array.isArray(activeResult.data) ? activeResult.data[0] || null : null;
+  let labor = null;
+  if (activeRow) {
+    const laborResult = await supabaseFetch(
+      env,
+      `/rest/v1/order_labor_sessions?select=*&bench_work_session_id=eq.${encodeURIComponent(activeRow.id)}&ended_at=is.null&order=started_at.desc&limit=1`
+    );
+    if (!laborResult.ok) return { ok: false, error: "Bench labor could not be loaded.", details: laborResult.error };
+    const laborRow = Array.isArray(laborResult.data) ? laborResult.data[0] || null : null;
+    labor = laborRow ? mapLaborSessionFromDb(laborRow) : null;
+  }
+  return {
+    ok: true,
+    state: {
+      activeBench: mapBenchWorkFromDb(activeRow),
+      activeLabor: labor,
+      unresolved: (Array.isArray(unresolvedResult.data) ? unresolvedResult.data : []).map(mapBenchWorkFromDb)
+    }
   };
 }
 

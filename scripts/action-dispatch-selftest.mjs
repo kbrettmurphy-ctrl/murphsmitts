@@ -3137,17 +3137,14 @@ await test("current database role overrides ordinary token role", async () => {
 
 console.log("Action registry and legacy source inventory");
 
-await test("v1.3 Bench Focus action names are reserved but not active in the baseline", async () => {
+await test("only the staged v1.3 Bench Focus action names are active", async () => {
   const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
   const registryMatch = source.match(/const ACTIONS = \{([\s\S]*?)\n\};/);
   ok(registryMatch, "ACTIONS registry is present");
-  for (const action of [
-    "getBenchFocus",
-    "startBenchWork",
-    "snoozeBenchReminder",
-    "endBenchWork",
-    "resolveBenchWork"
-  ]) {
+  for (const action of ["getBenchFocus", "startBenchWork"]) {
+    equal(new RegExp(`^  ${action}: \\{`, "m").test(registryMatch[1]), true, `${action} is registry-backed`);
+  }
+  for (const action of ["snoozeBenchReminder", "endBenchWork", "resolveBenchWork"]) {
     equal(
       new RegExp(`^  ${action}: \\{`, "m").test(registryMatch[1]),
       false,
@@ -3156,7 +3153,7 @@ await test("v1.3 Bench Focus action names are reserved but not active in the bas
   }
 });
 
-await test("all 76 documented actions are registry-backed with no legacy chain", async () => {
+await test("all production actions are registry-backed with no legacy chain", async () => {
   const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
   const plan = fs.readFileSync(new URL("../.docs/V1_2_ACTION_REGISTRY_PLAN.md", import.meta.url), "utf8");
   const dispatcher = source.split("/* =========================\n   RESPONSE HELPERS")[0];
@@ -3218,6 +3215,8 @@ await test("all 76 documented actions are registry-backed with no legacy chain",
     "pauseLaborSession",
     "resumeLaborSession",
     "updateLaborSessionNotes",
+    "getBenchFocus",
+    "startBenchWork",
     "deleteOrder",
     "uploadOrderPhoto",
     "removeOrderPhoto",
@@ -3296,6 +3295,8 @@ await test("all 76 documented actions are registry-backed with no legacy chain",
     ["pauseLaborSession", "deny"],
     ["resumeLaborSession", "deny"],
     ["updateLaborSessionNotes", "deny"],
+    ["getBenchFocus", "deny"],
+    ["startBenchWork", "deny"],
     ["deleteOrder", "deny"],
     ["uploadOrderPhoto", "deny"],
     ["removeOrderPhoto", "deny"],
@@ -3346,7 +3347,7 @@ await test("all 76 documented actions are registry-backed with no legacy chain",
   }
 
   deepEqual(registryActions, expectedRegistryActions);
-  equal(registryActions.length, 76);
+  equal(registryActions.length, 78);
   const registeredHandlers = [];
   for (const entry of registryEntries) {
     ok(/\bauth\s*:/.test(entry.source), `${entry.action} has auth metadata`);
@@ -3402,6 +3403,7 @@ await test("all 76 documented actions are registry-backed with no legacy chain",
           "deleteMessageThread", "createInventoryItem", "updateInventoryItem",
           "startLaborSession", "stopLaborSession", "pauseLaborSession",
           "resumeLaborSession", "updateLaborSessionNotes", "createExpense",
+          "getBenchFocus", "startBenchWork",
           "deleteExpense", "saveShopSettings", "createSaleGlove",
           "updateSaleGlove", "deleteSaleGlove", "deleteOrder",
           "uploadOrderPhoto", "removeOrderPhoto", "createOrder",
@@ -3551,7 +3553,10 @@ await test("all 76 documented actions are registry-backed with no legacy chain",
   equal(plannedActions.length, 76);
   deepEqual(legacyActions, plannedLegacyActions);
   deepEqual([...legacyCounts.entries()].filter(([, count]) => count !== 1), []);
-  deepEqual([...registryActions, ...legacyActions].sort(), plannedActions.slice().sort());
+  deepEqual(
+    [...registryActions, ...legacyActions].sort(),
+    [...plannedActions, "getBenchFocus", "startBenchWork"].sort()
+  );
 });
 
 console.log(`\n${testCount} tests, ${assertionCount} assertions passed`);
