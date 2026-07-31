@@ -38,6 +38,56 @@ const ACTIONS = {
       optional: ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "ENV-SIGNAL"]
     }
   },
+  listUsers: {
+    auth: "admin",
+    demo: "deny",
+    handler: handleListUsers,
+    effects: ["db:admin_users:read"],
+    bindings: {
+      required: ["CORE"],
+      optional: []
+    }
+  },
+  createUserInvite: {
+    auth: "admin",
+    demo: "deny",
+    handler: handleCreateUserInvite,
+    effects: ["db:admin_users:read", "db:admin_users:write", "email:send"],
+    bindings: {
+      required: ["CORE"],
+      optional: ["RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO", "WEBAUTHN_ORIGIN", "ENV-SIGNAL"]
+    }
+  },
+  setUserPassword: {
+    auth: "admin",
+    demo: "deny",
+    handler: handleSetUserPassword,
+    effects: ["db:admin_users:write"],
+    bindings: {
+      required: ["CORE"],
+      optional: []
+    }
+  },
+  updateUser: {
+    auth: "admin",
+    demo: "deny",
+    handler: handleUpdateUser,
+    effects: ["db:admin_users:write"],
+    bindings: {
+      required: ["CORE"],
+      optional: []
+    }
+  },
+  deleteUser: {
+    auth: "admin",
+    demo: "deny",
+    handler: handleDeleteUser,
+    effects: ["db:admin_users:write"],
+    bindings: {
+      required: ["CORE"],
+      optional: []
+    }
+  },
   getPushPublicKey: {
     auth: "public",
     demo: "deny",
@@ -101,8 +151,8 @@ export async function authorizeAction(policy, ctx) {
         policy,
         payload: gate.payload,
         role: gate.role,
-        user: null,
-        owner: gate.payload?.sub === "owner"
+        user: gate.user,
+        owner: gate.owner
       }
     };
   }
@@ -237,127 +287,6 @@ export async function onRequest(context) {
         action,
         jsonHeaders
       });
-    }
-
-    if (action === "listUsers") {
-      const gate = await requireAdmin(env, body);
-      if (!gate.ok) return json(gate, 200, jsonHeaders);
-      const resp = await supabaseFetch(env, `/rest/v1/admin_users?select=*&order=created_at.asc`);
-      if (!resp.ok) return json({ ok: false, error: "Could not load users." }, 200, jsonHeaders);
-      return json({ ok: true, users: (resp.data || []).map(mapUserFromDb) }, 200, jsonHeaders);
-    }
-
-    if (action === "createUserInvite") {
-      const gate = await requireAdmin(env, body);
-      if (!gate.ok) return json(gate, 200, jsonHeaders);
-
-      const email = normalizeEmail(body.email);
-      const displayName = cleanText(body.displayName);
-      const role = body.role === "admin" ? "admin" : "demo";
-      if (!email || !email.includes("@")) {
-        return json({ ok: false, error: "Enter a valid email address." }, 200, jsonHeaders);
-      }
-      const existing = await getUserByEmail(env, email);
-      if (existing.ok && existing.user) {
-        return json({ ok: false, error: "That email already has an account." }, 200, jsonHeaders);
-      }
-
-      const token = randomChallengeB64Url();
-      const insert = await supabaseFetch(env, `/rest/v1/admin_users`, {
-        method: "POST",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({
-          email,
-          display_name: displayName,
-          role,
-          active: true,
-          invite_token: token,
-          invite_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-        })
-      });
-      if (!insert.ok) {
-        return json({ ok: false, error: "Could not create the account." }, 200, jsonHeaders);
-      }
-
-      const link = `${getInviteBaseUrl(env)}/admin/?invite=${encodeURIComponent(token)}`;
-      let emailed = false;
-      if (env.RESEND_API_KEY) {
-        const send = await sendBrandedEmail(env, {
-          to: email,
-          subject: "Your Murph's Mitts admin invite",
-          plainBody: `You've been invited to the Murph's Mitts admin as a ${role} user.\n\nSet your password to get started:\n${link}\n\nThis link expires in 7 days.`,
-          htmlBody: `<p>You've been invited to the Murph's Mitts admin as a <strong>${role}</strong> user.</p><p><a href="${link}">Set your password to get started</a></p><p>This link expires in 7 days.</p>`
-        });
-        emailed = !!send.ok;
-      }
-
-      return json({ ok: true, inviteLink: link, emailed }, 200, jsonHeaders);
-    }
-
-    if (action === "setUserPassword") {
-      const gate = await requireAdmin(env, body);
-      if (!gate.ok) return json(gate, 200, jsonHeaders);
-      const userId = cleanText(body.userId);
-      const password = String(body.password || "").trim();
-      if (!userId || password.length < 8) {
-        return json({ ok: false, error: "Password must be at least 8 characters." }, 200, jsonHeaders);
-      }
-      const hashed = await hashPassword(password);
-      const resp = await supabaseFetch(
-        env,
-        `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
-        {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({
-            password_hash: hashed.hash,
-            password_salt: hashed.salt,
-            password_iterations: hashed.iterations,
-            invite_token: null,
-            invite_expires_at: null,
-            active: true
-          })
-        }
-      );
-      if (!resp.ok) return json({ ok: false, error: "Could not set the password." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "updateUser") {
-      const gate = await requireAdmin(env, body);
-      if (!gate.ok) return json(gate, 200, jsonHeaders);
-      const userId = cleanText(body.userId);
-      if (!userId) return json({ ok: false, error: "Missing user." }, 200, jsonHeaders);
-
-      const updates = {};
-      if ("role" in body) updates.role = body.role === "admin" ? "admin" : "demo";
-      if ("active" in body) updates.active = !!body.active;
-      if ("displayName" in body) updates.display_name = cleanText(body.displayName);
-      if (!Object.keys(updates).length) {
-        return json({ ok: false, error: "Nothing to update." }, 200, jsonHeaders);
-      }
-
-      const resp = await supabaseFetch(
-        env,
-        `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
-        { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(updates) }
-      );
-      if (!resp.ok) return json({ ok: false, error: "Could not update the user." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "deleteUser") {
-      const gate = await requireAdmin(env, body);
-      if (!gate.ok) return json(gate, 200, jsonHeaders);
-      const userId = cleanText(body.userId);
-      if (!userId) return json({ ok: false, error: "Missing user." }, 200, jsonHeaders);
-      const resp = await supabaseFetch(
-        env,
-        `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
-        { method: "DELETE", headers: { Prefer: "return=minimal" } }
-      );
-      if (!resp.ok) return json({ ok: false, error: "Could not remove the user." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
     }
 
     if (action === "savePushSubscription") {
@@ -2966,6 +2895,116 @@ async function handleAcceptInvite({ env, body, jsonHeaders }) {
   return json({ ok: true, token, role: user.role }, 200, jsonHeaders);
 }
 
+async function handleListUsers({ env, jsonHeaders }) {
+  const resp = await supabaseFetch(env, `/rest/v1/admin_users?select=*&order=created_at.asc`);
+  if (!resp.ok) return json({ ok: false, error: "Could not load users." }, 200, jsonHeaders);
+  return json({ ok: true, users: (resp.data || []).map(mapUserFromDb) }, 200, jsonHeaders);
+}
+
+async function handleCreateUserInvite({ env, body, jsonHeaders }) {
+  const email = normalizeEmail(body.email);
+  const displayName = cleanText(body.displayName);
+  const role = body.role === "admin" ? "admin" : "demo";
+  if (!email || !email.includes("@")) {
+    return json({ ok: false, error: "Enter a valid email address." }, 200, jsonHeaders);
+  }
+  const existing = await getUserByEmail(env, email);
+  if (existing.ok && existing.user) {
+    return json({ ok: false, error: "That email already has an account." }, 200, jsonHeaders);
+  }
+
+  const token = randomChallengeB64Url();
+  const insert = await supabaseFetch(env, `/rest/v1/admin_users`, {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      email,
+      display_name: displayName,
+      role,
+      active: true,
+      invite_token: token,
+      invite_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    })
+  });
+  if (!insert.ok) {
+    return json({ ok: false, error: "Could not create the account." }, 200, jsonHeaders);
+  }
+
+  const link = `${getInviteBaseUrl(env)}/admin/?invite=${encodeURIComponent(token)}`;
+  let emailed = false;
+  if (env.RESEND_API_KEY) {
+    const send = await sendBrandedEmail(env, {
+      to: email,
+      subject: "Your Murph's Mitts admin invite",
+      plainBody: `You've been invited to the Murph's Mitts admin as a ${role} user.\n\nSet your password to get started:\n${link}\n\nThis link expires in 7 days.`,
+      htmlBody: `<p>You've been invited to the Murph's Mitts admin as a <strong>${role}</strong> user.</p><p><a href="${link}">Set your password to get started</a></p><p>This link expires in 7 days.</p>`
+    });
+    emailed = !!send.ok;
+  }
+
+  return json({ ok: true, inviteLink: link, emailed }, 200, jsonHeaders);
+}
+
+async function handleSetUserPassword({ env, body, jsonHeaders }) {
+  const userId = cleanText(body.userId);
+  const password = String(body.password || "").trim();
+  if (!userId || password.length < 8) {
+    return json({ ok: false, error: "Password must be at least 8 characters." }, 200, jsonHeaders);
+  }
+  const hashed = await hashPassword(password);
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        password_hash: hashed.hash,
+        password_salt: hashed.salt,
+        password_iterations: hashed.iterations,
+        invite_token: null,
+        invite_expires_at: null,
+        active: true
+      })
+    }
+  );
+  if (!resp.ok) return json({ ok: false, error: "Could not set the password." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleUpdateUser({ env, body, jsonHeaders }) {
+  const userId = cleanText(body.userId);
+  if (!userId) return json({ ok: false, error: "Missing user." }, 200, jsonHeaders);
+
+  const updates = {};
+  if ("role" in body) updates.role = body.role === "admin" ? "admin" : "demo";
+  if ("active" in body) updates.active = !!body.active;
+  if ("displayName" in body) updates.display_name = cleanText(body.displayName);
+  if (!Object.keys(updates).length) {
+    return json({ ok: false, error: "Nothing to update." }, 200, jsonHeaders);
+  }
+
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
+    { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(updates) }
+  );
+  if (!resp.ok) return json({ ok: false, error: "Could not update the user." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleDeleteUser({ env, body, jsonHeaders }) {
+  const userId = cleanText(body.userId);
+  if (!userId) return json({ ok: false, error: "Missing user." }, 200, jsonHeaders);
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: { Prefer: "return=minimal" } }
+  );
+  if (!resp.ok) return json({ ok: false, error: "Could not remove the user." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
 async function handleGetPushPublicKey({ env, jsonHeaders }) {
   return json({ ok: true, publicKey: env.VAPID_PUBLIC_KEY || "" }, 200, jsonHeaders);
 }
@@ -4905,17 +4944,6 @@ async function touchUserLogin(env, userId) {
   );
 }
 
-/* Returns the resolved role for a validated token: the account's current
-   role (so a role change or deactivation takes effect immediately), or the
-   token's role for the owner/passkey escape hatches (sub === "owner"). */
-async function resolveAuthRole(env, payload) {
-  if (!payload) return null;
-  if (!payload.sub) return payload.role || null;
-
-  const identity = await resolveActiveAuthIdentity(env, payload);
-  return identity ? identity.role : null;
-}
-
 async function resolveActiveAuthIdentity(env, payload) {
   if (!payload) return null;
   if (payload.sub === "owner") {
@@ -4933,9 +4961,18 @@ async function resolveActiveAuthIdentity(env, payload) {
 async function requireAdmin(env, body) {
   const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
   if (!auth.ok) return { ok: false, error: auth.error };
-  const role = await resolveAuthRole(env, auth.payload);
+  const identity = auth.payload?.sub
+    ? await resolveActiveAuthIdentity(env, auth.payload)
+    : { role: auth.payload?.role || null, user: null, owner: false };
+  const role = identity ? identity.role : null;
   if (role !== "admin") return { ok: false, error: "Admins only." };
-  return { ok: true, payload: auth.payload, role };
+  return {
+    ok: true,
+    payload: auth.payload,
+    role,
+    user: identity.user,
+    owner: identity.owner
+  };
 }
 
 function getInviteBaseUrl(env) {

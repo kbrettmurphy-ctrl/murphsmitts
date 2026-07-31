@@ -542,13 +542,14 @@ await test("admin policy accepts owner without user resolution", async () => {
 
 await test("admin policy accepts an active current admin", async () => {
   const { admin } = await sessionTokens();
+  const row = {
+    id: "user-admin",
+    email: "admin@example.com",
+    role: "admin",
+    active: true
+  };
   const result = await withFetchMock(
-    () => jsonResponse([{
-      id: "user-admin",
-      email: "admin@example.com",
-      role: "admin",
-      active: true
-    }]),
+    () => jsonResponse([row]),
     () => authorizeAction("admin", {
       env: CORE_ENV,
       body: { _token: admin }
@@ -557,6 +558,7 @@ await test("admin policy accepts an active current admin", async () => {
   equal(result.ok, true);
   equal(result.auth.role, "admin");
   equal(result.auth.owner, false);
+  deepEqual(result.auth.user, row);
   equal(fetchCalls.length, 1);
 });
 
@@ -1170,6 +1172,300 @@ await test("listGalleryPhotos valid demo token is denied for public and hidden m
   await assertDemoDenied("listGalleryPhotos", demo, { includeHidden: true });
 });
 
+console.log("Registry-backed admin user actions");
+
+const adminUserActions = [
+  "listUsers",
+  "createUserInvite",
+  "setUserPassword",
+  "updateUser",
+  "deleteUser"
+];
+
+function validAdminActionBody(action, token) {
+  const bodies = {
+    listUsers: {},
+    createUserInvite: { email: `${action}@example.com`, displayName: "Invitee", role: "admin" },
+    setUserPassword: { userId: "target-user", password: "password123" },
+    updateUser: { userId: "target-user", active: true },
+    deleteUser: { userId: "target-user" }
+  };
+  return { action, _token: token, ...bodies[action] };
+}
+
+function successfulAdminActionFetch(input, init) {
+  const url = String(input);
+  if (url.includes("email=eq.admin%40example.com")) {
+    return jsonResponse([{
+      id: "user-admin",
+      email: "admin@example.com",
+      role: "admin",
+      active: true
+    }]);
+  }
+  if (url.includes("email=eq.createuserinvite%40example.com")) return jsonResponse([]);
+  if (url.includes("?select=*&order=created_at.asc")) return jsonResponse([]);
+  if (url.includes("/rest/v1/admin_users")) {
+    ok(["POST", "PATCH", "DELETE"].includes(init.method));
+    return jsonResponse([]);
+  }
+  return noNetworkFetch(input);
+}
+
+await test("all five admin-user actions reject before handler I/O", async () => {
+  for (const action of adminUserActions) {
+    const result = await invoke({ body: validAdminActionBody(action, undefined) });
+    equal(result.response.status, 200, action);
+    deepEqual(result.json, { ok: false, error: "Missing session token." }, action);
+    equal(result.fetchCalls.length, 0, action);
+  }
+});
+
+await test("owner token succeeds for all five admin-user actions", async () => {
+  const { owner } = await sessionTokens();
+  for (const action of adminUserActions) {
+    const result = await invoke({
+      body: validAdminActionBody(action, owner),
+      fetchMock: successfulAdminActionFetch
+    });
+    equal(result.response.status, 200, action);
+    equal(result.json?.ok, true, action);
+  }
+});
+
+await test("active admin succeeds for all five admin-user actions", async () => {
+  const { admin } = await sessionTokens();
+  for (const action of adminUserActions) {
+    const result = await invoke({
+      body: validAdminActionBody(action, admin),
+      fetchMock: successfulAdminActionFetch
+    });
+    equal(result.response.status, 200, action);
+    equal(result.json?.ok, true, action);
+    ok(result.fetchCalls[0].url.includes("email=eq.admin%40example.com"), action);
+  }
+});
+
+await test("non-admin, inactive, and missing identities reject all five actions before handler I/O", async () => {
+  const { user, admin } = await sessionTokens();
+  const cases = [
+    [user, [{
+      id: "user-standard",
+      email: "user@example.com",
+      role: "demo",
+      active: true
+    }]],
+    [admin, [{
+      id: "user-admin",
+      email: "admin@example.com",
+      role: "admin",
+      active: false
+    }]],
+    [admin, []]
+  ];
+  for (const action of adminUserActions) {
+    for (const [token, rows] of cases) {
+      const result = await invoke({
+        body: validAdminActionBody(action, token),
+        fetchMock: () => jsonResponse(rows)
+      });
+      deepEqual(result.json, { ok: false, error: "Admins only." }, action);
+      equal(result.fetchCalls.length, 1, `${action} stops after identity lookup`);
+    }
+  }
+});
+
+await test("admin-user actions preserve global demo-token denial", async () => {
+  const { demo } = await sessionTokens();
+  for (const action of adminUserActions) {
+    await assertDemoDenied(action, demo);
+  }
+});
+
+await test("listUsers maps rows without sensitive account material", async () => {
+  const { owner } = await sessionTokens();
+  const result = await invoke({
+    body: { action: "listUsers", _token: owner },
+    fetchMock: () => jsonResponse([{
+      id: "target-user",
+      email: "target@example.com",
+      display_name: "Target",
+      role: "admin",
+      active: true,
+      password_hash: "secret-hash",
+      password_salt: "secret-salt",
+      password_iterations: 100000,
+      invite_token: "secret-invite",
+      invite_expires_at: "2030-01-01T00:00:00.000Z",
+      created_at: "2026-01-01T00:00:00.000Z",
+      last_login_at: null
+    }])
+  });
+  equal(result.json?.ok, true);
+  equal(result.json?.users.length, 1);
+  deepEqual(Object.keys(result.json.users[0]).sort(), [
+    "active", "createdAt", "displayName", "email", "hasPassword", "id",
+    "inviteExpiresAt", "invitePending", "lastLoginAt", "role"
+  ]);
+  equal(JSON.stringify(result.json).includes("secret-"), false);
+});
+
+await test("createUserInvite validates email and rejects duplicates in order", async () => {
+  const { owner } = await sessionTokens();
+  const invalid = await invoke({
+    body: { action: "createUserInvite", _token: owner, email: "invalid" }
+  });
+  deepEqual(invalid.json, { ok: false, error: "Enter a valid email address." });
+  equal(invalid.fetchCalls.length, 0);
+
+  const duplicate = await invoke({
+    body: { action: "createUserInvite", _token: owner, email: "DUP@example.com" },
+    fetchMock: () => jsonResponse([{ id: "existing" }])
+  });
+  deepEqual(duplicate.json, { ok: false, error: "That email already has an account." });
+  equal(duplicate.fetchCalls.length, 1);
+  ok(duplicate.fetchCalls[0].url.includes("email=eq.dup%40example.com"));
+});
+
+await test("createUserInvite preserves role coercion, token, expiry, and missing-email behavior", async () => {
+  const { owner } = await sessionTokens();
+  for (const [inputRole, expectedRole] of [["admin", "admin"], ["demo", "demo"], ["staff", "demo"]]) {
+    let inserted = null;
+    const before = Date.now();
+    const result = await invoke({
+      body: {
+        action: "createUserInvite",
+        _token: owner,
+        email: `${inputRole}@example.com`,
+        displayName: "  New User  ",
+        role: inputRole
+      },
+      fetchMock(input, init, callNumber) {
+        if (callNumber === 1) return jsonResponse([]);
+        inserted = JSON.parse(init.body);
+        equal(init.method, "POST");
+        return jsonResponse([]);
+      }
+    });
+    equal(result.json?.ok, true);
+    equal(result.json?.emailed, false);
+    equal(inserted.email, `${inputRole}@example.com`);
+    equal(inserted.display_name, "New User");
+    equal(inserted.role, expectedRole);
+    equal(inserted.active, true);
+    equal(typeof inserted.invite_token, "string");
+    ok(inserted.invite_token.length > 20);
+    const expires = new Date(inserted.invite_expires_at).getTime();
+    ok(expires >= before + 7 * 24 * 60 * 60 * 1000);
+    ok(expires <= Date.now() + 7 * 24 * 60 * 60 * 1000);
+    ok(result.json.inviteLink.endsWith(`/admin/?invite=${inserted.invite_token}`));
+    equal(result.fetchCalls.length, 2);
+  }
+});
+
+await test("createUserInvite preserves Resend success, failure, and preview suppression", async () => {
+  const { owner } = await sessionTokens();
+  for (const [status, emailed] of [[200, true], [500, false]]) {
+    const result = await invoke({
+      env: { ...CORE_ENV, RESEND_API_KEY: "resend-test" },
+      body: { action: "createUserInvite", _token: owner, email: `mail${status}@example.com` },
+      fetchMock(input, init, callNumber) {
+        if (callNumber === 1) return jsonResponse([]);
+        if (callNumber === 2) return jsonResponse([]);
+        equal(String(input), "https://api.resend.com/emails");
+        equal(init.method, "POST");
+        return jsonResponse(status === 200 ? { id: "email-id" } : { error: "failed" }, status);
+      }
+    });
+    equal(result.json?.ok, true);
+    equal(result.json?.emailed, emailed);
+    equal(result.fetchCalls.length, 3);
+  }
+
+  const preview = await invoke({
+    env: { ...CORE_ENV, RESEND_API_KEY: "resend-test", MURPHOS_ENV: "preview" },
+    body: { action: "createUserInvite", _token: owner, email: "preview@example.com" },
+    fetchMock(input, init, callNumber) {
+      if (callNumber <= 2) return jsonResponse([]);
+      return noNetworkFetch(input);
+    }
+  });
+  equal(preview.json?.ok, true);
+  equal(preview.json?.emailed, true);
+  equal(preview.fetchCalls.length, 2);
+});
+
+await test("setUserPassword validates and writes current PBKDF2 fields", async () => {
+  const { owner } = await sessionTokens();
+  for (const body of [{ password: "password123" }, { userId: "target", password: "short" }]) {
+    const result = await invoke({ body: { action: "setUserPassword", _token: owner, ...body } });
+    deepEqual(result.json, { ok: false, error: "Password must be at least 8 characters." });
+    equal(result.fetchCalls.length, 0);
+  }
+  let payload;
+  const result = await invoke({
+    body: { action: "setUserPassword", _token: owner, userId: "target user", password: "password123" },
+    fetchMock(input, init) {
+      ok(String(input).includes("id=eq.target%20user"));
+      equal(init.method, "PATCH");
+      payload = JSON.parse(init.body);
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(result.json, { ok: true });
+  equal(typeof payload.password_hash, "string");
+  equal(typeof payload.password_salt, "string");
+  equal(payload.password_iterations, 100000);
+  equal(payload.invite_token, null);
+  equal(payload.invite_expires_at, null);
+  equal(payload.active, true);
+});
+
+await test("updateUser preserves whitelist, coercion, and combined patch payload", async () => {
+  const { owner } = await sessionTokens();
+  const missing = await invoke({ body: { action: "updateUser", _token: owner, role: "admin" } });
+  deepEqual(missing.json, { ok: false, error: "Missing user." });
+  const empty = await invoke({ body: { action: "updateUser", _token: owner, userId: "target", ignored: true } });
+  deepEqual(empty.json, { ok: false, error: "Nothing to update." });
+
+  let payload;
+  const result = await invoke({
+    body: {
+      action: "updateUser",
+      _token: owner,
+      userId: "target",
+      role: "staff",
+      active: 0,
+      displayName: "  Renamed  ",
+      ignored: "not written"
+    },
+    fetchMock(input, init) {
+      equal(init.method, "PATCH");
+      payload = JSON.parse(init.body);
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(result.json, { ok: true });
+  deepEqual(payload, { role: "demo", active: false, display_name: "Renamed" });
+});
+
+await test("deleteUser validates ID and preserves no-row success behavior", async () => {
+  const { owner } = await sessionTokens();
+  const missing = await invoke({ body: { action: "deleteUser", _token: owner } });
+  deepEqual(missing.json, { ok: false, error: "Missing user." });
+  equal(missing.fetchCalls.length, 0);
+  const result = await invoke({
+    body: { action: "deleteUser", _token: owner, userId: "missing row" },
+    fetchMock(input, init) {
+      ok(String(input).includes("id=eq.missing%20row"));
+      equal(init.method, "DELETE");
+      equal(init.headers.Prefer, "return=minimal");
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(result.json, { ok: true });
+});
+
 console.log("Owner and admin resolution semantics");
 
 await test("owner escape-hatch token is admin without user resolution", async () => {
@@ -1244,7 +1540,7 @@ await test("current database role overrides ordinary token role", async () => {
 
 console.log("Action registry and legacy source inventory");
 
-await test("six registry actions plus 70 legacy actions match the plan", async () => {
+await test("11 registry actions plus 65 legacy actions match the plan", async () => {
   const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
   const plan = fs.readFileSync(new URL("../.docs/V1_2_ACTION_REGISTRY_PLAN.md", import.meta.url), "utf8");
   const dispatcher = source.split("/* =========================\n   RESPONSE HELPERS")[0];
@@ -1264,6 +1560,11 @@ await test("six registry actions plus 70 legacy actions match the plan", async (
     "login",
     "getInvite",
     "acceptInvite",
+    "listUsers",
+    "createUserInvite",
+    "setUserPassword",
+    "updateUser",
+    "deleteUser",
     "getPushPublicKey",
     "webauthnLoginOptions",
     "webauthnLoginVerify"
@@ -1272,6 +1573,11 @@ await test("six registry actions plus 70 legacy actions match the plan", async (
     ["login", "allow"],
     ["getInvite", "allow"],
     ["acceptInvite", "allow"],
+    ["listUsers", "deny"],
+    ["createUserInvite", "deny"],
+    ["setUserPassword", "deny"],
+    ["updateUser", "deny"],
+    ["deleteUser", "deny"],
     ["getPushPublicKey", "deny"],
     ["webauthnLoginOptions", "allow"],
     ["webauthnLoginVerify", "allow"]
@@ -1284,7 +1590,7 @@ await test("six registry actions plus 70 legacy actions match the plan", async (
   }
 
   deepEqual(registryActions, expectedRegistryActions);
-  equal(registryActions.length, 6);
+  equal(registryActions.length, 11);
   equal(
     (dispatcher.match(/return dispatchRegisteredAction\(registeredAction,/g) || []).length,
     1,
@@ -1301,16 +1607,35 @@ await test("six registry actions plus 70 legacy actions match the plan", async (
   );
   for (const action of expectedRegistryActions) {
     equal(legacyActions.includes(action), false);
+    const expectedAuth = adminUserActions.includes(action) ? "admin" : "public";
     ok(
       new RegExp(
-        `^  ${action}: \\{\\n    auth: "public",\\n    demo: "${expectedDemoPolicies.get(action)}",`,
+        `^  ${action}: \\{\\n    auth: "${expectedAuth}",\\n    demo: "${expectedDemoPolicies.get(action)}",`,
         "m"
       ).test(registryMatch[1]),
-      `${action} retains its public authorization and demo policy`
+      `${action} retains its authorization and demo policy`
     );
   }
-  equal(legacyActions.length, 70);
-  equal(new Set(legacyActions).size, 70);
+  for (const handler of [
+    "handleListUsers",
+    "handleCreateUserInvite",
+    "handleSetUserPassword",
+    "handleUpdateUser",
+    "handleDeleteUser"
+  ]) {
+    const handlerSource = source.match(
+      new RegExp(`async function ${handler}\\([\\s\\S]*?(?=\\nasync function )`)
+    );
+    ok(handlerSource, `${handler} is present`);
+    equal(handlerSource[0].includes("requireAdmin("), false, `${handler} does not reauthorize`);
+    equal(
+      /\bbody(?:\._token|\["_token"\]|\['_token'\])/.test(handlerSource[0]),
+      false,
+      `${handler} does not revalidate the token`
+    );
+  }
+  equal(legacyActions.length, 65);
+  equal(new Set(legacyActions).size, 65);
   equal(plannedActions.length, 76);
   deepEqual(legacyActions, plannedLegacyActions);
   deepEqual([...legacyCounts.entries()].filter(([, count]) => count !== 1), []);
