@@ -2,6 +2,525 @@ import { sendWebPushToAll } from "./_webpush.js";
 import { formatServiceDisplayPrice } from "./_pricing.js";
 import { isPreviewEnvironment } from "./_env.js";
 
+/* =========================
+   ACTION REGISTRY
+   All supported API actions route through this registry.
+========================= */
+const ACTIONS = {
+  login: {
+    auth: "public",
+    demo: "allow",
+    handler: handleLogin,
+    effects: ["db:admin_users:read", "db:admin_users:write", "auth:session:sign"],
+    bindings: {
+      required: ["CORE"],
+      optional: []
+    }
+  },
+  getInvite: {
+    auth: "public",
+    demo: "allow",
+    handler: handleGetInvite,
+    effects: ["db:admin_users:read"],
+    bindings: {
+      required: ["CORE"],
+      optional: []
+    }
+  },
+  acceptInvite: {
+    auth: "public",
+    demo: "allow",
+    handler: handleAcceptInvite,
+    effects: ["db:admin_users:read", "db:admin_users:write", "push:send", "auth:session:sign"],
+    bindings: {
+      required: ["CORE"],
+      optional: ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "ENV-SIGNAL"]
+    }
+  },
+  listUsers: {
+    auth: "admin",
+    demo: "deny",
+    handler: handleListUsers,
+    effects: ["db:admin_users:read"],
+    bindings: {
+      required: ["CORE"],
+      optional: []
+    }
+  },
+  createUserInvite: {
+    auth: "admin",
+    demo: "deny",
+    handler: handleCreateUserInvite,
+    effects: ["db:admin_users:read", "db:admin_users:write", "email:send"],
+    bindings: {
+      required: ["CORE"],
+      optional: ["RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO", "WEBAUTHN_ORIGIN", "ENV-SIGNAL"]
+    }
+  },
+  setUserPassword: {
+    auth: "admin",
+    demo: "deny",
+    handler: handleSetUserPassword,
+    effects: ["db:admin_users:write"],
+    bindings: {
+      required: ["CORE"],
+      optional: []
+    }
+  },
+  updateUser: {
+    auth: "admin",
+    demo: "deny",
+    handler: handleUpdateUser,
+    effects: ["db:admin_users:write"],
+    bindings: {
+      required: ["CORE"],
+      optional: []
+    }
+  },
+  deleteUser: {
+    auth: "admin",
+    demo: "deny",
+    handler: handleDeleteUser,
+    effects: ["db:admin_users:write"],
+    bindings: {
+      required: ["CORE"],
+      optional: []
+    }
+  },
+  getPushPublicKey: {
+    auth: "public",
+    demo: "deny",
+    handler: handleGetPushPublicKey,
+    effects: [],
+    bindings: {
+      required: ["CORE"],
+      optional: ["VAPID_PUBLIC_KEY"]
+    }
+  },
+  savePushSubscription: {
+    auth: "session", demo: "deny", handler: handleSavePushSubscription,
+    effects: ["db:push_subscriptions:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  sendTestPush: {
+    auth: "session", demo: "deny", handler: handleSendTestPush,
+    effects: ["db:push_subscriptions:read", "db:push_subscriptions:delete", "external:web-push:send"],
+    bindings: { required: ["CORE"], optional: ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "ENV-SIGNAL"] }
+  },
+  listMessages: {
+    auth: "session", demo: "deny", handler: handleListMessages,
+    effects: ["db:sms_messages:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  sendMessageReply: {
+    auth: "session", demo: "deny", handler: handleSendMessageReply,
+    effects: ["storage:order-photos:write", "external:sms:send", "db:sms_messages:write"],
+    bindings: {
+      required: ["CORE", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_MESSAGING_SERVICE_SID"],
+      optional: ["ENV-SIGNAL"]
+    }
+  },
+  markMessagesRead: {
+    auth: "session", demo: "deny", handler: handleMarkMessagesRead,
+    effects: ["db:sms_messages:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteMessage: {
+    auth: "session", demo: "deny", handler: handleDeleteMessage,
+    effects: ["db:sms_messages:delete"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteMessageThread: {
+    auth: "session", demo: "deny", handler: handleDeleteMessageThread,
+    effects: ["db:sms_messages:delete"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listOrders: {
+    auth: "session", demo: "deny", handler: handleListOrders,
+    effects: ["db:orders:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listInventory: {
+    auth: "session", demo: "deny", handler: handleListInventory,
+    effects: ["db:lace_inventory:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  createInventoryItem: {
+    auth: "session", demo: "deny", handler: handleCreateInventoryItem,
+    effects: ["db:lace_inventory:read", "db:lace_inventory:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  updateInventoryItem: {
+    auth: "session", demo: "deny", handler: handleUpdateInventoryItem,
+    effects: ["db:lace_inventory:read", "db:lace_inventory:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  getOrder: {
+    auth: "session", demo: "deny", handler: handleGetOrder,
+    effects: ["db:orders:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listOrderActivity: {
+    auth: "session", demo: "deny", handler: handleListOrderActivity,
+    effects: ["db:order_activity:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listOrdersWithActivity: {
+    auth: "session", demo: "deny", handler: handleListOrdersWithActivity,
+    effects: ["db:order_activity:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  webauthnLoginOptions: {
+    auth: "public",
+    demo: "allow",
+    handler: handleWebauthnLoginOptions,
+    effects: ["db:webauthn_credentials:read", "auth:challenge:sign"],
+    bindings: {
+      required: ["CORE"],
+      optional: ["WEBAUTHN_ORIGIN", "WEBAUTHN_RP_ID"]
+    }
+  },
+  webauthnLoginVerify: {
+    auth: "public",
+    demo: "allow",
+    handler: handleWebauthnLoginVerify,
+    effects: ["db:webauthn_credentials:read", "db:webauthn_credentials:write", "auth:session:sign"],
+    bindings: {
+      required: ["CORE"],
+      optional: ["WEBAUTHN_ORIGIN", "WEBAUTHN_RP_ID"]
+    }
+  },
+  webauthnRegisterOptions: {
+    auth: "session",
+    demo: "deny",
+    handler: handleWebauthnRegisterOptions,
+    effects: ["db:webauthn_credentials:read", "crypto:webauthn:challenge"],
+    bindings: {
+      required: ["CORE"],
+      optional: ["WEBAUTHN_ORIGIN", "WEBAUTHN_RP_ID"]
+    }
+  },
+  webauthnRegisterVerify: {
+    auth: "session",
+    demo: "deny",
+    handler: handleWebauthnRegisterVerify,
+    effects: [
+      "db:webauthn_credentials:read", "db:webauthn_credentials:write",
+      "crypto:webauthn:verify"
+    ],
+    bindings: {
+      required: ["CORE"],
+      optional: ["WEBAUTHN_ORIGIN", "WEBAUTHN_RP_ID"]
+    }
+  },
+  listLaborSessions: {
+    auth: "session", demo: "deny", handler: handleListLaborSessions,
+    effects: ["db:order_labor_sessions:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  startLaborSession: {
+    auth: "session", demo: "deny", handler: handleStartLaborSession,
+    effects: ["db:order_labor_sessions:read", "db:order_labor_sessions:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  stopLaborSession: {
+    auth: "session", demo: "deny", handler: handleStopLaborSession,
+    effects: ["db:order_labor_sessions:read", "db:order_labor_sessions:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  listOpenLaborSessions: {
+    auth: "session", demo: "deny", handler: handleListOpenLaborSessions,
+    effects: ["db:order_labor_sessions:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listLaborSummary: {
+    auth: "session", demo: "deny", handler: handleListLaborSummary,
+    effects: ["db:order_labor_sessions:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  pauseLaborSession: {
+    auth: "session", demo: "deny", handler: handlePauseLaborSession,
+    effects: ["db:order_labor_sessions:read", "db:order_labor_sessions:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  resumeLaborSession: {
+    auth: "session", demo: "deny", handler: handleResumeLaborSession,
+    effects: ["db:order_labor_sessions:read", "db:order_labor_sessions:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  updateLaborSessionNotes: {
+    auth: "session", demo: "deny", handler: handleUpdateLaborSessionNotes,
+    effects: ["db:order_labor_sessions:read", "db:order_labor_sessions:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteOrder: {
+    auth: "session", demo: "deny", handler: handleDeleteOrder,
+    effects: ["db:orders:delete"], bindings: { required: ["CORE"], optional: [] }
+  },
+  uploadOrderPhoto: {
+    auth: "session", demo: "deny", handler: handleUploadOrderPhoto,
+    effects: ["db:orders:read", "storage:order-photos:write", "db:orders:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  removeOrderPhoto: {
+    auth: "session", demo: "deny", handler: handleRemoveOrderPhoto,
+    effects: ["db:orders:read", "db:orders:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  createOrder: {
+    auth: "session", demo: "deny", handler: handleCreateOrder,
+    effects: ["db:orders:read", "db:orders:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  resendStatusEmail: {
+    auth: "session", demo: "deny", handler: handleResendStatusEmail,
+    effects: ["db:orders:read", "external:email:send", "db:orders:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: ["RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO", "ENV-SIGNAL"] }
+  },
+  resendStatusText: {
+    auth: "session", demo: "deny", handler: handleResendStatusText,
+    effects: ["db:orders:read", "external:sms:send", "db:orders:write", "db:sms_messages:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_MESSAGING_SERVICE_SID", "ENV-SIGNAL"] }
+  },
+  updateOrder: {
+    auth: "session", demo: "deny", handler: handleUpdateOrder,
+    effects: [
+      "db:orders:read", "db:orders:write", "db:lace_inventory:read", "db:lace_inventory:write",
+      "db:order_activity:write", "external:email:send", "external:sms:send", "db:sms_messages:write"
+    ],
+    bindings: {
+      required: ["CORE"],
+      optional: [
+        "RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO",
+        "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_MESSAGING_SERVICE_SID", "ENV-SIGNAL"
+      ]
+    }
+  },
+  geocodeAddresses: {
+    auth: "session", demo: "deny", handler: handleGeocodeAddresses,
+    effects: ["external:geocoding:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  geocodeMissingOrderAddresses: {
+    auth: "session", demo: "deny", handler: handleGeocodeMissingOrderAddresses,
+    effects: ["db:orders:read", "external:geocoding:read", "db:orders:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  uploadGalleryPhoto: {
+    auth: "session", demo: "deny", handler: handleUploadGalleryPhoto,
+    effects: ["storage:gallery:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listExpenses: {
+    auth: "session", demo: "deny", handler: handleListExpenses,
+    effects: ["db:shop_expenses:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  createExpense: {
+    auth: "session", demo: "deny", handler: handleCreateExpense,
+    effects: ["db:shop_expenses:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteExpense: {
+    auth: "session", demo: "deny", handler: handleDeleteExpense,
+    effects: ["db:shop_expenses:delete"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listServicePricing: {
+    auth: "session", demo: "deny", handler: handleListServicePricing,
+    effects: ["db:service_pricing:read", "db:service_pricing_revisions:read", "db:service_job_types:read", "db:shop_settings:read"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  listServicePricingHistory: {
+    auth: "session", demo: "deny", handler: handleListServicePricingHistory,
+    effects: ["db:service_pricing_revisions:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  saveServicePricingDraft: {
+    auth: "session", demo: "deny", handler: handleSaveServicePricingDraft,
+    effects: [
+      "db:service_pricing:read", "db:service_pricing_revisions:read",
+      "db:service_pricing_revisions:write"
+    ],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  discardServicePricingDraft: {
+    auth: "session", demo: "deny", handler: handleDiscardServicePricingDraft,
+    effects: ["db:service_pricing:read", "db:service_pricing_revisions:delete"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  publishServicePricing: {
+    auth: "session", demo: "deny", handler: handlePublishServicePricing,
+    effects: [
+      "db:service_pricing:read", "db:service_pricing:write",
+      "db:service_pricing_revisions:read", "db:service_pricing_revisions:write"
+    ],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  restoreServicePricingRevision: {
+    auth: "session", demo: "deny", handler: handleRestoreServicePricingRevision,
+    effects: ["db:service_pricing_revisions:read", "db:service_pricing_revisions:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  createServicePricing: {
+    auth: "session", demo: "deny", handler: handleCreateServicePricing,
+    effects: ["db:service_pricing:read", "db:service_pricing:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  getShopSettings: {
+    auth: "session", demo: "deny", handler: handleGetShopSettings,
+    effects: ["db:shop_settings:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  saveShopSettings: {
+    auth: "session", demo: "deny", handler: handleSaveShopSettings,
+    effects: ["db:shop_settings:write", "db:shop_settings:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  setGalleryPhotoCover: {
+    auth: "session", demo: "deny", handler: handleSetGalleryPhotoCover,
+    effects: ["db:gallery_photo_links:read", "db:gallery_photo_links:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  setGalleryPhotoOrder: {
+    auth: "session", demo: "deny", handler: handleSetGalleryPhotoOrder,
+    effects: ["db:orders:read", "db:gallery_photo_links:write", "db:gallery_photo_links:delete"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  moveGalleryPhoto: {
+    auth: "session", demo: "deny", handler: handleMoveGalleryPhoto,
+    effects: ["storage:gallery:move", "db:gallery_photo_links:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  hideGalleryPhoto: {
+    auth: "session", demo: "deny", handler: handleHideGalleryPhoto,
+    effects: ["storage:gallery:move"], bindings: { required: ["CORE"], optional: [] }
+  },
+  restoreGalleryPhoto: {
+    auth: "session", demo: "deny", handler: handleRestoreGalleryPhoto,
+    effects: ["storage:gallery:move"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteGalleryPhoto: {
+    auth: "session", demo: "deny", handler: handleDeleteGalleryPhoto,
+    effects: ["storage:gallery:delete", "db:gallery_photo_links:delete"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  listSaleGloves: {
+    auth: "session", demo: "deny", handler: handleListSaleGloves,
+    effects: ["db:gloves_for_sale:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  getSaleGlove: {
+    auth: "session", demo: "deny", handler: handleGetSaleGlove,
+    effects: ["db:gloves_for_sale:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  createSaleGlove: {
+    auth: "session", demo: "deny", handler: handleCreateSaleGlove,
+    effects: ["db:gloves_for_sale:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  updateSaleGlove: {
+    auth: "session", demo: "deny", handler: handleUpdateSaleGlove,
+    effects: ["db:gloves_for_sale:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteSaleGlove: {
+    auth: "session", demo: "deny", handler: handleDeleteSaleGlove,
+    effects: ["db:gloves_for_sale:delete"], bindings: { required: ["CORE"], optional: [] }
+  },
+  uploadLacePhoto: {
+    auth: "session", demo: "deny", handler: handleUploadLacePhoto,
+    effects: ["storage:lace:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  uploadSaleGlovePhoto: {
+    auth: "session", demo: "deny", handler: handleUploadSaleGlovePhoto,
+    effects: [
+      "db:gloves_for_sale:read", "db:glove_sale_photos:read",
+      "storage:gloves-for-sale:write", "db:glove_sale_photos:write"
+    ],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  listSaleGlovePhotos: {
+    auth: "session", demo: "deny", handler: handleListSaleGlovePhotos,
+    effects: ["db:glove_sale_photos:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  setSalePhotoPrimary: {
+    auth: "session", demo: "deny", handler: handleSetSalePhotoPrimary,
+    effects: ["db:glove_sale_photos:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  setSalePhotoHover: {
+    auth: "session", demo: "deny", handler: handleSetSalePhotoHover,
+    effects: ["db:glove_sale_photos:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteSaleGlovePhoto: {
+    auth: "session", demo: "deny", handler: handleDeleteSaleGlovePhoto,
+    effects: ["db:glove_sale_photos:delete"], bindings: { required: ["CORE"], optional: [] }
+  },
+  searchPublicGloves: {
+    auth: "public", demo: "deny", handler: handleSearchPublicGloves,
+    effects: ["db:gallery_photo_links:read", "db:orders:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  listGalleryPhotos: {
+    auth: ({ body }) => body.includeHidden === true ? "session" : "public",
+    demo: "deny", handler: handleListGalleryPhotos,
+    effects: ["db:gallery_photo_links:read", "storage:gallery:list"],
+    bindings: { required: ["CORE"], optional: [] }
+  }
+};
+
+const ACTION_AUTH_POLICIES = new Set(["public", "session", "active-user", "admin"]);
+
+export function resolveActionAuthPolicy(policyOrResolver, ctx) {
+  const policy = typeof policyOrResolver === "function"
+    ? policyOrResolver(ctx)
+    : policyOrResolver;
+  if (!ACTION_AUTH_POLICIES.has(policy)) {
+    throw new Error(`Unsupported action auth policy: ${String(policy)}`);
+  }
+  return policy;
+}
+
+export async function authorizeAction(policy, ctx) {
+  const { env, body } = ctx;
+
+  if (policy === "public") {
+    return {
+      ok: true,
+      auth: { policy, payload: null, role: null, user: null, owner: false }
+    };
+  }
+
+  if (policy === "admin") {
+    const gate = await requireAdmin(env, body);
+    if (!gate.ok) return gate;
+    return {
+      ok: true,
+      auth: {
+        policy,
+        payload: gate.payload,
+        role: gate.role,
+        user: gate.user,
+        owner: gate.owner
+      }
+    };
+  }
+
+  const token = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+  if (!token.ok) return token;
+
+  if (policy === "session") {
+    return {
+      ok: true,
+      auth: {
+        policy,
+        payload: token.payload,
+        role: token.payload?.role || null,
+        user: null,
+        owner: token.payload?.sub === "owner"
+      }
+    };
+  }
+
+  const identity = await resolveActiveAuthIdentity(env, token.payload);
+  if (!identity) {
+    return { ok: false, error: "Session is no longer active." };
+  }
+  return {
+    ok: true,
+    auth: {
+      policy,
+      payload: token.payload,
+      role: identity.role,
+      user: identity.user,
+      owner: identity.owner
+    }
+  };
+}
+
+export async function dispatchRegisteredAction(entry, ctx) {
+  const policy = resolveActionAuthPolicy(entry.auth, ctx);
+  const authorization = await authorizeAction(policy, ctx);
+  if (!authorization.ok) {
+    return json(
+      { ok: false, error: authorization.error },
+      200,
+      ctx.jsonHeaders
+    );
+  }
+  return entry.handler({ ...ctx, auth: authorization.auth });
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -77,2822 +596,16 @@ export async function onRequest(context) {
       }
     }
 
-    if (action === "login") {
-      const email = normalizeEmail(body.email);
-      const password = String(body.password || body.pin || "").trim();
-      const sessionMs = 1000 * 60 * 60 * 24 * 14;
-
-      /* Owner escape hatch: blank email + the ADMIN_PIN. Keeps the owner able
-         to sign in anywhere (including preview URLs where the passkey's domain
-         binding doesn't apply) with zero lockout risk. */
-      if (!email && password && env.ADMIN_PIN && password === String(env.ADMIN_PIN).trim()) {
-        const token = await createSignedToken(
-          { sub: "owner", role: "admin", exp: Date.now() + sessionMs },
-          env.ADMIN_SESSION_SECRET
-        );
-        return json({ ok: true, token, role: "admin" }, 200, jsonHeaders);
-      }
-
-      if (!email || !password) {
-        return json({ ok: false, error: "Enter your email and password." }, 200, jsonHeaders);
-      }
-
-      const found = await getUserByEmail(env, email);
-      if (!found.ok) {
-        return json({ ok: false, error: "Could not sign in." }, 200, jsonHeaders);
-      }
-
-      const user = found.user;
-      const passwordOk = user && user.active !== false && await verifyPassword(password, {
-        hash: user.password_hash,
-        salt: user.password_salt,
-        iterations: user.password_iterations
-      });
-
-      if (!passwordOk) {
-        return json({ ok: false, error: "Invalid email or password." }, 200, jsonHeaders);
-      }
-
-      await touchUserLogin(env, user.id);
-
-      const token = await createSignedToken(
-        { sub: user.id, email: user.email, role: user.role, exp: Date.now() + sessionMs },
-        env.ADMIN_SESSION_SECRET
-      );
-
-      return json({ ok: true, token, role: user.role }, 200, jsonHeaders);
-    }
-
-    if (action === "getInvite") {
-      const found = await getUserByInviteToken(env, body.token);
-      const user = found.ok ? found.user : null;
-      if (!user || !user.invite_token) {
-        return json({ ok: false, error: "This invite is invalid or already used." }, 200, jsonHeaders);
-      }
-      if (user.invite_expires_at && Date.now() > new Date(user.invite_expires_at).getTime()) {
-        return json({ ok: false, error: "This invite has expired." }, 200, jsonHeaders);
-      }
-      return json({ ok: true, email: user.email, displayName: user.display_name, role: user.role }, 200, jsonHeaders);
-    }
-
-    if (action === "acceptInvite") {
-      const password = String(body.password || "").trim();
-      if (password.length < 8) {
-        return json({ ok: false, error: "Password must be at least 8 characters." }, 200, jsonHeaders);
-      }
-      const found = await getUserByInviteToken(env, body.token);
-      const user = found.ok ? found.user : null;
-      if (!user || !user.invite_token) {
-        return json({ ok: false, error: "This invite is invalid or already used." }, 200, jsonHeaders);
-      }
-      if (user.invite_expires_at && Date.now() > new Date(user.invite_expires_at).getTime()) {
-        return json({ ok: false, error: "This invite has expired." }, 200, jsonHeaders);
-      }
-
-      const hashed = await hashPassword(password);
-      const resp = await supabaseFetch(
+    const registeredAction = ACTIONS[action];
+    if (registeredAction) {
+      return dispatchRegisteredAction(registeredAction, {
+        context,
+        request,
         env,
-        `/rest/v1/admin_users?id=eq.${encodeURIComponent(user.id)}`,
-        {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({
-            password_hash: hashed.hash,
-            password_salt: hashed.salt,
-            password_iterations: hashed.iterations,
-            invite_token: null,
-            invite_expires_at: null,
-            active: true,
-            last_login_at: new Date().toISOString()
-          })
-        }
-      );
-      if (!resp.ok) {
-        return json({ ok: false, error: "Could not set your password." }, 200, jsonHeaders);
-      }
-
-      await sendWebPushToAll(env, {
-        title: "Invite accepted",
-        body: `${user.display_name || user.email} set their password (${user.role}).`,
-        url: "/admin/?view=users"
-      });
-
-      const token = await createSignedToken(
-        { sub: user.id, email: user.email, role: user.role, exp: Date.now() + 1000 * 60 * 60 * 24 * 14 },
-        env.ADMIN_SESSION_SECRET
-      );
-      return json({ ok: true, token, role: user.role }, 200, jsonHeaders);
-    }
-
-    if (action === "listUsers") {
-      const gate = await requireAdmin(env, body);
-      if (!gate.ok) return json(gate, 200, jsonHeaders);
-      const resp = await supabaseFetch(env, `/rest/v1/admin_users?select=*&order=created_at.asc`);
-      if (!resp.ok) return json({ ok: false, error: "Could not load users." }, 200, jsonHeaders);
-      return json({ ok: true, users: (resp.data || []).map(mapUserFromDb) }, 200, jsonHeaders);
-    }
-
-    if (action === "createUserInvite") {
-      const gate = await requireAdmin(env, body);
-      if (!gate.ok) return json(gate, 200, jsonHeaders);
-
-      const email = normalizeEmail(body.email);
-      const displayName = cleanText(body.displayName);
-      const role = body.role === "admin" ? "admin" : "demo";
-      if (!email || !email.includes("@")) {
-        return json({ ok: false, error: "Enter a valid email address." }, 200, jsonHeaders);
-      }
-      const existing = await getUserByEmail(env, email);
-      if (existing.ok && existing.user) {
-        return json({ ok: false, error: "That email already has an account." }, 200, jsonHeaders);
-      }
-
-      const token = randomChallengeB64Url();
-      const insert = await supabaseFetch(env, `/rest/v1/admin_users`, {
-        method: "POST",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({
-          email,
-          display_name: displayName,
-          role,
-          active: true,
-          invite_token: token,
-          invite_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-        })
-      });
-      if (!insert.ok) {
-        return json({ ok: false, error: "Could not create the account." }, 200, jsonHeaders);
-      }
-
-      const link = `${getInviteBaseUrl(env)}/admin/?invite=${encodeURIComponent(token)}`;
-      let emailed = false;
-      if (env.RESEND_API_KEY) {
-        const send = await sendBrandedEmail(env, {
-          to: email,
-          subject: "Your Murph's Mitts admin invite",
-          plainBody: `You've been invited to the Murph's Mitts admin as a ${role} user.\n\nSet your password to get started:\n${link}\n\nThis link expires in 7 days.`,
-          htmlBody: `<p>You've been invited to the Murph's Mitts admin as a <strong>${role}</strong> user.</p><p><a href="${link}">Set your password to get started</a></p><p>This link expires in 7 days.</p>`
-        });
-        emailed = !!send.ok;
-      }
-
-      return json({ ok: true, inviteLink: link, emailed }, 200, jsonHeaders);
-    }
-
-    if (action === "setUserPassword") {
-      const gate = await requireAdmin(env, body);
-      if (!gate.ok) return json(gate, 200, jsonHeaders);
-      const userId = cleanText(body.userId);
-      const password = String(body.password || "").trim();
-      if (!userId || password.length < 8) {
-        return json({ ok: false, error: "Password must be at least 8 characters." }, 200, jsonHeaders);
-      }
-      const hashed = await hashPassword(password);
-      const resp = await supabaseFetch(
-        env,
-        `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
-        {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({
-            password_hash: hashed.hash,
-            password_salt: hashed.salt,
-            password_iterations: hashed.iterations,
-            invite_token: null,
-            invite_expires_at: null,
-            active: true
-          })
-        }
-      );
-      if (!resp.ok) return json({ ok: false, error: "Could not set the password." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "updateUser") {
-      const gate = await requireAdmin(env, body);
-      if (!gate.ok) return json(gate, 200, jsonHeaders);
-      const userId = cleanText(body.userId);
-      if (!userId) return json({ ok: false, error: "Missing user." }, 200, jsonHeaders);
-
-      const updates = {};
-      if ("role" in body) updates.role = body.role === "admin" ? "admin" : "demo";
-      if ("active" in body) updates.active = !!body.active;
-      if ("displayName" in body) updates.display_name = cleanText(body.displayName);
-      if (!Object.keys(updates).length) {
-        return json({ ok: false, error: "Nothing to update." }, 200, jsonHeaders);
-      }
-
-      const resp = await supabaseFetch(
-        env,
-        `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
-        { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(updates) }
-      );
-      if (!resp.ok) return json({ ok: false, error: "Could not update the user." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "deleteUser") {
-      const gate = await requireAdmin(env, body);
-      if (!gate.ok) return json(gate, 200, jsonHeaders);
-      const userId = cleanText(body.userId);
-      if (!userId) return json({ ok: false, error: "Missing user." }, 200, jsonHeaders);
-      const resp = await supabaseFetch(
-        env,
-        `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
-        { method: "DELETE", headers: { Prefer: "return=minimal" } }
-      );
-      if (!resp.ok) return json({ ok: false, error: "Could not remove the user." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "getPushPublicKey") {
-      return json({ ok: true, publicKey: env.VAPID_PUBLIC_KEY || "" }, 200, jsonHeaders);
-    }
-
-    if (action === "savePushSubscription") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const sub = body.subscription || {};
-      const keys = sub.keys || {};
-      if (!sub.endpoint || !keys.p256dh || !keys.auth) {
-        return json({ ok: false, error: "Invalid subscription." }, 200, jsonHeaders);
-      }
-      const resp = await supabaseFetch(env, `/rest/v1/push_subscriptions?on_conflict=endpoint`, {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify({
-          endpoint: sub.endpoint, p256dh: keys.p256dh, auth: keys.auth,
-          label: cleanText(body.label) || null, last_used_at: new Date().toISOString()
-        })
-      });
-      if (!resp.ok) return json({ ok: false, error: "Could not save subscription." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "sendTestPush") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      await sendWebPushToAll(env, { title: "MurphOS", body: "Push notifications are working.", url: "/admin/" });
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "listMessages") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const resp = await supabaseFetch(
-        env,
-        `/rest/v1/sms_messages?select=*&order=created_at.desc&limit=300`
-      );
-      if (!resp.ok) return json({ ok: false, error: "Could not load messages." }, 200, jsonHeaders);
-      return json({ ok: true, messages: (resp.data || []).map(mapSmsMessage) }, 200, jsonHeaders);
-    }
-
-    if (action === "markMessagesRead") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const phone = cleanText(body.phoneNumber);
-      const path = phone
-        ? `/rest/v1/sms_messages?phone_number=eq.${encodeURIComponent(phone)}&read=eq.false`
-        : `/rest/v1/sms_messages?read=eq.false`;
-      const resp = await supabaseFetch(env, path, {
-        method: "PATCH",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({ read: true })
-      });
-      if (!resp.ok) return json({ ok: false, error: "Could not update messages." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "deleteMessage") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const id = cleanText(body.id);
-      if (!id) return json({ ok: false, error: "Missing message id." }, 200, jsonHeaders);
-      const resp = await supabaseFetch(
-        env,
-        `/rest/v1/sms_messages?id=eq.${encodeURIComponent(id)}`,
-        { method: "DELETE", headers: { Prefer: "return=minimal" } }
-      );
-      if (!resp.ok) return json({ ok: false, error: "Could not delete the message." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "deleteMessageThread") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const phones = Array.isArray(body.phoneNumbers) ? body.phoneNumbers.filter(Boolean).slice(0, 20) : [];
-      if (!phones.length) return json({ ok: false, error: "Missing phone numbers." }, 200, jsonHeaders);
-      const inList = phones.map(pn => `"${String(pn).replace(/"/g, "")}"`).join(",");
-      const resp = await supabaseFetch(
-        env,
-        `/rest/v1/sms_messages?phone_number=in.(${encodeURIComponent(inList)})`,
-        { method: "DELETE", headers: { Prefer: "return=minimal" } }
-      );
-      if (!resp.ok) return json({ ok: false, error: "Could not delete the conversation." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "sendMessageReply") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const to = toE164US(body.phoneNumber);
-      const text = cleanText(body.body);
-      const mediaDataUrl = String(body.mediaDataUrl || "");
-      if (!to) return json({ ok: false, error: "Invalid phone number." }, 200, jsonHeaders);
-      if (!text && !mediaDataUrl) return json({ ok: false, error: "Enter a message." }, 200, jsonHeaders);
-      if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
-        return json({ ok: false, error: "Twilio is not configured." }, 200, jsonHeaders);
-      }
-
-      let mediaUrl = null;
-      if (mediaDataUrl.startsWith("data:image/")) {
-        const contentType = mediaDataUrl.slice(5, mediaDataUrl.indexOf(";"));
-        const b64 = mediaDataUrl.slice(mediaDataUrl.indexOf(",") + 1);
-        const bin = atob(b64);
-        const bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        const ext = contentType.includes("png") ? "png" : "jpg";
-        const path = `sms-out/${Date.now()}.${ext}`;
-        const up = await fetch(`${env.SUPABASE_URL}/storage/v1/object/order-photos/${path}`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-            "Content-Type": contentType,
-            "x-upsert": "true"
-          },
-          body: bytes
-        });
-        if (!up.ok) return json({ ok: false, error: "Photo upload failed." }, 200, jsonHeaders);
-        mediaUrl = `${env.SUPABASE_URL}/storage/v1/object/public/order-photos/${path}`;
-      }
-
-      const sent = await sendTwilioSms(env, to, text, mediaUrl);
-      if (!sent.ok) {
-        return json({ ok: false, error: "Message failed to send.", details: sent.error }, 200, jsonHeaders);
-      }
-
-      await supabaseFetch(env, `/rest/v1/sms_messages`, {
-        method: "POST",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({
-          direction: "out",
-          phone_number: to,
-          customer_name: cleanText(body.customerName) || null,
-          order_number: cleanText(body.orderNumber) || null,
-          body: text,
-          media_urls: mediaUrl ? [mediaUrl] : null,
-          twilio_sid: sent.sid || null,
-          read: true
-        })
-      });
-
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "listOrders") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const supa = await supabaseFetch(
-        env,
-        `/rest/v1/orders?select=*&order=order_number.desc`
-      );
-
-      if (!supa.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to load orders from Supabase.",
-            details: supa.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          orders: (supa.data || []).map(mapOrderFromDb)
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "listInventory") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const supa = await supabaseFetch(
-        env,
-        `/rest/v1/lace_inventory?select=*&order=color.asc`
-      );
-
-      if (!supa.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to load lace inventory from Supabase.",
-            details: supa.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          inventory: supa.data || []
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "createInventoryItem") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await createInventoryItem(env, body);
-      return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "updateInventoryItem") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await updateInventoryItem(env, body);
-      return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "getOrder") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const orderNumber = String(body.orderNumber || "").trim();
-      if (!orderNumber) {
-        return json(
-          {
-            ok: false,
-            error: "Missing orderNumber."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const existing = await fetchOrderByNumber(env, orderNumber);
-      if (!existing.ok || !existing.data) {
-        return json(
-          {
-            ok: false,
-            error: "Order not found."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          order: mapOrderFromDb(existing.data)
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "listOrderActivity") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const orderNumber = cleanText(body.orderNumber);
-      if (!orderNumber) {
-        return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
-      }
-
-      const result = await listOrderActivity(env, orderNumber);
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Activity could not be loaded.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, activity: result.activity }, 200, jsonHeaders);
-    }
-
-    if (action === "listOrdersWithActivity") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await listOrdersWithActivity(env);
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Activity index could not be loaded.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, orderNumbers: result.orderNumbers }, 200, jsonHeaders);
-    }
-
-    if (action === "webauthnRegisterOptions") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const cfg = getWebauthnConfig(env);
-      const challenge = randomChallengeB64Url();
-      const challengeToken = await createChallengeToken("reg", challenge, env.ADMIN_SESSION_SECRET);
-
-      const existing = await listWebauthnCredentials(env);
-      const excludeCredentials = (existing.ok ? existing.credentials : []).map(cred => ({
-        id: cred.credential_id,
-        type: "public-key"
-      }));
-
-      return json(
-        {
-          ok: true,
-          challengeToken,
-          options: {
-            challenge,
-            rp: { id: cfg.rpId, name: cfg.rpName },
-            user: {
-              id: arrayBufferToBase64Url(new TextEncoder().encode(cfg.userId)),
-              name: cfg.userName,
-              displayName: cfg.userDisplayName
-            },
-            pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-            authenticatorSelection: { residentKey: "preferred", userVerification: "preferred" },
-            timeout: 60000,
-            attestation: "none",
-            excludeCredentials
-          }
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "webauthnRegisterVerify") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const cfg = getWebauthnConfig(env);
-      const chk = await verifyChallengeToken(body.challengeToken, "reg", env.ADMIN_SESSION_SECRET);
-      if (!chk.ok) {
-        return json({ ok: false, error: chk.error }, 200, jsonHeaders);
-      }
-
-      const cred = body.credential || {};
-      const resp = cred.response || {};
-
-      let clientData;
-      try {
-        clientData = JSON.parse(new TextDecoder().decode(base64UrlToBytes(resp.clientDataJSON)));
-      } catch {
-        return json({ ok: false, error: "Could not read passkey response." }, 200, jsonHeaders);
-      }
-
-      if (clientData.type !== "webauthn.create") {
-        return json({ ok: false, error: "Unexpected passkey ceremony." }, 200, jsonHeaders);
-      }
-      if (clientData.challenge !== chk.challenge) {
-        return json({ ok: false, error: "Passkey challenge mismatch." }, 200, jsonHeaders);
-      }
-      if (!cfg.origins.includes(clientData.origin)) {
-        return json({ ok: false, error: "Passkey origin mismatch." }, 200, jsonHeaders);
-      }
-
-      let authDataInfo;
-      let keyInfo;
-      let credentialIdB64;
-      try {
-        const attestation = cborDecodeFirst(base64UrlToBytes(resp.attestationObject));
-        authDataInfo = parseAuthData(attestation.get("authData"));
-        if (!authDataInfo.at || !authDataInfo.credentialPublicKey) {
-          throw new Error("Passkey did not include a credential.");
-        }
-        const expectedRpIdHash = await sha256Bytes(cfg.rpId);
-        if (!bytesEqual(authDataInfo.rpIdHash, expectedRpIdHash)) {
-          throw new Error("Passkey domain mismatch.");
-        }
-        if (!authDataInfo.up) {
-          throw new Error("Passkey user presence missing.");
-        }
-        keyInfo = coseToKeyInfo(authDataInfo.credentialPublicKey);
-        credentialIdB64 = arrayBufferToBase64Url(authDataInfo.credentialId);
-      } catch (err) {
-        return json({ ok: false, error: err.message || "Passkey could not be verified." }, 200, jsonHeaders);
-      }
-
-      const stored = await insertWebauthnCredential(env, {
-        credential_id: credentialIdB64,
-        public_key: JSON.stringify(keyInfo),
-        sign_count: authDataInfo.signCount,
-        transports: Array.isArray(cred.transports) && cred.transports.length ? cred.transports.join(",") : null,
-        label: cleanText(body.label) || "Passkey"
-      });
-
-      if (!stored.ok) {
-        return json({ ok: false, error: "Could not save passkey.", details: stored.error }, 200, jsonHeaders);
-      }
-
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "webauthnLoginOptions") {
-      const cfg = getWebauthnConfig(env);
-      const existing = await listWebauthnCredentials(env);
-      const creds = existing.ok ? existing.credentials : [];
-      const challenge = randomChallengeB64Url();
-      const challengeToken = await createChallengeToken("auth", challenge, env.ADMIN_SESSION_SECRET);
-
-      return json(
-        {
-          ok: true,
-          hasCredentials: creds.length > 0,
-          challengeToken,
-          options: {
-            challenge,
-            rpId: cfg.rpId,
-            timeout: 60000,
-            userVerification: "preferred",
-            allowCredentials: creds.map(cred => ({ id: cred.credential_id, type: "public-key" }))
-          }
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "webauthnLoginVerify") {
-      const cfg = getWebauthnConfig(env);
-      const chk = await verifyChallengeToken(body.challengeToken, "auth", env.ADMIN_SESSION_SECRET);
-      if (!chk.ok) {
-        return json({ ok: false, error: chk.error }, 200, jsonHeaders);
-      }
-
-      const cred = body.credential || {};
-      const resp = cred.response || {};
-      const credentialId = cleanText(cred.id) || cleanText(cred.rawId);
-      if (!credentialId) {
-        return json({ ok: false, error: "Missing passkey id." }, 200, jsonHeaders);
-      }
-
-      const record = await getWebauthnCredential(env, credentialId);
-      if (!record.ok || !record.credential) {
-        return json({ ok: false, error: "This passkey is not registered." }, 200, jsonHeaders);
-      }
-
-      let clientData;
-      try {
-        clientData = JSON.parse(new TextDecoder().decode(base64UrlToBytes(resp.clientDataJSON)));
-      } catch {
-        return json({ ok: false, error: "Could not read passkey response." }, 200, jsonHeaders);
-      }
-
-      if (clientData.type !== "webauthn.get") {
-        return json({ ok: false, error: "Unexpected passkey ceremony." }, 200, jsonHeaders);
-      }
-      if (clientData.challenge !== chk.challenge) {
-        return json({ ok: false, error: "Passkey challenge mismatch." }, 200, jsonHeaders);
-      }
-      if (!cfg.origins.includes(clientData.origin)) {
-        return json({ ok: false, error: "Passkey origin mismatch." }, 200, jsonHeaders);
-      }
-
-      let valid = false;
-      let newSignCount = 0;
-      try {
-        const authDataBytes = base64UrlToBytes(resp.authenticatorData);
-        const info = parseAuthData(authDataBytes);
-        const expectedRpIdHash = await sha256Bytes(cfg.rpId);
-        if (!bytesEqual(info.rpIdHash, expectedRpIdHash)) {
-          throw new Error("Passkey domain mismatch.");
-        }
-        if (!info.up) {
-          throw new Error("Passkey user presence missing.");
-        }
-        newSignCount = info.signCount;
-        const keyInfo = JSON.parse(record.credential.public_key);
-        valid = await verifyAssertionSignature(
-          keyInfo,
-          authDataBytes,
-          base64UrlToBytes(resp.clientDataJSON),
-          base64UrlToBytes(resp.signature)
-        );
-      } catch (err) {
-        return json({ ok: false, error: err.message || "Passkey could not be verified." }, 200, jsonHeaders);
-      }
-
-      if (!valid) {
-        return json({ ok: false, error: "Passkey signature was invalid." }, 200, jsonHeaders);
-      }
-
-      /* Counter is stored for the record but not hard-enforced: iCloud-synced
-         passkeys routinely report a sign count of 0, so a strict monotonic
-         check would lock out legitimate Face ID logins. */
-      const storedCount = Number(record.credential.sign_count) || 0;
-      await touchWebauthnCredential(env, credentialId, Math.max(storedCount, newSignCount));
-
-      const token = await createSignedToken(
-        {
-          sub: "owner",
-          role: "admin",
-          exp: Date.now() + 1000 * 60 * 60 * 24 * 14
-        },
-        env.ADMIN_SESSION_SECRET
-      );
-
-      return json({ ok: true, token, role: "admin" }, 200, jsonHeaders);
-    }
-
-    if (action === "listLaborSessions") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const orderNumber = cleanText(body.orderNumber);
-      if (!orderNumber) {
-        return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
-      }
-
-      const result = await listLaborSessions(env, orderNumber);
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Labor sessions could not be loaded.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, sessions: result.sessions }, 200, jsonHeaders);
-    }
-
-    if (action === "startLaborSession") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const orderNumber = cleanText(body.orderNumber);
-      const phase = cleanText(body.phase);
-      if (!orderNumber) {
-        return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
-      }
-      if (!phase) {
-        return json({ ok: false, error: "Select a phase before starting the timer." }, 200, jsonHeaders);
-      }
-      if (!isValidLaborPhase(phase)) {
-        return json({ ok: false, error: "Invalid labor phase." }, 200, jsonHeaders);
-      }
-
-      const result = await startLaborSession(env, {
-        orderNumber,
-        phase,
-        notes: body.notes
-      });
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: result.error || "Labor session could not be started.",
-            details: result.details
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, session: result.session }, 200, jsonHeaders);
-    }
-
-    if (action === "stopLaborSession") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const sessionId = cleanText(body.sessionId);
-      if (!sessionId) {
-        return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
-      }
-
-      const result = await stopLaborSession(env, {
-        sessionId,
-        notes: body.notes
-      });
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: result.error || "Labor session could not be stopped.",
-            details: result.details
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, session: result.session }, 200, jsonHeaders);
-    }
-
-    if (action === "listOpenLaborSessions") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await fetchOpenLaborSessions(env);
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Open labor sessions could not be loaded.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        { ok: true, sessions: result.data.map(mapLaborSessionFromDb) },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "listLaborSummary") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await fetchLaborSummary(env);
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Labor summary could not be loaded.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, sessions: result.sessions }, 200, jsonHeaders);
-    }
-
-    if (action === "pauseLaborSession") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const sessionId = cleanText(body.sessionId);
-      if (!sessionId) {
-        return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
-      }
-
-      const result = await pauseLaborSession(env, {
-        sessionId,
-        notes: body.notes
-      });
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: result.error || "Labor session could not be paused.",
-            details: result.details
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, session: result.session }, 200, jsonHeaders);
-    }
-
-    if (action === "resumeLaborSession") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const sessionId = cleanText(body.sessionId);
-      if (!sessionId) {
-        return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
-      }
-
-      const result = await resumeLaborSession(env, {
-        sessionId,
-        notes: body.notes
-      });
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: result.error || "Labor session could not be resumed.",
-            details: result.details
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, session: result.session }, 200, jsonHeaders);
-    }
-
-    if (action === "updateLaborSessionNotes") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const sessionId = cleanText(body.sessionId);
-      if (!sessionId) {
-        return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
-      }
-
-      const result = await updateLaborSessionNotes(env, {
-        sessionId,
-        notes: body.notes
-      });
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: result.error || "Labor session notes could not be updated.",
-            details: result.details
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, session: result.session }, 200, jsonHeaders);
-    }
-
-    if (action === "deleteOrder") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const orderNumber = String(body.orderNumber || "").trim();
-      if (!orderNumber) {
-        return json(
-          {
-            ok: false,
-            error: "Missing orderNumber."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const del = await supabaseFetch(
-        env,
-        `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
-        {
-          method: "DELETE",
-          headers: {
-            Prefer: "return=representation"
-          }
-        }
-      );
-
-      if (!del.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to delete order from Supabase.",
-            details: del.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          deleted: true,
-          orderNumber
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "uploadOrderPhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await uploadOrderPhotoAction(env, body);
-      return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "removeOrderPhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await removeOrderPhotoAction(env, body);
-      return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "createOrder") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await createOrderAction(env, body);
-      return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "resendStatusEmail") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await resendStatusEmailAction(env, body);
-      return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "resendStatusText") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await resendStatusTextAction(env, body);
-      return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "updateOrder") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const orderNumber = String(body.orderNumber || "").trim();
-      const updates = body.updates || {};
-
-      if (!orderNumber) {
-        return json(
-          {
-            ok: false,
-            error: "Missing orderNumber."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const existing = await fetchOrderByNumber(env, orderNumber);
-      if (!existing.ok || !existing.data) {
-        return json(
-          {
-            ok: false,
-            error: `Order not found: ${orderNumber}`
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const oldRow = existing.data;
-      const oldStatus = normalizeStatus(oldRow.status);
-      const lastStatusEmailed = normalizeStatus(oldRow.last_status_emailed);
-      const lastStatusTexted = normalizeStatus(oldRow.last_status_texted);
-      const oldPrimaryColor = cleanText(oldRow.primary_lace_color);
-      const oldSecondaryColor = cleanText(oldRow.secondary_lace_color);
-      const oldPrimaryUsed = Number(oldRow.primary_lace_used || 0);
-      const oldSecondaryUsed = Number(oldRow.secondary_lace_used || 0);
-      const dbUpdates = mapUpdatesToDb(updates);
-      const mergedPreview = { ...oldRow, ...dbUpdates };
-
-      const newStatus = normalizeStatus(mergedPreview.status);
-      const statusChanged = !!newStatus && newStatus !== oldStatus;
-      const shouldEmailForStatus =
-        statusChanged &&
-        !isInternalOnlyStatus(newStatus) &&
-        newStatus !== lastStatusEmailed;
-      const shouldTextForStatus =
-        statusChanged &&
-        toBoolean(mergedPreview.sms_opt_in) &&
-        shouldSendTextForStatus(newStatus) &&
-        newStatus !== lastStatusTexted;
-      
-      if (
-        newStatus === "completed" &&
-        looksLikeShipMethod(mergedPreview.drop_off_method) &&
-        normalizePaidValue(mergedPreview.paid) !== "paid" &&
-        !toBoolean(mergedPreview.allow_ship_without_payment)
-      ) {
-        return json(
-          {
-            ok: false,
-            error: "Cannot mark a shipped order completed unless it is paid or override is checked."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      if (newStatus === "completed" && !mergedPreview.date_completed) {
-        dbUpdates.date_completed = todayIsoDate();
-        mergedPreview.date_completed = dbUpdates.date_completed;
-      }
-
-      if (shouldEmailForStatus && !env.RESEND_API_KEY) {
-        return json(
-          {
-            ok: false,
-            error: "Missing RESEND_API_KEY environment variable."
-          },
-          500,
-          jsonHeaders
-        );
-      }
-
-      const patch = await supabaseFetch(
-        env,
-        `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
-        {
-          method: "PATCH",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify(dbUpdates)
-        }
-      );
-
-      if (!patch.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to update order in Supabase.",
-            details: patch.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      let updated = Array.isArray(patch.data) ? patch.data[0] : null;
-      if (!updated) {
-        return json(
-          {
-            ok: false,
-            error: "Update succeeded but no row was returned."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      await adjustLaceInventoryForOrderUpdate(env, {
-        oldPrimaryColor,
-        oldSecondaryColor,
-        oldPrimaryUsed,
-        oldSecondaryUsed,
-        newPrimaryColor: cleanText(updated.primary_lace_color),
-        newSecondaryColor: cleanText(updated.secondary_lace_color),
-        newPrimaryUsed: Number(updated.primary_lace_used || 0),
-        newSecondaryUsed: Number(updated.secondary_lace_used || 0)
-      });
-
-      await logOrderActivities(env, getOrderUpdateActivityEvents(oldRow, updated));
-      
-      if (shouldEmailForStatus) {
-        const emailResult = await sendStatusEmail(
-          env,
-          updated,
-          normalizeDisplayStatus(updated.status)
-        );
-
-        if (!emailResult.ok) {
-          return json(
-            {
-              ok: false,
-              error: "Order updated, but status email failed to send.",
-              details: emailResult.error
-            },
-            200,
-            jsonHeaders
-          );
-        }
-
-        const stamp = await supabaseFetch(
-          env,
-          `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
-          {
-            method: "PATCH",
-            headers: {
-              Prefer: "return=representation"
-            },
-            body: JSON.stringify({
-              last_status_emailed: normalizeDisplayStatus(updated.status)
-            })
-          }
-        );
-
-        if (stamp.ok && Array.isArray(stamp.data) && stamp.data[0]) {
-          updated = stamp.data[0];
-        }
-
-        await logOrderActivity(env, {
-          orderNumber,
-          eventType: "status_email_sent",
-          eventLabel: "Status email sent",
-          eventDetail: normalizeDisplayStatus(updated.status)
-        });
-      }
-
-      if (shouldTextForStatus) {
-        if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
-          return json(
-            {
-              ok: false,
-              error: "Order updated, but SMS was not sent because Twilio environment variables are missing."
-            },
-            200,
-            jsonHeaders
-          );
-        }
-
-        const textResult = await sendStatusText(
-          env,
-          updated,
-          normalizeDisplayStatus(updated.status)
-        );
-
-        if (textResult.skipped) {
-          return json(
-            {
-              ok: false,
-              error: "Order updated, but SMS was skipped.",
-              details: textResult.reason
-            },
-            200,
-            jsonHeaders
-          );
-        }
-
-        if (!textResult.ok) {
-          return json(
-            {
-              ok: false,
-              error: "Order updated, but status text failed to send.",
-              details: textResult.error
-            },
-            200,
-            jsonHeaders
-          );
-        }
-
-        const textStamp = await supabaseFetch(
-          env,
-          `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
-          {
-            method: "PATCH",
-            headers: {
-              Prefer: "return=representation"
-            },
-            body: JSON.stringify({
-              last_status_texted: normalizeDisplayStatus(updated.status)
-            })
-          }
-        );
-
-        if (textStamp.ok && Array.isArray(textStamp.data) && textStamp.data[0]) {
-          updated = textStamp.data[0];
-        }
-
-        await logOrderActivity(env, {
-          orderNumber,
-          eventType: "status_text_sent",
-          eventLabel: "Status text sent",
-          eventDetail: normalizeDisplayStatus(updated.status)
-        });
-      }
-
-      return json(
-        {
-          ok: true,
-          order: mapOrderFromDb(updated)
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "geocodeAddresses") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const items = Array.isArray(body.items) ? body.items : [];
-      const results = await geocodeAddresses(items);
-
-      return json(
-        {
-          ok: true,
-          results
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "geocodeMissingOrderAddresses") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const items = Array.isArray(body.items) ? body.items : [];
-      const results = await geocodeMissingOrderAddresses(env, items);
-
-      return json(
-        {
-          ok: true,
-          results
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "uploadGalleryPhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const filename = cleanText(body.filename);
-      const contentType = cleanText(body.contentType) || "image/jpeg";
-      const dataUrl = cleanText(body.dataUrl);
-      const section = cleanText(body.section) || "fielding-gloves";
-
-      if (!filename || !dataUrl) {
-        return json(
-          {
-            ok: false,
-            error: "Missing filename or image data."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      if (!contentType.startsWith("image/")) {
-        return json(
-          {
-            ok: false,
-            error: "Only image uploads are allowed."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const uploaded = await uploadGalleryPhoto(env, {
-        section,
-        filename,
-        contentType,
-        dataUrl
-      });
-
-      if (!uploaded.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Gallery upload failed.",
-            details: uploaded.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          url: uploaded.url,
-          path: uploaded.path
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "listExpenses") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const resp = await supabaseFetch(env, `/rest/v1/shop_expenses?select=*&order=expense_date.desc,created_at.desc&limit=500`);
-      if (!resp.ok) return json({ ok: false, error: "Expenses could not be loaded." }, 200, jsonHeaders);
-      return json({
-        ok: true,
-        expenses: (resp.data || []).map(row => ({
-          id: row.id,
-          expenseDate: row.expense_date,
-          category: row.category,
-          description: row.description,
-          amount: row.amount != null ? Number(row.amount) : 0,
-          quantity: row.quantity != null ? Number(row.quantity) : null,
-          unitKind: row.unit_kind
-        }))
-      }, 200, jsonHeaders);
-    }
-
-    if (action === "createExpense") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const amount = Number(body.amount);
-      const expenseDate = cleanText(body.expenseDate);
-      const category = cleanText(body.category);
-      if (!expenseDate || !category || !Number.isFinite(amount) || amount <= 0) {
-        return json({ ok: false, error: "Expense needs a date, category, and amount." }, 200, jsonHeaders);
-      }
-      const quantity = Number(body.quantity);
-      const resp = await supabaseFetch(env, `/rest/v1/shop_expenses`, {
-        method: "POST",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({
-          expense_date: expenseDate,
-          category,
-          description: cleanText(body.description) || null,
-          amount,
-          quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : null,
-          unit_kind: cleanText(body.unitKind) || null
-        })
-      });
-      if (!resp.ok) return json({ ok: false, error: "Expense could not be saved." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "deleteExpense") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const id = cleanText(body.id);
-      if (!id) return json({ ok: false, error: "Missing expense id." }, 200, jsonHeaders);
-      const resp = await supabaseFetch(env, `/rest/v1/shop_expenses?id=eq.${encodeURIComponent(id)}`, {
-        method: "DELETE", headers: { Prefer: "return=minimal" }
-      });
-      if (!resp.ok) return json({ ok: false, error: "Expense could not be deleted." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    /* =========================
-       SERVICE PRICING (Pricing Management)
-       Live rows in service_pricing are what the public site reads. Editing
-       only ever writes a draft revision; publishing copies the draft into the
-       live row and turns that revision into an immutable history record.
-    ========================= */
-    if (action === "listServicePricing") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const rowsResp = await supabaseFetch(env, `/rest/v1/service_pricing?select=*&order=category.asc,sort_order.asc`);
-      if (!rowsResp.ok) return json({ ok: false, error: "Pricing could not be loaded." }, 200, jsonHeaders);
-      const rows = Array.isArray(rowsResp.data) ? rowsResp.data : [];
-
-      const draftsResp = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?select=*&status=eq.draft`);
-      const drafts = draftsResp.ok && Array.isArray(draftsResp.data) ? draftsResp.data : [];
-      const draftByService = {};
-      drafts.forEach((d) => { draftByService[String(d.service_pricing_id)] = d; });
-
-      const jobTypesResp = await supabaseFetch(env, `/rest/v1/service_pricing_job_types?select=*`);
-      const jobTypes = jobTypesResp.ok && Array.isArray(jobTypesResp.data) ? jobTypesResp.data : [];
-      const mappingsByService = {};
-      jobTypes.forEach((j) => {
-        const key = String(j.service_pricing_id);
-        (mappingsByService[key] = mappingsByService[key] || []).push({
-          gloveType: j.glove_type || null,
-          services: j.services || null,
-          trapeze: j.trapeze === true
-        });
-      });
-
-      const services = rows.map((row) => {
-        const service = mapServicePricingRow(row);
-        service.analyticsMappings = mappingsByService[String(row.id)] || [];
-        const draftRow = draftByService[String(row.id)];
-        if (draftRow && draftRow.data && typeof draftRow.data === "object") {
-          const data = draftRow.data;
-          service.draft = {
-            revisionId: draftRow.id,
-            note: draftRow.note || "",
-            display: formatServiceDisplayPrice(data),
-            fields: mapPricingSnapshotToClient(data),
-            differs: pricingSnapshotsDiffer(liveSnapshotFromRow(row), data),
-            createdAt: draftRow.created_at
-          };
-        } else {
-          service.draft = null;
-        }
-        return service;
-      });
-
-      const settings = await fetchShopSettings(env);
-      return json({ ok: true, services, settings }, 200, jsonHeaders);
-    }
-
-    if (action === "saveServicePricingDraft") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
-      if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
-
-      const built = buildPricingDraftData(body);
-      if (!built.ok) return json({ ok: false, error: built.error }, 200, jsonHeaders);
-
-      const note = cleanText(body.note);
-      const existing = await fetchServicePricingDraft(env, service.id);
-      if (existing) {
-        const patch = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(existing.id)}`, {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ data: built.data, note, created_at: new Date().toISOString() })
-        });
-        if (!patch.ok) return json({ ok: false, error: "Draft could not be saved." }, 200, jsonHeaders);
-      } else {
-        const insert = await supabaseFetch(env, `/rest/v1/service_pricing_revisions`, {
-          method: "POST",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({
-            service_pricing_id: service.id,
-            service_key: service.service_key,
-            status: "draft",
-            data: built.data,
-            note
-          })
-        });
-        if (!insert.ok) return json({ ok: false, error: "Draft could not be saved." }, 200, jsonHeaders);
-      }
-      return json({ ok: true, display: formatServiceDisplayPrice(built.data) }, 200, jsonHeaders);
-    }
-
-    if (action === "discardServicePricingDraft") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
-      if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
-      const del = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?service_pricing_id=eq.${encodeURIComponent(service.id)}&status=eq.draft`, {
-        method: "DELETE", headers: { Prefer: "return=minimal" }
-      });
-      if (!del.ok) return json({ ok: false, error: "Draft could not be discarded." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "publishServicePricing") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
-      if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
-
-      const draft = await fetchServicePricingDraft(env, service.id);
-      if (!draft || !draft.data || typeof draft.data !== "object") {
-        return json({ ok: false, error: "No draft to publish." }, 200, jsonHeaders);
-      }
-
-      const data = draft.data;
-      const previousDisplay = formatServiceDisplayPrice(service);
-      const newDisplay = formatServiceDisplayPrice(data);
-      const nowIso = new Date().toISOString();
-
-      const liveUpdate = {
-        service_name: data.service_name,
-        category: data.category,
-        short_description: data.short_description ?? null,
-        bullet_details: Array.isArray(data.bullet_details) ? data.bullet_details : [],
-        pricing_type: data.pricing_type,
-        base_price: data.base_price ?? null,
-        premium_price: data.premium_price ?? null,
-        price_suffix: data.price_suffix ?? null,
-        display_override: data.display_override ?? null,
-        is_public: data.is_public !== false,
-        is_active: data.is_active !== false,
-        sort_order: Number.isFinite(Number(data.sort_order)) ? Math.round(Number(data.sort_order)) : 0,
-        updated_at: nowIso,
-        published_at: nowIso
-      };
-
-      const patchLive = await supabaseFetch(env, `/rest/v1/service_pricing?id=eq.${encodeURIComponent(service.id)}`, {
-        method: "PATCH",
-        headers: { Prefer: "return=representation" },
-        body: JSON.stringify(liveUpdate)
-      });
-      if (!patchLive.ok) return json({ ok: false, error: "Publish failed while updating live pricing." }, 200, jsonHeaders);
-
-      const promote = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(draft.id)}`, {
-        method: "PATCH",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({
-          status: "published",
-          previous_display: previousDisplay,
-          new_display: newDisplay,
-          note: cleanText(body.note) || draft.note || null,
-          published_at: nowIso
-        })
-      });
-      if (!promote.ok) return json({ ok: false, error: "Publish saved pricing but failed to record history." }, 200, jsonHeaders);
-
-      const updatedRow = Array.isArray(patchLive.data) ? patchLive.data[0] : null;
-      return json({
-        ok: true,
-        service: updatedRow ? mapServicePricingRow(updatedRow) : null,
-        previousDisplay,
-        newDisplay
-      }, 200, jsonHeaders);
-    }
-
-    if (action === "listServicePricingHistory") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const key = cleanText(body.serviceKey);
-      let path = `/rest/v1/service_pricing_revisions?select=*&status=eq.published&order=published_at.desc&limit=200`;
-      if (key) path += `&service_key=eq.${encodeURIComponent(key)}`;
-      const resp = await supabaseFetch(env, path);
-      if (!resp.ok) return json({ ok: false, error: "History could not be loaded." }, 200, jsonHeaders);
-      const history = (resp.data || []).map((r) => ({
-        id: r.id,
-        serviceKey: r.service_key,
-        previousDisplay: r.previous_display || "",
-        newDisplay: r.new_display || "",
-        note: r.note || "",
-        publishedAt: r.published_at,
-        fields: r.data && typeof r.data === "object" ? mapPricingSnapshotToClient(r.data) : null
-      }));
-      return json({ ok: true, history }, 200, jsonHeaders);
-    }
-
-    if (action === "restoreServicePricingRevision") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const revisionId = cleanText(body.revisionId);
-      if (!revisionId) return json({ ok: false, error: "Missing revision id." }, 200, jsonHeaders);
-
-      const revResp = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?select=*&id=eq.${encodeURIComponent(revisionId)}&limit=1`);
-      const revision = revResp.ok && Array.isArray(revResp.data) ? revResp.data[0] : null;
-      if (!revision || !revision.data) return json({ ok: false, error: "Revision not found." }, 200, jsonHeaders);
-
-      const restoredAt = revision.published_at ? new Date(revision.published_at).toLocaleDateString("en-US") : "a prior revision";
-      const note = `Restored from ${restoredAt}`;
-      const existing = await fetchServicePricingDraft(env, revision.service_pricing_id);
-      if (existing) {
-        const patch = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(existing.id)}`, {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ data: revision.data, note, created_at: new Date().toISOString() })
-        });
-        if (!patch.ok) return json({ ok: false, error: "Restore failed." }, 200, jsonHeaders);
-      } else {
-        const insert = await supabaseFetch(env, `/rest/v1/service_pricing_revisions`, {
-          method: "POST",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({
-            service_pricing_id: revision.service_pricing_id,
-            service_key: revision.service_key,
-            status: "draft",
-            data: revision.data,
-            note
-          })
-        });
-        if (!insert.ok) return json({ ok: false, error: "Restore failed." }, 200, jsonHeaders);
-      }
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "createServicePricing") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const serviceName = cleanText(body.serviceName);
-      if (!serviceName) return json({ ok: false, error: "Service name is required." }, 200, jsonHeaders);
-
-      let serviceKey = cleanText(body.serviceKey);
-      if (!serviceKey) {
-        serviceKey = serviceName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48);
-      }
-      if (!/^[a-z0-9_]+$/.test(serviceKey)) {
-        return json({ ok: false, error: "Service key must be lowercase letters, numbers, and underscores." }, 200, jsonHeaders);
-      }
-
-      const existing = await fetchServicePricingByKey(env, serviceKey);
-      if (existing) return json({ ok: false, error: "A service with that key already exists." }, 200, jsonHeaders);
-
-      const category = ["relacing", "additional"].includes(String(body.category)) ? String(body.category) : "additional";
-      const rowsResp = await supabaseFetch(env, `/rest/v1/service_pricing?select=sort_order`);
-      const maxSort = rowsResp.ok && Array.isArray(rowsResp.data)
-        ? rowsResp.data.reduce((m, r) => Math.max(m, Number(r.sort_order) || 0), 0)
-        : 0;
-
-      /* New services start hidden + inactive with no published_at, so they can
-         never leak to the public endpoint before the owner publishes them. */
-      const insert = await supabaseFetch(env, `/rest/v1/service_pricing`, {
-        method: "POST",
-        headers: { Prefer: "return=representation" },
-        body: JSON.stringify({
-          service_key: serviceKey,
-          service_name: serviceName,
-          category,
-          bullet_details: [],
-          pricing_type: ["fixed", "range", "starting_at", "per_item", "variable", "tiered"].includes(String(body.pricingType)) ? String(body.pricingType) : "fixed",
-          is_public: false,
-          is_active: false,
-          sort_order: maxSort + 10
-        })
-      });
-      if (!insert.ok) return json({ ok: false, error: "Service could not be created." }, 200, jsonHeaders);
-      const created = Array.isArray(insert.data) ? insert.data[0] : null;
-      return json({ ok: true, service: created ? mapServicePricingRow(created) : null }, 200, jsonHeaders);
-    }
-
-    if (action === "getShopSettings") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const settings = await fetchShopSettings(env);
-      return json({ ok: true, settings }, 200, jsonHeaders);
-    }
-
-    if (action === "saveShopSettings") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const updates = [];
-      const targetRate = cleanNumeric(body.targetLaborRate);
-      const minCharge = cleanNumeric(body.minShopCharge);
-      const rounding = cleanNumeric(body.roundingIncrement);
-      if (targetRate !== null && targetRate > 0) updates.push({ key: "target_labor_rate", value: targetRate });
-      if (minCharge !== null && minCharge >= 0) updates.push({ key: "min_shop_charge", value: minCharge });
-      if (rounding !== null && rounding > 0) updates.push({ key: "rounding_increment", value: rounding });
-
-      if (!updates.length) return json({ ok: false, error: "No valid settings to save." }, 200, jsonHeaders);
-
-      const nowIso = new Date().toISOString();
-      const resp = await supabaseFetch(env, `/rest/v1/shop_settings?on_conflict=key`, {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify(updates.map((u) => ({ ...u, updated_at: nowIso })))
-      });
-      if (!resp.ok) return json({ ok: false, error: "Settings could not be saved." }, 200, jsonHeaders);
-      const settings = await fetchShopSettings(env);
-      return json({ ok: true, settings }, 200, jsonHeaders);
-    }
-
-    if (action === "setGalleryPhotoCover") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const url = cleanText(body.url);
-      if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
-
-      const link = await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}&select=order_number&limit=1`);
-      const row = link.ok && Array.isArray(link.data) ? link.data[0] : null;
-      if (!row?.order_number) {
-        return json({ ok: false, error: "Photo must be linked to an order first." }, 200, jsonHeaders);
-      }
-
-      /* One cover per album: clear the order's flag, then set this photo. */
-      await supabaseFetch(env, `/rest/v1/gallery_photo_links?order_number=eq.${encodeURIComponent(row.order_number)}`, {
-        method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_cover: false })
-      });
-      const set = await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}`, {
-        method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_cover: true })
-      });
-      if (!set.ok) return json({ ok: false, error: "Could not set the cover." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "setGalleryPhotoOrder") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const url = cleanText(body.url);
-      const orderNumber = cleanText(body.orderNumber);
-      if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
-
-      /* Orderless "shop glove" description: descriptors make the photo
-         searchable without an order (personal/family/sold gloves). */
-      const d = body.descriptors && typeof body.descriptors === "object" ? body.descriptors : null;
-      const descriptors = {
-        brand_model: cleanText(d?.brandModel) || null,
-        glove_type: cleanText(d?.gloveType) || null,
-        web_type: cleanText(d?.webType) || null,
-        primary_lace_color: cleanText(d?.primaryLaceColor) || null,
-        secondary_lace_color: cleanText(d?.secondaryLaceColor) || null
-      };
-      const hasDescriptors = Object.values(descriptors).some(Boolean);
-
-      if (!orderNumber && !hasDescriptors) {
-        await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}`, {
-          method: "DELETE", headers: { Prefer: "return=minimal" }
-        });
-        return json({ ok: true, cleared: true }, 200, jsonHeaders);
-      }
-
-      if (orderNumber) {
-        const found = await fetchOrderByNumber(env, orderNumber);
-        if (!found.ok || !found.data) {
-          return json({ ok: false, error: `Order #${orderNumber} not found.` }, 200, jsonHeaders);
-        }
-      }
-
-      /* Linking to an order clears descriptors and vice versa. */
-      const row = orderNumber
-        ? {
-            photo_url: url,
-            photo_path: cleanText(body.path) || null,
-            order_number: orderNumber,
-            brand_model: null,
-            glove_type: null,
-            web_type: null,
-            primary_lace_color: null,
-            secondary_lace_color: null
-          }
-        : {
-            photo_url: url,
-            photo_path: cleanText(body.path) || null,
-            order_number: null,
-            ...descriptors
-          };
-
-      const resp = await supabaseFetch(env, `/rest/v1/gallery_photo_links?on_conflict=photo_url`, {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify(row)
-      });
-      if (!resp.ok) return json({ ok: false, error: "Could not save the link." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "moveGalleryPhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const photoPath = cleanText(body.path);
-      const oldUrl = cleanText(body.url);
-      const targetSection = safeGallerySection(cleanText(body.section));
-      const parsed = parseGalleryPhotoPath(photoPath);
-      if (!parsed.ok) return json({ ok: false, error: "Invalid gallery photo path." }, 200, jsonHeaders);
-      if (parsed.section === targetSection) {
-        return json({ ok: false, error: "Photo is already in that section." }, 200, jsonHeaders);
-      }
-
-      const destinationPath = parsed.hidden
-        ? `_hidden/${targetSection}/${parsed.name}`
-        : `${targetSection}/${parsed.name}`;
-      const moved = await moveGalleryStorageObject(env, photoPath, destinationPath);
-      if (!moved.ok) return json({ ok: false, error: moved.error || "Move failed." }, 200, jsonHeaders);
-
-      const photo = galleryPhotoFromPath(env, destinationPath, parsed.hidden);
-
-      /* The URL changes with the path — keep the album link attached. */
-      if (oldUrl) {
-        await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(oldUrl)}`, {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ photo_url: photo.url, photo_path: photo.path })
-        });
-      }
-
-      return json({ ok: true, photo }, 200, jsonHeaders);
-    }
-
-    if (action === "hideGalleryPhoto" || action === "restoreGalleryPhoto" || action === "deleteGalleryPhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const photoPath = cleanText(body.path);
-      const result = action === "hideGalleryPhoto"
-        ? await hideGalleryPhoto(env, photoPath)
-        : action === "restoreGalleryPhoto"
-          ? await restoreGalleryPhoto(env, photoPath)
-          : await deleteGalleryPhoto(env, photoPath);
-
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: result.error || "Gallery photo action failed."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          photo: result.photo || null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "listSaleGloves") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const supa = await supabaseFetch(
-        env,
-        `/rest/v1/gloves_for_sale?select=*&order=sort_order.asc,created_at.desc`
-      );
-
-      if (!supa.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to load gloves for sale from Supabase.",
-            details: supa.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          gloves: (supa.data || []).map(mapSaleGloveFromDb)
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "getSaleGlove") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const id = cleanText(body.id);
-
-      if (!id) {
-        return json(
-          {
-            ok: false,
-            error: "Missing glove id."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const supa = await supabaseFetch(
-        env,
-        `/rest/v1/gloves_for_sale?select=*&id=eq.${encodeURIComponent(id)}&limit=1`
-      );
-
-      if (!supa.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to load glove listing.",
-            details: supa.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const row = Array.isArray(supa.data) ? supa.data[0] : null;
-
-      if (!row) {
-        return json(
-          {
-            ok: false,
-            error: "Glove listing not found."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          glove: mapSaleGloveFromDb(row)
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "createSaleGlove") {
-      const auth = await validateTokenFromBody(
         body,
-        env.ADMIN_SESSION_SECRET
-      );
-
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const payload = {
-        slug: body.slug,
-        title: body.title,
-        short_description: body.shortDescription,
-        description: body.description,
-        price: body.price || null,
-        brand: body.brand,
-        model: body.model,
-        glove_size: body.gloveSize,
-        position: body.position,
-        web: body.web,
-        throw_hand: body.throwHand,
-        condition: body.condition,
-        status: body.status || "available",
-        purchase_url: body.purchaseUrl,
-        featured: body.featured === true,
-        sort_order: Number(body.sortOrder || 0)
-      };
-
-      const result = await supabaseFetch(
-        env,
-        "/rest/v1/gloves_for_sale",
-        {
-          method: "POST",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify(payload)
-        }
-      );
-
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to create glove listing.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          glove: result.data?.[0] || null
-        },
-        200,
+        action,
         jsonHeaders
-      );
-    }
-
-    if (action === "updateSaleGlove") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const id = cleanText(body.id);
-
-      if (!id) {
-        return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
-      }
-
-      const payload = {
-        slug: cleanText(body.slug),
-        title: cleanText(body.title),
-        short_description: cleanText(body.shortDescription),
-        description: cleanText(body.description),
-        price: cleanNumeric(body.price),
-        brand: cleanText(body.brand),
-        model: cleanText(body.model),
-        glove_size: cleanText(body.gloveSize),
-        position: cleanText(body.position),
-        web: cleanText(body.web),
-        throw_hand: cleanText(body.throwHand),
-        condition: cleanText(body.condition),
-        status: cleanText(body.status) || "available",
-        purchase_url: cleanText(body.purchaseUrl),
-        featured: body.featured === true,
-        sort_order: Number(body.sortOrder || 0)
-      };
-
-      const result = await supabaseFetch(
-        env,
-        `/rest/v1/gloves_for_sale?id=eq.${encodeURIComponent(id)}`,
-        {
-          method: "PATCH",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify(payload)
-        }
-      );
-
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to update glove listing.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          glove: result.data?.[0] || null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "deleteSaleGlove") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const id = cleanText(body.id);
-
-      if (!id) {
-        return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
-      }
-
-      const result = await supabaseFetch(
-        env,
-        `/rest/v1/gloves_for_sale?id=eq.${encodeURIComponent(id)}`,
-        {
-          method: "DELETE",
-          headers: {
-            Prefer: "return=representation"
-          }
-        }
-      );
-
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to delete glove listing.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          deleted: true,
-          id
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "uploadLacePhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const color = cleanText(body.color);
-      const filename = cleanText(body.filename);
-      const contentType = cleanText(body.contentType) || "image/jpeg";
-      const dataUrl = cleanText(body.dataUrl);
-
-      if (!color || !filename || !dataUrl) {
-        return json({ ok: false, error: "Missing color, filename or image data." }, 200, jsonHeaders);
-      }
-      if (!contentType.startsWith("image/")) {
-        return json({ ok: false, error: "Only image uploads are allowed." }, 200, jsonHeaders);
-      }
-
-      const uploaded = await uploadLacePhoto(env, { color, filename, contentType, dataUrl });
-      if (!uploaded.ok) {
-        return json({ ok: false, error: "Lace photo upload failed.", details: uploaded.error }, 200, jsonHeaders);
-      }
-      return json({ ok: true, url: uploaded.url, path: uploaded.path }, 200, jsonHeaders);
-    }
-
-    if (action === "uploadSaleGlovePhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const gloveId = cleanText(body.gloveId);
-      const filename = cleanText(body.filename);
-      const contentType = cleanText(body.contentType) || "image/jpeg";
-      const dataUrl = cleanText(body.dataUrl);
-
-      if (!gloveId || !filename || !dataUrl) {
-        return json(
-          {
-            ok: false,
-            error: "Missing gloveId, filename or image data."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      if (!contentType.startsWith("image/")) {
-        return json(
-          {
-            ok: false,
-            error: "Only image uploads are allowed."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const gloveResp = await supabaseFetch(
-        env,
-        `/rest/v1/gloves_for_sale?select=id,slug&id=eq.${encodeURIComponent(gloveId)}&limit=1`
-      );
-
-      if (!gloveResp.ok || !Array.isArray(gloveResp.data) || !gloveResp.data[0]) {
-        return json(
-          {
-            ok: false,
-            error: "Glove not found.",
-            details: gloveResp.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const glove = gloveResp.data[0];
-
-      const uploaded = await uploadSaleGlovePhoto(env, {
-        slug: glove.slug,
-        filename,
-        contentType,
-        dataUrl
       });
-
-      if (!uploaded.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Glove photo upload failed.",
-            details: uploaded.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const countResp = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?select=id&glove_id=eq.${encodeURIComponent(gloveId)}`
-      );
-
-      const sortOrder = Array.isArray(countResp.data)
-        ? countResp.data.length
-        : 0;
-
-      const photoInsert = await supabaseFetch(
-        env,
-        "/rest/v1/glove_sale_photos",
-        {
-          method: "POST",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify({
-            glove_id: gloveId,
-            url: uploaded.url,
-            filename,
-            sort_order: sortOrder
-          })
-        }
-      );
-
-      if (!photoInsert.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Photo uploaded but database insert failed.",
-            details: photoInsert.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          photo: photoInsert.data?.[0] || null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "listSaleGlovePhotos") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const gloveId = cleanText(body.gloveId);
-
-      if (!gloveId) {
-        return json(
-          {
-            ok: false,
-            error: "Missing glove id."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const photos = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?glove_id=eq.${encodeURIComponent(gloveId)}&select=*&order=sort_order.asc,id.asc`
-      );
-
-      if (!photos.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to load glove photos.",
-            details: photos.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          photos: photos.data || []
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "setSalePhotoPrimary") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const gloveId = cleanText(body.gloveId);
-      const photoId = cleanText(body.photoId);
-
-      if (!gloveId || !photoId) {
-        return json(
-          {
-            ok: false,
-            error: "Missing gloveId or photoId."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const clearPrimary = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?glove_id=eq.${encodeURIComponent(gloveId)}`,
-        {
-          method: "PATCH",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify({
-            is_primary: false
-          })
-        }
-      );
-
-      if (!clearPrimary.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to clear existing primary photo.",
-            details: clearPrimary.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const setPrimary = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?id=eq.${encodeURIComponent(photoId)}&glove_id=eq.${encodeURIComponent(gloveId)}`,
-        {
-          method: "PATCH",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify({
-            is_primary: true
-          })
-        }
-      );
-
-      if (!setPrimary.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to set primary photo.",
-            details: setPrimary.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          photo: Array.isArray(setPrimary.data) ? setPrimary.data[0] : null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "setSalePhotoHover") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const gloveId = cleanText(body.gloveId);
-      const photoId = cleanText(body.photoId);
-
-      if (!gloveId || !photoId) {
-        return json(
-          {
-            ok: false,
-            error: "Missing gloveId or photoId."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const clearHover = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?glove_id=eq.${encodeURIComponent(gloveId)}`,
-        {
-          method: "PATCH",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify({
-            is_hover: false
-          })
-        }
-      );
-
-      if (!clearHover.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to clear existing hover photo.",
-            details: clearHover.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const setHover = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?id=eq.${encodeURIComponent(photoId)}&glove_id=eq.${encodeURIComponent(gloveId)}`,
-        {
-          method: "PATCH",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify({
-            is_hover: true
-          })
-        }
-      );
-
-      if (!setHover.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to set hover photo.",
-            details: setHover.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          photo: Array.isArray(setHover.data) ? setHover.data[0] : null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "deleteSaleGlovePhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const gloveId = cleanText(body.gloveId);
-      const photoId = cleanText(body.photoId);
-
-      if (!gloveId || !photoId) {
-        return json(
-          {
-            ok: false,
-            error: "Missing gloveId or photoId."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-    
-      const del = await supabaseFetch(
-        env,
-        `/rest/v1/glove_sale_photos?id=eq.${encodeURIComponent(photoId)}&glove_id=eq.${encodeURIComponent(gloveId)}`,
-        {
-          method: "DELETE",
-          headers: {
-            Prefer: "return=representation"
-          }
-        }
-      );
-    
-      if (!del.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to delete glove photo.",
-            details: del.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-    
-      return json(
-        {
-          ok: true,
-          deleted: true,
-          photo: Array.isArray(del.data) ? del.data[0] : null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "searchPublicGloves") {
-      /* Public glove search for the website gallery. Returns ONLY glove
-         fields + photos — never customer name/contact/address. */
-      const q = String(body.q || "").trim().toLowerCase();
-      if (q.length < 2) return json({ ok: true, gloves: [] }, 200, jsonHeaders);
-
-      const terms = q.split(/\s+/).filter(Boolean);
-      const gloves = [];
-
-      /* Source: curated gallery photos, either linked to an order (searchable
-         via the order's fields) or carrying their own shop-glove descriptors. */
-      const links = await supabaseFetch(
-        env,
-        `/rest/v1/gallery_photo_links?select=photo_url,order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
-      );
-      const linkRows = (links.ok && Array.isArray(links.data)) ? links.data : [];
-
-      const byOrder = new Map();
-      /* Shop gloves described directly on the photo link. No grouping: two
-         distinct gloves can share identical descriptors, so every described
-         photo is its own result. */
-      for (const l of linkRows) {
-        if (l.order_number) {
-          if (!byOrder.has(l.order_number)) byOrder.set(l.order_number, []);
-          byOrder.get(l.order_number).push(l.photo_url);
-          continue;
-        }
-        const fields = [l.brand_model, l.glove_type, l.web_type, l.primary_lace_color, l.secondary_lace_color];
-        if (!fields.some(Boolean)) continue;
-        if (gloves.length >= 24) continue;
-        const hay = fields.map(v => String(v || "").toLowerCase()).join(" ");
-        if (!terms.every(t => hay.includes(t))) continue;
-        gloves.push({
-          brandModel: l.brand_model || "",
-          gloveType: l.glove_type || "",
-          webType: l.web_type || "",
-          laceColors: [l.primary_lace_color, l.secondary_lace_color].filter(Boolean),
-          photos: [l.photo_url]
-        });
-      }
-
-      if (byOrder.size && gloves.length < 24) {
-        const nums = [...byOrder.keys()].map(n => `"${String(n).replace(/"/g, "")}"`).join(",");
-        const ordersResp = await supabaseFetch(
-          env,
-          `/rest/v1/orders?select=order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color,custom_color_request,services_requested&order_number=in.(${encodeURIComponent(nums)})`
-        );
-        for (const row of (ordersResp.ok && Array.isArray(ordersResp.data)) ? ordersResp.data : []) {
-          const hay = [
-            row.brand_model, row.glove_type, row.web_type,
-            row.primary_lace_color, row.secondary_lace_color,
-            row.custom_color_request, row.services_requested
-          ].map(v => String(v || "").toLowerCase()).join(" ");
-          if (!terms.every(t => hay.includes(t))) continue;
-          gloves.push({
-            brandModel: row.brand_model || "",
-            gloveType: row.glove_type || "",
-            webType: row.web_type || "",
-            laceColors: [row.primary_lace_color, row.secondary_lace_color].filter(Boolean),
-            photos: (byOrder.get(row.order_number) || []).slice(0, 4)
-          });
-          if (gloves.length >= 24) break;
-        }
-      }
-
-      /* Curated linked gallery photos only — customer intake/SMS photos
-         (orders.glove_photos) must never appear in public search results. */
-      return json({ ok: true, gloves, source: "gallery" }, 200, jsonHeaders);
-    }
-
-    if (action === "listGalleryPhotos") {
-      const includeHidden = body.includeHidden === true;
-
-      if (includeHidden) {
-        const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-        if (!auth.ok) {
-          return json(auth, 200, jsonHeaders);
-        }
-      }
-
-      const sections = [
-        "fielding-gloves",
-        "catchers-mitts",
-        "first-base-mitts",
-        "custom-color-relaces",
-        "vintage"
-      ];
-
-      const gallery = {};
-      const hiddenGallery = {};
-
-      /* photoLinks (photo -> order number) ships publicly so the gallery can
-         group a glove's photos into one album; descriptors stay admin-only. */
-      let photoLinks = {};
-      let photoCovers = {};
-      let photoGloveMeta = {};
-      {
-        const links = await supabaseFetch(
-          env,
-          `/rest/v1/gallery_photo_links?select=photo_url,order_number,is_cover,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
-        );
-        if (links.ok && Array.isArray(links.data)) {
-          for (const l of links.data) {
-            if (l.is_cover) photoCovers[l.photo_url] = true;
-            if (l.order_number) {
-              photoLinks[l.photo_url] = l.order_number;
-              continue;
-            }
-            if (includeHidden) {
-              photoGloveMeta[l.photo_url] = {
-                brandModel: l.brand_model || "",
-                gloveType: l.glove_type || "",
-                webType: l.web_type || "",
-                primaryLaceColor: l.primary_lace_color || "",
-                secondaryLaceColor: l.secondary_lace_color || ""
-              };
-            }
-          }
-        }
-      }
-
-      for (const section of sections) {
-        const listed = await listGallerySection(env, section);
-
-        if (!listed.ok) {
-          return json(
-            {
-              ok: false,
-              error: `Failed to load gallery section: ${section}`,
-              details: listed.error
-            },
-            200,
-            jsonHeaders
-          );
-        }
-
-        gallery[section] = listed.photos;
-
-        if (includeHidden) {
-          const hidden = await listGallerySection(env, section, { hidden: true });
-
-          if (!hidden.ok) {
-            return json(
-              {
-                ok: false,
-                error: `Failed to load hidden gallery section: ${section}`,
-                details: hidden.error
-              },
-              200,
-              jsonHeaders
-            );
-          }
-
-          hiddenGallery[section] = hidden.photos;
-        }
-      }
-
-      return json(
-        {
-          ok: true,
-          gallery,
-          photoLinks,
-          photoCovers,
-          photoGloveMeta,
-          hiddenGallery
-        },
-        200,
-        jsonHeaders
-      );
     }
 
     return json(
@@ -2913,6 +626,1861 @@ export async function onRequest(context) {
       jsonHeaders
     );
   }
+}
+
+async function handleSavePushSubscription({ env, body, jsonHeaders }) {
+  const sub = body.subscription || {};
+  const keys = sub.keys || {};
+  if (!sub.endpoint || !keys.p256dh || !keys.auth) {
+    return json({ ok: false, error: "Invalid subscription." }, 200, jsonHeaders);
+  }
+  const resp = await supabaseFetch(env, `/rest/v1/push_subscriptions?on_conflict=endpoint`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({
+      endpoint: sub.endpoint, p256dh: keys.p256dh, auth: keys.auth,
+      label: cleanText(body.label) || null, last_used_at: new Date().toISOString()
+    })
+  });
+  if (!resp.ok) return json({ ok: false, error: "Could not save subscription." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleSendTestPush({ env, jsonHeaders }) {
+  await sendWebPushToAll(env, {
+    title: "MurphOS",
+    body: "Push notifications are working.",
+    url: "/admin/"
+  });
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleMarkMessagesRead({ env, body, jsonHeaders }) {
+  const phone = cleanText(body.phoneNumber);
+  const path = phone
+    ? `/rest/v1/sms_messages?phone_number=eq.${encodeURIComponent(phone)}&read=eq.false`
+    : `/rest/v1/sms_messages?read=eq.false`;
+  const resp = await supabaseFetch(env, path, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ read: true })
+  });
+  if (!resp.ok) return json({ ok: false, error: "Could not update messages." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleDeleteMessage({ env, body, jsonHeaders }) {
+  const id = cleanText(body.id);
+  if (!id) return json({ ok: false, error: "Missing message id." }, 200, jsonHeaders);
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/sms_messages?id=eq.${encodeURIComponent(id)}`,
+    { method: "DELETE", headers: { Prefer: "return=minimal" } }
+  );
+  if (!resp.ok) return json({ ok: false, error: "Could not delete the message." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleDeleteMessageThread({ env, body, jsonHeaders }) {
+  const phones = Array.isArray(body.phoneNumbers) ? body.phoneNumbers.filter(Boolean).slice(0, 20) : [];
+  if (!phones.length) return json({ ok: false, error: "Missing phone numbers." }, 200, jsonHeaders);
+  const inList = phones.map(pn => `"${String(pn).replace(/"/g, "")}"`).join(",");
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/sms_messages?phone_number=in.(${encodeURIComponent(inList)})`,
+    { method: "DELETE", headers: { Prefer: "return=minimal" } }
+  );
+  if (!resp.ok) return json({ ok: false, error: "Could not delete the conversation." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleListMessages({ env, jsonHeaders }) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/sms_messages?select=*&order=created_at.desc&limit=300`
+  );
+  if (!resp.ok) return json({ ok: false, error: "Could not load messages." }, 200, jsonHeaders);
+  return json({ ok: true, messages: (resp.data || []).map(mapSmsMessage) }, 200, jsonHeaders);
+}
+
+async function handleSendMessageReply({ env, body, jsonHeaders }) {
+  const to = toE164US(body.phoneNumber);
+  const text = cleanText(body.body);
+  const mediaDataUrl = String(body.mediaDataUrl || "");
+  if (!to) return json({ ok: false, error: "Invalid phone number." }, 200, jsonHeaders);
+  if (!text && !mediaDataUrl) return json({ ok: false, error: "Enter a message." }, 200, jsonHeaders);
+  if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
+    return json({ ok: false, error: "Twilio is not configured." }, 200, jsonHeaders);
+  }
+
+  let mediaUrl = null;
+  if (mediaDataUrl.startsWith("data:image/")) {
+    const contentType = mediaDataUrl.slice(5, mediaDataUrl.indexOf(";"));
+    const b64 = mediaDataUrl.slice(mediaDataUrl.indexOf(",") + 1);
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const ext = contentType.includes("png") ? "png" : "jpg";
+    const path = `sms-out/${Date.now()}.${ext}`;
+    const up = await fetch(`${env.SUPABASE_URL}/storage/v1/object/order-photos/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": contentType,
+        "x-upsert": "true"
+      },
+      body: bytes
+    });
+    if (!up.ok) return json({ ok: false, error: "Photo upload failed." }, 200, jsonHeaders);
+    mediaUrl = `${env.SUPABASE_URL}/storage/v1/object/public/order-photos/${path}`;
+  }
+
+  const sent = await sendTwilioSms(env, to, text, mediaUrl);
+  if (!sent.ok) {
+    return json({ ok: false, error: "Message failed to send.", details: sent.error }, 200, jsonHeaders);
+  }
+
+  await supabaseFetch(env, `/rest/v1/sms_messages`, {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      direction: "out",
+      phone_number: to,
+      customer_name: cleanText(body.customerName) || null,
+      order_number: cleanText(body.orderNumber) || null,
+      body: text,
+      media_urls: mediaUrl ? [mediaUrl] : null,
+      twilio_sid: sent.sid || null,
+      read: true
+    })
+  });
+
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleListOrders({ env, jsonHeaders }) {
+  const supa = await supabaseFetch(env, `/rest/v1/orders?select=*&order=order_number.desc`);
+  if (!supa.ok) {
+    return json({
+      ok: false,
+      error: "Failed to load orders from Supabase.",
+      details: supa.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, orders: (supa.data || []).map(mapOrderFromDb) }, 200, jsonHeaders);
+}
+
+async function handleListInventory({ env, jsonHeaders }) {
+  const supa = await supabaseFetch(env, `/rest/v1/lace_inventory?select=*&order=color.asc`);
+  if (!supa.ok) {
+    return json({
+      ok: false,
+      error: "Failed to load lace inventory from Supabase.",
+      details: supa.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, inventory: supa.data || [] }, 200, jsonHeaders);
+}
+
+async function handleCreateInventoryItem({ env, body, jsonHeaders }) {
+  const result = await createInventoryItem(env, body);
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleUpdateInventoryItem({ env, body, jsonHeaders }) {
+  const result = await updateInventoryItem(env, body);
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleGetOrder({ env, body, jsonHeaders }) {
+  const orderNumber = String(body.orderNumber || "").trim();
+  if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+  const existing = await fetchOrderByNumber(env, orderNumber);
+  if (!existing.ok || !existing.data) {
+    return json({ ok: false, error: "Order not found." }, 200, jsonHeaders);
+  }
+  return json({ ok: true, order: mapOrderFromDb(existing.data) }, 200, jsonHeaders);
+}
+
+async function handleListOrderActivity({ env, body, jsonHeaders }) {
+  const orderNumber = cleanText(body.orderNumber);
+  if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+  const result = await listOrderActivity(env, orderNumber);
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Activity could not be loaded.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, activity: result.activity }, 200, jsonHeaders);
+}
+
+async function handleListOrdersWithActivity({ env, jsonHeaders }) {
+  const result = await listOrdersWithActivity(env);
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Activity index could not be loaded.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, orderNumbers: result.orderNumbers }, 200, jsonHeaders);
+}
+
+async function handleListLaborSessions({ env, body, jsonHeaders }) {
+  const orderNumber = cleanText(body.orderNumber);
+  if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+  const result = await listLaborSessions(env, orderNumber);
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Labor sessions could not be loaded.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, sessions: result.sessions }, 200, jsonHeaders);
+}
+
+async function handleStartLaborSession({ env, body, jsonHeaders }) {
+  const orderNumber = cleanText(body.orderNumber);
+  const phase = cleanText(body.phase);
+  if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+  if (!phase) {
+    return json({ ok: false, error: "Select a phase before starting the timer." }, 200, jsonHeaders);
+  }
+  if (!isValidLaborPhase(phase)) {
+    return json({ ok: false, error: "Invalid labor phase." }, 200, jsonHeaders);
+  }
+  const result = await startLaborSession(env, { orderNumber, phase, notes: body.notes });
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: result.error || "Labor session could not be started.",
+      details: result.details
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, session: result.session }, 200, jsonHeaders);
+}
+
+async function handleStopLaborSession({ env, body, jsonHeaders }) {
+  const sessionId = cleanText(body.sessionId);
+  if (!sessionId) return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
+  const result = await stopLaborSession(env, { sessionId, notes: body.notes });
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: result.error || "Labor session could not be stopped.",
+      details: result.details
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, session: result.session }, 200, jsonHeaders);
+}
+
+async function handleListOpenLaborSessions({ env, jsonHeaders }) {
+  const result = await fetchOpenLaborSessions(env);
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Open labor sessions could not be loaded.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, sessions: result.data.map(mapLaborSessionFromDb) }, 200, jsonHeaders);
+}
+
+async function handleListLaborSummary({ env, jsonHeaders }) {
+  const result = await fetchLaborSummary(env);
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Labor summary could not be loaded.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, sessions: result.sessions }, 200, jsonHeaders);
+}
+
+async function handlePauseLaborSession({ env, body, jsonHeaders }) {
+  const sessionId = cleanText(body.sessionId);
+  if (!sessionId) return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
+  const result = await pauseLaborSession(env, { sessionId, notes: body.notes });
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: result.error || "Labor session could not be paused.",
+      details: result.details
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, session: result.session }, 200, jsonHeaders);
+}
+
+async function handleResumeLaborSession({ env, body, jsonHeaders }) {
+  const sessionId = cleanText(body.sessionId);
+  if (!sessionId) return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
+  const result = await resumeLaborSession(env, { sessionId, notes: body.notes });
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: result.error || "Labor session could not be resumed.",
+      details: result.details
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, session: result.session }, 200, jsonHeaders);
+}
+
+async function handleUpdateLaborSessionNotes({ env, body, jsonHeaders }) {
+  const sessionId = cleanText(body.sessionId);
+  if (!sessionId) return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
+  const result = await updateLaborSessionNotes(env, { sessionId, notes: body.notes });
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: result.error || "Labor session notes could not be updated.",
+      details: result.details
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, session: result.session }, 200, jsonHeaders);
+}
+
+async function handleDeleteOrder({ env, body, jsonHeaders }) {
+  const orderNumber = String(body.orderNumber || "").trim();
+  if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+  const del = await supabaseFetch(
+    env,
+    `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+    { method: "DELETE", headers: { Prefer: "return=representation" } }
+  );
+  if (!del.ok) {
+    return json({
+      ok: false,
+      error: "Failed to delete order from Supabase.",
+      details: del.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, deleted: true, orderNumber }, 200, jsonHeaders);
+}
+
+async function handleUploadOrderPhoto({ env, body, jsonHeaders }) {
+  const result = await uploadOrderPhotoAction(env, body);
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleRemoveOrderPhoto({ env, body, jsonHeaders }) {
+  const result = await removeOrderPhotoAction(env, body);
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleCreateOrder({ env, body, jsonHeaders }) {
+  const result = await createOrderAction(env, body);
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleResendStatusEmail({ env, body, jsonHeaders }) {
+  const result = await resendStatusEmailAction(env, body);
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleResendStatusText({ env, body, jsonHeaders }) {
+  const result = await resendStatusTextAction(env, body);
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleUpdateOrder({ env, body, jsonHeaders }) {
+  const orderNumber = String(body.orderNumber || "").trim();
+  const updates = body.updates || {};
+  if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+
+  const existing = await fetchOrderByNumber(env, orderNumber);
+  if (!existing.ok || !existing.data) {
+    return json({ ok: false, error: `Order not found: ${orderNumber}` }, 200, jsonHeaders);
+  }
+
+  const oldRow = existing.data;
+  const oldStatus = normalizeStatus(oldRow.status);
+  const lastStatusEmailed = normalizeStatus(oldRow.last_status_emailed);
+  const lastStatusTexted = normalizeStatus(oldRow.last_status_texted);
+  const oldPrimaryColor = cleanText(oldRow.primary_lace_color);
+  const oldSecondaryColor = cleanText(oldRow.secondary_lace_color);
+  const oldPrimaryUsed = Number(oldRow.primary_lace_used || 0);
+  const oldSecondaryUsed = Number(oldRow.secondary_lace_used || 0);
+  const dbUpdates = mapUpdatesToDb(updates);
+  const mergedPreview = { ...oldRow, ...dbUpdates };
+
+  const newStatus = normalizeStatus(mergedPreview.status);
+  const statusChanged = !!newStatus && newStatus !== oldStatus;
+  const shouldEmailForStatus =
+    statusChanged &&
+    !isInternalOnlyStatus(newStatus) &&
+    newStatus !== lastStatusEmailed;
+  const shouldTextForStatus =
+    statusChanged &&
+    toBoolean(mergedPreview.sms_opt_in) &&
+    shouldSendTextForStatus(newStatus) &&
+    newStatus !== lastStatusTexted;
+
+  if (
+    newStatus === "completed" &&
+    looksLikeShipMethod(mergedPreview.drop_off_method) &&
+    normalizePaidValue(mergedPreview.paid) !== "paid" &&
+    !toBoolean(mergedPreview.allow_ship_without_payment)
+  ) {
+    return json({
+      ok: false,
+      error: "Cannot mark a shipped order completed unless it is paid or override is checked."
+    }, 200, jsonHeaders);
+  }
+
+  if (newStatus === "completed" && !mergedPreview.date_completed) {
+    dbUpdates.date_completed = todayIsoDate();
+    mergedPreview.date_completed = dbUpdates.date_completed;
+  }
+
+  if (shouldEmailForStatus && !env.RESEND_API_KEY) {
+    return json({
+      ok: false,
+      error: "Missing RESEND_API_KEY environment variable."
+    }, 500, jsonHeaders);
+  }
+
+  const patch = await supabaseFetch(
+    env,
+    `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(dbUpdates)
+    }
+  );
+  if (!patch.ok) {
+    return json({
+      ok: false,
+      error: "Failed to update order in Supabase.",
+      details: patch.error
+    }, 200, jsonHeaders);
+  }
+
+  let updated = Array.isArray(patch.data) ? patch.data[0] : null;
+  if (!updated) {
+    return json({ ok: false, error: "Update succeeded but no row was returned." }, 200, jsonHeaders);
+  }
+
+  await adjustLaceInventoryForOrderUpdate(env, {
+    oldPrimaryColor,
+    oldSecondaryColor,
+    oldPrimaryUsed,
+    oldSecondaryUsed,
+    newPrimaryColor: cleanText(updated.primary_lace_color),
+    newSecondaryColor: cleanText(updated.secondary_lace_color),
+    newPrimaryUsed: Number(updated.primary_lace_used || 0),
+    newSecondaryUsed: Number(updated.secondary_lace_used || 0)
+  });
+
+  await logOrderActivities(env, getOrderUpdateActivityEvents(oldRow, updated));
+
+  if (shouldEmailForStatus) {
+    const emailResult = await sendStatusEmail(
+      env,
+      updated,
+      normalizeDisplayStatus(updated.status)
+    );
+    if (!emailResult.ok) {
+      return json({
+        ok: false,
+        error: "Order updated, but status email failed to send.",
+        details: emailResult.error
+      }, 200, jsonHeaders);
+    }
+
+    const stamp = await supabaseFetch(
+      env,
+      `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          last_status_emailed: normalizeDisplayStatus(updated.status)
+        })
+      }
+    );
+    if (stamp.ok && Array.isArray(stamp.data) && stamp.data[0]) updated = stamp.data[0];
+    await logOrderActivity(env, {
+      orderNumber,
+      eventType: "status_email_sent",
+      eventLabel: "Status email sent",
+      eventDetail: normalizeDisplayStatus(updated.status)
+    });
+  }
+
+  if (shouldTextForStatus) {
+    if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
+      return json({
+        ok: false,
+        error: "Order updated, but SMS was not sent because Twilio environment variables are missing."
+      }, 200, jsonHeaders);
+    }
+
+    const textResult = await sendStatusText(
+      env,
+      updated,
+      normalizeDisplayStatus(updated.status)
+    );
+    if (textResult.skipped) {
+      return json({
+        ok: false,
+        error: "Order updated, but SMS was skipped.",
+        details: textResult.reason
+      }, 200, jsonHeaders);
+    }
+    if (!textResult.ok) {
+      return json({
+        ok: false,
+        error: "Order updated, but status text failed to send.",
+        details: textResult.error
+      }, 200, jsonHeaders);
+    }
+
+    const textStamp = await supabaseFetch(
+      env,
+      `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          last_status_texted: normalizeDisplayStatus(updated.status)
+        })
+      }
+    );
+    if (textStamp.ok && Array.isArray(textStamp.data) && textStamp.data[0]) updated = textStamp.data[0];
+    await logOrderActivity(env, {
+      orderNumber,
+      eventType: "status_text_sent",
+      eventLabel: "Status text sent",
+      eventDetail: normalizeDisplayStatus(updated.status)
+    });
+  }
+
+  return json({ ok: true, order: mapOrderFromDb(updated) }, 200, jsonHeaders);
+}
+
+async function handleGeocodeAddresses({ body, jsonHeaders }) {
+  const items = Array.isArray(body.items) ? body.items : [];
+  const results = await geocodeAddresses(items);
+  return json({ ok: true, results }, 200, jsonHeaders);
+}
+
+async function handleGeocodeMissingOrderAddresses({ env, body, jsonHeaders }) {
+  const items = Array.isArray(body.items) ? body.items : [];
+  const results = await geocodeMissingOrderAddresses(env, items);
+  return json({ ok: true, results }, 200, jsonHeaders);
+}
+
+async function handleUploadGalleryPhoto({ env, body, jsonHeaders }) {
+  const filename = cleanText(body.filename);
+  const contentType = cleanText(body.contentType) || "image/jpeg";
+  const dataUrl = cleanText(body.dataUrl);
+  const section = cleanText(body.section) || "fielding-gloves";
+  if (!filename || !dataUrl) {
+    return json({ ok: false, error: "Missing filename or image data." }, 200, jsonHeaders);
+  }
+  if (!contentType.startsWith("image/")) {
+    return json({ ok: false, error: "Only image uploads are allowed." }, 200, jsonHeaders);
+  }
+  const uploaded = await uploadGalleryPhoto(env, { section, filename, contentType, dataUrl });
+  if (!uploaded.ok) {
+    return json({ ok: false, error: "Gallery upload failed.", details: uploaded.error }, 200, jsonHeaders);
+  }
+  return json({ ok: true, url: uploaded.url, path: uploaded.path }, 200, jsonHeaders);
+}
+
+async function handleListExpenses({ env, jsonHeaders }) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/shop_expenses?select=*&order=expense_date.desc,created_at.desc&limit=500`
+  );
+  if (!resp.ok) return json({ ok: false, error: "Expenses could not be loaded." }, 200, jsonHeaders);
+  return json({
+    ok: true,
+    expenses: (resp.data || []).map(row => ({
+      id: row.id,
+      expenseDate: row.expense_date,
+      category: row.category,
+      description: row.description,
+      amount: row.amount != null ? Number(row.amount) : 0,
+      quantity: row.quantity != null ? Number(row.quantity) : null,
+      unitKind: row.unit_kind
+    }))
+  }, 200, jsonHeaders);
+}
+
+async function handleCreateExpense({ env, body, jsonHeaders }) {
+  const amount = Number(body.amount);
+  const expenseDate = cleanText(body.expenseDate);
+  const category = cleanText(body.category);
+  if (!expenseDate || !category || !Number.isFinite(amount) || amount <= 0) {
+    return json({ ok: false, error: "Expense needs a date, category, and amount." }, 200, jsonHeaders);
+  }
+  const quantity = Number(body.quantity);
+  const resp = await supabaseFetch(env, `/rest/v1/shop_expenses`, {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      expense_date: expenseDate,
+      category,
+      description: cleanText(body.description) || null,
+      amount,
+      quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : null,
+      unit_kind: cleanText(body.unitKind) || null
+    })
+  });
+  if (!resp.ok) return json({ ok: false, error: "Expense could not be saved." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleDeleteExpense({ env, body, jsonHeaders }) {
+  const id = cleanText(body.id);
+  if (!id) return json({ ok: false, error: "Missing expense id." }, 200, jsonHeaders);
+  const resp = await supabaseFetch(env, `/rest/v1/shop_expenses?id=eq.${encodeURIComponent(id)}`, {
+    method: "DELETE", headers: { Prefer: "return=minimal" }
+  });
+  if (!resp.ok) return json({ ok: false, error: "Expense could not be deleted." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleListServicePricing({ env, jsonHeaders }) {
+  const rowsResp = await supabaseFetch(env, `/rest/v1/service_pricing?select=*&order=category.asc,sort_order.asc`);
+  if (!rowsResp.ok) return json({ ok: false, error: "Pricing could not be loaded." }, 200, jsonHeaders);
+  const rows = Array.isArray(rowsResp.data) ? rowsResp.data : [];
+  const draftsResp = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?select=*&status=eq.draft`);
+  const drafts = draftsResp.ok && Array.isArray(draftsResp.data) ? draftsResp.data : [];
+  const draftByService = {};
+  drafts.forEach((d) => { draftByService[String(d.service_pricing_id)] = d; });
+  const jobTypesResp = await supabaseFetch(env, `/rest/v1/service_pricing_job_types?select=*`);
+  const jobTypes = jobTypesResp.ok && Array.isArray(jobTypesResp.data) ? jobTypesResp.data : [];
+  const mappingsByService = {};
+  jobTypes.forEach((j) => {
+    const key = String(j.service_pricing_id);
+    (mappingsByService[key] = mappingsByService[key] || []).push({
+      gloveType: j.glove_type || null,
+      services: j.services || null,
+      trapeze: j.trapeze === true
+    });
+  });
+  const services = rows.map((row) => {
+    const service = mapServicePricingRow(row);
+    service.analyticsMappings = mappingsByService[String(row.id)] || [];
+    const draftRow = draftByService[String(row.id)];
+    if (draftRow && draftRow.data && typeof draftRow.data === "object") {
+      const data = draftRow.data;
+      service.draft = {
+        revisionId: draftRow.id,
+        note: draftRow.note || "",
+        display: formatServiceDisplayPrice(data),
+        fields: mapPricingSnapshotToClient(data),
+        differs: pricingSnapshotsDiffer(liveSnapshotFromRow(row), data),
+        createdAt: draftRow.created_at
+      };
+    } else {
+      service.draft = null;
+    }
+    return service;
+  });
+  const settings = await fetchShopSettings(env);
+  return json({ ok: true, services, settings }, 200, jsonHeaders);
+}
+
+async function handleListServicePricingHistory({ env, body, jsonHeaders }) {
+  const key = cleanText(body.serviceKey);
+  let path = `/rest/v1/service_pricing_revisions?select=*&status=eq.published&order=published_at.desc&limit=200`;
+  if (key) path += `&service_key=eq.${encodeURIComponent(key)}`;
+  const resp = await supabaseFetch(env, path);
+  if (!resp.ok) return json({ ok: false, error: "History could not be loaded." }, 200, jsonHeaders);
+  const history = (resp.data || []).map((r) => ({
+    id: r.id,
+    serviceKey: r.service_key,
+    previousDisplay: r.previous_display || "",
+    newDisplay: r.new_display || "",
+    note: r.note || "",
+    publishedAt: r.published_at,
+    fields: r.data && typeof r.data === "object" ? mapPricingSnapshotToClient(r.data) : null
+  }));
+  return json({ ok: true, history }, 200, jsonHeaders);
+}
+
+async function handleSaveServicePricingDraft({ env, body, jsonHeaders }) {
+  const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
+  if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
+  const built = buildPricingDraftData(body);
+  if (!built.ok) return json({ ok: false, error: built.error }, 200, jsonHeaders);
+  const note = cleanText(body.note);
+  const existing = await fetchServicePricingDraft(env, service.id);
+  if (existing) {
+    const patch = await supabaseFetch(
+      env,
+      `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(existing.id)}`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ data: built.data, note, created_at: new Date().toISOString() })
+      }
+    );
+    if (!patch.ok) return json({ ok: false, error: "Draft could not be saved." }, 200, jsonHeaders);
+  } else {
+    const insert = await supabaseFetch(env, `/rest/v1/service_pricing_revisions`, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        service_pricing_id: service.id,
+        service_key: service.service_key,
+        status: "draft",
+        data: built.data,
+        note
+      })
+    });
+    if (!insert.ok) return json({ ok: false, error: "Draft could not be saved." }, 200, jsonHeaders);
+  }
+  return json({ ok: true, display: formatServiceDisplayPrice(built.data) }, 200, jsonHeaders);
+}
+
+async function handleDiscardServicePricingDraft({ env, body, jsonHeaders }) {
+  const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
+  if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
+  const del = await supabaseFetch(
+    env,
+    `/rest/v1/service_pricing_revisions?service_pricing_id=eq.${encodeURIComponent(service.id)}&status=eq.draft`,
+    { method: "DELETE", headers: { Prefer: "return=minimal" } }
+  );
+  if (!del.ok) return json({ ok: false, error: "Draft could not be discarded." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handlePublishServicePricing({ env, body, jsonHeaders }) {
+  const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
+  if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
+  const draft = await fetchServicePricingDraft(env, service.id);
+  if (!draft || !draft.data || typeof draft.data !== "object") {
+    return json({ ok: false, error: "No draft to publish." }, 200, jsonHeaders);
+  }
+  const data = draft.data;
+  const previousDisplay = formatServiceDisplayPrice(service);
+  const newDisplay = formatServiceDisplayPrice(data);
+  const nowIso = new Date().toISOString();
+  const liveUpdate = {
+    service_name: data.service_name,
+    category: data.category,
+    short_description: data.short_description ?? null,
+    bullet_details: Array.isArray(data.bullet_details) ? data.bullet_details : [],
+    pricing_type: data.pricing_type,
+    base_price: data.base_price ?? null,
+    premium_price: data.premium_price ?? null,
+    price_suffix: data.price_suffix ?? null,
+    display_override: data.display_override ?? null,
+    is_public: data.is_public !== false,
+    is_active: data.is_active !== false,
+    sort_order: Number.isFinite(Number(data.sort_order)) ? Math.round(Number(data.sort_order)) : 0,
+    updated_at: nowIso,
+    published_at: nowIso
+  };
+  const patchLive = await supabaseFetch(
+    env,
+    `/rest/v1/service_pricing?id=eq.${encodeURIComponent(service.id)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(liveUpdate)
+    }
+  );
+  if (!patchLive.ok) {
+    return json({ ok: false, error: "Publish failed while updating live pricing." }, 200, jsonHeaders);
+  }
+  const promote = await supabaseFetch(
+    env,
+    `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(draft.id)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        status: "published",
+        previous_display: previousDisplay,
+        new_display: newDisplay,
+        note: cleanText(body.note) || draft.note || null,
+        published_at: nowIso
+      })
+    }
+  );
+  if (!promote.ok) {
+    return json({
+      ok: false,
+      error: "Publish saved pricing but failed to record history."
+    }, 200, jsonHeaders);
+  }
+  const updatedRow = Array.isArray(patchLive.data) ? patchLive.data[0] : null;
+  return json({
+    ok: true,
+    service: updatedRow ? mapServicePricingRow(updatedRow) : null,
+    previousDisplay,
+    newDisplay
+  }, 200, jsonHeaders);
+}
+
+async function handleRestoreServicePricingRevision({ env, body, jsonHeaders }) {
+  const revisionId = cleanText(body.revisionId);
+  if (!revisionId) return json({ ok: false, error: "Missing revision id." }, 200, jsonHeaders);
+  const revResp = await supabaseFetch(
+    env,
+    `/rest/v1/service_pricing_revisions?select=*&id=eq.${encodeURIComponent(revisionId)}&limit=1`
+  );
+  const revision = revResp.ok && Array.isArray(revResp.data) ? revResp.data[0] : null;
+  if (!revision || !revision.data) {
+    return json({ ok: false, error: "Revision not found." }, 200, jsonHeaders);
+  }
+  const restoredAt = revision.published_at
+    ? new Date(revision.published_at).toLocaleDateString("en-US")
+    : "a prior revision";
+  const note = `Restored from ${restoredAt}`;
+  const existing = await fetchServicePricingDraft(env, revision.service_pricing_id);
+  if (existing) {
+    const patch = await supabaseFetch(
+      env,
+      `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(existing.id)}`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ data: revision.data, note, created_at: new Date().toISOString() })
+      }
+    );
+    if (!patch.ok) return json({ ok: false, error: "Restore failed." }, 200, jsonHeaders);
+  } else {
+    const insert = await supabaseFetch(env, `/rest/v1/service_pricing_revisions`, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        service_pricing_id: revision.service_pricing_id,
+        service_key: revision.service_key,
+        status: "draft",
+        data: revision.data,
+        note
+      })
+    });
+    if (!insert.ok) return json({ ok: false, error: "Restore failed." }, 200, jsonHeaders);
+  }
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleCreateServicePricing({ env, body, jsonHeaders }) {
+  const serviceName = cleanText(body.serviceName);
+  if (!serviceName) return json({ ok: false, error: "Service name is required." }, 200, jsonHeaders);
+  let serviceKey = cleanText(body.serviceKey);
+  if (!serviceKey) {
+    serviceKey = serviceName.toLowerCase().replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "").slice(0, 48);
+  }
+  if (!/^[a-z0-9_]+$/.test(serviceKey)) {
+    return json({
+      ok: false,
+      error: "Service key must be lowercase letters, numbers, and underscores."
+    }, 200, jsonHeaders);
+  }
+  const existing = await fetchServicePricingByKey(env, serviceKey);
+  if (existing) {
+    return json({ ok: false, error: "A service with that key already exists." }, 200, jsonHeaders);
+  }
+  const category = ["relacing", "additional"].includes(String(body.category))
+    ? String(body.category)
+    : "additional";
+  const rowsResp = await supabaseFetch(env, `/rest/v1/service_pricing?select=sort_order`);
+  const maxSort = rowsResp.ok && Array.isArray(rowsResp.data)
+    ? rowsResp.data.reduce((m, r) => Math.max(m, Number(r.sort_order) || 0), 0)
+    : 0;
+  const insert = await supabaseFetch(env, `/rest/v1/service_pricing`, {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      service_key: serviceKey,
+      service_name: serviceName,
+      category,
+      bullet_details: [],
+      pricing_type: [
+        "fixed", "range", "starting_at", "per_item", "variable", "tiered"
+      ].includes(String(body.pricingType)) ? String(body.pricingType) : "fixed",
+      is_public: false,
+      is_active: false,
+      sort_order: maxSort + 10
+    })
+  });
+  if (!insert.ok) {
+    return json({ ok: false, error: "Service could not be created." }, 200, jsonHeaders);
+  }
+  const created = Array.isArray(insert.data) ? insert.data[0] : null;
+  return json({
+    ok: true,
+    service: created ? mapServicePricingRow(created) : null
+  }, 200, jsonHeaders);
+}
+
+async function handleGetShopSettings({ env, jsonHeaders }) {
+  const settings = await fetchShopSettings(env);
+  return json({ ok: true, settings }, 200, jsonHeaders);
+}
+
+async function handleSaveShopSettings({ env, body, jsonHeaders }) {
+  const updates = [];
+  const targetRate = cleanNumeric(body.targetLaborRate);
+  const minCharge = cleanNumeric(body.minShopCharge);
+  const rounding = cleanNumeric(body.roundingIncrement);
+  if (targetRate !== null && targetRate > 0) updates.push({ key: "target_labor_rate", value: targetRate });
+  if (minCharge !== null && minCharge >= 0) updates.push({ key: "min_shop_charge", value: minCharge });
+  if (rounding !== null && rounding > 0) updates.push({ key: "rounding_increment", value: rounding });
+  if (!updates.length) return json({ ok: false, error: "No valid settings to save." }, 200, jsonHeaders);
+  const nowIso = new Date().toISOString();
+  const resp = await supabaseFetch(env, `/rest/v1/shop_settings?on_conflict=key`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(updates.map((u) => ({ ...u, updated_at: nowIso })))
+  });
+  if (!resp.ok) return json({ ok: false, error: "Settings could not be saved." }, 200, jsonHeaders);
+  const settings = await fetchShopSettings(env);
+  return json({ ok: true, settings }, 200, jsonHeaders);
+}
+
+async function handleSetGalleryPhotoCover({ env, body, jsonHeaders }) {
+  const url = cleanText(body.url);
+  if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
+  const link = await supabaseFetch(
+    env,
+    `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}&select=order_number&limit=1`
+  );
+  const row = link.ok && Array.isArray(link.data) ? link.data[0] : null;
+  if (!row?.order_number) {
+    return json({ ok: false, error: "Photo must be linked to an order first." }, 200, jsonHeaders);
+  }
+  await supabaseFetch(env, `/rest/v1/gallery_photo_links?order_number=eq.${encodeURIComponent(row.order_number)}`, {
+    method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_cover: false })
+  });
+  const set = await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}`, {
+    method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_cover: true })
+  });
+  if (!set.ok) return json({ ok: false, error: "Could not set the cover." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleSetGalleryPhotoOrder({ env, body, jsonHeaders }) {
+  const url = cleanText(body.url);
+  const orderNumber = cleanText(body.orderNumber);
+  if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
+  const d = body.descriptors && typeof body.descriptors === "object" ? body.descriptors : null;
+  const descriptors = {
+    brand_model: cleanText(d?.brandModel) || null,
+    glove_type: cleanText(d?.gloveType) || null,
+    web_type: cleanText(d?.webType) || null,
+    primary_lace_color: cleanText(d?.primaryLaceColor) || null,
+    secondary_lace_color: cleanText(d?.secondaryLaceColor) || null
+  };
+  const hasDescriptors = Object.values(descriptors).some(Boolean);
+  if (!orderNumber && !hasDescriptors) {
+    await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}`, {
+      method: "DELETE", headers: { Prefer: "return=minimal" }
+    });
+    return json({ ok: true, cleared: true }, 200, jsonHeaders);
+  }
+  if (orderNumber) {
+    const found = await fetchOrderByNumber(env, orderNumber);
+    if (!found.ok || !found.data) {
+      return json({ ok: false, error: `Order #${orderNumber} not found.` }, 200, jsonHeaders);
+    }
+  }
+  const row = orderNumber
+    ? {
+        photo_url: url, photo_path: cleanText(body.path) || null, order_number: orderNumber,
+        brand_model: null, glove_type: null, web_type: null,
+        primary_lace_color: null, secondary_lace_color: null
+      }
+    : {
+        photo_url: url, photo_path: cleanText(body.path) || null, order_number: null, ...descriptors
+      };
+  const resp = await supabaseFetch(env, `/rest/v1/gallery_photo_links?on_conflict=photo_url`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(row)
+  });
+  if (!resp.ok) return json({ ok: false, error: "Could not save the link." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleMoveGalleryPhoto({ env, body, jsonHeaders }) {
+  const photoPath = cleanText(body.path);
+  const oldUrl = cleanText(body.url);
+  const targetSection = safeGallerySection(cleanText(body.section));
+  const parsed = parseGalleryPhotoPath(photoPath);
+  if (!parsed.ok) return json({ ok: false, error: "Invalid gallery photo path." }, 200, jsonHeaders);
+  if (parsed.section === targetSection) {
+    return json({ ok: false, error: "Photo is already in that section." }, 200, jsonHeaders);
+  }
+  const destinationPath = parsed.hidden
+    ? `_hidden/${targetSection}/${parsed.name}`
+    : `${targetSection}/${parsed.name}`;
+  const moved = await moveGalleryStorageObject(env, photoPath, destinationPath);
+  if (!moved.ok) return json({ ok: false, error: moved.error || "Move failed." }, 200, jsonHeaders);
+  const photo = galleryPhotoFromPath(env, destinationPath, parsed.hidden);
+  if (oldUrl) {
+    await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(oldUrl)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ photo_url: photo.url, photo_path: photo.path })
+    });
+  }
+  return json({ ok: true, photo }, 200, jsonHeaders);
+}
+
+async function handleGalleryPhotoStorageAction({ env, body, jsonHeaders }, operation) {
+  const result = await operation(env, cleanText(body.path));
+  if (!result.ok) {
+    return json({ ok: false, error: result.error || "Gallery photo action failed." }, 200, jsonHeaders);
+  }
+  return json({ ok: true, photo: result.photo || null }, 200, jsonHeaders);
+}
+
+async function handleHideGalleryPhoto(ctx) {
+  return handleGalleryPhotoStorageAction(ctx, hideGalleryPhoto);
+}
+
+async function handleRestoreGalleryPhoto(ctx) {
+  return handleGalleryPhotoStorageAction(ctx, restoreGalleryPhoto);
+}
+
+async function handleDeleteGalleryPhoto(ctx) {
+  return handleGalleryPhotoStorageAction(ctx, deleteGalleryPhoto);
+}
+
+async function handleListSaleGloves({ env, jsonHeaders }) {
+  const supa = await supabaseFetch(env, `/rest/v1/gloves_for_sale?select=*&order=sort_order.asc,created_at.desc`);
+  if (!supa.ok) {
+    return json({
+      ok: false,
+      error: "Failed to load gloves for sale from Supabase.",
+      details: supa.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, gloves: (supa.data || []).map(mapSaleGloveFromDb) }, 200, jsonHeaders);
+}
+
+async function handleGetSaleGlove({ env, body, jsonHeaders }) {
+  const id = cleanText(body.id);
+  if (!id) return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
+  const supa = await supabaseFetch(
+    env,
+    `/rest/v1/gloves_for_sale?select=*&id=eq.${encodeURIComponent(id)}&limit=1`
+  );
+  if (!supa.ok) {
+    return json({
+      ok: false,
+      error: "Failed to load glove listing.",
+      details: supa.error
+    }, 200, jsonHeaders);
+  }
+  const row = Array.isArray(supa.data) ? supa.data[0] : null;
+  if (!row) return json({ ok: false, error: "Glove listing not found." }, 200, jsonHeaders);
+  return json({ ok: true, glove: mapSaleGloveFromDb(row) }, 200, jsonHeaders);
+}
+
+async function handleCreateSaleGlove({ env, body, jsonHeaders }) {
+  const payload = {
+    slug: body.slug,
+    title: body.title,
+    short_description: body.shortDescription,
+    description: body.description,
+    price: body.price || null,
+    brand: body.brand,
+    model: body.model,
+    glove_size: body.gloveSize,
+    position: body.position,
+    web: body.web,
+    throw_hand: body.throwHand,
+    condition: body.condition,
+    status: body.status || "available",
+    purchase_url: body.purchaseUrl,
+    featured: body.featured === true,
+    sort_order: Number(body.sortOrder || 0)
+  };
+  const result = await supabaseFetch(env, "/rest/v1/gloves_for_sale", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(payload)
+  });
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Failed to create glove listing.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, glove: result.data?.[0] || null }, 200, jsonHeaders);
+}
+
+async function handleUpdateSaleGlove({ env, body, jsonHeaders }) {
+  const id = cleanText(body.id);
+  if (!id) return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
+  const payload = {
+    slug: cleanText(body.slug),
+    title: cleanText(body.title),
+    short_description: cleanText(body.shortDescription),
+    description: cleanText(body.description),
+    price: cleanNumeric(body.price),
+    brand: cleanText(body.brand),
+    model: cleanText(body.model),
+    glove_size: cleanText(body.gloveSize),
+    position: cleanText(body.position),
+    web: cleanText(body.web),
+    throw_hand: cleanText(body.throwHand),
+    condition: cleanText(body.condition),
+    status: cleanText(body.status) || "available",
+    purchase_url: cleanText(body.purchaseUrl),
+    featured: body.featured === true,
+    sort_order: Number(body.sortOrder || 0)
+  };
+  const result = await supabaseFetch(
+    env,
+    `/rest/v1/gloves_for_sale?id=eq.${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(payload)
+    }
+  );
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Failed to update glove listing.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, glove: result.data?.[0] || null }, 200, jsonHeaders);
+}
+
+async function handleDeleteSaleGlove({ env, body, jsonHeaders }) {
+  const id = cleanText(body.id);
+  if (!id) return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
+  const result = await supabaseFetch(
+    env,
+    `/rest/v1/gloves_for_sale?id=eq.${encodeURIComponent(id)}`,
+    { method: "DELETE", headers: { Prefer: "return=representation" } }
+  );
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Failed to delete glove listing.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, deleted: true, id }, 200, jsonHeaders);
+}
+
+async function handleUploadLacePhoto({ env, body, jsonHeaders }) {
+  const color = cleanText(body.color);
+  const filename = cleanText(body.filename);
+  const contentType = cleanText(body.contentType) || "image/jpeg";
+  const dataUrl = cleanText(body.dataUrl);
+  if (!color || !filename || !dataUrl) {
+    return json({ ok: false, error: "Missing color, filename or image data." }, 200, jsonHeaders);
+  }
+  if (!contentType.startsWith("image/")) {
+    return json({ ok: false, error: "Only image uploads are allowed." }, 200, jsonHeaders);
+  }
+  const uploaded = await uploadLacePhoto(env, { color, filename, contentType, dataUrl });
+  if (!uploaded.ok) {
+    return json({ ok: false, error: "Lace photo upload failed.", details: uploaded.error }, 200, jsonHeaders);
+  }
+  return json({ ok: true, url: uploaded.url, path: uploaded.path }, 200, jsonHeaders);
+}
+
+async function handleUploadSaleGlovePhoto({ env, body, jsonHeaders }) {
+  const gloveId = cleanText(body.gloveId);
+  const filename = cleanText(body.filename);
+  const contentType = cleanText(body.contentType) || "image/jpeg";
+  const dataUrl = cleanText(body.dataUrl);
+  if (!gloveId || !filename || !dataUrl) {
+    return json({ ok: false, error: "Missing gloveId, filename or image data." }, 200, jsonHeaders);
+  }
+  if (!contentType.startsWith("image/")) {
+    return json({ ok: false, error: "Only image uploads are allowed." }, 200, jsonHeaders);
+  }
+  const gloveResp = await supabaseFetch(
+    env,
+    `/rest/v1/gloves_for_sale?select=id,slug&id=eq.${encodeURIComponent(gloveId)}&limit=1`
+  );
+  if (!gloveResp.ok || !Array.isArray(gloveResp.data) || !gloveResp.data[0]) {
+    return json({ ok: false, error: "Glove not found.", details: gloveResp.error }, 200, jsonHeaders);
+  }
+  const glove = gloveResp.data[0];
+  const uploaded = await uploadSaleGlovePhoto(env, {
+    slug: glove.slug, filename, contentType, dataUrl
+  });
+  if (!uploaded.ok) {
+    return json({ ok: false, error: "Glove photo upload failed.", details: uploaded.error }, 200, jsonHeaders);
+  }
+  const countResp = await supabaseFetch(
+    env,
+    `/rest/v1/glove_sale_photos?select=id&glove_id=eq.${encodeURIComponent(gloveId)}`
+  );
+  const sortOrder = Array.isArray(countResp.data) ? countResp.data.length : 0;
+  const photoInsert = await supabaseFetch(env, "/rest/v1/glove_sale_photos", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      glove_id: gloveId, url: uploaded.url, filename, sort_order: sortOrder
+    })
+  });
+  if (!photoInsert.ok) {
+    return json({
+      ok: false, error: "Photo uploaded but database insert failed.", details: photoInsert.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, photo: photoInsert.data?.[0] || null }, 200, jsonHeaders);
+}
+
+async function handleListSaleGlovePhotos({ env, body, jsonHeaders }) {
+  const gloveId = cleanText(body.gloveId);
+  if (!gloveId) return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
+  const photos = await supabaseFetch(
+    env,
+    `/rest/v1/glove_sale_photos?glove_id=eq.${encodeURIComponent(gloveId)}&select=*&order=sort_order.asc,id.asc`
+  );
+  if (!photos.ok) {
+    return json({
+      ok: false,
+      error: "Failed to load glove photos.",
+      details: photos.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, photos: photos.data || [] }, 200, jsonHeaders);
+}
+
+async function handleSetSalePhotoFlag({ env, body, jsonHeaders }, config) {
+  const gloveId = cleanText(body.gloveId);
+  const photoId = cleanText(body.photoId);
+  if (!gloveId || !photoId) {
+    return json({ ok: false, error: "Missing gloveId or photoId." }, 200, jsonHeaders);
+  }
+  const clear = await supabaseFetch(
+    env,
+    `/rest/v1/glove_sale_photos?glove_id=eq.${encodeURIComponent(gloveId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ [config.field]: false })
+    }
+  );
+  if (!clear.ok) {
+    return json({ ok: false, error: config.clearError, details: clear.error }, 200, jsonHeaders);
+  }
+  const set = await supabaseFetch(
+    env,
+    `/rest/v1/glove_sale_photos?id=eq.${encodeURIComponent(photoId)}&glove_id=eq.${encodeURIComponent(gloveId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ [config.field]: true })
+    }
+  );
+  if (!set.ok) {
+    return json({ ok: false, error: config.setError, details: set.error }, 200, jsonHeaders);
+  }
+  return json({
+    ok: true,
+    photo: Array.isArray(set.data) ? set.data[0] : null
+  }, 200, jsonHeaders);
+}
+
+async function handleSetSalePhotoPrimary(ctx) {
+  return handleSetSalePhotoFlag(ctx, {
+    field: "is_primary",
+    clearError: "Failed to clear existing primary photo.",
+    setError: "Failed to set primary photo."
+  });
+}
+
+async function handleSetSalePhotoHover(ctx) {
+  return handleSetSalePhotoFlag(ctx, {
+    field: "is_hover",
+    clearError: "Failed to clear existing hover photo.",
+    setError: "Failed to set hover photo."
+  });
+}
+
+async function handleDeleteSaleGlovePhoto({ env, body, jsonHeaders }) {
+  const gloveId = cleanText(body.gloveId);
+  const photoId = cleanText(body.photoId);
+  if (!gloveId || !photoId) {
+    return json({ ok: false, error: "Missing gloveId or photoId." }, 200, jsonHeaders);
+  }
+  const del = await supabaseFetch(
+    env,
+    `/rest/v1/glove_sale_photos?id=eq.${encodeURIComponent(photoId)}&glove_id=eq.${encodeURIComponent(gloveId)}`,
+    { method: "DELETE", headers: { Prefer: "return=representation" } }
+  );
+  if (!del.ok) {
+    return json({ ok: false, error: "Failed to delete glove photo.", details: del.error }, 200, jsonHeaders);
+  }
+  return json({
+    ok: true,
+    deleted: true,
+    photo: Array.isArray(del.data) ? del.data[0] : null
+  }, 200, jsonHeaders);
+}
+
+async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
+  /* Public glove search returns only glove fields and curated gallery photos,
+     never customer name, contact, address, or intake photos. */
+  const q = String(body.q || "").trim().toLowerCase();
+  if (q.length < 2) return json({ ok: true, gloves: [] }, 200, jsonHeaders);
+  const terms = q.split(/\s+/).filter(Boolean);
+  const gloves = [];
+  const links = await supabaseFetch(
+    env,
+    `/rest/v1/gallery_photo_links?select=photo_url,order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
+  );
+  const linkRows = (links.ok && Array.isArray(links.data)) ? links.data : [];
+  const byOrder = new Map();
+  for (const l of linkRows) {
+    if (l.order_number) {
+      if (!byOrder.has(l.order_number)) byOrder.set(l.order_number, []);
+      byOrder.get(l.order_number).push(l.photo_url);
+      continue;
+    }
+    const fields = [l.brand_model, l.glove_type, l.web_type, l.primary_lace_color, l.secondary_lace_color];
+    if (!fields.some(Boolean)) continue;
+    if (gloves.length >= 24) continue;
+    const hay = fields.map(v => String(v || "").toLowerCase()).join(" ");
+    if (!terms.every(t => hay.includes(t))) continue;
+    gloves.push({
+      brandModel: l.brand_model || "",
+      gloveType: l.glove_type || "",
+      webType: l.web_type || "",
+      laceColors: [l.primary_lace_color, l.secondary_lace_color].filter(Boolean),
+      photos: [l.photo_url]
+    });
+  }
+  if (byOrder.size && gloves.length < 24) {
+    const nums = [...byOrder.keys()].map(n => `"${String(n).replace(/"/g, "")}"`).join(",");
+    const ordersResp = await supabaseFetch(
+      env,
+      `/rest/v1/orders?select=order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color,custom_color_request,services_requested&order_number=in.(${encodeURIComponent(nums)})`
+    );
+    for (const row of (ordersResp.ok && Array.isArray(ordersResp.data)) ? ordersResp.data : []) {
+      const hay = [
+        row.brand_model, row.glove_type, row.web_type,
+        row.primary_lace_color, row.secondary_lace_color,
+        row.custom_color_request, row.services_requested
+      ].map(v => String(v || "").toLowerCase()).join(" ");
+      if (!terms.every(t => hay.includes(t))) continue;
+      gloves.push({
+        brandModel: row.brand_model || "",
+        gloveType: row.glove_type || "",
+        webType: row.web_type || "",
+        laceColors: [row.primary_lace_color, row.secondary_lace_color].filter(Boolean),
+        photos: (byOrder.get(row.order_number) || []).slice(0, 4)
+      });
+      if (gloves.length >= 24) break;
+    }
+  }
+  return json({ ok: true, gloves, source: "gallery" }, 200, jsonHeaders);
+}
+
+async function handleListGalleryPhotos({ env, body, jsonHeaders }) {
+  const includeHidden = body.includeHidden === true;
+  const sections = [
+    "fielding-gloves",
+    "catchers-mitts",
+    "first-base-mitts",
+    "custom-color-relaces",
+    "vintage"
+  ];
+  const gallery = {};
+  const hiddenGallery = {};
+  let photoLinks = {};
+  let photoCovers = {};
+  let photoGloveMeta = {};
+  {
+    const links = await supabaseFetch(
+      env,
+      `/rest/v1/gallery_photo_links?select=photo_url,order_number,is_cover,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
+    );
+    if (links.ok && Array.isArray(links.data)) {
+      for (const l of links.data) {
+        if (l.is_cover) photoCovers[l.photo_url] = true;
+        if (l.order_number) {
+          photoLinks[l.photo_url] = l.order_number;
+          continue;
+        }
+        if (includeHidden) {
+          photoGloveMeta[l.photo_url] = {
+            brandModel: l.brand_model || "",
+            gloveType: l.glove_type || "",
+            webType: l.web_type || "",
+            primaryLaceColor: l.primary_lace_color || "",
+            secondaryLaceColor: l.secondary_lace_color || ""
+          };
+        }
+      }
+    }
+  }
+  for (const section of sections) {
+    const listed = await listGallerySection(env, section);
+    if (!listed.ok) {
+      return json({
+        ok: false,
+        error: `Failed to load gallery section: ${section}`,
+        details: listed.error
+      }, 200, jsonHeaders);
+    }
+    gallery[section] = listed.photos;
+    if (includeHidden) {
+      const hidden = await listGallerySection(env, section, { hidden: true });
+      if (!hidden.ok) {
+        return json({
+          ok: false,
+          error: `Failed to load hidden gallery section: ${section}`,
+          details: hidden.error
+        }, 200, jsonHeaders);
+      }
+      hiddenGallery[section] = hidden.photos;
+    }
+  }
+  return json({
+    ok: true,
+    gallery,
+    photoLinks,
+    photoCovers,
+    photoGloveMeta,
+    hiddenGallery
+  }, 200, jsonHeaders);
+}
+
+async function handleLogin({ env, body, jsonHeaders }) {
+  const email = normalizeEmail(body.email);
+  const password = String(body.password || body.pin || "").trim();
+  const sessionMs = 1000 * 60 * 60 * 24 * 14;
+
+  /* Owner escape hatch: blank email + the ADMIN_PIN. Keeps the owner able
+     to sign in anywhere (including preview URLs where the passkey's domain
+     binding doesn't apply) with zero lockout risk. */
+  if (!email && password && env.ADMIN_PIN && password === String(env.ADMIN_PIN).trim()) {
+    const token = await createSignedToken(
+      { sub: "owner", role: "admin", exp: Date.now() + sessionMs },
+      env.ADMIN_SESSION_SECRET
+    );
+    return json({ ok: true, token, role: "admin" }, 200, jsonHeaders);
+  }
+
+  if (!email || !password) {
+    return json({ ok: false, error: "Enter your email and password." }, 200, jsonHeaders);
+  }
+
+  const found = await getUserByEmail(env, email);
+  if (!found.ok) {
+    return json({ ok: false, error: "Could not sign in." }, 200, jsonHeaders);
+  }
+
+  const user = found.user;
+  const passwordOk = user && user.active !== false && await verifyPassword(password, {
+    hash: user.password_hash,
+    salt: user.password_salt,
+    iterations: user.password_iterations
+  });
+
+  if (!passwordOk) {
+    return json({ ok: false, error: "Invalid email or password." }, 200, jsonHeaders);
+  }
+
+  await touchUserLogin(env, user.id);
+
+  const token = await createSignedToken(
+    { sub: user.id, email: user.email, role: user.role, exp: Date.now() + sessionMs },
+    env.ADMIN_SESSION_SECRET
+  );
+
+  return json({ ok: true, token, role: user.role }, 200, jsonHeaders);
+}
+
+async function handleGetInvite({ env, body, jsonHeaders }) {
+  const found = await getUserByInviteToken(env, body.token);
+  const user = found.ok ? found.user : null;
+  if (!user || !user.invite_token) {
+    return json({ ok: false, error: "This invite is invalid or already used." }, 200, jsonHeaders);
+  }
+  if (user.invite_expires_at && Date.now() > new Date(user.invite_expires_at).getTime()) {
+    return json({ ok: false, error: "This invite has expired." }, 200, jsonHeaders);
+  }
+  return json({ ok: true, email: user.email, displayName: user.display_name, role: user.role }, 200, jsonHeaders);
+}
+
+async function handleAcceptInvite({ env, body, jsonHeaders }) {
+  const password = String(body.password || "").trim();
+  if (password.length < 8) {
+    return json({ ok: false, error: "Password must be at least 8 characters." }, 200, jsonHeaders);
+  }
+  const found = await getUserByInviteToken(env, body.token);
+  const user = found.ok ? found.user : null;
+  if (!user || !user.invite_token) {
+    return json({ ok: false, error: "This invite is invalid or already used." }, 200, jsonHeaders);
+  }
+  if (user.invite_expires_at && Date.now() > new Date(user.invite_expires_at).getTime()) {
+    return json({ ok: false, error: "This invite has expired." }, 200, jsonHeaders);
+  }
+
+  const hashed = await hashPassword(password);
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/admin_users?id=eq.${encodeURIComponent(user.id)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        password_hash: hashed.hash,
+        password_salt: hashed.salt,
+        password_iterations: hashed.iterations,
+        invite_token: null,
+        invite_expires_at: null,
+        active: true,
+        last_login_at: new Date().toISOString()
+      })
+    }
+  );
+  if (!resp.ok) {
+    return json({ ok: false, error: "Could not set your password." }, 200, jsonHeaders);
+  }
+
+  await sendWebPushToAll(env, {
+    title: "Invite accepted",
+    body: `${user.display_name || user.email} set their password (${user.role}).`,
+    url: "/admin/?view=users"
+  });
+
+  const token = await createSignedToken(
+    { sub: user.id, email: user.email, role: user.role, exp: Date.now() + 1000 * 60 * 60 * 24 * 14 },
+    env.ADMIN_SESSION_SECRET
+  );
+  return json({ ok: true, token, role: user.role }, 200, jsonHeaders);
+}
+
+async function handleListUsers({ env, jsonHeaders }) {
+  const resp = await supabaseFetch(env, `/rest/v1/admin_users?select=*&order=created_at.asc`);
+  if (!resp.ok) return json({ ok: false, error: "Could not load users." }, 200, jsonHeaders);
+  return json({ ok: true, users: (resp.data || []).map(mapUserFromDb) }, 200, jsonHeaders);
+}
+
+async function handleCreateUserInvite({ env, body, jsonHeaders }) {
+  const email = normalizeEmail(body.email);
+  const displayName = cleanText(body.displayName);
+  const role = body.role === "admin" ? "admin" : "demo";
+  if (!email || !email.includes("@")) {
+    return json({ ok: false, error: "Enter a valid email address." }, 200, jsonHeaders);
+  }
+  const existing = await getUserByEmail(env, email);
+  if (existing.ok && existing.user) {
+    return json({ ok: false, error: "That email already has an account." }, 200, jsonHeaders);
+  }
+
+  const token = randomChallengeB64Url();
+  const insert = await supabaseFetch(env, `/rest/v1/admin_users`, {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      email,
+      display_name: displayName,
+      role,
+      active: true,
+      invite_token: token,
+      invite_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    })
+  });
+  if (!insert.ok) {
+    return json({ ok: false, error: "Could not create the account." }, 200, jsonHeaders);
+  }
+
+  const link = `${getInviteBaseUrl(env)}/admin/?invite=${encodeURIComponent(token)}`;
+  let emailed = false;
+  if (env.RESEND_API_KEY) {
+    const send = await sendBrandedEmail(env, {
+      to: email,
+      subject: "Your Murph's Mitts admin invite",
+      plainBody: `You've been invited to the Murph's Mitts admin as a ${role} user.\n\nSet your password to get started:\n${link}\n\nThis link expires in 7 days.`,
+      htmlBody: `<p>You've been invited to the Murph's Mitts admin as a <strong>${role}</strong> user.</p><p><a href="${link}">Set your password to get started</a></p><p>This link expires in 7 days.</p>`
+    });
+    emailed = !!send.ok;
+  }
+
+  return json({ ok: true, inviteLink: link, emailed }, 200, jsonHeaders);
+}
+
+async function handleSetUserPassword({ env, body, jsonHeaders }) {
+  const userId = cleanText(body.userId);
+  const password = String(body.password || "").trim();
+  if (!userId || password.length < 8) {
+    return json({ ok: false, error: "Password must be at least 8 characters." }, 200, jsonHeaders);
+  }
+  const hashed = await hashPassword(password);
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        password_hash: hashed.hash,
+        password_salt: hashed.salt,
+        password_iterations: hashed.iterations,
+        invite_token: null,
+        invite_expires_at: null,
+        active: true
+      })
+    }
+  );
+  if (!resp.ok) return json({ ok: false, error: "Could not set the password." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleUpdateUser({ env, body, jsonHeaders }) {
+  const userId = cleanText(body.userId);
+  if (!userId) return json({ ok: false, error: "Missing user." }, 200, jsonHeaders);
+
+  const updates = {};
+  if ("role" in body) updates.role = body.role === "admin" ? "admin" : "demo";
+  if ("active" in body) updates.active = !!body.active;
+  if ("displayName" in body) updates.display_name = cleanText(body.displayName);
+  if (!Object.keys(updates).length) {
+    return json({ ok: false, error: "Nothing to update." }, 200, jsonHeaders);
+  }
+
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
+    { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(updates) }
+  );
+  if (!resp.ok) return json({ ok: false, error: "Could not update the user." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleDeleteUser({ env, body, jsonHeaders }) {
+  const userId = cleanText(body.userId);
+  if (!userId) return json({ ok: false, error: "Missing user." }, 200, jsonHeaders);
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/admin_users?id=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: { Prefer: "return=minimal" } }
+  );
+  if (!resp.ok) return json({ ok: false, error: "Could not remove the user." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleGetPushPublicKey({ env, jsonHeaders }) {
+  return json({ ok: true, publicKey: env.VAPID_PUBLIC_KEY || "" }, 200, jsonHeaders);
+}
+
+async function handleWebauthnLoginOptions({ env, jsonHeaders }) {
+  const cfg = getWebauthnConfig(env);
+  const existing = await listWebauthnCredentials(env);
+  const creds = existing.ok ? existing.credentials : [];
+  const challenge = randomChallengeB64Url();
+  const challengeToken = await createChallengeToken("auth", challenge, env.ADMIN_SESSION_SECRET);
+
+  return json(
+    {
+      ok: true,
+      hasCredentials: creds.length > 0,
+      challengeToken,
+      options: {
+        challenge,
+        rpId: cfg.rpId,
+        timeout: 60000,
+        userVerification: "preferred",
+        allowCredentials: creds.map(cred => ({ id: cred.credential_id, type: "public-key" }))
+      }
+    },
+    200,
+    jsonHeaders
+  );
+}
+
+async function handleWebauthnLoginVerify({ env, body, jsonHeaders }) {
+  const cfg = getWebauthnConfig(env);
+  const chk = await verifyChallengeToken(body.challengeToken, "auth", env.ADMIN_SESSION_SECRET);
+  if (!chk.ok) {
+    return json({ ok: false, error: chk.error }, 200, jsonHeaders);
+  }
+
+  const cred = body.credential || {};
+  const resp = cred.response || {};
+  const credentialId = cleanText(cred.id) || cleanText(cred.rawId);
+  if (!credentialId) {
+    return json({ ok: false, error: "Missing passkey id." }, 200, jsonHeaders);
+  }
+
+  const record = await getWebauthnCredential(env, credentialId);
+  if (!record.ok || !record.credential) {
+    return json({ ok: false, error: "This passkey is not registered." }, 200, jsonHeaders);
+  }
+
+  let clientData;
+  try {
+    clientData = JSON.parse(new TextDecoder().decode(base64UrlToBytes(resp.clientDataJSON)));
+  } catch {
+    return json({ ok: false, error: "Could not read passkey response." }, 200, jsonHeaders);
+  }
+
+  if (clientData.type !== "webauthn.get") {
+    return json({ ok: false, error: "Unexpected passkey ceremony." }, 200, jsonHeaders);
+  }
+  if (clientData.challenge !== chk.challenge) {
+    return json({ ok: false, error: "Passkey challenge mismatch." }, 200, jsonHeaders);
+  }
+  if (!cfg.origins.includes(clientData.origin)) {
+    return json({ ok: false, error: "Passkey origin mismatch." }, 200, jsonHeaders);
+  }
+
+  let valid = false;
+  let newSignCount = 0;
+  try {
+    const authDataBytes = base64UrlToBytes(resp.authenticatorData);
+    const info = parseAuthData(authDataBytes);
+    const expectedRpIdHash = await sha256Bytes(cfg.rpId);
+    if (!bytesEqual(info.rpIdHash, expectedRpIdHash)) {
+      throw new Error("Passkey domain mismatch.");
+    }
+    if (!info.up) {
+      throw new Error("Passkey user presence missing.");
+    }
+    newSignCount = info.signCount;
+    const keyInfo = JSON.parse(record.credential.public_key);
+    valid = await verifyAssertionSignature(
+      keyInfo,
+      authDataBytes,
+      base64UrlToBytes(resp.clientDataJSON),
+      base64UrlToBytes(resp.signature)
+    );
+  } catch (err) {
+    return json({ ok: false, error: err.message || "Passkey could not be verified." }, 200, jsonHeaders);
+  }
+
+  if (!valid) {
+    return json({ ok: false, error: "Passkey signature was invalid." }, 200, jsonHeaders);
+  }
+
+  /* Counter is stored for the record but not hard-enforced: iCloud-synced
+     passkeys routinely report a sign count of 0, so a strict monotonic
+     check would lock out legitimate Face ID logins. */
+  const storedCount = Number(record.credential.sign_count) || 0;
+  await touchWebauthnCredential(env, credentialId, Math.max(storedCount, newSignCount));
+
+  const token = await createSignedToken(
+    {
+      sub: "owner",
+      role: "admin",
+      exp: Date.now() + 1000 * 60 * 60 * 24 * 14
+    },
+    env.ADMIN_SESSION_SECRET
+  );
+
+  return json({ ok: true, token, role: "admin" }, 200, jsonHeaders);
+}
+
+async function handleWebauthnRegisterOptions({ env, jsonHeaders }) {
+  const cfg = getWebauthnConfig(env);
+  const challenge = randomChallengeB64Url();
+  const challengeToken = await createChallengeToken("reg", challenge, env.ADMIN_SESSION_SECRET);
+  const existing = await listWebauthnCredentials(env);
+  const excludeCredentials = (existing.ok ? existing.credentials : []).map(cred => ({
+    id: cred.credential_id,
+    type: "public-key"
+  }));
+  return json({
+    ok: true,
+    challengeToken,
+    options: {
+      challenge,
+      rp: { id: cfg.rpId, name: cfg.rpName },
+      user: {
+        id: arrayBufferToBase64Url(new TextEncoder().encode(cfg.userId)),
+        name: cfg.userName,
+        displayName: cfg.userDisplayName
+      },
+      pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+      authenticatorSelection: {
+        residentKey: "preferred",
+        userVerification: "preferred"
+      },
+      timeout: 60000,
+      attestation: "none",
+      excludeCredentials
+    }
+  }, 200, jsonHeaders);
+}
+
+async function handleWebauthnRegisterVerify({ env, body, jsonHeaders }) {
+  const cfg = getWebauthnConfig(env);
+  const chk = await verifyChallengeToken(body.challengeToken, "reg", env.ADMIN_SESSION_SECRET);
+  if (!chk.ok) {
+    return json({ ok: false, error: chk.error }, 200, jsonHeaders);
+  }
+  const cred = body.credential || {};
+  const resp = cred.response || {};
+  let clientData;
+  try {
+    clientData = JSON.parse(new TextDecoder().decode(base64UrlToBytes(resp.clientDataJSON)));
+  } catch {
+    return json({ ok: false, error: "Could not read passkey response." }, 200, jsonHeaders);
+  }
+  if (clientData.type !== "webauthn.create") {
+    return json({ ok: false, error: "Unexpected passkey ceremony." }, 200, jsonHeaders);
+  }
+  if (clientData.challenge !== chk.challenge) {
+    return json({ ok: false, error: "Passkey challenge mismatch." }, 200, jsonHeaders);
+  }
+  if (!cfg.origins.includes(clientData.origin)) {
+    return json({ ok: false, error: "Passkey origin mismatch." }, 200, jsonHeaders);
+  }
+  let authDataInfo;
+  let keyInfo;
+  let credentialIdB64;
+  try {
+    const attestation = cborDecodeFirst(base64UrlToBytes(resp.attestationObject));
+    authDataInfo = parseAuthData(attestation.get("authData"));
+    if (!authDataInfo.at || !authDataInfo.credentialPublicKey) {
+      throw new Error("Passkey did not include a credential.");
+    }
+    const expectedRpIdHash = await sha256Bytes(cfg.rpId);
+    if (!bytesEqual(authDataInfo.rpIdHash, expectedRpIdHash)) {
+      throw new Error("Passkey domain mismatch.");
+    }
+    if (!authDataInfo.up) {
+      throw new Error("Passkey user presence missing.");
+    }
+    keyInfo = coseToKeyInfo(authDataInfo.credentialPublicKey);
+    credentialIdB64 = arrayBufferToBase64Url(authDataInfo.credentialId);
+  } catch (err) {
+    return json({
+      ok: false,
+      error: err.message || "Passkey could not be verified."
+    }, 200, jsonHeaders);
+  }
+  const stored = await insertWebauthnCredential(env, {
+    credential_id: credentialIdB64,
+    public_key: JSON.stringify(keyInfo),
+    sign_count: authDataInfo.signCount,
+    transports: Array.isArray(cred.transports) && cred.transports.length
+      ? cred.transports.join(",")
+      : null,
+    label: cleanText(body.label) || "Passkey"
+  });
+  if (!stored.ok) {
+    return json({
+      ok: false,
+      error: "Could not save passkey.",
+      details: stored.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true }, 200, jsonHeaders);
 }
 
 /* =========================
@@ -4743,27 +4311,35 @@ async function touchUserLogin(env, userId) {
   );
 }
 
-/* Returns the resolved role for a validated token: the account's current
-   role (so a role change or deactivation takes effect immediately), or the
-   token's role for the owner/passkey escape hatches (sub === "owner"). */
-async function resolveAuthRole(env, payload) {
+async function resolveActiveAuthIdentity(env, payload) {
   if (!payload) return null;
-  if (payload.sub === "owner") return "admin";
-  if (!payload.sub) return payload.role || null;
+  if (payload.sub === "owner") {
+    return { role: "admin", user: null, owner: true };
+  }
+  if (!payload.sub) return null;
 
   const found = await getUserByEmail(env, payload.email || "");
   const user = found.ok ? found.user : null;
   if (!user || user.active === false) return null;
-  return user.role || null;
+  return { role: user.role || null, user, owner: false };
 }
 
 /* Gate for admin-only actions: valid token AND resolved role === "admin". */
 async function requireAdmin(env, body) {
   const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
   if (!auth.ok) return { ok: false, error: auth.error };
-  const role = await resolveAuthRole(env, auth.payload);
+  const identity = auth.payload?.sub
+    ? await resolveActiveAuthIdentity(env, auth.payload)
+    : { role: auth.payload?.role || null, user: null, owner: false };
+  const role = identity ? identity.role : null;
   if (role !== "admin") return { ok: false, error: "Admins only." };
-  return { ok: true, payload: auth.payload, role };
+  return {
+    ok: true,
+    payload: auth.payload,
+    role,
+    user: identity.user,
+    owner: identity.owner
+  };
 }
 
 function getInviteBaseUrl(env) {
