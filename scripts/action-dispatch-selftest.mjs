@@ -1100,6 +1100,346 @@ await test("webauthnLoginVerify verifies ES256, updates count, and issues owner 
   equal(failed.fetchCalls.length, 1);
 });
 
+console.log("Registry-backed pricing mutations");
+
+const stageElevenActions = [
+  "saveServicePricingDraft", "discardServicePricingDraft",
+  "publishServicePricing", "restoreServicePricingRevision",
+  "createServicePricing"
+];
+
+const pricingServiceRow = {
+  id: "svc-1",
+  service_key: "full_service",
+  service_name: "Full Service",
+  category: "relacing",
+  short_description: "Current",
+  bullet_details: ["Current bullet"],
+  pricing_type: "fixed",
+  base_price: 80,
+  premium_price: null,
+  price_suffix: "",
+  display_override: "",
+  is_public: true,
+  is_active: true,
+  sort_order: 10
+};
+
+const pricingDraftData = {
+  service_name: "Full Service Plus",
+  category: "relacing",
+  short_description: "Updated",
+  bullet_details: ["Clean", "Condition"],
+  pricing_type: "tiered",
+  base_price: 90,
+  premium_price: 110,
+  price_suffix: "",
+  display_override: "",
+  is_public: true,
+  is_active: true,
+  sort_order: 20
+};
+
+await test("Stage 11 pricing actions centralize authorization and demo denial", async () => {
+  const { owner, demo } = await sessionTokens();
+  for (const action of stageElevenActions) {
+    const missing = await invoke({ body: { action } });
+    deepEqual(missing.json, { ok: false, error: "Missing session token." }, action);
+    equal(missing.fetchCalls.length, 0, action);
+    await assertDemoDenied(action, demo);
+    const valid = await invoke({
+      body: { action, _token: owner },
+      fetchMock: emptySupabaseFetch
+    });
+    equal(valid.response.status, 200, action);
+    equal(valid.json?.error === "Missing session token.", false, action);
+  }
+});
+
+await test("saveServicePricingDraft preserves patch and insert branches", async () => {
+  const { owner } = await sessionTokens();
+  const commonBody = {
+    action: "saveServicePricingDraft",
+    _token: owner,
+    serviceKey: " full_service ",
+    serviceName: " Full Service Plus ",
+    category: "invalid-defaults-additional",
+    pricingType: "invalid-defaults-fixed",
+    shortDescription: " Updated ",
+    bulletDetails: [" Clean ", "", " Condition "],
+    basePrice: "90",
+    premiumPrice: "",
+    priceSuffix: " each ",
+    displayOverride: " ",
+    isPublic: false,
+    isActive: false,
+    sortOrder: "12.6",
+    note: " Draft note "
+  };
+
+  const patched = await invoke({
+    body: commonBody,
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) {
+        ok(String(input).includes("service_key=eq.full_service"));
+        return jsonResponse([pricingServiceRow]);
+      }
+      if (callNumber === 2) {
+        ok(String(input).includes("status=eq.draft"));
+        return jsonResponse([{ id: "draft-1" }]);
+      }
+      ok(String(input).includes("id=eq.draft-1"));
+      equal(init.method, "PATCH");
+      equal(init.headers.Prefer, "return=minimal");
+      const payload = JSON.parse(init.body);
+      deepEqual(payload.data, {
+        service_name: "Full Service Plus",
+        category: "additional",
+        short_description: "Updated",
+        bullet_details: ["Clean", "Condition"],
+        pricing_type: "fixed",
+        base_price: 90,
+        premium_price: null,
+        price_suffix: "each",
+        display_override: null,
+        is_public: false,
+        is_active: false,
+        sort_order: 13
+      });
+      equal(payload.note, "Draft note");
+      ok(!Number.isNaN(Date.parse(payload.created_at)));
+      return jsonResponse(null);
+    }
+  });
+  deepEqual(patched.json, { ok: true, display: "$90" });
+  equal(patched.fetchCalls.length, 3);
+
+  const inserted = await invoke({
+    body: { ...commonBody, category: "relacing", pricingType: "tiered", premiumPrice: "110" },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse([pricingServiceRow]);
+      if (callNumber === 2) return jsonResponse([]);
+      equal(init.method, "POST");
+      equal(init.headers.Prefer, "return=minimal");
+      const payload = JSON.parse(init.body);
+      equal(payload.service_pricing_id, "svc-1");
+      equal(payload.service_key, "full_service");
+      equal(payload.status, "draft");
+      equal(payload.data.premium_price, 110);
+      equal(payload.note, "Draft note");
+      return jsonResponse(null);
+    }
+  });
+  deepEqual(inserted.json, { ok: true, display: "$90–$110" });
+  equal(inserted.fetchCalls.length, 3);
+});
+
+await test("discard and restore preserve lookup/write ordering", async () => {
+  const { owner } = await sessionTokens();
+  const discarded = await invoke({
+    body: {
+      action: "discardServicePricingDraft", _token: owner, serviceKey: "full_service"
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse([pricingServiceRow]);
+      ok(String(input).includes("service_pricing_id=eq.svc-1&status=eq.draft"));
+      equal(init.method, "DELETE");
+      equal(init.headers.Prefer, "return=minimal");
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(discarded.json, { ok: true });
+  equal(discarded.fetchCalls.length, 2);
+  equal(discarded.fetchCalls.some(call => call.init.method === "PATCH"), false);
+
+  const revision = {
+    id: "revision-1",
+    service_pricing_id: "svc-1",
+    service_key: "full_service",
+    data: pricingDraftData,
+    published_at: "2026-01-15T12:00:00.000Z"
+  };
+  const restored = await invoke({
+    body: {
+      action: "restoreServicePricingRevision", _token: owner, revisionId: " revision-1 "
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) {
+        ok(String(input).includes("id=eq.revision-1&limit=1"));
+        return jsonResponse([revision]);
+      }
+      if (callNumber === 2) {
+        ok(String(input).includes("service_pricing_id=eq.svc-1&status=eq.draft"));
+        return jsonResponse([]);
+      }
+      equal(init.method, "POST");
+      const payload = JSON.parse(init.body);
+      deepEqual(payload.data, pricingDraftData);
+      equal(payload.service_pricing_id, "svc-1");
+      equal(payload.status, "draft");
+      equal(payload.note, "Restored from 1/15/2026");
+      return jsonResponse(null);
+    }
+  });
+  deepEqual(restored.json, { ok: true });
+  equal(restored.fetchCalls.length, 3);
+  equal(
+    restored.fetchCalls.some(call => call.url.includes("/rest/v1/service_pricing?")),
+    false
+  );
+});
+
+await test("createServicePricing preserves derived key and forced initial state", async () => {
+  const { owner } = await sessionTokens();
+  const missing = await invoke({
+    body: { action: "createServicePricing", _token: owner }
+  });
+  deepEqual(missing.json, { ok: false, error: "Service name is required." });
+  const invalid = await invoke({
+    body: {
+      action: "createServicePricing", _token: owner,
+      serviceName: "New Service", serviceKey: "Not Valid"
+    }
+  });
+  deepEqual(invalid.json, {
+    ok: false,
+    error: "Service key must be lowercase letters, numbers, and underscores."
+  });
+
+  const created = await invoke({
+    body: {
+      action: "createServicePricing", _token: owner,
+      serviceName: " New Custom Service ", category: "unknown", pricingType: "unknown"
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) {
+        ok(String(input).includes("service_key=eq.new_custom_service"));
+        return jsonResponse([]);
+      }
+      if (callNumber === 2) return jsonResponse([{ sort_order: 10 }, { sort_order: 35 }]);
+      equal(init.method, "POST");
+      equal(init.headers.Prefer, "return=representation");
+      const payload = JSON.parse(init.body);
+      deepEqual(payload, {
+        service_key: "new_custom_service",
+        service_name: "New Custom Service",
+        category: "additional",
+        bullet_details: [],
+        pricing_type: "fixed",
+        is_public: false,
+        is_active: false,
+        sort_order: 45
+      });
+      return jsonResponse([{ id: "svc-new", ...payload, published_at: null }]);
+    }
+  });
+  equal(created.json.ok, true);
+  equal(created.json.service.serviceKey, "new_custom_service");
+  equal(created.json.service.isPublic, false);
+  equal(created.json.service.isActive, false);
+  equal(created.fetchCalls.length, 3);
+  equal(
+    created.fetchCalls.some(call => call.url.includes("service_pricing_revisions")),
+    false
+  );
+});
+
+await test("publishServicePricing preserves writes, payload, and partial states", async () => {
+  const { owner } = await sessionTokens();
+  const draft = {
+    id: "draft-1",
+    service_pricing_id: "svc-1",
+    service_key: "full_service",
+    status: "draft",
+    note: "Original note",
+    data: pricingDraftData
+  };
+  const livePatched = {
+    ...pricingServiceRow,
+    ...pricingDraftData,
+    id: "svc-1",
+    service_key: "full_service"
+  };
+
+  const success = await invoke({
+    body: {
+      action: "publishServicePricing", _token: owner,
+      serviceKey: "full_service", note: " Published note "
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse([pricingServiceRow]);
+      if (callNumber === 2) return jsonResponse([draft]);
+      if (callNumber === 3) {
+        ok(String(input).includes("/service_pricing?id=eq.svc-1"));
+        equal(init.method, "PATCH");
+        equal(init.headers.Prefer, "return=representation");
+        const payload = JSON.parse(init.body);
+        deepEqual(Object.keys(payload), [
+          "service_name", "category", "short_description", "bullet_details",
+          "pricing_type", "base_price", "premium_price", "price_suffix",
+          "display_override", "is_public", "is_active", "sort_order",
+          "updated_at", "published_at"
+        ]);
+        equal(payload.service_name, "Full Service Plus");
+        equal(payload.updated_at, payload.published_at);
+        ok(!Number.isNaN(Date.parse(payload.published_at)));
+        return jsonResponse([{ ...livePatched, ...payload }]);
+      }
+      ok(String(input).includes("/service_pricing_revisions?id=eq.draft-1"));
+      equal(init.method, "PATCH");
+      equal(init.headers.Prefer, "return=minimal");
+      const payload = JSON.parse(init.body);
+      equal(payload.status, "published");
+      equal(payload.previous_display, "$80");
+      equal(payload.new_display, "$90–$110");
+      equal(payload.note, "Published note");
+      ok(!Number.isNaN(Date.parse(payload.published_at)));
+      return jsonResponse(null);
+    }
+  });
+  equal(success.json.ok, true);
+  equal(success.json.previousDisplay, "$80");
+  equal(success.json.newDisplay, "$90–$110");
+  equal(success.fetchCalls.length, 4);
+
+  const liveFailure = await invoke({
+    body: {
+      action: "publishServicePricing", _token: owner, serviceKey: "full_service"
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse([pricingServiceRow]);
+      if (callNumber === 2) return jsonResponse([draft]);
+      return jsonResponse({ message: "live failed" }, 500);
+    }
+  });
+  deepEqual(liveFailure.json, {
+    ok: false,
+    error: "Publish failed while updating live pricing."
+  });
+  equal(liveFailure.fetchCalls.length, 3);
+
+  const promoteFailure = await invoke({
+    body: {
+      action: "publishServicePricing", _token: owner, serviceKey: "full_service"
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse([pricingServiceRow]);
+      if (callNumber === 2) return jsonResponse([draft]);
+      if (callNumber === 3) return jsonResponse([livePatched]);
+      return jsonResponse({ message: "promotion failed" }, 500);
+    }
+  });
+  deepEqual(promoteFailure.json, {
+    ok: false,
+    error: "Publish saved pricing but failed to record history."
+  });
+  equal(promoteFailure.fetchCalls.length, 4);
+  equal(
+    promoteFailure.fetchCalls.filter(call => call.init.method === "PATCH").length,
+    2
+  );
+});
+
 console.log("Registry-backed storage and gallery workflows");
 
 const stageTenActions = [
@@ -2559,7 +2899,7 @@ await test("current database role overrides ordinary token role", async () => {
 
 console.log("Action registry and legacy source inventory");
 
-await test("68 registry actions plus 8 legacy actions match the plan", async () => {
+await test("73 registry actions plus 3 legacy actions match the plan", async () => {
   const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
   const plan = fs.readFileSync(new URL("../.docs/V1_2_ACTION_REGISTRY_PLAN.md", import.meta.url), "utf8");
   const dispatcher = source.split("/* =========================\n   RESPONSE HELPERS")[0];
@@ -2623,6 +2963,11 @@ await test("68 registry actions plus 8 legacy actions match the plan", async () 
     "deleteExpense",
     "listServicePricing",
     "listServicePricingHistory",
+    "saveServicePricingDraft",
+    "discardServicePricingDraft",
+    "publishServicePricing",
+    "restoreServicePricingRevision",
+    "createServicePricing",
     "getShopSettings",
     "saveShopSettings",
     "setGalleryPhotoCover",
@@ -2693,6 +3038,11 @@ await test("68 registry actions plus 8 legacy actions match the plan", async () 
     ["deleteExpense", "deny"],
     ["listServicePricing", "deny"],
     ["listServicePricingHistory", "deny"],
+    ["saveServicePricingDraft", "deny"],
+    ["discardServicePricingDraft", "deny"],
+    ["publishServicePricing", "deny"],
+    ["restoreServicePricingRevision", "deny"],
+    ["createServicePricing", "deny"],
     ["getShopSettings", "deny"],
     ["saveShopSettings", "deny"],
     ["setGalleryPhotoCover", "deny"],
@@ -2723,7 +3073,7 @@ await test("68 registry actions plus 8 legacy actions match the plan", async () 
   }
 
   deepEqual(registryActions, expectedRegistryActions);
-  equal(registryActions.length, 68);
+  equal(registryActions.length, 73);
   equal(
     (dispatcher.match(/return dispatchRegisteredAction\(registeredAction,/g) || []).length,
     1,
@@ -2760,7 +3110,10 @@ await test("68 registry actions plus 8 legacy actions match the plan", async () 
           , "uploadGalleryPhoto", "setGalleryPhotoCover", "setGalleryPhotoOrder",
           "moveGalleryPhoto", "hideGalleryPhoto", "restoreGalleryPhoto",
           "deleteGalleryPhoto", "uploadLacePhoto", "uploadSaleGlovePhoto",
-          "setSalePhotoPrimary", "setSalePhotoHover", "deleteSaleGlovePhoto"
+          "setSalePhotoPrimary", "setSalePhotoHover", "deleteSaleGlovePhoto",
+          "saveServicePricingDraft", "discardServicePricingDraft",
+          "publishServicePricing", "restoreServicePricingRevision",
+          "createServicePricing"
         ].includes(action) ? "session" : "public";
     if (action === "listGalleryPhotos") {
       ok(
@@ -2863,8 +3216,23 @@ await test("68 registry actions plus 8 legacy actions match the plan", async () 
       `${handler} relies on centralized authorization`
     );
   }
-  equal(legacyActions.length, 8);
-  equal(new Set(legacyActions).size, 8);
+  for (const handler of [
+    "handleSaveServicePricingDraft", "handleDiscardServicePricingDraft",
+    "handlePublishServicePricing", "handleRestoreServicePricingRevision",
+    "handleCreateServicePricing"
+  ]) {
+    const handlerSource = source.match(
+      new RegExp(`async function ${handler}\\([\\s\\S]*?(?=\\nasync function )`)
+    );
+    ok(handlerSource, `${handler} is present`);
+    equal(
+      /validateTokenFromBody|body(?:\._token|\["_token"\]|\['_token'\])/.test(handlerSource[0]),
+      false,
+      `${handler} relies on centralized authorization`
+    );
+  }
+  equal(legacyActions.length, 3);
+  equal(new Set(legacyActions).size, 3);
   equal(plannedActions.length, 76);
   deepEqual(legacyActions, plannedLegacyActions);
   deepEqual([...legacyCounts.entries()].filter(([, count]) => count !== 1), []);

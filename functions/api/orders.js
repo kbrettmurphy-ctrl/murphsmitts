@@ -285,6 +285,37 @@ const ACTIONS = {
     auth: "session", demo: "deny", handler: handleListServicePricingHistory,
     effects: ["db:service_pricing_revisions:read"], bindings: { required: ["CORE"], optional: [] }
   },
+  saveServicePricingDraft: {
+    auth: "session", demo: "deny", handler: handleSaveServicePricingDraft,
+    effects: [
+      "db:service_pricing:read", "db:service_pricing_revisions:read",
+      "db:service_pricing_revisions:write"
+    ],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  discardServicePricingDraft: {
+    auth: "session", demo: "deny", handler: handleDiscardServicePricingDraft,
+    effects: ["db:service_pricing:read", "db:service_pricing_revisions:delete"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  publishServicePricing: {
+    auth: "session", demo: "deny", handler: handlePublishServicePricing,
+    effects: [
+      "db:service_pricing:read", "db:service_pricing:write",
+      "db:service_pricing_revisions:read", "db:service_pricing_revisions:write"
+    ],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  restoreServicePricingRevision: {
+    auth: "session", demo: "deny", handler: handleRestoreServicePricingRevision,
+    effects: ["db:service_pricing_revisions:read", "db:service_pricing_revisions:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  createServicePricing: {
+    auth: "session", demo: "deny", handler: handleCreateServicePricing,
+    effects: ["db:service_pricing:read", "db:service_pricing:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
   getShopSettings: {
     auth: "session", demo: "deny", handler: handleGetShopSettings,
     effects: ["db:shop_settings:read"], bindings: { required: ["CORE"], optional: [] }
@@ -686,199 +717,6 @@ export async function onRequest(context) {
        only ever writes a draft revision; publishing copies the draft into the
        live row and turns that revision into an immutable history record.
     ========================= */
-    if (action === "saveServicePricingDraft") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
-      if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
-
-      const built = buildPricingDraftData(body);
-      if (!built.ok) return json({ ok: false, error: built.error }, 200, jsonHeaders);
-
-      const note = cleanText(body.note);
-      const existing = await fetchServicePricingDraft(env, service.id);
-      if (existing) {
-        const patch = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(existing.id)}`, {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ data: built.data, note, created_at: new Date().toISOString() })
-        });
-        if (!patch.ok) return json({ ok: false, error: "Draft could not be saved." }, 200, jsonHeaders);
-      } else {
-        const insert = await supabaseFetch(env, `/rest/v1/service_pricing_revisions`, {
-          method: "POST",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({
-            service_pricing_id: service.id,
-            service_key: service.service_key,
-            status: "draft",
-            data: built.data,
-            note
-          })
-        });
-        if (!insert.ok) return json({ ok: false, error: "Draft could not be saved." }, 200, jsonHeaders);
-      }
-      return json({ ok: true, display: formatServiceDisplayPrice(built.data) }, 200, jsonHeaders);
-    }
-
-    if (action === "discardServicePricingDraft") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
-      if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
-      const del = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?service_pricing_id=eq.${encodeURIComponent(service.id)}&status=eq.draft`, {
-        method: "DELETE", headers: { Prefer: "return=minimal" }
-      });
-      if (!del.ok) return json({ ok: false, error: "Draft could not be discarded." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "publishServicePricing") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
-      if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
-
-      const draft = await fetchServicePricingDraft(env, service.id);
-      if (!draft || !draft.data || typeof draft.data !== "object") {
-        return json({ ok: false, error: "No draft to publish." }, 200, jsonHeaders);
-      }
-
-      const data = draft.data;
-      const previousDisplay = formatServiceDisplayPrice(service);
-      const newDisplay = formatServiceDisplayPrice(data);
-      const nowIso = new Date().toISOString();
-
-      const liveUpdate = {
-        service_name: data.service_name,
-        category: data.category,
-        short_description: data.short_description ?? null,
-        bullet_details: Array.isArray(data.bullet_details) ? data.bullet_details : [],
-        pricing_type: data.pricing_type,
-        base_price: data.base_price ?? null,
-        premium_price: data.premium_price ?? null,
-        price_suffix: data.price_suffix ?? null,
-        display_override: data.display_override ?? null,
-        is_public: data.is_public !== false,
-        is_active: data.is_active !== false,
-        sort_order: Number.isFinite(Number(data.sort_order)) ? Math.round(Number(data.sort_order)) : 0,
-        updated_at: nowIso,
-        published_at: nowIso
-      };
-
-      const patchLive = await supabaseFetch(env, `/rest/v1/service_pricing?id=eq.${encodeURIComponent(service.id)}`, {
-        method: "PATCH",
-        headers: { Prefer: "return=representation" },
-        body: JSON.stringify(liveUpdate)
-      });
-      if (!patchLive.ok) return json({ ok: false, error: "Publish failed while updating live pricing." }, 200, jsonHeaders);
-
-      const promote = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(draft.id)}`, {
-        method: "PATCH",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({
-          status: "published",
-          previous_display: previousDisplay,
-          new_display: newDisplay,
-          note: cleanText(body.note) || draft.note || null,
-          published_at: nowIso
-        })
-      });
-      if (!promote.ok) return json({ ok: false, error: "Publish saved pricing but failed to record history." }, 200, jsonHeaders);
-
-      const updatedRow = Array.isArray(patchLive.data) ? patchLive.data[0] : null;
-      return json({
-        ok: true,
-        service: updatedRow ? mapServicePricingRow(updatedRow) : null,
-        previousDisplay,
-        newDisplay
-      }, 200, jsonHeaders);
-    }
-
-    if (action === "restoreServicePricingRevision") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const revisionId = cleanText(body.revisionId);
-      if (!revisionId) return json({ ok: false, error: "Missing revision id." }, 200, jsonHeaders);
-
-      const revResp = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?select=*&id=eq.${encodeURIComponent(revisionId)}&limit=1`);
-      const revision = revResp.ok && Array.isArray(revResp.data) ? revResp.data[0] : null;
-      if (!revision || !revision.data) return json({ ok: false, error: "Revision not found." }, 200, jsonHeaders);
-
-      const restoredAt = revision.published_at ? new Date(revision.published_at).toLocaleDateString("en-US") : "a prior revision";
-      const note = `Restored from ${restoredAt}`;
-      const existing = await fetchServicePricingDraft(env, revision.service_pricing_id);
-      if (existing) {
-        const patch = await supabaseFetch(env, `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(existing.id)}`, {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ data: revision.data, note, created_at: new Date().toISOString() })
-        });
-        if (!patch.ok) return json({ ok: false, error: "Restore failed." }, 200, jsonHeaders);
-      } else {
-        const insert = await supabaseFetch(env, `/rest/v1/service_pricing_revisions`, {
-          method: "POST",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({
-            service_pricing_id: revision.service_pricing_id,
-            service_key: revision.service_key,
-            status: "draft",
-            data: revision.data,
-            note
-          })
-        });
-        if (!insert.ok) return json({ ok: false, error: "Restore failed." }, 200, jsonHeaders);
-      }
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "createServicePricing") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const serviceName = cleanText(body.serviceName);
-      if (!serviceName) return json({ ok: false, error: "Service name is required." }, 200, jsonHeaders);
-
-      let serviceKey = cleanText(body.serviceKey);
-      if (!serviceKey) {
-        serviceKey = serviceName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48);
-      }
-      if (!/^[a-z0-9_]+$/.test(serviceKey)) {
-        return json({ ok: false, error: "Service key must be lowercase letters, numbers, and underscores." }, 200, jsonHeaders);
-      }
-
-      const existing = await fetchServicePricingByKey(env, serviceKey);
-      if (existing) return json({ ok: false, error: "A service with that key already exists." }, 200, jsonHeaders);
-
-      const category = ["relacing", "additional"].includes(String(body.category)) ? String(body.category) : "additional";
-      const rowsResp = await supabaseFetch(env, `/rest/v1/service_pricing?select=sort_order`);
-      const maxSort = rowsResp.ok && Array.isArray(rowsResp.data)
-        ? rowsResp.data.reduce((m, r) => Math.max(m, Number(r.sort_order) || 0), 0)
-        : 0;
-
-      /* New services start hidden + inactive with no published_at, so they can
-         never leak to the public endpoint before the owner publishes them. */
-      const insert = await supabaseFetch(env, `/rest/v1/service_pricing`, {
-        method: "POST",
-        headers: { Prefer: "return=representation" },
-        body: JSON.stringify({
-          service_key: serviceKey,
-          service_name: serviceName,
-          category,
-          bullet_details: [],
-          pricing_type: ["fixed", "range", "starting_at", "per_item", "variable", "tiered"].includes(String(body.pricingType)) ? String(body.pricingType) : "fixed",
-          is_public: false,
-          is_active: false,
-          sort_order: maxSort + 10
-        })
-      });
-      if (!insert.ok) return json({ ok: false, error: "Service could not be created." }, 200, jsonHeaders);
-      const created = Array.isArray(insert.data) ? insert.data[0] : null;
-      return json({ ok: true, service: created ? mapServicePricingRow(created) : null }, 200, jsonHeaders);
-    }
-
     return json(
       {
         ok: false,
@@ -1571,6 +1409,217 @@ async function handleListServicePricingHistory({ env, body, jsonHeaders }) {
     fields: r.data && typeof r.data === "object" ? mapPricingSnapshotToClient(r.data) : null
   }));
   return json({ ok: true, history }, 200, jsonHeaders);
+}
+
+async function handleSaveServicePricingDraft({ env, body, jsonHeaders }) {
+  const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
+  if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
+  const built = buildPricingDraftData(body);
+  if (!built.ok) return json({ ok: false, error: built.error }, 200, jsonHeaders);
+  const note = cleanText(body.note);
+  const existing = await fetchServicePricingDraft(env, service.id);
+  if (existing) {
+    const patch = await supabaseFetch(
+      env,
+      `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(existing.id)}`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ data: built.data, note, created_at: new Date().toISOString() })
+      }
+    );
+    if (!patch.ok) return json({ ok: false, error: "Draft could not be saved." }, 200, jsonHeaders);
+  } else {
+    const insert = await supabaseFetch(env, `/rest/v1/service_pricing_revisions`, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        service_pricing_id: service.id,
+        service_key: service.service_key,
+        status: "draft",
+        data: built.data,
+        note
+      })
+    });
+    if (!insert.ok) return json({ ok: false, error: "Draft could not be saved." }, 200, jsonHeaders);
+  }
+  return json({ ok: true, display: formatServiceDisplayPrice(built.data) }, 200, jsonHeaders);
+}
+
+async function handleDiscardServicePricingDraft({ env, body, jsonHeaders }) {
+  const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
+  if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
+  const del = await supabaseFetch(
+    env,
+    `/rest/v1/service_pricing_revisions?service_pricing_id=eq.${encodeURIComponent(service.id)}&status=eq.draft`,
+    { method: "DELETE", headers: { Prefer: "return=minimal" } }
+  );
+  if (!del.ok) return json({ ok: false, error: "Draft could not be discarded." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handlePublishServicePricing({ env, body, jsonHeaders }) {
+  const service = await fetchServicePricingByKey(env, cleanText(body.serviceKey));
+  if (!service) return json({ ok: false, error: "Service not found." }, 200, jsonHeaders);
+  const draft = await fetchServicePricingDraft(env, service.id);
+  if (!draft || !draft.data || typeof draft.data !== "object") {
+    return json({ ok: false, error: "No draft to publish." }, 200, jsonHeaders);
+  }
+  const data = draft.data;
+  const previousDisplay = formatServiceDisplayPrice(service);
+  const newDisplay = formatServiceDisplayPrice(data);
+  const nowIso = new Date().toISOString();
+  const liveUpdate = {
+    service_name: data.service_name,
+    category: data.category,
+    short_description: data.short_description ?? null,
+    bullet_details: Array.isArray(data.bullet_details) ? data.bullet_details : [],
+    pricing_type: data.pricing_type,
+    base_price: data.base_price ?? null,
+    premium_price: data.premium_price ?? null,
+    price_suffix: data.price_suffix ?? null,
+    display_override: data.display_override ?? null,
+    is_public: data.is_public !== false,
+    is_active: data.is_active !== false,
+    sort_order: Number.isFinite(Number(data.sort_order)) ? Math.round(Number(data.sort_order)) : 0,
+    updated_at: nowIso,
+    published_at: nowIso
+  };
+  const patchLive = await supabaseFetch(
+    env,
+    `/rest/v1/service_pricing?id=eq.${encodeURIComponent(service.id)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(liveUpdate)
+    }
+  );
+  if (!patchLive.ok) {
+    return json({ ok: false, error: "Publish failed while updating live pricing." }, 200, jsonHeaders);
+  }
+  const promote = await supabaseFetch(
+    env,
+    `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(draft.id)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        status: "published",
+        previous_display: previousDisplay,
+        new_display: newDisplay,
+        note: cleanText(body.note) || draft.note || null,
+        published_at: nowIso
+      })
+    }
+  );
+  if (!promote.ok) {
+    return json({
+      ok: false,
+      error: "Publish saved pricing but failed to record history."
+    }, 200, jsonHeaders);
+  }
+  const updatedRow = Array.isArray(patchLive.data) ? patchLive.data[0] : null;
+  return json({
+    ok: true,
+    service: updatedRow ? mapServicePricingRow(updatedRow) : null,
+    previousDisplay,
+    newDisplay
+  }, 200, jsonHeaders);
+}
+
+async function handleRestoreServicePricingRevision({ env, body, jsonHeaders }) {
+  const revisionId = cleanText(body.revisionId);
+  if (!revisionId) return json({ ok: false, error: "Missing revision id." }, 200, jsonHeaders);
+  const revResp = await supabaseFetch(
+    env,
+    `/rest/v1/service_pricing_revisions?select=*&id=eq.${encodeURIComponent(revisionId)}&limit=1`
+  );
+  const revision = revResp.ok && Array.isArray(revResp.data) ? revResp.data[0] : null;
+  if (!revision || !revision.data) {
+    return json({ ok: false, error: "Revision not found." }, 200, jsonHeaders);
+  }
+  const restoredAt = revision.published_at
+    ? new Date(revision.published_at).toLocaleDateString("en-US")
+    : "a prior revision";
+  const note = `Restored from ${restoredAt}`;
+  const existing = await fetchServicePricingDraft(env, revision.service_pricing_id);
+  if (existing) {
+    const patch = await supabaseFetch(
+      env,
+      `/rest/v1/service_pricing_revisions?id=eq.${encodeURIComponent(existing.id)}`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ data: revision.data, note, created_at: new Date().toISOString() })
+      }
+    );
+    if (!patch.ok) return json({ ok: false, error: "Restore failed." }, 200, jsonHeaders);
+  } else {
+    const insert = await supabaseFetch(env, `/rest/v1/service_pricing_revisions`, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        service_pricing_id: revision.service_pricing_id,
+        service_key: revision.service_key,
+        status: "draft",
+        data: revision.data,
+        note
+      })
+    });
+    if (!insert.ok) return json({ ok: false, error: "Restore failed." }, 200, jsonHeaders);
+  }
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleCreateServicePricing({ env, body, jsonHeaders }) {
+  const serviceName = cleanText(body.serviceName);
+  if (!serviceName) return json({ ok: false, error: "Service name is required." }, 200, jsonHeaders);
+  let serviceKey = cleanText(body.serviceKey);
+  if (!serviceKey) {
+    serviceKey = serviceName.toLowerCase().replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "").slice(0, 48);
+  }
+  if (!/^[a-z0-9_]+$/.test(serviceKey)) {
+    return json({
+      ok: false,
+      error: "Service key must be lowercase letters, numbers, and underscores."
+    }, 200, jsonHeaders);
+  }
+  const existing = await fetchServicePricingByKey(env, serviceKey);
+  if (existing) {
+    return json({ ok: false, error: "A service with that key already exists." }, 200, jsonHeaders);
+  }
+  const category = ["relacing", "additional"].includes(String(body.category))
+    ? String(body.category)
+    : "additional";
+  const rowsResp = await supabaseFetch(env, `/rest/v1/service_pricing?select=sort_order`);
+  const maxSort = rowsResp.ok && Array.isArray(rowsResp.data)
+    ? rowsResp.data.reduce((m, r) => Math.max(m, Number(r.sort_order) || 0), 0)
+    : 0;
+  const insert = await supabaseFetch(env, `/rest/v1/service_pricing`, {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      service_key: serviceKey,
+      service_name: serviceName,
+      category,
+      bullet_details: [],
+      pricing_type: [
+        "fixed", "range", "starting_at", "per_item", "variable", "tiered"
+      ].includes(String(body.pricingType)) ? String(body.pricingType) : "fixed",
+      is_public: false,
+      is_active: false,
+      sort_order: maxSort + 10
+    })
+  });
+  if (!insert.ok) {
+    return json({ ok: false, error: "Service could not be created." }, 200, jsonHeaders);
+  }
+  const created = Array.isArray(insert.data) ? insert.data[0] : null;
+  return json({
+    ok: true,
+    service: created ? mapServicePricingRow(created) : null
+  }, 200, jsonHeaders);
 }
 
 async function handleGetShopSettings({ env, jsonHeaders }) {
