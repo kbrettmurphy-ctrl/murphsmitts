@@ -154,6 +154,14 @@ let financeFilterMenuOpen = false;
 let dashboardLaborSessions = {};
 let dashboardTimerPopoverOrder = null;
 let dashboardTimerBusy = false;
+let benchFocusState = { activeBench: null, activeLabor: null, unresolved: [], serverNow: null };
+let benchFocusBusy = false;
+let benchFocusPollInterval = null;
+let benchFocusClockOffsetMs = 0;
+const BENCH_FOCUS_SIGNAL_KEY = "mm_bench_focus_changed";
+const benchFocusChannel = typeof BroadcastChannel === "function"
+  ? new BroadcastChannel("murphos-bench-focus")
+  : null;
 
 /* Set of order numbers that have at least one real activity-log entry
    (the manual-creation event is excluded server-side). Drives the New
@@ -404,6 +412,8 @@ function clearToken() {
   laceInventory = [];
   galleryPhotos = [];
   dashboardLaborSessions = {};
+  benchFocusState = { activeBench: null, activeLabor: null, unresolved: [], serverNow: null };
+  stopBenchFocusPolling();
   dashboardActivityOrders = new Set();
   dashboardActivityLoaded = false;
   allMessages = [];
@@ -529,7 +539,9 @@ async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
       }
     }
 
-    throw new Error(message);
+    const error = new Error(message);
+    Object.assign(error, data);
+    throw error;
   }
 
   return data;
@@ -1598,6 +1610,58 @@ async function refreshDashboardLaborSessions({ rerender = true } = {}) {
   }
 }
 
+function stopBenchFocusPolling() {
+  if (benchFocusPollInterval) {
+    clearInterval(benchFocusPollInterval);
+    benchFocusPollInterval = null;
+  }
+}
+
+function syncBenchFocusPolling() {
+  if (!getToken() || !benchFocusState.activeBench) {
+    stopBenchFocusPolling();
+    return;
+  }
+  if (!benchFocusPollInterval) {
+    benchFocusPollInterval = setInterval(() => refreshBenchFocusState(), 15000);
+  }
+}
+
+function broadcastBenchFocusChange() {
+  benchFocusChannel?.postMessage({ type: "changed" });
+  try { localStorage.setItem(BENCH_FOCUS_SIGNAL_KEY, String(Date.now())); } catch {}
+}
+
+async function refreshBenchFocusState({ rerender = true } = {}) {
+  if (!getToken() || isDemoRole()) return;
+  try {
+    const data = await postJson({ action: "getBenchFocus" }, true);
+    const next = {
+      activeBench: data.activeBench || null,
+      activeLabor: data.activeLabor || null,
+      unresolved: data.unresolved || [],
+      serverNow: data.serverNow || null
+    };
+    const changed = JSON.stringify({ ...next, serverNow: null }) !==
+      JSON.stringify({ ...benchFocusState, serverNow: null });
+    const parsedServerNow = Date.parse(next.serverNow);
+    if (Number.isFinite(parsedServerNow)) benchFocusClockOffsetMs = parsedServerNow - Date.now();
+    benchFocusState = next;
+    syncBenchFocusPolling();
+    if (changed && rerender && activeView === "dashboard") renderHomeDashboard();
+  } catch {
+    /* Preserve the last confirmed state during transient network loss. */
+  }
+}
+
+benchFocusChannel?.addEventListener("message", event => {
+  if (event.data?.type === "changed") refreshBenchFocusState();
+});
+window.addEventListener("storage", event => {
+  if (event.key === BENCH_FOCUS_SIGNAL_KEY) refreshBenchFocusState();
+});
+window.addEventListener("focus", () => refreshBenchFocusState());
+
 async function refreshDashboardActivityIndex({ rerender = true } = {}) {
   try {
     const data = await postJson({ action: "listOrdersWithActivity" }, true);
@@ -1693,6 +1757,9 @@ async function handleDashboardTimerPhaseSelect(orderKey, phase) {
       orderNumber: orderKey,
       phase
     }, true);
+
+    broadcastBenchFocusChange();
+    await refreshBenchFocusState({ rerender: false });
     await refreshDashboardLaborSessions();
   } catch (err) {
     alert(err?.message || "Labor timer could not be started.");
@@ -4093,6 +4160,7 @@ async function loadLaborSessions(orderNumber, { preserveError = "" } = {}) {
   stopLaborTimerTick();
 
   try {
+    refreshBenchFocusState({ rerender: false });
     const data = await postJson({
       action: "listLaborSessions",
       orderNumber
@@ -4168,6 +4236,9 @@ async function handleLaborTimerPause(orderNumber, sessionId) {
       notes
     }, true);
 
+    broadcastBenchFocusChange();
+    await refreshBenchFocusState({ rerender: false });
+
     stopLaborTimerTick();
     await loadLaborSessions(orderNumber);
   } catch (err) {
@@ -4189,6 +4260,9 @@ async function handleLaborTimerResume(orderNumber, sessionId) {
       notes
     }, true);
 
+    broadcastBenchFocusChange();
+    await refreshBenchFocusState({ rerender: false });
+
     await loadLaborSessions(orderNumber);
   } catch (err) {
     await loadLaborSessions(orderNumber, {
@@ -4208,6 +4282,9 @@ async function handleLaborTimerStop(orderNumber, sessionId) {
       sessionId,
       notes
     }, true);
+
+    broadcastBenchFocusChange();
+    await refreshBenchFocusState({ rerender: false });
 
     stopLaborTimerTick();
     await loadLaborSessions(orderNumber);
@@ -5409,6 +5486,7 @@ function setActiveView(viewName) {
     renderHomeDashboard();
     refreshDashboardLaborSessions();
     refreshDashboardActivityIndex();
+    refreshBenchFocusState();
     markOrdersSeen();
     showView(homeDashboardView);
     closeMenu();
@@ -12914,7 +12992,10 @@ async function checkForNewBuild() {
 
 checkForNewBuild();
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") checkForNewBuild();
+  if (document.visibilityState === "visible") {
+    checkForNewBuild();
+    refreshBenchFocusState();
+  }
 });
 
 /* =========================
