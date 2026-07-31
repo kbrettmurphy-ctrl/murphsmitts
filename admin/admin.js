@@ -1608,6 +1608,8 @@ function renderBenchFocusCard() {
   const order = allOrders.find(item => String(item.orderNumber) === String(bench.orderNumber)) || {};
   const labor = benchFocusState.activeLabor;
   const laborStatus = labor ? getLaborSessionStatus(labor) : "";
+  const reminderDue = !labor && getBenchFocusNow() >= Date.parse(bench.startedAt) + 90000 &&
+    (!bench.reminderSnoozedUntil || getBenchFocusNow() >= Date.parse(bench.reminderSnoozedUntil));
   const services = parseServicesValue(order.servicesRequested || "").selected.join(", ") || order.servicesRequested || "—";
   const lace = [order.primaryLaceColor, order.secondaryLaceColor].filter(Boolean).join(" · ") || "—";
   return `
@@ -1635,10 +1637,127 @@ function renderBenchFocusCard() {
           <div class="bench-focus-labor-status">${escapeHtml(laborStatus === "paused" ? "Paused" : "Running")}</div>
           <div class="bench-focus-labor-time"><span>Labor elapsed</span><strong data-bench-labor-elapsed>${escapeHtml(formatLaborDuration(getLaborActiveSeconds(labor) / 60))}</strong></div>
           <div class="bench-focus-labor-controls">${renderDashboardTimerButton(order, labor)}</div>
-        ` : `<p>Bench Work is active, but time is not being recorded as labor.</p>`}
+        ` : `
+          <p>${reminderDue ? "No labor timer is running." : "Bench Work is active, but time is not being recorded as labor."}</p>
+          ${reminderDue ? `<div class="bench-focus-reminder-actions">
+            ${!bench.backdateConsumedAt ? `<button type="button" data-bench-labor-start="bench">Start from Bench Work</button>` : ""}
+            <button type="button" data-bench-labor-start="now">Start Now</button>
+            <button type="button" data-bench-remind-later>Remind Later</button>
+          </div>` : ""}
+        `}
       </div>
     </section>
   `;
+}
+
+function closeBenchChoiceSheet(value = null) {
+  const sheet = document.querySelector(".bench-choice-sheet");
+  if (!sheet) return;
+  const resolve = sheet._resolve;
+  sheet.remove();
+  if (resolve) resolve(value);
+}
+
+function openBenchChoiceSheet({ title, message = "", actions = [] }) {
+  closeBenchChoiceSheet();
+  return new Promise(resolve => {
+    const sheet = document.createElement("div");
+    sheet.className = "bench-choice-sheet";
+    sheet._resolve = resolve;
+    sheet.innerHTML = `<div class="bench-choice-panel" role="dialog" aria-modal="false" aria-labelledby="benchChoiceTitle">
+      <div id="benchChoiceTitle" class="bench-choice-title">${escapeHtml(title)}</div>
+      ${message ? `<p>${escapeHtml(message)}</p>` : ""}
+      <div class="bench-choice-actions">${actions.map(action => `<button type="button" data-bench-choice="${escapeAttr(action.value)}" class="${action.danger ? "is-danger" : ""}">${escapeHtml(action.label)}</button>`).join("")}</div>
+    </div>`;
+    sheet.addEventListener("click", event => {
+      const button = event.target.closest("[data-bench-choice]");
+      if (button) closeBenchChoiceSheet(button.dataset.benchChoice);
+    });
+    document.body.appendChild(sheet);
+  });
+}
+
+async function chooseBenchLaborPhase(title) {
+  return openBenchChoiceSheet({
+    title,
+    actions: [...LABOR_TIMER_PHASES.map(phase => ({ label: phase, value: phase })), { label: "Cancel", value: "" }]
+  });
+}
+
+async function startLaborForActiveBench(mode) {
+  const bench = benchFocusState.activeBench;
+  if (!bench || benchFocusBusy) return;
+  const phase = await chooseBenchLaborPhase(mode === "bench" ? "Start from Bench Work" : "Start labor now");
+  if (!phase) return;
+  benchFocusBusy = true;
+  try {
+    await postJson({
+      action: "startLaborSession",
+      orderNumber: bench.orderNumber,
+      phase,
+      benchSessionId: bench.id,
+      benchStartMode: mode
+    }, true);
+    broadcastBenchFocusChange();
+    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+  } catch (error) {
+    alert(error.message || "Labor timer could not be started.");
+    await refreshBenchFocusState();
+  } finally {
+    benchFocusBusy = false;
+  }
+}
+
+async function snoozeBenchReminder() {
+  const bench = benchFocusState.activeBench;
+  if (!bench || benchFocusBusy) return;
+  benchFocusBusy = true;
+  try {
+    await postJson({ action: "snoozeBenchReminder", benchSessionId: bench.id }, true);
+    broadcastBenchFocusChange();
+    await refreshBenchFocusState();
+  } catch (error) {
+    alert(error.message || "Reminder could not be snoozed.");
+  } finally {
+    benchFocusBusy = false;
+  }
+}
+
+async function endActiveBenchWork({ switchToOrder = "" } = {}) {
+  const bench = benchFocusState.activeBench;
+  if (!bench || benchFocusBusy) return false;
+  let runningAction = "none";
+  if (getLaborSessionStatus(benchFocusState.activeLabor) === "running") {
+    runningAction = await openBenchChoiceSheet({
+      title: switchToOrder ? "End current Bench Work and switch?" : "End Bench Work",
+      message: "A linked labor timer is running. Choose how to resolve it.",
+      actions: [
+        { label: switchToOrder ? "Pause Timer and Switch" : "Pause Timer and End Bench Work", value: "pause" },
+        { label: switchToOrder ? "Stop Timer and Switch" : "Stop Timer and End Bench Work", value: "stop", danger: true },
+        { label: "Cancel", value: "" }
+      ]
+    });
+    if (!runningAction) return false;
+  }
+  benchFocusBusy = true;
+  try {
+    const result = await postJson({ action: "endBenchWork", benchSessionId: bench.id, runningAction }, true);
+    broadcastBenchFocusChange();
+    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+    if (result.bench?.resolution === "pending") openImmediateBenchResolution(result.bench);
+    if (switchToOrder) {
+      benchFocusBusy = false;
+      await startBenchWorkFromDashboard(switchToOrder);
+    }
+    return true;
+  } catch (error) {
+    if (error.runningLaborChoice) return endActiveBenchWork({ switchToOrder });
+    alert(error.message || "Bench Work could not be ended.");
+    await refreshBenchFocusState();
+    return false;
+  } finally {
+    benchFocusBusy = false;
+  }
 }
 
 async function startBenchWorkFromDashboard(orderNumber, options = {}) {
@@ -1656,6 +1775,45 @@ async function startBenchWorkFromDashboard(orderNumber, options = {}) {
       if (confirm(`This order is currently ${error.status}. Start Bench Work without changing its status?${physical}`)) {
         benchFocusBusy = false;
         return startBenchWorkFromDashboard(orderNumber, { ...options, confirmStatusOverride: true });
+      }
+    } else if (error.pausedLaborChoice) {
+      const choice = await openBenchChoiceSheet({
+        title: "Paused labor session detected.",
+        message: "Resume previous labor?",
+        actions: [
+          { label: "Resume and attach to Bench Work", value: "resume_attach" },
+          { label: "Leave paused", value: "leave" },
+          { label: "Cancel", value: "cancel" }
+        ]
+      });
+      if (choice && choice !== "cancel") {
+        benchFocusBusy = false;
+        return startBenchWorkFromDashboard(orderNumber, { ...options, pausedAction: choice });
+      }
+    } else if (error.conflict === "active_bench") {
+      const choice = await openBenchChoiceSheet({
+        title: "Another glove is on the bench.",
+        message: `End Bench Work for #${error.activeOrderNumber || "current order"} before switching.`,
+        actions: [{ label: "End Current and Switch", value: "switch" }, { label: "Stay on Current Glove", value: "" }]
+      });
+      if (choice === "switch") {
+        benchFocusBusy = false;
+        return endActiveBenchWork({ switchToOrder: orderNumber });
+      }
+    } else if (error.conflict === "other_running_labor") {
+      const choice = await openBenchChoiceSheet({
+        title: "Another labor timer is running.",
+        message: `Resolve the timer for #${error.laborOrderNumber || "another order"} before switching.`,
+        actions: [
+          { label: "Pause Timer and Switch", value: "pause" },
+          { label: "Stop Timer and Switch", value: "stop", danger: true },
+          { label: "Stay on Current Glove", value: "" },
+          { label: "Cancel", value: "" }
+        ]
+      });
+      if (choice) {
+        benchFocusBusy = false;
+        return startBenchWorkFromDashboard(orderNumber, { ...options, otherRunningAction: choice });
       }
     } else {
       alert(error.message || "Bench Work could not be started.");
@@ -2280,6 +2438,22 @@ function wireHomeDashboardActions() {
     const benchStartBtn = e.target.closest("[data-bench-start]");
     if (benchStartBtn) {
       startBenchWorkFromDashboard(benchStartBtn.dataset.benchStart);
+      return;
+    }
+
+    const benchLaborStartBtn = e.target.closest("[data-bench-labor-start]");
+    if (benchLaborStartBtn) {
+      startLaborForActiveBench(benchLaborStartBtn.dataset.benchLaborStart);
+      return;
+    }
+
+    if (e.target.closest("[data-bench-remind-later]")) {
+      snoozeBenchReminder();
+      return;
+    }
+
+    if (e.target.closest("[data-bench-end]")) {
+      endActiveBenchWork();
       return;
     }
 
