@@ -154,7 +154,7 @@ let financeFilterMenuOpen = false;
 let dashboardLaborSessions = {};
 let dashboardTimerPopoverOrder = null;
 let dashboardTimerBusy = false;
-let benchFocusState = { activeBench: null, activeLabor: null, unresolved: [], serverNow: null };
+let benchFocusState = { activeBench: null, activeLabor: null, unlinkedPausedLabor: null, unresolved: [], serverNow: null };
 let benchFocusBusy = false;
 let benchFocusPollInterval = null;
 let benchFocusClockOffsetMs = 0;
@@ -412,7 +412,7 @@ function clearToken() {
   laceInventory = [];
   galleryPhotos = [];
   dashboardLaborSessions = {};
-  benchFocusState = { activeBench: null, activeLabor: null, unresolved: [], serverNow: null };
+  benchFocusState = { activeBench: null, activeLabor: null, unlinkedPausedLabor: null, unresolved: [], serverNow: null };
   stopBenchFocusPolling();
   dashboardActivityOrders = new Set();
   dashboardActivityLoaded = false;
@@ -1607,6 +1607,7 @@ function renderBenchFocusCard() {
   if (!bench) return "";
   const order = allOrders.find(item => String(item.orderNumber) === String(bench.orderNumber)) || {};
   const labor = benchFocusState.activeLabor;
+  const unlinkedPausedLabor = benchFocusState.unlinkedPausedLabor;
   const laborStatus = labor ? getLaborSessionStatus(labor) : "";
   const reminderDue = !labor && getBenchFocusNow() >= Date.parse(bench.startedAt) + 90000 &&
     (!bench.reminderSnoozedUntil || getBenchFocusNow() >= Date.parse(bench.reminderSnoozedUntil));
@@ -1637,6 +1638,13 @@ function renderBenchFocusCard() {
           <div class="bench-focus-labor-status">${escapeHtml(laborStatus === "paused" ? "Paused" : "Running")}</div>
           <div class="bench-focus-labor-time"><span>Labor elapsed</span><strong data-bench-labor-elapsed>${escapeHtml(formatLaborDuration(getLaborActiveSeconds(labor) / 60))}</strong></div>
           <div class="bench-focus-labor-controls">${renderDashboardTimerButton(order, labor)}</div>
+        ` : unlinkedPausedLabor ? `
+          <p class="bench-focus-paused-warning">A paused labor session is still open for this order.</p>
+          <div class="bench-focus-reminder-actions">
+            <button type="button" data-bench-paused-resume>Resume Existing Timer</button>
+            <button type="button" data-bench-paused-stop>Stop Existing Timer</button>
+            <button type="button" data-bench-end>End Bench Work</button>
+          </div>
         ` : `
           <p>${reminderDue ? "No labor timer is running." : "Bench Work is active, but time is not being recorded as labor."}</p>
           ${reminderDue ? `<div class="bench-focus-reminder-actions">
@@ -1648,6 +1656,43 @@ function renderBenchFocusCard() {
       </div>
     </section>
   `;
+}
+
+async function resumeExistingPausedLaborForBench() {
+  const bench = benchFocusState.activeBench;
+  const labor = benchFocusState.unlinkedPausedLabor;
+  if (!bench || !labor || benchFocusBusy) return;
+  benchFocusBusy = true;
+  try {
+    await postJson({
+      action: "resumePausedLaborForBench",
+      benchSessionId: bench.id,
+      laborSessionId: labor.id
+    }, true);
+    broadcastBenchFocusChange();
+    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+  } catch (error) {
+    alert(error.message || "The paused labor timer could not be resumed.");
+    await refreshBenchFocusState();
+  } finally {
+    benchFocusBusy = false;
+  }
+}
+
+async function stopExistingPausedLaborForBench() {
+  const labor = benchFocusState.unlinkedPausedLabor;
+  if (!labor || benchFocusBusy) return;
+  benchFocusBusy = true;
+  try {
+    await postJson({ action: "stopLaborSession", sessionId: labor.id }, true);
+    broadcastBenchFocusChange();
+    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+  } catch (error) {
+    alert(error.message || "The paused labor timer could not be stopped.");
+    await refreshBenchFocusState();
+  } finally {
+    benchFocusBusy = false;
+  }
 }
 
 function closeBenchChoiceSheet(value = null) {
@@ -1744,7 +1789,10 @@ async function endActiveBenchWork({ switchToOrder = "" } = {}) {
     const result = await postJson({ action: "endBenchWork", benchSessionId: bench.id, runningAction }, true);
     broadcastBenchFocusChange();
     await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
-    if (result.bench?.resolution === "pending") openImmediateBenchResolution(result.bench);
+    if (result.bench?.resolution === "pending") {
+      const unresolvedBench = benchFocusState.unresolved.find(item => item.id === result.bench.id) || result.bench;
+      openImmediateBenchResolution(unresolvedBench);
+    }
     if (switchToOrder) {
       benchFocusBusy = false;
       await startBenchWorkFromDashboard(switchToOrder);
@@ -1762,6 +1810,10 @@ async function endActiveBenchWork({ switchToOrder = "" } = {}) {
 
 async function resolveBenchInterval(bench, resolution) {
   if (!bench || benchFocusBusy) return;
+  if (resolution === "labor_recorded" && bench.hasOpenLabor) {
+    alert("Stop or resolve the open labor session before assigning this Bench Work interval.");
+    return;
+  }
   let phase = "";
   if (resolution === "labor_recorded") {
     phase = await chooseBenchLaborPhase("Assign Bench Work time");
@@ -1791,9 +1843,11 @@ async function resolveBenchInterval(bench, resolution) {
 async function openImmediateBenchResolution(bench) {
   const choice = await openBenchChoiceSheet({
     title: "Bench Work ended without labor.",
-    message: `#${bench.orderNumber} · ${formatBenchElapsed(bench.startedAt, bench.endedAt)}`,
+    message: bench.hasOpenLabor
+      ? `#${bench.orderNumber} · A separate paused labor session remains open. Stop or resolve it before assigning the entire Bench interval.`
+      : `#${bench.orderNumber} · ${formatBenchElapsed(bench.startedAt, bench.endedAt)}`,
     actions: [
-      { label: "Assign Time", value: "labor_recorded" },
+      ...(!bench.hasOpenLabor ? [{ label: "Assign Time", value: "labor_recorded" }] : []),
       { label: "Discard", value: "discarded", danger: true },
       { label: "Resolve Later", value: "" }
     ]
@@ -1812,9 +1866,10 @@ function openUnresolvedBenchList() {
       return `<article class="bench-unresolved-row">
         <div><strong>#${escapeHtml(bench.orderNumber)} · ${escapeHtml(order.customerName || "Customer")}</strong>
         <span>${escapeHtml(formatLaborDateTime(bench.startedAt))} – ${escapeHtml(formatLaborDateTime(bench.endedAt))}</span>
-        <span>${escapeHtml(formatBenchElapsed(bench.startedAt, bench.endedAt))}</span></div>
+        <span>${escapeHtml(formatBenchElapsed(bench.startedAt, bench.endedAt))}</span>
+        ${bench.hasOpenLabor ? `<span class="bench-unresolved-conflict">Paused labor remains open — stop it before assigning.</span>` : ""}</div>
         <div class="bench-unresolved-actions">
-          <button type="button" data-unresolved-assign="${escapeAttr(bench.id)}">Assign</button>
+          <button type="button" data-unresolved-assign="${escapeAttr(bench.id)}" ${bench.hasOpenLabor ? "disabled" : ""}>Assign</button>
           <button type="button" class="is-danger" data-unresolved-discard="${escapeAttr(bench.id)}">Discard</button>
         </div>
       </article>`;
@@ -1954,6 +2009,7 @@ async function refreshBenchFocusState({ rerender = true } = {}) {
     const next = {
       activeBench: data.activeBench || null,
       activeLabor: data.activeLabor || null,
+      unlinkedPausedLabor: data.unlinkedPausedLabor || null,
       unresolved: data.unresolved || [],
       serverNow: data.serverNow || null
     };
@@ -2535,6 +2591,16 @@ function wireHomeDashboardActions() {
 
     if (e.target.closest("[data-bench-end]")) {
       endActiveBenchWork();
+      return;
+    }
+
+    if (e.target.closest("[data-bench-paused-resume]")) {
+      resumeExistingPausedLaborForBench();
+      return;
+    }
+
+    if (e.target.closest("[data-bench-paused-stop]")) {
+      stopExistingPausedLaborForBench();
       return;
     }
 

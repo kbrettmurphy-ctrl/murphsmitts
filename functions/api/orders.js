@@ -244,6 +244,10 @@ const ACTIONS = {
     effects: ["db:orders:read", "db:bench_work_sessions:write", "db:order_labor_sessions:read", "db:order_labor_sessions:write", "db:order_activity:write"],
     bindings: { required: ["CORE"], optional: [] }
   },
+  resumePausedLaborForBench: {
+    auth: "session", demo: "deny", handler: handleResumePausedLaborForBench,
+    effects: ["db:bench_work_sessions:write", "db:order_labor_sessions:write"], bindings: { required: ["CORE"], optional: [] }
+  },
   snoozeBenchReminder: {
     auth: "session", demo: "deny", handler: handleSnoozeBenchReminder,
     effects: ["db:bench_work_sessions:read", "db:bench_work_sessions:write"], bindings: { required: ["CORE"], optional: [] }
@@ -1004,6 +1008,18 @@ async function handleStartBenchWork({ env, body, jsonHeaders, auth }) {
     eventType: "bench_work_started",
     eventLabel: "Bench Work started",
     metadata: { benchWorkSessionId: result.bench?.id || null }
+  });
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleResumePausedLaborForBench({ env, body, jsonHeaders }) {
+  const benchSessionId = cleanText(body.benchSessionId);
+  const laborSessionId = cleanText(body.laborSessionId);
+  if (!benchSessionId) return json({ ok: false, error: "Missing benchSessionId." }, 200, jsonHeaders);
+  if (!laborSessionId) return json({ ok: false, error: "Missing laborSessionId." }, 200, jsonHeaders);
+  const result = await callBenchRpc(env, "resume_paused_labor_for_bench", {
+    p_bench_session_id: benchSessionId,
+    p_labor_session_id: laborSessionId
   });
   return json(result, 200, jsonHeaders);
 }
@@ -2873,29 +2889,43 @@ async function callBenchRpc(env, name, payload) {
 }
 
 async function getBenchFocusState(env) {
-  const [activeResult, unresolvedResult] = await Promise.all([
+  const [activeResult, unresolvedResult, openLaborResult] = await Promise.all([
     supabaseFetch(env, "/rest/v1/bench_work_sessions?select=*&ended_at=is.null&limit=1"),
-    supabaseFetch(env, "/rest/v1/bench_work_sessions?select=*&ended_at=not.is.null&resolution=eq.pending&order=ended_at.desc")
+    supabaseFetch(env, "/rest/v1/bench_work_sessions?select=*&ended_at=not.is.null&resolution=eq.pending&order=ended_at.desc"),
+    supabaseFetch(env, "/rest/v1/order_labor_sessions?select=*&ended_at=is.null&order=started_at.desc")
   ]);
   if (!activeResult.ok) return { ok: false, error: "Bench Focus could not be loaded.", details: activeResult.error };
   if (!unresolvedResult.ok) return { ok: false, error: "Unresolved Bench Work could not be loaded.", details: unresolvedResult.error };
+  if (!openLaborResult.ok) return { ok: false, error: "Open labor sessions could not be loaded.", details: openLaborResult.error };
   const activeRow = Array.isArray(activeResult.data) ? activeResult.data[0] || null : null;
-  let labor = null;
-  if (activeRow) {
-    const laborResult = await supabaseFetch(
-      env,
-      `/rest/v1/order_labor_sessions?select=*&bench_work_session_id=eq.${encodeURIComponent(activeRow.id)}&ended_at=is.null&order=started_at.desc&limit=1`
-    );
-    if (!laborResult.ok) return { ok: false, error: "Bench labor could not be loaded.", details: laborResult.error };
-    const laborRow = Array.isArray(laborResult.data) ? laborResult.data[0] || null : null;
-    labor = laborRow ? mapLaborSessionFromDb(laborRow) : null;
-  }
+  const openLaborRows = Array.isArray(openLaborResult.data) ? openLaborResult.data : [];
+  const laborRow = activeRow
+    ? openLaborRows.find(row => row.bench_work_session_id === activeRow.id) || null
+    : null;
+  const unlinkedPausedRow = activeRow
+    ? openLaborRows.find(row =>
+        row.order_number === activeRow.order_number &&
+        row.status === "paused" &&
+        !row.bench_work_session_id
+      ) || null
+    : null;
+  const unresolvedRows = Array.isArray(unresolvedResult.data) ? unresolvedResult.data : [];
+  const unresolved = unresolvedRows.map(row => {
+    const bench = mapBenchWorkFromDb(row);
+    const openRow = openLaborRows.find(labor => labor.order_number === row.order_number) || null;
+    return {
+      ...bench,
+      hasOpenLabor: !!openRow,
+      openLabor: openRow ? mapLaborSessionFromDb(openRow) : null
+    };
+  });
   return {
     ok: true,
     state: {
       activeBench: mapBenchWorkFromDb(activeRow),
-      activeLabor: labor,
-      unresolved: (Array.isArray(unresolvedResult.data) ? unresolvedResult.data : []).map(mapBenchWorkFromDb)
+      activeLabor: laborRow ? mapLaborSessionFromDb(laborRow) : null,
+      unlinkedPausedLabor: unlinkedPausedRow ? mapLaborSessionFromDb(unlinkedPausedRow) : null,
+      unresolved
     }
   };
 }

@@ -227,6 +227,78 @@ begin
     'session', case when v_labor.id is null then null else to_jsonb(v_labor) end);
 end $$;
 
+create or replace function public.resume_paused_labor_for_bench(
+  p_bench_session_id uuid,
+  p_labor_session_id uuid
+) returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_now timestamptz := clock_timestamp();
+  v_bench public.bench_work_sessions%rowtype;
+  v_labor public.order_labor_sessions%rowtype;
+  v_other public.order_labor_sessions%rowtype;
+  v_paused_seconds integer;
+begin
+  select * into v_bench from public.bench_work_sessions
+  where id = p_bench_session_id for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'error', 'Bench Work session not found.', 'conflict', 'bench_missing');
+  end if;
+  if v_bench.ended_at is not null then
+    return jsonb_build_object('ok', false, 'error', 'Bench Work is no longer active.', 'conflict', 'bench_ended');
+  end if;
+
+  select * into v_labor from public.order_labor_sessions
+  where id = p_labor_session_id for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'error', 'Labor session not found.', 'conflict', 'labor_missing');
+  end if;
+  if v_labor.order_number <> v_bench.order_number then
+    return jsonb_build_object('ok', false, 'error', 'Labor session does not match this Bench Work order.', 'conflict', 'order_mismatch');
+  end if;
+  if v_labor.ended_at is not null or v_labor.status <> 'paused' then
+    return jsonb_build_object('ok', false, 'error', 'The labor session is no longer paused.', 'conflict', 'labor_state_changed');
+  end if;
+  if v_labor.bench_work_session_id is not null then
+    return jsonb_build_object('ok', false, 'error', 'The labor session is already linked to Bench Work.', 'conflict', 'labor_already_linked');
+  end if;
+
+  select * into v_other from public.order_labor_sessions
+  where ended_at is null and status = 'running' and id <> v_labor.id
+  order by started_at desc limit 1 for update;
+  if found then
+    return jsonb_build_object('ok', false, 'error', 'Pause or stop the current timer first.',
+      'conflict', 'other_running_labor', 'laborSessionId', v_other.id,
+      'laborOrderNumber', v_other.order_number);
+  end if;
+
+  v_paused_seconds := case
+    when v_labor.paused_at is null then 0
+    else greatest(0, round(extract(epoch from (v_now - v_labor.paused_at))))::integer
+  end;
+  update public.order_labor_sessions set
+    status = 'running',
+    paused_at = null,
+    pause_accumulated_seconds = coalesce(pause_accumulated_seconds, 0) + v_paused_seconds,
+    bench_work_session_id = v_bench.id,
+    updated_at = v_now
+  where id = v_labor.id
+  returning * into v_labor;
+
+  update public.bench_work_sessions set
+    resolution = 'labor_recorded',
+    backdate_consumed_at = coalesce(backdate_consumed_at, v_now),
+    reminder_snoozed_until = null,
+    updated_at = v_now
+  where id = v_bench.id
+  returning * into v_bench;
+
+  return jsonb_build_object('ok', true, 'bench', to_jsonb(v_bench), 'session', to_jsonb(v_labor));
+end $$;
+
 create or replace function public.resolve_bench_work(
   p_bench_session_id uuid,
   p_resolution text,
@@ -240,6 +312,7 @@ declare
   v_now timestamptz := clock_timestamp();
   v_bench public.bench_work_sessions%rowtype;
   v_labor public.order_labor_sessions%rowtype;
+  v_open public.order_labor_sessions%rowtype;
   v_minutes numeric;
 begin
   select * into v_bench from public.bench_work_sessions where id = p_bench_session_id for update;
@@ -252,6 +325,18 @@ begin
   end if;
   if p_resolution <> 'labor_recorded' or nullif(trim(p_phase), '') is null then
     return jsonb_build_object('ok', false, 'error', 'Select a phase before assigning time.');
+  end if;
+  select * into v_open from public.order_labor_sessions
+  where order_number = v_bench.order_number and ended_at is null
+  order by started_at desc limit 1 for update;
+  if found then
+    return jsonb_build_object(
+      'ok', false,
+      'error', 'Stop or resolve the open labor session before assigning this Bench Work interval.',
+      'conflict', 'open_labor_for_order',
+      'laborSessionId', v_open.id,
+      'laborStatus', v_open.status
+    );
   end if;
   v_minutes := round((extract(epoch from (v_bench.ended_at - v_bench.started_at)) / 60.0)::numeric, 2);
   insert into public.order_labor_sessions

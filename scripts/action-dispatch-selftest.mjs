@@ -3141,7 +3141,7 @@ await test("all v1.3 Bench Focus action names are registry-backed", async () => 
   const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
   const registryMatch = source.match(/const ACTIONS = \{([\s\S]*?)\n\};/);
   ok(registryMatch, "ACTIONS registry is present");
-  for (const action of ["getBenchFocus", "startBenchWork", "snoozeBenchReminder", "endBenchWork", "resolveBenchWork"]) {
+  for (const action of ["getBenchFocus", "startBenchWork", "resumePausedLaborForBench", "snoozeBenchReminder", "endBenchWork", "resolveBenchWork"]) {
     equal(new RegExp(`^  ${action}: \\{`, "m").test(registryMatch[1]), true, `${action} is registry-backed`);
   }
 });
@@ -3210,6 +3210,7 @@ await test("all production actions are registry-backed with no legacy chain", as
     "updateLaborSessionNotes",
     "getBenchFocus",
     "startBenchWork",
+    "resumePausedLaborForBench",
     "snoozeBenchReminder",
     "endBenchWork",
     "resolveBenchWork",
@@ -3293,6 +3294,7 @@ await test("all production actions are registry-backed with no legacy chain", as
     ["updateLaborSessionNotes", "deny"],
     ["getBenchFocus", "deny"],
     ["startBenchWork", "deny"],
+    ["resumePausedLaborForBench", "deny"],
     ["snoozeBenchReminder", "deny"],
     ["endBenchWork", "deny"],
     ["resolveBenchWork", "deny"],
@@ -3346,7 +3348,7 @@ await test("all production actions are registry-backed with no legacy chain", as
   }
 
   deepEqual(registryActions, expectedRegistryActions);
-  equal(registryActions.length, 81);
+  equal(registryActions.length, 82);
   const registeredHandlers = [];
   for (const entry of registryEntries) {
     ok(/\bauth\s*:/.test(entry.source), `${entry.action} has auth metadata`);
@@ -3403,6 +3405,7 @@ await test("all production actions are registry-backed with no legacy chain", as
           "startLaborSession", "stopLaborSession", "pauseLaborSession",
           "resumeLaborSession", "updateLaborSessionNotes", "createExpense",
           "getBenchFocus", "startBenchWork",
+          "resumePausedLaborForBench",
           "snoozeBenchReminder", "endBenchWork", "resolveBenchWork",
           "deleteExpense", "saveShopSettings", "createSaleGlove",
           "updateSaleGlove", "deleteSaleGlove", "deleteOrder",
@@ -3555,7 +3558,7 @@ await test("all production actions are registry-backed with no legacy chain", as
   deepEqual([...legacyCounts.entries()].filter(([, count]) => count !== 1), []);
   deepEqual(
     [...registryActions, ...legacyActions].sort(),
-    [...plannedActions, "getBenchFocus", "startBenchWork", "snoozeBenchReminder", "endBenchWork", "resolveBenchWork"].sort()
+    [...plannedActions, "getBenchFocus", "startBenchWork", "resumePausedLaborForBench", "snoozeBenchReminder", "endBenchWork", "resolveBenchWork"].sort()
   );
 });
 

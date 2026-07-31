@@ -53,10 +53,10 @@ await test("schema is additive and enforces the Bench Focus invariants", () => {
 });
 
 await test("all cross-table transitions are SECURITY INVOKER RPCs", () => {
-  for (const name of ["start_bench_work", "start_labor_for_bench", "end_bench_work", "resolve_bench_work"]) {
+  for (const name of ["start_bench_work", "start_labor_for_bench", "end_bench_work", "resume_paused_labor_for_bench", "resolve_bench_work"]) {
     ok(new RegExp(`function public\\.${name}\\(`).test(migration), `${name} exists`);
   }
-  equal((migration.match(/security invoker/g) || []).length, 4);
+  equal((migration.match(/security invoker/g) || []).length, 5);
   ok(/clock_timestamp\(\)/.test(migration));
   ok(/for update/g.test(migration));
   equal(/p_started_at|p_ended_at|client_timestamp/i.test(migration), false);
@@ -89,7 +89,7 @@ await test("ending atomically pauses or stops linked labor and preserves stop ac
 });
 
 await test("registry metadata denies demo and declares no external effects", () => {
-  for (const action of ["getBenchFocus", "startBenchWork", "snoozeBenchReminder", "endBenchWork", "resolveBenchWork"]) {
+  for (const action of ["getBenchFocus", "startBenchWork", "resumePausedLaborForBench", "snoozeBenchReminder", "endBenchWork", "resolveBenchWork"]) {
     const entry = source.match(new RegExp(`${action}: \\{[\\s\\S]*?bindings: \\{ required: \\["CORE"\\], optional: \\[\\] \\}`));
     ok(entry, `${action} registry entry`);
     ok(/auth: "session"/.test(entry[0]));
@@ -116,6 +116,58 @@ await test("Bench Focus read returns active, unresolved, labor, and server time"
   equal(result.json.activeLabor.startedFromBench, true);
   ok(Number.isFinite(Date.parse(result.json.serverNow)));
   equal(result.calls.length, 3);
+});
+
+await test("Leave-paused state is returned separately from linked labor", async () => {
+  const owner = await token();
+  const bench = { id: "b1", order_number: "0169", started_at: "2026-07-31T12:00:00Z", ended_at: null, resolution: "pending", backdate_consumed_at: null };
+  const paused = { id: "old1", order_number: "0169", phase: "Cleaning", started_at: "2026-07-31T10:00:00Z", ended_at: null, status: "paused", paused_at: "2026-07-31T11:00:00Z", pause_accumulated_seconds: 30, bench_work_session_id: null };
+  const result = await invoke({ action: "getBenchFocus", _token: owner }, [[bench], [], [paused]]);
+  equal(result.json.activeLabor, null);
+  equal(result.json.unlinkedPausedLabor.id, "old1");
+  equal(result.json.activeBench.backdateConsumedAt, null);
+});
+
+await test("Resume Existing Timer uses one atomic RPC and authoritative pause arithmetic", async () => {
+  const owner = await token();
+  const rpc = { ok: true, bench: { id: "b1", order_number: "0169", resolution: "labor_recorded", backdate_consumed_at: "2026-07-31T12:10:00Z" }, session: { id: "old1", order_number: "0169", status: "running", pause_accumulated_seconds: 630, bench_work_session_id: "b1" } };
+  const result = await invoke({ action: "resumePausedLaborForBench", _token: owner, benchSessionId: "b1", laborSessionId: "old1" }, [rpc]);
+  equal(result.json.ok, true);
+  equal(result.calls.length, 1);
+  equal(result.calls[0].url.endsWith("/rest/v1/rpc/resume_paused_labor_for_bench"), true);
+  equal(result.calls[0].body.p_bench_session_id, "b1");
+  equal(result.calls[0].body.p_labor_session_id, "old1");
+  ok(/pause_accumulated_seconds = coalesce\(pause_accumulated_seconds, 0\) \+ v_paused_seconds/.test(migration));
+  ok(/bench_work_session_id = v_bench.id/.test(migration));
+  ok(/backdate_consumed_at = coalesce\(backdate_consumed_at, v_now\)/.test(migration));
+  const resumeRpc = migration.match(/function public\.resume_paused_labor_for_bench\([\s\S]*?end \$\$;/)?.[0] || "";
+  equal(/insert into public\.order_labor_sessions/.test(resumeRpc), false);
+  ok(resumeRpc.includes("for update"));
+});
+
+await test("paused-session UI never offers guaranteed-failing timer starts", () => {
+  const render = admin.match(/function renderBenchFocusCard\([\s\S]*?\n\}/)?.[0] || "";
+  ok(render.includes("unlinkedPausedLabor ?"));
+  ok(render.includes("A paused labor session is still open for this order."));
+  ok(render.includes("Resume Existing Timer"));
+  ok(render.includes("Stop Existing Timer"));
+  const pausedBranch = render.split("unlinkedPausedLabor ?")[1].split("` : `")[0];
+  equal(pausedBranch.includes("data-bench-labor-start"), false);
+  ok(admin.includes('action: "stopLaborSession", sessionId: labor.id'));
+  ok(admin.includes("await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()])"));
+  const stopClient = admin.match(/async function stopExistingPausedLaborForBench\([\s\S]*?\n\}/)?.[0] || "";
+  equal(stopClient.includes('action: "endBenchWork"'), false);
+  equal(stopClient.includes("benchSessionId"), false);
+});
+
+await test("Assign Time conflicts with open same-order labor while other resolutions remain", () => {
+  const resolveFunction = migration.match(/function public\.resolve_bench_work\([\s\S]*?end \$\$;/)?.[0] || "";
+  ok(resolveFunction.includes("open_labor_for_order"));
+  ok(resolveFunction.includes("Stop or resolve the open labor session"));
+  ok(resolveFunction.indexOf("p_resolution = 'discarded'") < resolveFunction.indexOf("open_labor_for_order"));
+  ok(admin.includes("Resolve Later"));
+  ok(admin.includes("bench.hasOpenLabor"));
+  ok(admin.includes("Stop or resolve the open labor session before assigning"));
 });
 
 await test("Bench-aware labor sends no client timestamp and logs source metadata", async () => {
