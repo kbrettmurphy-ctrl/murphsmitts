@@ -862,7 +862,14 @@ async function handleStartLaborSession({ env, body, jsonHeaders }) {
   if (!isValidLaborPhase(phase)) {
     return json({ ok: false, error: "Invalid labor phase." }, 200, jsonHeaders);
   }
-  const result = await startLaborSession(env, { orderNumber, phase, notes: body.notes });
+  const benchSessionId = cleanText(body.benchSessionId);
+  const benchStartMode = cleanText(body.benchStartMode) || "now";
+  if (benchSessionId && !["bench", "now"].includes(benchStartMode)) {
+    return json({ ok: false, error: "Invalid Bench Work start mode." }, 200, jsonHeaders);
+  }
+  const result = benchSessionId
+    ? await startBenchLaborSession(env, { orderNumber, phase, notes: body.notes, benchSessionId, mode: benchStartMode })
+    : await startLaborSession(env, { orderNumber, phase, notes: body.notes });
   if (!result.ok) {
     return json({
       ok: false,
@@ -2950,6 +2957,31 @@ async function startLaborSession(env, { orderNumber, phase, notes }) {
     ok: true,
     session
   };
+}
+
+async function startBenchLaborSession(env, { orderNumber, phase, notes, benchSessionId, mode }) {
+  const result = await callBenchRpc(env, "start_labor_for_bench", {
+    p_bench_session_id: benchSessionId,
+    p_order_number: orderNumber,
+    p_phase: phase,
+    p_notes: cleanText(notes) || null,
+    p_mode: mode
+  });
+  if (!result.ok) return result;
+  await logOrderActivity(env, {
+    orderNumber,
+    eventType: "labor_timer",
+    eventLabel: "Labor timer started",
+    eventDetail: phase,
+    metadata: {
+      sessionId: result.session?.id || null,
+      phase,
+      benchWorkSessionId: benchSessionId,
+      startSource: mode,
+      backdated: mode === "bench"
+    }
+  });
+  return result;
 }
 
 async function stopLaborSession(env, { sessionId, notes }) {
