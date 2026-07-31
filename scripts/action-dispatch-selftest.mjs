@@ -1100,6 +1100,316 @@ await test("webauthnLoginVerify verifies ES256, updates count, and issues owner 
   equal(failed.fetchCalls.length, 1);
 });
 
+console.log("Registry-backed isolated write actions");
+
+const stageEightActions = [
+  "savePushSubscription", "sendTestPush", "markMessagesRead", "deleteMessage",
+  "deleteMessageThread", "createInventoryItem", "updateInventoryItem",
+  "startLaborSession", "stopLaborSession", "pauseLaborSession",
+  "resumeLaborSession", "updateLaborSessionNotes", "createExpense",
+  "deleteExpense", "saveShopSettings", "createSaleGlove",
+  "updateSaleGlove", "deleteSaleGlove"
+];
+
+await test("Stage 8 actions reject before I/O, deny demo, and accept valid sessions", async () => {
+  const { owner, demo } = await sessionTokens();
+  for (const action of stageEightActions) {
+    const missing = await invoke({ body: { action } });
+    deepEqual(missing.json, { ok: false, error: "Missing session token." }, action);
+    equal(missing.fetchCalls.length, 0, action);
+    await assertDemoDenied(action, demo);
+    const valid = await invoke({
+      body: { action, _token: owner },
+      fetchMock: emptySupabaseFetch
+    });
+    equal(valid.response.status, 200, action);
+    equal(
+      ["Missing session token.", "Invalid session token.", "Session expired."].includes(valid.json?.error),
+      false,
+      `${action} reached its handler`
+    );
+  }
+});
+
+await test("push subscription preserves validation, cleaning, and exact upsert", async () => {
+  const { owner } = await sessionTokens();
+  for (const subscription of [{}, { endpoint: "https://push.invalid", keys: {} }]) {
+    const invalid = await invoke({
+      body: { action: "savePushSubscription", _token: owner, subscription }
+    });
+    deepEqual(invalid.json, { ok: false, error: "Invalid subscription." });
+    equal(invalid.fetchCalls.length, 0);
+  }
+  let payload;
+  const result = await invoke({
+    body: {
+      action: "savePushSubscription",
+      _token: owner,
+      label: "  Brett's phone  ",
+      subscription: {
+        endpoint: "not-validated://endpoint",
+        keys: { p256dh: "p-key", auth: "a-key" }
+      }
+    },
+    fetchMock(input, init) {
+      ok(String(input).includes("push_subscriptions?on_conflict=endpoint"));
+      equal(init.method, "POST");
+      equal(init.headers.Prefer, "resolution=merge-duplicates,return=minimal");
+      payload = JSON.parse(init.body);
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(result.json, { ok: true });
+  deepEqual(
+    { endpoint: payload.endpoint, p256dh: payload.p256dh, auth: payload.auth, label: payload.label },
+    { endpoint: "not-validated://endpoint", p256dh: "p-key", auth: "a-key", label: "Brett's phone" }
+  );
+  ok(payload.last_used_at);
+});
+
+await test("test push remains successful when VAPID is absent", async () => {
+  const { owner } = await sessionTokens();
+  const result = await invoke({ body: { action: "sendTestPush", _token: owner } });
+  deepEqual(result.json, { ok: true });
+  equal(result.fetchCalls.length, 0);
+});
+
+await test("message mutations preserve filters, caps, and affected-row behavior", async () => {
+  const { owner } = await sessionTokens();
+  for (const [phoneNumber, expected] of [
+    ["  +15550000000  ", "phone_number=eq.%2B15550000000&read=eq.false"],
+    ["   ", "sms_messages?read=eq.false"]
+  ]) {
+    const result = await invoke({
+      body: { action: "markMessagesRead", _token: owner, phoneNumber },
+      fetchMock(input, init) {
+        ok(String(input).includes(expected));
+        equal(init.method, "PATCH");
+        deepEqual(JSON.parse(init.body), { read: true });
+        return jsonResponse([]);
+      }
+    });
+    deepEqual(result.json, { ok: true });
+  }
+  const missing = await invoke({ body: { action: "deleteMessage", _token: owner } });
+  deepEqual(missing.json, { ok: false, error: "Missing message id." });
+  const deleted = await invoke({
+    body: { action: "deleteMessage", _token: owner, id: " m 1 " },
+    fetchMock(input, init) {
+      ok(String(input).includes("id=eq.m%201"));
+      equal(init.method, "DELETE");
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(deleted.json, { ok: true });
+  const invalidThread = await invoke({
+    body: { action: "deleteMessageThread", _token: owner, phoneNumbers: [null, "", false] }
+  });
+  deepEqual(invalidThread.json, { ok: false, error: "Missing phone numbers." });
+  const phones = Array.from({ length: 25 }, (_, i) => `"+1555${i}"`);
+  const thread = await invoke({
+    body: { action: "deleteMessageThread", _token: owner, phoneNumbers: phones },
+    fetchMock(input, init) {
+      equal(init.method, "DELETE");
+      const decoded = decodeURIComponent(String(input));
+      equal((decoded.match(/\+1555/g) || []).length, 20);
+      equal(decoded.includes('""'), false);
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(thread.json, { ok: true });
+});
+
+await test("labor mutation handlers preserve validation before helper I/O", async () => {
+  const { owner } = await sessionTokens();
+  const startMissing = await invoke({ body: { action: "startLaborSession", _token: owner } });
+  deepEqual(startMissing.json, { ok: false, error: "Missing orderNumber." });
+  const phaseMissing = await invoke({
+    body: { action: "startLaborSession", _token: owner, orderNumber: "0169" }
+  });
+  deepEqual(phaseMissing.json, { ok: false, error: "Select a phase before starting the timer." });
+  const invalidPhase = await invoke({
+    body: { action: "startLaborSession", _token: owner, orderNumber: "0169", phase: "Unknown" }
+  });
+  deepEqual(invalidPhase.json, { ok: false, error: "Invalid labor phase." });
+  for (const action of [
+    "stopLaborSession", "pauseLaborSession", "resumeLaborSession", "updateLaborSessionNotes"
+  ]) {
+    const result = await invoke({ body: { action, _token: owner } });
+    deepEqual(result.json, { ok: false, error: "Missing sessionId." }, action);
+    equal(result.fetchCalls.length, 0, action);
+  }
+});
+
+await test("inventory writes preserve normalized uniqueness, validation, capabilities, and empty updates", async () => {
+  const { owner } = await sessionTokens();
+  const duplicate = await invoke({
+    body: { action: "createInventoryItem", _token: owner, color: "  jet   black " },
+    fetchMock: () => jsonResponse([{ color: "Jet Black", quantity_on_hand: 2 }])
+  });
+  deepEqual(duplicate.json, { ok: false, error: "That lace color already exists." });
+  const invalid = await invoke({
+    body: { action: "createInventoryItem", _token: owner, color: "Tan", quantityOnHand: -1 },
+    fetchMock: () => jsonResponse([])
+  });
+  deepEqual(invalid.json, { ok: false, error: "Invalid quantity." });
+
+  let payload;
+  const created = await invoke({
+    body: {
+      action: "createInventoryItem", _token: owner, color: "Tan",
+      quantityOnHand: 3, reorderAt: 1, reorderAlertEnabled: false, active: false
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) {
+        return jsonResponse([{
+          color: "Black", quantity_on_hand: 2, reorder_at: 1,
+          reorder_alert_enabled: true, active: true, photo_url: null
+        }]);
+      }
+      equal(init.method, "POST");
+      payload = JSON.parse(init.body);
+      return jsonResponse([{ ...payload }]);
+    }
+  });
+  equal(created.json.ok, true);
+  deepEqual(payload, {
+    color: "Tan", quantity_on_hand: 3, reorder_at: 1,
+    reorder_alert_enabled: false, active: false
+  });
+
+  const missing = await invoke({
+    body: { action: "updateInventoryItem", _token: owner, color: "Missing", updates: {} },
+    fetchMock: () => jsonResponse([{ color: "Black", quantity_on_hand: 2 }])
+  });
+  deepEqual(missing.json, { ok: false, error: "Lace color not found." });
+  const row = { color: "Black", quantity_on_hand: 2 };
+  const unchanged = await invoke({
+    body: { action: "updateInventoryItem", _token: owner, color: "Black", updates: {} },
+    fetchMock: () => jsonResponse([row])
+  });
+  deepEqual(unchanged.json, { ok: true, item: row });
+  equal(unchanged.fetchCalls.length, 1);
+  const collision = await invoke({
+    body: {
+      action: "updateInventoryItem", _token: owner,
+      color: "Black", updates: { color: "  jet black " }
+    },
+    fetchMock: () => jsonResponse([row, { color: "Jet   Black", quantity_on_hand: 1 }])
+  });
+  deepEqual(collision.json, { ok: false, error: "That lace color already exists." });
+});
+
+await test("expense writes preserve validation, payload coercion, and no-row success", async () => {
+  const { owner } = await sessionTokens();
+  for (const amount of [0, -1, "not-a-number"]) {
+    const invalid = await invoke({
+      body: { action: "createExpense", _token: owner, expenseDate: "2026-01-01", category: "lace", amount }
+    });
+    deepEqual(invalid.json, { ok: false, error: "Expense needs a date, category, and amount." });
+  }
+  let payload;
+  const created = await invoke({
+    body: {
+      action: "createExpense", _token: owner, expenseDate: " 2026-01-01 ",
+      category: " lace ", amount: "12.5", quantity: "-2",
+      description: "  Lace  ", unitKind: " spools "
+    },
+    fetchMock(input, init) {
+      equal(init.method, "POST");
+      payload = JSON.parse(init.body);
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(created.json, { ok: true });
+  deepEqual(payload, {
+    expense_date: "2026-01-01", category: "lace", description: "Lace",
+    amount: 12.5, quantity: null, unit_kind: "spools"
+  });
+  const missing = await invoke({ body: { action: "deleteExpense", _token: owner } });
+  deepEqual(missing.json, { ok: false, error: "Missing expense id." });
+  const deleted = await invoke({
+    body: { action: "deleteExpense", _token: owner, id: "e 1" },
+    fetchMock: () => jsonResponse([])
+  });
+  deepEqual(deleted.json, { ok: true });
+});
+
+await test("settings preserve validation and upsert-readback order", async () => {
+  const { owner } = await sessionTokens();
+  for (const body of [
+    {}, { targetLaborRate: 0 }, { roundingIncrement: 0 }, { minShopCharge: -1 }
+  ]) {
+    const invalid = await invoke({ body: { action: "saveShopSettings", _token: owner, ...body } });
+    deepEqual(invalid.json, { ok: false, error: "No valid settings to save." });
+  }
+  let payload;
+  const result = await invoke({
+    body: {
+      action: "saveShopSettings", _token: owner,
+      targetLaborRate: "50", minShopCharge: "0", roundingIncrement: "5"
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) {
+        ok(String(input).includes("shop_settings?on_conflict=key"));
+        payload = JSON.parse(init.body);
+        return jsonResponse([]);
+      }
+      ok(String(input).includes("shop_settings?select=key,value"));
+      return jsonResponse(payload);
+    }
+  });
+  deepEqual(result.json.settings, {
+    targetLaborRate: 50, minShopCharge: 0, roundingIncrement: 5
+  });
+  equal(result.fetchCalls.length, 2);
+});
+
+await test("sale glove writes preserve defaults, full payloads, and database-only deletion", async () => {
+  const { owner } = await sessionTokens();
+  let createPayload;
+  const created = await invoke({
+    body: { action: "createSaleGlove", _token: owner, title: "Glove" },
+    fetchMock(input, init) {
+      equal(init.method, "POST");
+      createPayload = JSON.parse(init.body);
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(created.json, { ok: true, glove: null });
+  equal(createPayload.status, "available");
+  equal(createPayload.sort_order, 0);
+  const updateMissing = await invoke({ body: { action: "updateSaleGlove", _token: owner } });
+  deepEqual(updateMissing.json, { ok: false, error: "Missing glove id." });
+  let updatePayload;
+  const updated = await invoke({
+    body: {
+      action: "updateSaleGlove", _token: owner, id: "g 1",
+      title: "  Glove  ", price: "99.5", featured: true, sortOrder: "4"
+    },
+    fetchMock(input, init) {
+      equal(init.method, "PATCH");
+      updatePayload = JSON.parse(init.body);
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(updated.json, { ok: true, glove: null });
+  equal(updatePayload.title, "Glove");
+  equal(updatePayload.price, 99.5);
+  equal(updatePayload.featured, true);
+  equal(updatePayload.sort_order, 4);
+  const deleted = await invoke({
+    body: { action: "deleteSaleGlove", _token: owner, id: "g 1" },
+    fetchMock(input, init) {
+      ok(String(input).includes("/rest/v1/gloves_for_sale?id=eq.g%201"));
+      equal(String(input).includes("/storage/"), false);
+      equal(init.method, "DELETE");
+      return jsonResponse([]);
+    }
+  });
+  deepEqual(deleted.json, { ok: true, deleted: true, id: "g 1" });
+});
+
 console.log("Registry-backed read actions");
 
 const stageSevenSessionActions = [
@@ -1264,15 +1574,14 @@ await test("pricing, history, settings defaults, and empty geocoding remain unch
 await test("a remaining legacy write action still dispatches successfully", async () => {
   const { owner } = await sessionTokens();
   const result = await invoke({
-    body: { action: "markMessagesRead", _token: owner },
+    body: { action: "deleteOrder", _token: owner, orderNumber: "0999" },
     fetchMock(input, init) {
-      ok(String(input).includes("sms_messages?read=eq.false"));
-      equal(init.method, "PATCH");
-      deepEqual(JSON.parse(init.body), { read: true });
+      ok(String(input).includes("orders?order_number=eq.0999"));
+      equal(init.method, "DELETE");
       return jsonResponse([]);
     }
   });
-  deepEqual(result.json, { ok: true });
+  deepEqual(result.json, { ok: true, deleted: true, orderNumber: "0999" });
 });
 
 await test("public glove search preserves threshold, all-term matching, cap, and safe fields", async () => {
@@ -1800,7 +2109,7 @@ await test("current database role overrides ordinary token role", async () => {
 
 console.log("Action registry and legacy source inventory");
 
-await test("30 registry actions plus 46 legacy actions match the plan", async () => {
+await test("48 registry actions plus 28 legacy actions match the plan", async () => {
   const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
   const plan = fs.readFileSync(new URL("../.docs/V1_2_ACTION_REGISTRY_PLAN.md", import.meta.url), "utf8");
   const dispatcher = source.split("/* =========================\n   RESPONSE HELPERS")[0];
@@ -1826,24 +2135,42 @@ await test("30 registry actions plus 46 legacy actions match the plan", async ()
     "updateUser",
     "deleteUser",
     "getPushPublicKey",
+    "savePushSubscription",
+    "sendTestPush",
     "listMessages",
+    "markMessagesRead",
+    "deleteMessage",
+    "deleteMessageThread",
     "listOrders",
     "listInventory",
+    "createInventoryItem",
+    "updateInventoryItem",
     "getOrder",
     "listOrderActivity",
     "listOrdersWithActivity",
     "webauthnLoginOptions",
     "webauthnLoginVerify",
     "listLaborSessions",
+    "startLaborSession",
+    "stopLaborSession",
     "listOpenLaborSessions",
     "listLaborSummary",
+    "pauseLaborSession",
+    "resumeLaborSession",
+    "updateLaborSessionNotes",
     "geocodeAddresses",
     "listExpenses",
+    "createExpense",
+    "deleteExpense",
     "listServicePricing",
     "listServicePricingHistory",
     "getShopSettings",
+    "saveShopSettings",
     "listSaleGloves",
     "getSaleGlove",
+    "createSaleGlove",
+    "updateSaleGlove",
+    "deleteSaleGlove",
     "listSaleGlovePhotos",
     "searchPublicGloves",
     "listGalleryPhotos"
@@ -1858,24 +2185,42 @@ await test("30 registry actions plus 46 legacy actions match the plan", async ()
     ["updateUser", "deny"],
     ["deleteUser", "deny"],
     ["getPushPublicKey", "deny"],
+    ["savePushSubscription", "deny"],
+    ["sendTestPush", "deny"],
     ["listMessages", "deny"],
+    ["markMessagesRead", "deny"],
+    ["deleteMessage", "deny"],
+    ["deleteMessageThread", "deny"],
     ["listOrders", "deny"],
     ["listInventory", "deny"],
+    ["createInventoryItem", "deny"],
+    ["updateInventoryItem", "deny"],
     ["getOrder", "deny"],
     ["listOrderActivity", "deny"],
     ["listOrdersWithActivity", "deny"],
     ["webauthnLoginOptions", "allow"],
     ["webauthnLoginVerify", "allow"],
     ["listLaborSessions", "deny"],
+    ["startLaborSession", "deny"],
+    ["stopLaborSession", "deny"],
     ["listOpenLaborSessions", "deny"],
     ["listLaborSummary", "deny"],
+    ["pauseLaborSession", "deny"],
+    ["resumeLaborSession", "deny"],
+    ["updateLaborSessionNotes", "deny"],
     ["geocodeAddresses", "deny"],
     ["listExpenses", "deny"],
+    ["createExpense", "deny"],
+    ["deleteExpense", "deny"],
     ["listServicePricing", "deny"],
     ["listServicePricingHistory", "deny"],
     ["getShopSettings", "deny"],
+    ["saveShopSettings", "deny"],
     ["listSaleGloves", "deny"],
     ["getSaleGlove", "deny"],
+    ["createSaleGlove", "deny"],
+    ["updateSaleGlove", "deny"],
+    ["deleteSaleGlove", "deny"],
     ["listSaleGlovePhotos", "deny"],
     ["searchPublicGloves", "deny"],
     ["listGalleryPhotos", "deny"]
@@ -1888,7 +2233,7 @@ await test("30 registry actions plus 46 legacy actions match the plan", async ()
   }
 
   deepEqual(registryActions, expectedRegistryActions);
-  equal(registryActions.length, 30);
+  equal(registryActions.length, 48);
   equal(
     (dispatcher.match(/return dispatchRegisteredAction\(registeredAction,/g) || []).length,
     1,
@@ -1912,7 +2257,13 @@ await test("30 registry actions plus 46 legacy actions match the plan", async ()
           "listOrderActivity", "listOrdersWithActivity", "listLaborSessions",
           "listOpenLaborSessions", "listLaborSummary", "geocodeAddresses",
           "listExpenses", "listServicePricing", "listServicePricingHistory",
-          "getShopSettings", "listSaleGloves", "getSaleGlove", "listSaleGlovePhotos"
+          "getShopSettings", "listSaleGloves", "getSaleGlove", "listSaleGlovePhotos",
+          "savePushSubscription", "sendTestPush", "markMessagesRead", "deleteMessage",
+          "deleteMessageThread", "createInventoryItem", "updateInventoryItem",
+          "startLaborSession", "stopLaborSession", "pauseLaborSession",
+          "resumeLaborSession", "updateLaborSessionNotes", "createExpense",
+          "deleteExpense", "saveShopSettings", "createSaleGlove",
+          "updateSaleGlove", "deleteSaleGlove"
         ].includes(action) ? "session" : "public";
     if (action === "listGalleryPhotos") {
       ok(
@@ -1965,8 +2316,26 @@ await test("30 registry actions plus 46 legacy actions match the plan", async ()
       `${handler} relies on centralized authorization`
     );
   }
-  equal(legacyActions.length, 46);
-  equal(new Set(legacyActions).size, 46);
+  for (const handler of [
+    "handleSavePushSubscription", "handleSendTestPush", "handleMarkMessagesRead",
+    "handleDeleteMessage", "handleDeleteMessageThread", "handleCreateInventoryItem",
+    "handleUpdateInventoryItem", "handleStartLaborSession", "handleStopLaborSession",
+    "handlePauseLaborSession", "handleResumeLaborSession", "handleUpdateLaborSessionNotes",
+    "handleCreateExpense", "handleDeleteExpense", "handleSaveShopSettings",
+    "handleCreateSaleGlove", "handleUpdateSaleGlove", "handleDeleteSaleGlove"
+  ]) {
+    const handlerSource = source.match(
+      new RegExp(`async function ${handler}\\([\\s\\S]*?(?=\\nasync function )`)
+    );
+    ok(handlerSource, `${handler} is present`);
+    equal(
+      /validateTokenFromBody|body(?:\._token|\["_token"\]|\['_token'\])/.test(handlerSource[0]),
+      false,
+      `${handler} relies on centralized authorization`
+    );
+  }
+  equal(legacyActions.length, 28);
+  equal(new Set(legacyActions).size, 28);
   equal(plannedActions.length, 76);
   deepEqual(legacyActions, plannedLegacyActions);
   deepEqual([...legacyCounts.entries()].filter(([, count]) => count !== 1), []);

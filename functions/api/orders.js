@@ -98,9 +98,30 @@ const ACTIONS = {
       optional: ["VAPID_PUBLIC_KEY"]
     }
   },
+  savePushSubscription: {
+    auth: "session", demo: "deny", handler: handleSavePushSubscription,
+    effects: ["db:push_subscriptions:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  sendTestPush: {
+    auth: "session", demo: "deny", handler: handleSendTestPush,
+    effects: ["db:push_subscriptions:read", "db:push_subscriptions:delete", "external:web-push:send"],
+    bindings: { required: ["CORE"], optional: ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "ENV-SIGNAL"] }
+  },
   listMessages: {
     auth: "session", demo: "deny", handler: handleListMessages,
     effects: ["db:sms_messages:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  markMessagesRead: {
+    auth: "session", demo: "deny", handler: handleMarkMessagesRead,
+    effects: ["db:sms_messages:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteMessage: {
+    auth: "session", demo: "deny", handler: handleDeleteMessage,
+    effects: ["db:sms_messages:delete"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteMessageThread: {
+    auth: "session", demo: "deny", handler: handleDeleteMessageThread,
+    effects: ["db:sms_messages:delete"], bindings: { required: ["CORE"], optional: [] }
   },
   listOrders: {
     auth: "session", demo: "deny", handler: handleListOrders,
@@ -109,6 +130,14 @@ const ACTIONS = {
   listInventory: {
     auth: "session", demo: "deny", handler: handleListInventory,
     effects: ["db:lace_inventory:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  createInventoryItem: {
+    auth: "session", demo: "deny", handler: handleCreateInventoryItem,
+    effects: ["db:lace_inventory:read", "db:lace_inventory:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  updateInventoryItem: {
+    auth: "session", demo: "deny", handler: handleUpdateInventoryItem,
+    effects: ["db:lace_inventory:read", "db:lace_inventory:write"], bindings: { required: ["CORE"], optional: [] }
   },
   getOrder: {
     auth: "session", demo: "deny", handler: handleGetOrder,
@@ -146,6 +175,16 @@ const ACTIONS = {
     auth: "session", demo: "deny", handler: handleListLaborSessions,
     effects: ["db:order_labor_sessions:read"], bindings: { required: ["CORE"], optional: [] }
   },
+  startLaborSession: {
+    auth: "session", demo: "deny", handler: handleStartLaborSession,
+    effects: ["db:order_labor_sessions:read", "db:order_labor_sessions:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  stopLaborSession: {
+    auth: "session", demo: "deny", handler: handleStopLaborSession,
+    effects: ["db:order_labor_sessions:read", "db:order_labor_sessions:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
   listOpenLaborSessions: {
     auth: "session", demo: "deny", handler: handleListOpenLaborSessions,
     effects: ["db:order_labor_sessions:read"], bindings: { required: ["CORE"], optional: [] }
@@ -154,6 +193,18 @@ const ACTIONS = {
     auth: "session", demo: "deny", handler: handleListLaborSummary,
     effects: ["db:order_labor_sessions:read"], bindings: { required: ["CORE"], optional: [] }
   },
+  pauseLaborSession: {
+    auth: "session", demo: "deny", handler: handlePauseLaborSession,
+    effects: ["db:order_labor_sessions:read", "db:order_labor_sessions:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  resumeLaborSession: {
+    auth: "session", demo: "deny", handler: handleResumeLaborSession,
+    effects: ["db:order_labor_sessions:read", "db:order_labor_sessions:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  updateLaborSessionNotes: {
+    auth: "session", demo: "deny", handler: handleUpdateLaborSessionNotes,
+    effects: ["db:order_labor_sessions:read", "db:order_labor_sessions:write"], bindings: { required: ["CORE"], optional: [] }
+  },
   geocodeAddresses: {
     auth: "session", demo: "deny", handler: handleGeocodeAddresses,
     effects: ["external:geocoding:read"], bindings: { required: ["CORE"], optional: [] }
@@ -161,6 +212,14 @@ const ACTIONS = {
   listExpenses: {
     auth: "session", demo: "deny", handler: handleListExpenses,
     effects: ["db:shop_expenses:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  createExpense: {
+    auth: "session", demo: "deny", handler: handleCreateExpense,
+    effects: ["db:shop_expenses:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteExpense: {
+    auth: "session", demo: "deny", handler: handleDeleteExpense,
+    effects: ["db:shop_expenses:delete"], bindings: { required: ["CORE"], optional: [] }
   },
   listServicePricing: {
     auth: "session", demo: "deny", handler: handleListServicePricing,
@@ -175,6 +234,10 @@ const ACTIONS = {
     auth: "session", demo: "deny", handler: handleGetShopSettings,
     effects: ["db:shop_settings:read"], bindings: { required: ["CORE"], optional: [] }
   },
+  saveShopSettings: {
+    auth: "session", demo: "deny", handler: handleSaveShopSettings,
+    effects: ["db:shop_settings:write", "db:shop_settings:read"], bindings: { required: ["CORE"], optional: [] }
+  },
   listSaleGloves: {
     auth: "session", demo: "deny", handler: handleListSaleGloves,
     effects: ["db:gloves_for_sale:read"], bindings: { required: ["CORE"], optional: [] }
@@ -182,6 +245,18 @@ const ACTIONS = {
   getSaleGlove: {
     auth: "session", demo: "deny", handler: handleGetSaleGlove,
     effects: ["db:gloves_for_sale:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  createSaleGlove: {
+    auth: "session", demo: "deny", handler: handleCreateSaleGlove,
+    effects: ["db:gloves_for_sale:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  updateSaleGlove: {
+    auth: "session", demo: "deny", handler: handleUpdateSaleGlove,
+    effects: ["db:gloves_for_sale:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteSaleGlove: {
+    auth: "session", demo: "deny", handler: handleDeleteSaleGlove,
+    effects: ["db:gloves_for_sale:delete"], bindings: { required: ["CORE"], optional: [] }
   },
   listSaleGlovePhotos: {
     auth: "session", demo: "deny", handler: handleListSaleGlovePhotos,
@@ -368,78 +443,6 @@ export async function onRequest(context) {
       });
     }
 
-    if (action === "savePushSubscription") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const sub = body.subscription || {};
-      const keys = sub.keys || {};
-      if (!sub.endpoint || !keys.p256dh || !keys.auth) {
-        return json({ ok: false, error: "Invalid subscription." }, 200, jsonHeaders);
-      }
-      const resp = await supabaseFetch(env, `/rest/v1/push_subscriptions?on_conflict=endpoint`, {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify({
-          endpoint: sub.endpoint, p256dh: keys.p256dh, auth: keys.auth,
-          label: cleanText(body.label) || null, last_used_at: new Date().toISOString()
-        })
-      });
-      if (!resp.ok) return json({ ok: false, error: "Could not save subscription." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "sendTestPush") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      await sendWebPushToAll(env, { title: "MurphOS", body: "Push notifications are working.", url: "/admin/" });
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "markMessagesRead") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const phone = cleanText(body.phoneNumber);
-      const path = phone
-        ? `/rest/v1/sms_messages?phone_number=eq.${encodeURIComponent(phone)}&read=eq.false`
-        : `/rest/v1/sms_messages?read=eq.false`;
-      const resp = await supabaseFetch(env, path, {
-        method: "PATCH",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({ read: true })
-      });
-      if (!resp.ok) return json({ ok: false, error: "Could not update messages." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "deleteMessage") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const id = cleanText(body.id);
-      if (!id) return json({ ok: false, error: "Missing message id." }, 200, jsonHeaders);
-      const resp = await supabaseFetch(
-        env,
-        `/rest/v1/sms_messages?id=eq.${encodeURIComponent(id)}`,
-        { method: "DELETE", headers: { Prefer: "return=minimal" } }
-      );
-      if (!resp.ok) return json({ ok: false, error: "Could not delete the message." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "deleteMessageThread") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const phones = Array.isArray(body.phoneNumbers) ? body.phoneNumbers.filter(Boolean).slice(0, 20) : [];
-      if (!phones.length) return json({ ok: false, error: "Missing phone numbers." }, 200, jsonHeaders);
-      const inList = phones.map(pn => `"${String(pn).replace(/"/g, "")}"`).join(",");
-      const resp = await supabaseFetch(
-        env,
-        `/rest/v1/sms_messages?phone_number=in.(${encodeURIComponent(inList)})`,
-        { method: "DELETE", headers: { Prefer: "return=minimal" } }
-      );
-      if (!resp.ok) return json({ ok: false, error: "Could not delete the conversation." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
     if (action === "sendMessageReply") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) return json(auth, 200, jsonHeaders);
@@ -497,26 +500,6 @@ export async function onRequest(context) {
       });
 
       return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "createInventoryItem") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await createInventoryItem(env, body);
-      return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "updateInventoryItem") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await updateInventoryItem(env, body);
-      return json(result, 200, jsonHeaders);
     }
 
     if (action === "webauthnRegisterOptions") {
@@ -626,164 +609,6 @@ export async function onRequest(context) {
       }
 
       return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "startLaborSession") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const orderNumber = cleanText(body.orderNumber);
-      const phase = cleanText(body.phase);
-      if (!orderNumber) {
-        return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
-      }
-      if (!phase) {
-        return json({ ok: false, error: "Select a phase before starting the timer." }, 200, jsonHeaders);
-      }
-      if (!isValidLaborPhase(phase)) {
-        return json({ ok: false, error: "Invalid labor phase." }, 200, jsonHeaders);
-      }
-
-      const result = await startLaborSession(env, {
-        orderNumber,
-        phase,
-        notes: body.notes
-      });
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: result.error || "Labor session could not be started.",
-            details: result.details
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, session: result.session }, 200, jsonHeaders);
-    }
-
-    if (action === "stopLaborSession") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const sessionId = cleanText(body.sessionId);
-      if (!sessionId) {
-        return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
-      }
-
-      const result = await stopLaborSession(env, {
-        sessionId,
-        notes: body.notes
-      });
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: result.error || "Labor session could not be stopped.",
-            details: result.details
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, session: result.session }, 200, jsonHeaders);
-    }
-
-    if (action === "pauseLaborSession") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const sessionId = cleanText(body.sessionId);
-      if (!sessionId) {
-        return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
-      }
-
-      const result = await pauseLaborSession(env, {
-        sessionId,
-        notes: body.notes
-      });
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: result.error || "Labor session could not be paused.",
-            details: result.details
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, session: result.session }, 200, jsonHeaders);
-    }
-
-    if (action === "resumeLaborSession") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const sessionId = cleanText(body.sessionId);
-      if (!sessionId) {
-        return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
-      }
-
-      const result = await resumeLaborSession(env, {
-        sessionId,
-        notes: body.notes
-      });
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: result.error || "Labor session could not be resumed.",
-            details: result.details
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, session: result.session }, 200, jsonHeaders);
-    }
-
-    if (action === "updateLaborSessionNotes") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const sessionId = cleanText(body.sessionId);
-      if (!sessionId) {
-        return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
-      }
-
-      const result = await updateLaborSessionNotes(env, {
-        sessionId,
-        notes: body.notes
-      });
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: result.error || "Labor session notes could not be updated.",
-            details: result.details
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json({ ok: true, session: result.session }, 200, jsonHeaders);
     }
 
     if (action === "deleteOrder") {
@@ -1229,44 +1054,6 @@ export async function onRequest(context) {
       );
     }
 
-    if (action === "createExpense") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const amount = Number(body.amount);
-      const expenseDate = cleanText(body.expenseDate);
-      const category = cleanText(body.category);
-      if (!expenseDate || !category || !Number.isFinite(amount) || amount <= 0) {
-        return json({ ok: false, error: "Expense needs a date, category, and amount." }, 200, jsonHeaders);
-      }
-      const quantity = Number(body.quantity);
-      const resp = await supabaseFetch(env, `/rest/v1/shop_expenses`, {
-        method: "POST",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({
-          expense_date: expenseDate,
-          category,
-          description: cleanText(body.description) || null,
-          amount,
-          quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : null,
-          unit_kind: cleanText(body.unitKind) || null
-        })
-      });
-      if (!resp.ok) return json({ ok: false, error: "Expense could not be saved." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "deleteExpense") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-      const id = cleanText(body.id);
-      if (!id) return json({ ok: false, error: "Missing expense id." }, 200, jsonHeaders);
-      const resp = await supabaseFetch(env, `/rest/v1/shop_expenses?id=eq.${encodeURIComponent(id)}`, {
-        method: "DELETE", headers: { Prefer: "return=minimal" }
-      });
-      if (!resp.ok) return json({ ok: false, error: "Expense could not be deleted." }, 200, jsonHeaders);
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
     /* =========================
        SERVICE PRICING (Pricing Management)
        Live rows in service_pricing are what the public site reads. Editing
@@ -1466,31 +1253,6 @@ export async function onRequest(context) {
       return json({ ok: true, service: created ? mapServicePricingRow(created) : null }, 200, jsonHeaders);
     }
 
-    if (action === "saveShopSettings") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) return json(auth, 200, jsonHeaders);
-
-      const updates = [];
-      const targetRate = cleanNumeric(body.targetLaborRate);
-      const minCharge = cleanNumeric(body.minShopCharge);
-      const rounding = cleanNumeric(body.roundingIncrement);
-      if (targetRate !== null && targetRate > 0) updates.push({ key: "target_labor_rate", value: targetRate });
-      if (minCharge !== null && minCharge >= 0) updates.push({ key: "min_shop_charge", value: minCharge });
-      if (rounding !== null && rounding > 0) updates.push({ key: "rounding_increment", value: rounding });
-
-      if (!updates.length) return json({ ok: false, error: "No valid settings to save." }, 200, jsonHeaders);
-
-      const nowIso = new Date().toISOString();
-      const resp = await supabaseFetch(env, `/rest/v1/shop_settings?on_conflict=key`, {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify(updates.map((u) => ({ ...u, updated_at: nowIso })))
-      });
-      if (!resp.ok) return json({ ok: false, error: "Settings could not be saved." }, 200, jsonHeaders);
-      const settings = await fetchShopSettings(env);
-      return json({ ok: true, settings }, 200, jsonHeaders);
-    }
-
     if (action === "setGalleryPhotoCover") {
       const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
       if (!auth.ok) return json(auth, 200, jsonHeaders);
@@ -1636,180 +1398,6 @@ export async function onRequest(context) {
         {
           ok: true,
           photo: result.photo || null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "createSaleGlove") {
-      const auth = await validateTokenFromBody(
-        body,
-        env.ADMIN_SESSION_SECRET
-      );
-
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const payload = {
-        slug: body.slug,
-        title: body.title,
-        short_description: body.shortDescription,
-        description: body.description,
-        price: body.price || null,
-        brand: body.brand,
-        model: body.model,
-        glove_size: body.gloveSize,
-        position: body.position,
-        web: body.web,
-        throw_hand: body.throwHand,
-        condition: body.condition,
-        status: body.status || "available",
-        purchase_url: body.purchaseUrl,
-        featured: body.featured === true,
-        sort_order: Number(body.sortOrder || 0)
-      };
-
-      const result = await supabaseFetch(
-        env,
-        "/rest/v1/gloves_for_sale",
-        {
-          method: "POST",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify(payload)
-        }
-      );
-
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to create glove listing.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          glove: result.data?.[0] || null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "updateSaleGlove") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const id = cleanText(body.id);
-
-      if (!id) {
-        return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
-      }
-
-      const payload = {
-        slug: cleanText(body.slug),
-        title: cleanText(body.title),
-        short_description: cleanText(body.shortDescription),
-        description: cleanText(body.description),
-        price: cleanNumeric(body.price),
-        brand: cleanText(body.brand),
-        model: cleanText(body.model),
-        glove_size: cleanText(body.gloveSize),
-        position: cleanText(body.position),
-        web: cleanText(body.web),
-        throw_hand: cleanText(body.throwHand),
-        condition: cleanText(body.condition),
-        status: cleanText(body.status) || "available",
-        purchase_url: cleanText(body.purchaseUrl),
-        featured: body.featured === true,
-        sort_order: Number(body.sortOrder || 0)
-      };
-
-      const result = await supabaseFetch(
-        env,
-        `/rest/v1/gloves_for_sale?id=eq.${encodeURIComponent(id)}`,
-        {
-          method: "PATCH",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify(payload)
-        }
-      );
-
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to update glove listing.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          glove: result.data?.[0] || null
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "deleteSaleGlove") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const id = cleanText(body.id);
-
-      if (!id) {
-        return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
-      }
-
-      const result = await supabaseFetch(
-        env,
-        `/rest/v1/gloves_for_sale?id=eq.${encodeURIComponent(id)}`,
-        {
-          method: "DELETE",
-          headers: {
-            Prefer: "return=representation"
-          }
-        }
-      );
-
-      if (!result.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to delete glove listing.",
-            details: result.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          deleted: true,
-          id
         },
         200,
         jsonHeaders
@@ -2202,6 +1790,72 @@ export async function onRequest(context) {
   }
 }
 
+async function handleSavePushSubscription({ env, body, jsonHeaders }) {
+  const sub = body.subscription || {};
+  const keys = sub.keys || {};
+  if (!sub.endpoint || !keys.p256dh || !keys.auth) {
+    return json({ ok: false, error: "Invalid subscription." }, 200, jsonHeaders);
+  }
+  const resp = await supabaseFetch(env, `/rest/v1/push_subscriptions?on_conflict=endpoint`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({
+      endpoint: sub.endpoint, p256dh: keys.p256dh, auth: keys.auth,
+      label: cleanText(body.label) || null, last_used_at: new Date().toISOString()
+    })
+  });
+  if (!resp.ok) return json({ ok: false, error: "Could not save subscription." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleSendTestPush({ env, jsonHeaders }) {
+  await sendWebPushToAll(env, {
+    title: "MurphOS",
+    body: "Push notifications are working.",
+    url: "/admin/"
+  });
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleMarkMessagesRead({ env, body, jsonHeaders }) {
+  const phone = cleanText(body.phoneNumber);
+  const path = phone
+    ? `/rest/v1/sms_messages?phone_number=eq.${encodeURIComponent(phone)}&read=eq.false`
+    : `/rest/v1/sms_messages?read=eq.false`;
+  const resp = await supabaseFetch(env, path, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ read: true })
+  });
+  if (!resp.ok) return json({ ok: false, error: "Could not update messages." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleDeleteMessage({ env, body, jsonHeaders }) {
+  const id = cleanText(body.id);
+  if (!id) return json({ ok: false, error: "Missing message id." }, 200, jsonHeaders);
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/sms_messages?id=eq.${encodeURIComponent(id)}`,
+    { method: "DELETE", headers: { Prefer: "return=minimal" } }
+  );
+  if (!resp.ok) return json({ ok: false, error: "Could not delete the message." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleDeleteMessageThread({ env, body, jsonHeaders }) {
+  const phones = Array.isArray(body.phoneNumbers) ? body.phoneNumbers.filter(Boolean).slice(0, 20) : [];
+  if (!phones.length) return json({ ok: false, error: "Missing phone numbers." }, 200, jsonHeaders);
+  const inList = phones.map(pn => `"${String(pn).replace(/"/g, "")}"`).join(",");
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/sms_messages?phone_number=in.(${encodeURIComponent(inList)})`,
+    { method: "DELETE", headers: { Prefer: "return=minimal" } }
+  );
+  if (!resp.ok) return json({ ok: false, error: "Could not delete the conversation." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
 async function handleListMessages({ env, jsonHeaders }) {
   const resp = await supabaseFetch(
     env,
@@ -2233,6 +1887,16 @@ async function handleListInventory({ env, jsonHeaders }) {
     }, 200, jsonHeaders);
   }
   return json({ ok: true, inventory: supa.data || [] }, 200, jsonHeaders);
+}
+
+async function handleCreateInventoryItem({ env, body, jsonHeaders }) {
+  const result = await createInventoryItem(env, body);
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleUpdateInventoryItem({ env, body, jsonHeaders }) {
+  const result = await updateInventoryItem(env, body);
+  return json(result, 200, jsonHeaders);
 }
 
 async function handleGetOrder({ env, body, jsonHeaders }) {
@@ -2285,6 +1949,41 @@ async function handleListLaborSessions({ env, body, jsonHeaders }) {
   return json({ ok: true, sessions: result.sessions }, 200, jsonHeaders);
 }
 
+async function handleStartLaborSession({ env, body, jsonHeaders }) {
+  const orderNumber = cleanText(body.orderNumber);
+  const phase = cleanText(body.phase);
+  if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+  if (!phase) {
+    return json({ ok: false, error: "Select a phase before starting the timer." }, 200, jsonHeaders);
+  }
+  if (!isValidLaborPhase(phase)) {
+    return json({ ok: false, error: "Invalid labor phase." }, 200, jsonHeaders);
+  }
+  const result = await startLaborSession(env, { orderNumber, phase, notes: body.notes });
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: result.error || "Labor session could not be started.",
+      details: result.details
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, session: result.session }, 200, jsonHeaders);
+}
+
+async function handleStopLaborSession({ env, body, jsonHeaders }) {
+  const sessionId = cleanText(body.sessionId);
+  if (!sessionId) return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
+  const result = await stopLaborSession(env, { sessionId, notes: body.notes });
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: result.error || "Labor session could not be stopped.",
+      details: result.details
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, session: result.session }, 200, jsonHeaders);
+}
+
 async function handleListOpenLaborSessions({ env, jsonHeaders }) {
   const result = await fetchOpenLaborSessions(env);
   if (!result.ok) {
@@ -2307,6 +2006,48 @@ async function handleListLaborSummary({ env, jsonHeaders }) {
     }, 200, jsonHeaders);
   }
   return json({ ok: true, sessions: result.sessions }, 200, jsonHeaders);
+}
+
+async function handlePauseLaborSession({ env, body, jsonHeaders }) {
+  const sessionId = cleanText(body.sessionId);
+  if (!sessionId) return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
+  const result = await pauseLaborSession(env, { sessionId, notes: body.notes });
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: result.error || "Labor session could not be paused.",
+      details: result.details
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, session: result.session }, 200, jsonHeaders);
+}
+
+async function handleResumeLaborSession({ env, body, jsonHeaders }) {
+  const sessionId = cleanText(body.sessionId);
+  if (!sessionId) return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
+  const result = await resumeLaborSession(env, { sessionId, notes: body.notes });
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: result.error || "Labor session could not be resumed.",
+      details: result.details
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, session: result.session }, 200, jsonHeaders);
+}
+
+async function handleUpdateLaborSessionNotes({ env, body, jsonHeaders }) {
+  const sessionId = cleanText(body.sessionId);
+  if (!sessionId) return json({ ok: false, error: "Missing sessionId." }, 200, jsonHeaders);
+  const result = await updateLaborSessionNotes(env, { sessionId, notes: body.notes });
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: result.error || "Labor session notes could not be updated.",
+      details: result.details
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, session: result.session }, 200, jsonHeaders);
 }
 
 async function handleGeocodeAddresses({ body, jsonHeaders }) {
@@ -2333,6 +2074,40 @@ async function handleListExpenses({ env, jsonHeaders }) {
       unitKind: row.unit_kind
     }))
   }, 200, jsonHeaders);
+}
+
+async function handleCreateExpense({ env, body, jsonHeaders }) {
+  const amount = Number(body.amount);
+  const expenseDate = cleanText(body.expenseDate);
+  const category = cleanText(body.category);
+  if (!expenseDate || !category || !Number.isFinite(amount) || amount <= 0) {
+    return json({ ok: false, error: "Expense needs a date, category, and amount." }, 200, jsonHeaders);
+  }
+  const quantity = Number(body.quantity);
+  const resp = await supabaseFetch(env, `/rest/v1/shop_expenses`, {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      expense_date: expenseDate,
+      category,
+      description: cleanText(body.description) || null,
+      amount,
+      quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : null,
+      unit_kind: cleanText(body.unitKind) || null
+    })
+  });
+  if (!resp.ok) return json({ ok: false, error: "Expense could not be saved." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleDeleteExpense({ env, body, jsonHeaders }) {
+  const id = cleanText(body.id);
+  if (!id) return json({ ok: false, error: "Missing expense id." }, 200, jsonHeaders);
+  const resp = await supabaseFetch(env, `/rest/v1/shop_expenses?id=eq.${encodeURIComponent(id)}`, {
+    method: "DELETE", headers: { Prefer: "return=minimal" }
+  });
+  if (!resp.ok) return json({ ok: false, error: "Expense could not be deleted." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
 }
 
 async function handleListServicePricing({ env, jsonHeaders }) {
@@ -2400,6 +2175,26 @@ async function handleGetShopSettings({ env, jsonHeaders }) {
   return json({ ok: true, settings }, 200, jsonHeaders);
 }
 
+async function handleSaveShopSettings({ env, body, jsonHeaders }) {
+  const updates = [];
+  const targetRate = cleanNumeric(body.targetLaborRate);
+  const minCharge = cleanNumeric(body.minShopCharge);
+  const rounding = cleanNumeric(body.roundingIncrement);
+  if (targetRate !== null && targetRate > 0) updates.push({ key: "target_labor_rate", value: targetRate });
+  if (minCharge !== null && minCharge >= 0) updates.push({ key: "min_shop_charge", value: minCharge });
+  if (rounding !== null && rounding > 0) updates.push({ key: "rounding_increment", value: rounding });
+  if (!updates.length) return json({ ok: false, error: "No valid settings to save." }, 200, jsonHeaders);
+  const nowIso = new Date().toISOString();
+  const resp = await supabaseFetch(env, `/rest/v1/shop_settings?on_conflict=key`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(updates.map((u) => ({ ...u, updated_at: nowIso })))
+  });
+  if (!resp.ok) return json({ ok: false, error: "Settings could not be saved." }, 200, jsonHeaders);
+  const settings = await fetchShopSettings(env);
+  return json({ ok: true, settings }, 200, jsonHeaders);
+}
+
 async function handleListSaleGloves({ env, jsonHeaders }) {
   const supa = await supabaseFetch(env, `/rest/v1/gloves_for_sale?select=*&order=sort_order.asc,created_at.desc`);
   if (!supa.ok) {
@@ -2429,6 +2224,98 @@ async function handleGetSaleGlove({ env, body, jsonHeaders }) {
   const row = Array.isArray(supa.data) ? supa.data[0] : null;
   if (!row) return json({ ok: false, error: "Glove listing not found." }, 200, jsonHeaders);
   return json({ ok: true, glove: mapSaleGloveFromDb(row) }, 200, jsonHeaders);
+}
+
+async function handleCreateSaleGlove({ env, body, jsonHeaders }) {
+  const payload = {
+    slug: body.slug,
+    title: body.title,
+    short_description: body.shortDescription,
+    description: body.description,
+    price: body.price || null,
+    brand: body.brand,
+    model: body.model,
+    glove_size: body.gloveSize,
+    position: body.position,
+    web: body.web,
+    throw_hand: body.throwHand,
+    condition: body.condition,
+    status: body.status || "available",
+    purchase_url: body.purchaseUrl,
+    featured: body.featured === true,
+    sort_order: Number(body.sortOrder || 0)
+  };
+  const result = await supabaseFetch(env, "/rest/v1/gloves_for_sale", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(payload)
+  });
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Failed to create glove listing.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, glove: result.data?.[0] || null }, 200, jsonHeaders);
+}
+
+async function handleUpdateSaleGlove({ env, body, jsonHeaders }) {
+  const id = cleanText(body.id);
+  if (!id) return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
+  const payload = {
+    slug: cleanText(body.slug),
+    title: cleanText(body.title),
+    short_description: cleanText(body.shortDescription),
+    description: cleanText(body.description),
+    price: cleanNumeric(body.price),
+    brand: cleanText(body.brand),
+    model: cleanText(body.model),
+    glove_size: cleanText(body.gloveSize),
+    position: cleanText(body.position),
+    web: cleanText(body.web),
+    throw_hand: cleanText(body.throwHand),
+    condition: cleanText(body.condition),
+    status: cleanText(body.status) || "available",
+    purchase_url: cleanText(body.purchaseUrl),
+    featured: body.featured === true,
+    sort_order: Number(body.sortOrder || 0)
+  };
+  const result = await supabaseFetch(
+    env,
+    `/rest/v1/gloves_for_sale?id=eq.${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(payload)
+    }
+  );
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Failed to update glove listing.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, glove: result.data?.[0] || null }, 200, jsonHeaders);
+}
+
+async function handleDeleteSaleGlove({ env, body, jsonHeaders }) {
+  const id = cleanText(body.id);
+  if (!id) return json({ ok: false, error: "Missing glove id." }, 200, jsonHeaders);
+  const result = await supabaseFetch(
+    env,
+    `/rest/v1/gloves_for_sale?id=eq.${encodeURIComponent(id)}`,
+    { method: "DELETE", headers: { Prefer: "return=representation" } }
+  );
+  if (!result.ok) {
+    return json({
+      ok: false,
+      error: "Failed to delete glove listing.",
+      details: result.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, deleted: true, id }, 200, jsonHeaders);
 }
 
 async function handleListSaleGlovePhotos({ env, body, jsonHeaders }) {
