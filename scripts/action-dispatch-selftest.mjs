@@ -148,6 +148,46 @@ async function signedToken(payload, secret = CORE_ENV.ADMIN_SESSION_SECRET) {
   return `${payloadBase64}.${base64Url(new Uint8Array(signature))}`;
 }
 
+function decodeTokenPayload(token) {
+  const payload = String(token || "").split(".")[0];
+  return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+}
+
+async function passwordFields(password, iterations = 100000) {
+  const salt = new Uint8Array(16);
+  salt.fill(7);
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    keyMaterial,
+    256
+  );
+  return {
+    password_hash: base64Url(new Uint8Array(bits)),
+    password_salt: base64Url(salt),
+    password_iterations: iterations
+  };
+}
+
+function rawEcdsaToDer(rawInput) {
+  const raw = new Uint8Array(rawInput);
+  const encodeInt = (part) => {
+    let value = part;
+    while (value.length > 1 && value[0] === 0) value = value.slice(1);
+    if (value[0] & 0x80) value = Uint8Array.from([0, ...value]);
+    return Uint8Array.from([0x02, value.length, ...value]);
+  };
+  const r = encodeInt(raw.slice(0, 32));
+  const s = encodeInt(raw.slice(32, 64));
+  return Uint8Array.from([0x30, r.length + s.length, ...r, ...s]);
+}
+
 async function sessionTokens() {
   const future = Date.now() + 60_000;
   return {
@@ -683,6 +723,381 @@ await test("searchPublicGloves allows anonymous but denies demo token", async ()
   await assertDemoDenied("searchPublicGloves", demo, { q: "a" });
 });
 
+console.log("Registry-backed login and invite behavior");
+
+await test("owner PIN login issues the owner admin session", async () => {
+  const before = Date.now();
+  const result = await invoke({
+    body: { action: "login", email: "", password: CORE_ENV.ADMIN_PIN }
+  });
+  equal(result.response.status, 200);
+  equal(result.json?.ok, true);
+  equal(result.json?.role, "admin");
+  equal(typeof result.json?.token, "string");
+  const payload = decodeTokenPayload(result.json.token);
+  equal(payload.sub, "owner");
+  equal(payload.role, "admin");
+  ok(payload.exp >= before + 14 * 24 * 60 * 60 * 1000);
+  equal(result.fetchCalls.length, 0);
+});
+
+await test("password login accepts active user and touches login before response", async () => {
+  const password = "correct horse battery";
+  const fields = await passwordFields(password);
+  const user = {
+    id: "user-active",
+    email: "active@example.com",
+    role: "admin",
+    active: true,
+    ...fields
+  };
+  const result = await invoke({
+    body: { action: "login", email: "ACTIVE@EXAMPLE.COM", password },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) {
+        ok(String(input).includes("email=eq.active%40example.com"));
+        equal(init.method, "GET");
+        return jsonResponse([user]);
+      }
+      if (callNumber === 2) {
+        ok(String(input).includes(`/rest/v1/admin_users?id=eq.${user.id}`));
+        equal(init.method, "PATCH");
+        ok(JSON.parse(init.body).last_login_at);
+        return jsonResponse([]);
+      }
+      return noNetworkFetch(input);
+    }
+  });
+  equal(result.response.status, 200);
+  equal(result.json?.ok, true);
+  equal(result.json?.role, "admin");
+  const payload = decodeTokenPayload(result.json.token);
+  deepEqual(
+    { sub: payload.sub, email: payload.email, role: payload.role },
+    { sub: user.id, email: user.email, role: user.role }
+  );
+  equal(result.fetchCalls.length, 2);
+});
+
+await test("password login rejects inactive user and incorrect password", async () => {
+  const fields = await passwordFields("correct password");
+  const baseUser = {
+    id: "user-login",
+    email: "login@example.com",
+    role: "admin",
+    ...fields
+  };
+  const inactive = await invoke({
+    body: { action: "login", email: baseUser.email, password: "correct password" },
+    fetchMock: () => jsonResponse([{ ...baseUser, active: false }])
+  });
+  deepEqual(inactive.json, { ok: false, error: "Invalid email or password." });
+  equal(inactive.fetchCalls.length, 1);
+
+  const wrong = await invoke({
+    body: { action: "login", email: baseUser.email, password: "wrong password" },
+    fetchMock: () => jsonResponse([{ ...baseUser, active: true }])
+  });
+  deepEqual(wrong.json, { ok: false, error: "Invalid email or password." });
+  equal(wrong.fetchCalls.length, 1);
+});
+
+await test("password login preserves generic lookup-failure response", async () => {
+  const result = await invoke({
+    body: { action: "login", email: "user@example.com", password: "password1" },
+    fetchMock: () => jsonResponse({ message: "database unavailable" }, 503)
+  });
+  equal(result.response.status, 200);
+  deepEqual(result.json, { ok: false, error: "Could not sign in." });
+  equal(result.fetchCalls.length, 1);
+});
+
+await test("getInvite returns only current public invite fields", async () => {
+  const user = {
+    id: "invite-user",
+    email: "invite@example.com",
+    display_name: "Invited User",
+    role: "demo",
+    invite_token: "valid-invite",
+    invite_expires_at: new Date(Date.now() + 60_000).toISOString(),
+    password_hash: "must-not-leak"
+  };
+  const result = await invoke({
+    body: { action: "getInvite", token: "valid-invite" },
+    fetchMock: () => jsonResponse([user])
+  });
+  equal(result.response.status, 200);
+  deepEqual(result.json, {
+    ok: true,
+    email: user.email,
+    displayName: user.display_name,
+    role: user.role
+  });
+  equal(result.fetchCalls.length, 1);
+});
+
+await test("getInvite rejects missing, used, and expired invites", async () => {
+  const missing = await invoke({
+    body: { action: "getInvite" }
+  });
+  deepEqual(missing.json, { ok: false, error: "This invite is invalid or already used." });
+  equal(missing.fetchCalls.length, 0);
+
+  const used = await invoke({
+    body: { action: "getInvite", token: "used" },
+    fetchMock: () => jsonResponse([])
+  });
+  deepEqual(used.json, { ok: false, error: "This invite is invalid or already used." });
+
+  const expired = await invoke({
+    body: { action: "getInvite", token: "expired" },
+    fetchMock: () => jsonResponse([{
+      email: "expired@example.com",
+      role: "demo",
+      invite_token: "expired",
+      invite_expires_at: new Date(Date.now() - 60_000).toISOString()
+    }])
+  });
+  deepEqual(expired.json, { ok: false, error: "This invite has expired." });
+});
+
+await test("acceptInvite preserves short-password rejection", async () => {
+  const result = await invoke({
+    body: { action: "acceptInvite", token: "invite", password: "short" }
+  });
+  deepEqual(result.json, { ok: false, error: "Password must be at least 8 characters." });
+  equal(result.fetchCalls.length, 0);
+});
+
+await test("acceptInvite writes password fields before issuing session", async () => {
+  const user = {
+    id: "accepted-user",
+    email: "accepted@example.com",
+    display_name: "Accepted User",
+    role: "demo",
+    invite_token: "accept-me",
+    invite_expires_at: new Date(Date.now() + 60_000).toISOString()
+  };
+  let patchBody;
+  const result = await invoke({
+    body: { action: "acceptInvite", token: "accept-me", password: "new password" },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse([user]);
+      if (callNumber === 2) {
+        equal(init.method, "PATCH");
+        patchBody = JSON.parse(init.body);
+        return jsonResponse([]);
+      }
+      return noNetworkFetch(input);
+    }
+  });
+  equal(result.response.status, 200);
+  equal(result.json?.ok, true);
+  equal(result.json?.role, "demo");
+  equal(result.fetchCalls.length, 2);
+  equal(typeof patchBody.password_hash, "string");
+  equal(typeof patchBody.password_salt, "string");
+  equal(patchBody.password_iterations, 100000);
+  equal(patchBody.invite_token, null);
+  equal(patchBody.invite_expires_at, null);
+  equal(patchBody.active, true);
+  ok(patchBody.last_login_at);
+  const payload = decodeTokenPayload(result.json.token);
+  deepEqual(
+    { sub: payload.sub, email: payload.email, role: payload.role },
+    { sub: user.id, email: user.email, role: user.role }
+  );
+});
+
+await test("acceptInvite remains successful when best-effort push fails", async () => {
+  const user = {
+    id: "push-failure-user",
+    email: "push-failure@example.com",
+    display_name: "Push Failure",
+    role: "admin",
+    invite_token: "push-failure",
+    invite_expires_at: new Date(Date.now() + 60_000).toISOString()
+  };
+  const result = await invoke({
+    body: { action: "acceptInvite", token: "push-failure", password: "new password" },
+    env: {
+      ...CORE_ENV,
+      VAPID_PUBLIC_KEY: "configured",
+      VAPID_PRIVATE_KEY: "configured"
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse([user]);
+      if (callNumber === 2) {
+        equal(init.method, "PATCH");
+        return jsonResponse([]);
+      }
+      if (callNumber === 3) throw new Error("mock push storage failure");
+      return noNetworkFetch(input);
+    }
+  });
+  equal(result.response.status, 200);
+  equal(result.json?.ok, true);
+  equal(result.json?.role, "admin");
+  equal(decodeTokenPayload(result.json.token).sub, user.id);
+  equal(result.fetchCalls.length, 3);
+});
+
+console.log("Registry-backed WebAuthn login behavior");
+
+await test("webauthnLoginOptions maps zero and existing credentials", async () => {
+  const empty = await invoke({
+    body: { action: "webauthnLoginOptions" },
+    fetchMock: emptySupabaseFetch
+  });
+  equal(empty.response.status, 200);
+  equal(empty.json?.ok, true);
+  equal(empty.json?.hasCredentials, false);
+  deepEqual(empty.json?.options?.allowCredentials, []);
+  equal(empty.json?.options?.rpId, "murphsmitts.com");
+  equal(empty.json?.options?.timeout, 60000);
+  equal(empty.json?.options?.userVerification, "preferred");
+  equal(typeof empty.json?.options?.challenge, "string");
+  equal(typeof empty.json?.challengeToken, "string");
+
+  const existing = await invoke({
+    body: { action: "webauthnLoginOptions" },
+    env: {
+      ...CORE_ENV,
+      WEBAUTHN_RP_ID: "admin.example.com",
+      WEBAUTHN_ORIGIN: "https://admin.example.com"
+    },
+    fetchMock: () => jsonResponse([
+      { credential_id: "credential-a" },
+      { credential_id: "credential-b" }
+    ])
+  });
+  equal(existing.json?.hasCredentials, true);
+  equal(existing.json?.options?.rpId, "admin.example.com");
+  deepEqual(existing.json?.options?.allowCredentials, [
+    { id: "credential-a", type: "public-key" },
+    { id: "credential-b", type: "public-key" }
+  ]);
+});
+
+await test("webauthnLoginVerify preserves invalid challenge response", async () => {
+  const result = await invoke({
+    body: { action: "webauthnLoginVerify", challengeToken: "invalid" }
+  });
+  equal(result.response.status, 200);
+  deepEqual(result.json, { ok: false, error: "Invalid passkey challenge." });
+  equal(result.fetchCalls.length, 0);
+});
+
+await test("webauthnLoginVerify verifies ES256, updates count, and issues owner session", async () => {
+  const options = await invoke({
+    body: { action: "webauthnLoginOptions" },
+    fetchMock: emptySupabaseFetch
+  });
+  const challenge = options.json.options.challenge;
+  const challengeToken = options.json.challengeToken;
+  const credentialId = "credential-success";
+
+  const keyPair = await crypto.subtle.generateKey(
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["sign", "verify"]
+  );
+  const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+  const publicKey = JSON.stringify({ alg: -7, x: publicJwk.x, y: publicJwk.y });
+
+  const rpHash = new Uint8Array(await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode("murphsmitts.com")
+  ));
+  const authenticatorData = new Uint8Array(37);
+  authenticatorData.set(rpHash, 0);
+  authenticatorData[32] = 0x01;
+  new DataView(authenticatorData.buffer).setUint32(33, 7);
+
+  const clientDataBytes = new TextEncoder().encode(JSON.stringify({
+    type: "webauthn.get",
+    challenge,
+    origin: "https://murphsmitts.com"
+  }));
+  const clientHash = new Uint8Array(await crypto.subtle.digest("SHA-256", clientDataBytes));
+  const signedData = new Uint8Array(authenticatorData.length + clientHash.length);
+  signedData.set(authenticatorData, 0);
+  signedData.set(clientHash, authenticatorData.length);
+  const rawSignature = new Uint8Array(await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    keyPair.privateKey,
+    signedData
+  ));
+  const signature = rawSignature.length === 64 ? rawEcdsaToDer(rawSignature) : rawSignature;
+
+  const credentialBody = {
+    id: credentialId,
+    response: {
+      clientDataJSON: base64Url(clientDataBytes),
+      authenticatorData: base64Url(authenticatorData),
+      signature: base64Url(signature)
+    }
+  };
+  let countPatch;
+  const success = await invoke({
+    body: {
+      action: "webauthnLoginVerify",
+      challengeToken,
+      credential: credentialBody
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) {
+        ok(String(input).includes(`credential_id=eq.${credentialId}`));
+        return jsonResponse([{
+          credential_id: credentialId,
+          public_key: publicKey,
+          sign_count: 3
+        }]);
+      }
+      if (callNumber === 2) {
+        ok(String(input).includes(`credential_id=eq.${credentialId}`));
+        equal(init.method, "PATCH");
+        countPatch = JSON.parse(init.body);
+        return jsonResponse([]);
+      }
+      return noNetworkFetch(input);
+    }
+  });
+  equal(success.response.status, 200);
+  equal(success.json?.ok, true);
+  equal(success.json?.role, "admin");
+  equal(success.fetchCalls.length, 2);
+  equal(countPatch.sign_count, 7);
+  ok(countPatch.last_used_at);
+  const payload = decodeTokenPayload(success.json.token);
+  equal(payload.sub, "owner");
+  equal(payload.role, "admin");
+
+  const badSignature = signature.slice();
+  badSignature[badSignature.length - 1] ^= 0xff;
+  const failed = await invoke({
+    body: {
+      action: "webauthnLoginVerify",
+      challengeToken,
+      credential: {
+        ...credentialBody,
+        response: {
+          ...credentialBody.response,
+          signature: base64Url(badSignature)
+        }
+      }
+    },
+    fetchMock: () => jsonResponse([{
+      credential_id: credentialId,
+      public_key: publicKey,
+      sign_count: 3
+    }])
+  });
+  equal(failed.response.status, 200);
+  deepEqual(failed.json, { ok: false, error: "Passkey signature was invalid." });
+  equal(failed.fetchCalls.length, 1);
+});
+
 console.log("Conditional gallery authentication");
 
 async function visibleGallery(body) {
@@ -829,7 +1244,7 @@ await test("current database role overrides ordinary token role", async () => {
 
 console.log("Action registry and legacy source inventory");
 
-await test("one registry action plus 75 legacy actions match the plan", async () => {
+await test("six registry actions plus 70 legacy actions match the plan", async () => {
   const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
   const plan = fs.readFileSync(new URL("../.docs/V1_2_ACTION_REGISTRY_PLAN.md", import.meta.url), "utf8");
   const dispatcher = source.split("/* =========================\n   RESPONSE HELPERS")[0];
@@ -845,17 +1260,57 @@ await test("one registry action plus 75 legacy actions match the plan", async ()
     }
   }
   const plannedActions = [...plan.matchAll(/^\| \d+ \| `([^`]+)` →/gm)].map(match => match[1]);
-  const plannedLegacyActions = plannedActions.filter(action => action !== "getPushPublicKey");
+  const expectedRegistryActions = [
+    "login",
+    "getInvite",
+    "acceptInvite",
+    "getPushPublicKey",
+    "webauthnLoginOptions",
+    "webauthnLoginVerify"
+  ];
+  const expectedDemoPolicies = new Map([
+    ["login", "allow"],
+    ["getInvite", "allow"],
+    ["acceptInvite", "allow"],
+    ["getPushPublicKey", "deny"],
+    ["webauthnLoginOptions", "allow"],
+    ["webauthnLoginVerify", "allow"]
+  ]);
+  const registryActionSet = new Set(expectedRegistryActions);
+  const plannedLegacyActions = plannedActions.filter(action => !registryActionSet.has(action));
   const legacyCounts = new Map();
   for (const action of legacyActions) {
     legacyCounts.set(action, (legacyCounts.get(action) || 0) + 1);
   }
 
-  deepEqual(registryActions, ["getPushPublicKey"]);
-  equal(registryActions.length, 1);
-  equal(legacyActions.includes("getPushPublicKey"), false);
-  equal(legacyActions.length, 75);
-  equal(new Set(legacyActions).size, 75);
+  deepEqual(registryActions, expectedRegistryActions);
+  equal(registryActions.length, 6);
+  equal(
+    (dispatcher.match(/return dispatchRegisteredAction\(registeredAction,/g) || []).length,
+    1,
+    "registry dispatch has one central authorization path"
+  );
+  const registryDispatchHelper = source.match(
+    /export async function dispatchRegisteredAction\([\s\S]*?\n\}/
+  );
+  ok(registryDispatchHelper, "registry dispatch helper is present");
+  equal(
+    (registryDispatchHelper[0].match(/\bauthorizeAction\(/g) || []).length,
+    1,
+    "registry dispatch authorizes exactly once before handler invocation"
+  );
+  for (const action of expectedRegistryActions) {
+    equal(legacyActions.includes(action), false);
+    ok(
+      new RegExp(
+        `^  ${action}: \\{\\n    auth: "public",\\n    demo: "${expectedDemoPolicies.get(action)}",`,
+        "m"
+      ).test(registryMatch[1]),
+      `${action} retains its public authorization and demo policy`
+    );
+  }
+  equal(legacyActions.length, 70);
+  equal(new Set(legacyActions).size, 70);
   equal(plannedActions.length, 76);
   deepEqual(legacyActions, plannedLegacyActions);
   deepEqual([...legacyCounts.entries()].filter(([, count]) => count !== 1), []);

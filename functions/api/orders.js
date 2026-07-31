@@ -4,10 +4,40 @@ import { isPreviewEnvironment } from "./_env.js";
 
 /* =========================
    ACTION REGISTRY
-   Stage 3 routes one low-risk action through the registry. All other actions
-   continue through the legacy dispatcher below until migrated individually.
+   Migrated actions route through the registry. All other actions continue
+   through the legacy dispatcher below until migrated individually.
 ========================= */
 const ACTIONS = {
+  login: {
+    auth: "public",
+    demo: "allow",
+    handler: handleLogin,
+    effects: ["db:admin_users:read", "db:admin_users:write", "auth:session:sign"],
+    bindings: {
+      required: ["CORE"],
+      optional: []
+    }
+  },
+  getInvite: {
+    auth: "public",
+    demo: "allow",
+    handler: handleGetInvite,
+    effects: ["db:admin_users:read"],
+    bindings: {
+      required: ["CORE"],
+      optional: []
+    }
+  },
+  acceptInvite: {
+    auth: "public",
+    demo: "allow",
+    handler: handleAcceptInvite,
+    effects: ["db:admin_users:read", "db:admin_users:write", "push:send", "auth:session:sign"],
+    bindings: {
+      required: ["CORE"],
+      optional: ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "ENV-SIGNAL"]
+    }
+  },
   getPushPublicKey: {
     auth: "public",
     demo: "deny",
@@ -16,6 +46,26 @@ const ACTIONS = {
     bindings: {
       required: ["CORE"],
       optional: ["VAPID_PUBLIC_KEY"]
+    }
+  },
+  webauthnLoginOptions: {
+    auth: "public",
+    demo: "allow",
+    handler: handleWebauthnLoginOptions,
+    effects: ["db:webauthn_credentials:read", "auth:challenge:sign"],
+    bindings: {
+      required: ["CORE"],
+      optional: ["WEBAUTHN_ORIGIN", "WEBAUTHN_RP_ID"]
+    }
+  },
+  webauthnLoginVerify: {
+    auth: "public",
+    demo: "allow",
+    handler: handleWebauthnLoginVerify,
+    effects: ["db:webauthn_credentials:read", "db:webauthn_credentials:write", "auth:session:sign"],
+    bindings: {
+      required: ["CORE"],
+      optional: ["WEBAUTHN_ORIGIN", "WEBAUTHN_RP_ID"]
     }
   }
 };
@@ -187,113 +237,6 @@ export async function onRequest(context) {
         action,
         jsonHeaders
       });
-    }
-
-    if (action === "login") {
-      const email = normalizeEmail(body.email);
-      const password = String(body.password || body.pin || "").trim();
-      const sessionMs = 1000 * 60 * 60 * 24 * 14;
-
-      /* Owner escape hatch: blank email + the ADMIN_PIN. Keeps the owner able
-         to sign in anywhere (including preview URLs where the passkey's domain
-         binding doesn't apply) with zero lockout risk. */
-      if (!email && password && env.ADMIN_PIN && password === String(env.ADMIN_PIN).trim()) {
-        const token = await createSignedToken(
-          { sub: "owner", role: "admin", exp: Date.now() + sessionMs },
-          env.ADMIN_SESSION_SECRET
-        );
-        return json({ ok: true, token, role: "admin" }, 200, jsonHeaders);
-      }
-
-      if (!email || !password) {
-        return json({ ok: false, error: "Enter your email and password." }, 200, jsonHeaders);
-      }
-
-      const found = await getUserByEmail(env, email);
-      if (!found.ok) {
-        return json({ ok: false, error: "Could not sign in." }, 200, jsonHeaders);
-      }
-
-      const user = found.user;
-      const passwordOk = user && user.active !== false && await verifyPassword(password, {
-        hash: user.password_hash,
-        salt: user.password_salt,
-        iterations: user.password_iterations
-      });
-
-      if (!passwordOk) {
-        return json({ ok: false, error: "Invalid email or password." }, 200, jsonHeaders);
-      }
-
-      await touchUserLogin(env, user.id);
-
-      const token = await createSignedToken(
-        { sub: user.id, email: user.email, role: user.role, exp: Date.now() + sessionMs },
-        env.ADMIN_SESSION_SECRET
-      );
-
-      return json({ ok: true, token, role: user.role }, 200, jsonHeaders);
-    }
-
-    if (action === "getInvite") {
-      const found = await getUserByInviteToken(env, body.token);
-      const user = found.ok ? found.user : null;
-      if (!user || !user.invite_token) {
-        return json({ ok: false, error: "This invite is invalid or already used." }, 200, jsonHeaders);
-      }
-      if (user.invite_expires_at && Date.now() > new Date(user.invite_expires_at).getTime()) {
-        return json({ ok: false, error: "This invite has expired." }, 200, jsonHeaders);
-      }
-      return json({ ok: true, email: user.email, displayName: user.display_name, role: user.role }, 200, jsonHeaders);
-    }
-
-    if (action === "acceptInvite") {
-      const password = String(body.password || "").trim();
-      if (password.length < 8) {
-        return json({ ok: false, error: "Password must be at least 8 characters." }, 200, jsonHeaders);
-      }
-      const found = await getUserByInviteToken(env, body.token);
-      const user = found.ok ? found.user : null;
-      if (!user || !user.invite_token) {
-        return json({ ok: false, error: "This invite is invalid or already used." }, 200, jsonHeaders);
-      }
-      if (user.invite_expires_at && Date.now() > new Date(user.invite_expires_at).getTime()) {
-        return json({ ok: false, error: "This invite has expired." }, 200, jsonHeaders);
-      }
-
-      const hashed = await hashPassword(password);
-      const resp = await supabaseFetch(
-        env,
-        `/rest/v1/admin_users?id=eq.${encodeURIComponent(user.id)}`,
-        {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({
-            password_hash: hashed.hash,
-            password_salt: hashed.salt,
-            password_iterations: hashed.iterations,
-            invite_token: null,
-            invite_expires_at: null,
-            active: true,
-            last_login_at: new Date().toISOString()
-          })
-        }
-      );
-      if (!resp.ok) {
-        return json({ ok: false, error: "Could not set your password." }, 200, jsonHeaders);
-      }
-
-      await sendWebPushToAll(env, {
-        title: "Invite accepted",
-        body: `${user.display_name || user.email} set their password (${user.role}).`,
-        url: "/admin/?view=users"
-      });
-
-      const token = await createSignedToken(
-        { sub: user.id, email: user.email, role: user.role, exp: Date.now() + 1000 * 60 * 60 * 24 * 14 },
-        env.ADMIN_SESSION_SECRET
-      );
-      return json({ ok: true, token, role: user.role }, 200, jsonHeaders);
     }
 
     if (action === "listUsers") {
@@ -841,113 +784,6 @@ export async function onRequest(context) {
       }
 
       return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "webauthnLoginOptions") {
-      const cfg = getWebauthnConfig(env);
-      const existing = await listWebauthnCredentials(env);
-      const creds = existing.ok ? existing.credentials : [];
-      const challenge = randomChallengeB64Url();
-      const challengeToken = await createChallengeToken("auth", challenge, env.ADMIN_SESSION_SECRET);
-
-      return json(
-        {
-          ok: true,
-          hasCredentials: creds.length > 0,
-          challengeToken,
-          options: {
-            challenge,
-            rpId: cfg.rpId,
-            timeout: 60000,
-            userVerification: "preferred",
-            allowCredentials: creds.map(cred => ({ id: cred.credential_id, type: "public-key" }))
-          }
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "webauthnLoginVerify") {
-      const cfg = getWebauthnConfig(env);
-      const chk = await verifyChallengeToken(body.challengeToken, "auth", env.ADMIN_SESSION_SECRET);
-      if (!chk.ok) {
-        return json({ ok: false, error: chk.error }, 200, jsonHeaders);
-      }
-
-      const cred = body.credential || {};
-      const resp = cred.response || {};
-      const credentialId = cleanText(cred.id) || cleanText(cred.rawId);
-      if (!credentialId) {
-        return json({ ok: false, error: "Missing passkey id." }, 200, jsonHeaders);
-      }
-
-      const record = await getWebauthnCredential(env, credentialId);
-      if (!record.ok || !record.credential) {
-        return json({ ok: false, error: "This passkey is not registered." }, 200, jsonHeaders);
-      }
-
-      let clientData;
-      try {
-        clientData = JSON.parse(new TextDecoder().decode(base64UrlToBytes(resp.clientDataJSON)));
-      } catch {
-        return json({ ok: false, error: "Could not read passkey response." }, 200, jsonHeaders);
-      }
-
-      if (clientData.type !== "webauthn.get") {
-        return json({ ok: false, error: "Unexpected passkey ceremony." }, 200, jsonHeaders);
-      }
-      if (clientData.challenge !== chk.challenge) {
-        return json({ ok: false, error: "Passkey challenge mismatch." }, 200, jsonHeaders);
-      }
-      if (!cfg.origins.includes(clientData.origin)) {
-        return json({ ok: false, error: "Passkey origin mismatch." }, 200, jsonHeaders);
-      }
-
-      let valid = false;
-      let newSignCount = 0;
-      try {
-        const authDataBytes = base64UrlToBytes(resp.authenticatorData);
-        const info = parseAuthData(authDataBytes);
-        const expectedRpIdHash = await sha256Bytes(cfg.rpId);
-        if (!bytesEqual(info.rpIdHash, expectedRpIdHash)) {
-          throw new Error("Passkey domain mismatch.");
-        }
-        if (!info.up) {
-          throw new Error("Passkey user presence missing.");
-        }
-        newSignCount = info.signCount;
-        const keyInfo = JSON.parse(record.credential.public_key);
-        valid = await verifyAssertionSignature(
-          keyInfo,
-          authDataBytes,
-          base64UrlToBytes(resp.clientDataJSON),
-          base64UrlToBytes(resp.signature)
-        );
-      } catch (err) {
-        return json({ ok: false, error: err.message || "Passkey could not be verified." }, 200, jsonHeaders);
-      }
-
-      if (!valid) {
-        return json({ ok: false, error: "Passkey signature was invalid." }, 200, jsonHeaders);
-      }
-
-      /* Counter is stored for the record but not hard-enforced: iCloud-synced
-         passkeys routinely report a sign count of 0, so a strict monotonic
-         check would lock out legitimate Face ID logins. */
-      const storedCount = Number(record.credential.sign_count) || 0;
-      await touchWebauthnCredential(env, credentialId, Math.max(storedCount, newSignCount));
-
-      const token = await createSignedToken(
-        {
-          sub: "owner",
-          role: "admin",
-          exp: Date.now() + 1000 * 60 * 60 * 24 * 14
-        },
-        env.ADMIN_SESSION_SECRET
-      );
-
-      return json({ ok: true, token, role: "admin" }, 200, jsonHeaders);
     }
 
     if (action === "listLaborSessions") {
@@ -3023,8 +2859,222 @@ export async function onRequest(context) {
   }
 }
 
+async function handleLogin({ env, body, jsonHeaders }) {
+  const email = normalizeEmail(body.email);
+  const password = String(body.password || body.pin || "").trim();
+  const sessionMs = 1000 * 60 * 60 * 24 * 14;
+
+  /* Owner escape hatch: blank email + the ADMIN_PIN. Keeps the owner able
+     to sign in anywhere (including preview URLs where the passkey's domain
+     binding doesn't apply) with zero lockout risk. */
+  if (!email && password && env.ADMIN_PIN && password === String(env.ADMIN_PIN).trim()) {
+    const token = await createSignedToken(
+      { sub: "owner", role: "admin", exp: Date.now() + sessionMs },
+      env.ADMIN_SESSION_SECRET
+    );
+    return json({ ok: true, token, role: "admin" }, 200, jsonHeaders);
+  }
+
+  if (!email || !password) {
+    return json({ ok: false, error: "Enter your email and password." }, 200, jsonHeaders);
+  }
+
+  const found = await getUserByEmail(env, email);
+  if (!found.ok) {
+    return json({ ok: false, error: "Could not sign in." }, 200, jsonHeaders);
+  }
+
+  const user = found.user;
+  const passwordOk = user && user.active !== false && await verifyPassword(password, {
+    hash: user.password_hash,
+    salt: user.password_salt,
+    iterations: user.password_iterations
+  });
+
+  if (!passwordOk) {
+    return json({ ok: false, error: "Invalid email or password." }, 200, jsonHeaders);
+  }
+
+  await touchUserLogin(env, user.id);
+
+  const token = await createSignedToken(
+    { sub: user.id, email: user.email, role: user.role, exp: Date.now() + sessionMs },
+    env.ADMIN_SESSION_SECRET
+  );
+
+  return json({ ok: true, token, role: user.role }, 200, jsonHeaders);
+}
+
+async function handleGetInvite({ env, body, jsonHeaders }) {
+  const found = await getUserByInviteToken(env, body.token);
+  const user = found.ok ? found.user : null;
+  if (!user || !user.invite_token) {
+    return json({ ok: false, error: "This invite is invalid or already used." }, 200, jsonHeaders);
+  }
+  if (user.invite_expires_at && Date.now() > new Date(user.invite_expires_at).getTime()) {
+    return json({ ok: false, error: "This invite has expired." }, 200, jsonHeaders);
+  }
+  return json({ ok: true, email: user.email, displayName: user.display_name, role: user.role }, 200, jsonHeaders);
+}
+
+async function handleAcceptInvite({ env, body, jsonHeaders }) {
+  const password = String(body.password || "").trim();
+  if (password.length < 8) {
+    return json({ ok: false, error: "Password must be at least 8 characters." }, 200, jsonHeaders);
+  }
+  const found = await getUserByInviteToken(env, body.token);
+  const user = found.ok ? found.user : null;
+  if (!user || !user.invite_token) {
+    return json({ ok: false, error: "This invite is invalid or already used." }, 200, jsonHeaders);
+  }
+  if (user.invite_expires_at && Date.now() > new Date(user.invite_expires_at).getTime()) {
+    return json({ ok: false, error: "This invite has expired." }, 200, jsonHeaders);
+  }
+
+  const hashed = await hashPassword(password);
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/admin_users?id=eq.${encodeURIComponent(user.id)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        password_hash: hashed.hash,
+        password_salt: hashed.salt,
+        password_iterations: hashed.iterations,
+        invite_token: null,
+        invite_expires_at: null,
+        active: true,
+        last_login_at: new Date().toISOString()
+      })
+    }
+  );
+  if (!resp.ok) {
+    return json({ ok: false, error: "Could not set your password." }, 200, jsonHeaders);
+  }
+
+  await sendWebPushToAll(env, {
+    title: "Invite accepted",
+    body: `${user.display_name || user.email} set their password (${user.role}).`,
+    url: "/admin/?view=users"
+  });
+
+  const token = await createSignedToken(
+    { sub: user.id, email: user.email, role: user.role, exp: Date.now() + 1000 * 60 * 60 * 24 * 14 },
+    env.ADMIN_SESSION_SECRET
+  );
+  return json({ ok: true, token, role: user.role }, 200, jsonHeaders);
+}
+
 async function handleGetPushPublicKey({ env, jsonHeaders }) {
   return json({ ok: true, publicKey: env.VAPID_PUBLIC_KEY || "" }, 200, jsonHeaders);
+}
+
+async function handleWebauthnLoginOptions({ env, jsonHeaders }) {
+  const cfg = getWebauthnConfig(env);
+  const existing = await listWebauthnCredentials(env);
+  const creds = existing.ok ? existing.credentials : [];
+  const challenge = randomChallengeB64Url();
+  const challengeToken = await createChallengeToken("auth", challenge, env.ADMIN_SESSION_SECRET);
+
+  return json(
+    {
+      ok: true,
+      hasCredentials: creds.length > 0,
+      challengeToken,
+      options: {
+        challenge,
+        rpId: cfg.rpId,
+        timeout: 60000,
+        userVerification: "preferred",
+        allowCredentials: creds.map(cred => ({ id: cred.credential_id, type: "public-key" }))
+      }
+    },
+    200,
+    jsonHeaders
+  );
+}
+
+async function handleWebauthnLoginVerify({ env, body, jsonHeaders }) {
+  const cfg = getWebauthnConfig(env);
+  const chk = await verifyChallengeToken(body.challengeToken, "auth", env.ADMIN_SESSION_SECRET);
+  if (!chk.ok) {
+    return json({ ok: false, error: chk.error }, 200, jsonHeaders);
+  }
+
+  const cred = body.credential || {};
+  const resp = cred.response || {};
+  const credentialId = cleanText(cred.id) || cleanText(cred.rawId);
+  if (!credentialId) {
+    return json({ ok: false, error: "Missing passkey id." }, 200, jsonHeaders);
+  }
+
+  const record = await getWebauthnCredential(env, credentialId);
+  if (!record.ok || !record.credential) {
+    return json({ ok: false, error: "This passkey is not registered." }, 200, jsonHeaders);
+  }
+
+  let clientData;
+  try {
+    clientData = JSON.parse(new TextDecoder().decode(base64UrlToBytes(resp.clientDataJSON)));
+  } catch {
+    return json({ ok: false, error: "Could not read passkey response." }, 200, jsonHeaders);
+  }
+
+  if (clientData.type !== "webauthn.get") {
+    return json({ ok: false, error: "Unexpected passkey ceremony." }, 200, jsonHeaders);
+  }
+  if (clientData.challenge !== chk.challenge) {
+    return json({ ok: false, error: "Passkey challenge mismatch." }, 200, jsonHeaders);
+  }
+  if (!cfg.origins.includes(clientData.origin)) {
+    return json({ ok: false, error: "Passkey origin mismatch." }, 200, jsonHeaders);
+  }
+
+  let valid = false;
+  let newSignCount = 0;
+  try {
+    const authDataBytes = base64UrlToBytes(resp.authenticatorData);
+    const info = parseAuthData(authDataBytes);
+    const expectedRpIdHash = await sha256Bytes(cfg.rpId);
+    if (!bytesEqual(info.rpIdHash, expectedRpIdHash)) {
+      throw new Error("Passkey domain mismatch.");
+    }
+    if (!info.up) {
+      throw new Error("Passkey user presence missing.");
+    }
+    newSignCount = info.signCount;
+    const keyInfo = JSON.parse(record.credential.public_key);
+    valid = await verifyAssertionSignature(
+      keyInfo,
+      authDataBytes,
+      base64UrlToBytes(resp.clientDataJSON),
+      base64UrlToBytes(resp.signature)
+    );
+  } catch (err) {
+    return json({ ok: false, error: err.message || "Passkey could not be verified." }, 200, jsonHeaders);
+  }
+
+  if (!valid) {
+    return json({ ok: false, error: "Passkey signature was invalid." }, 200, jsonHeaders);
+  }
+
+  /* Counter is stored for the record but not hard-enforced: iCloud-synced
+     passkeys routinely report a sign count of 0, so a strict monotonic
+     check would lock out legitimate Face ID logins. */
+  const storedCount = Number(record.credential.sign_count) || 0;
+  await touchWebauthnCredential(env, credentialId, Math.max(storedCount, newSignCount));
+
+  const token = await createSignedToken(
+    {
+      sub: "owner",
+      role: "admin",
+      exp: Date.now() + 1000 * 60 * 60 * 24 * 14
+    },
+    env.ADMIN_SESSION_SECRET
+  );
+
+  return json({ ok: true, token, role: "admin" }, 200, jsonHeaders);
 }
 
 /* =========================
