@@ -6411,6 +6411,8 @@ button.secondary,
 .bench-unresolved-indicator--medium{border-color:#c38a19;background:#fff8e7}.bench-unresolved-indicator--high{border-color:#b3261e;background:#fff0ed;color:#8e1f19}
 @media (max-width:600px){.bench-focus-details{grid-template-columns:1fr}.dashboard-bench-actions{align-items:flex-end;flex-direction:column}.bench-focus-start-btn{max-width:120px;white-space:normal}}
 @media (max-width:500px){.bench-unresolved-row{align-items:stretch;flex-direction:column}.bench-unresolved-actions button{flex:1}}
+.detail-bench-focus-banner{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:center;gap:12px;margin-bottom:12px;padding:12px;border:1px solid rgba(9,47,77,.17);border-left:4px solid var(--navy);border-radius:12px;background:#fffaf3}.detail-bench-focus-banner>div{display:flex;min-width:0;flex-direction:column;gap:2px}.detail-bench-focus-banner span{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:rgba(9,47,77,.55)}.detail-bench-focus-banner strong{font-size:.8rem;color:var(--navy)}.detail-bench-focus-banner small{font-size:.66rem;color:rgba(9,47,77,.52)}.detail-bench-focus-banner button{min-height:44px;border:1px solid rgba(9,47,77,.16);border-radius:10px;background:#fffdf8;color:var(--navy);font:inherit;font-size:.72rem;font-weight:700;padding:7px 10px}
+@media (max-width:600px){.detail-bench-focus-banner{grid-template-columns:1fr}.detail-bench-focus-banner button{width:100%}}
 
 /* =========================
    USERS / ACCOUNTS SCREEN

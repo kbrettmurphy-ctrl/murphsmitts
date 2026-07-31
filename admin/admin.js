@@ -4566,11 +4566,16 @@ async function handleLaborTimerStart(orderNumber) {
   if (startBtn) startBtn.disabled = true;
 
   try {
+    const activeBench = benchFocusState.activeBench &&
+      String(benchFocusState.activeBench.orderNumber) === String(orderNumber)
+      ? benchFocusState.activeBench
+      : null;
     await postJson({
       action: "startLaborSession",
       orderNumber,
       phase,
-      notes
+      notes,
+      ...(activeBench ? { benchSessionId: activeBench.id, benchStartMode: "now" } : {})
     }, true);
 
     await loadLaborSessions(orderNumber);
@@ -6845,6 +6850,7 @@ function renderOrderDetail(order) {
 
   orderDetail.innerHTML = `
     <div class="detail-form-shell">
+      ${renderOrderDetailBenchBanner(order)}
       ${customerSection}
       ${orderStatusSection}
       ${laborTimerSection}
@@ -6862,6 +6868,8 @@ function renderOrderDetail(order) {
       </div>
     </div>
   `;
+
+  orderDetail.querySelector("[data-detail-bench-end]")?.addEventListener("click", () => endActiveBenchWork());
 
   document.getElementById("editStatus").value = order.status || "Received";
   document.getElementById("editPaid").value = normalizeText(order.paid) === "paid" ? "Paid" : "Unpaid";
@@ -6925,6 +6933,18 @@ function renderOrderDetail(order) {
   loadLaborSessions(order.orderNumber);
   loadOrderActivity(order.orderNumber);
   renderPromiseProposal();
+}
+
+function renderOrderDetailBenchBanner(order) {
+  const bench = benchFocusState.activeBench;
+  if (!bench || String(bench.orderNumber) !== String(order.orderNumber)) return "";
+  const labor = benchFocusState.activeLabor;
+  return `<aside class="detail-bench-focus-banner">
+    <div><span>Bench Work</span><strong>Active · ${escapeHtml(formatBenchElapsed(bench.startedAt))}</strong>
+    <small>Bench context — not logged labor</small></div>
+    <div><span>${escapeHtml(labor?.phase || "No labor timer")}</span><strong>${labor ? escapeHtml(getLaborSessionStatus(labor) === "paused" ? "Paused" : "Running") : "Not recording labor"}</strong></div>
+    <button type="button" data-detail-bench-end>End Bench Work</button>
+  </aside>`;
 }
 
 function getBlankAdminOrder() {
