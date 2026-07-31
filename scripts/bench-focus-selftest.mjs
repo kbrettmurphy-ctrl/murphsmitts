@@ -132,6 +132,7 @@ await test("client implements recovery, reminder, and separate Bench/Labor prese
   ok(source.includes("10 * 60 * 1000"));
   ok(admin.includes("Bench context — not logged labor"));
   ok(admin.includes("Labor elapsed"));
+  ok((admin.match(/benchSessionId: activeBench\.id/g) || []).length >= 2);
   equal(/Keep Timer Running and End Bench Work/.test(admin), false);
 });
 

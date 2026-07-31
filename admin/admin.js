@@ -2067,10 +2067,15 @@ async function handleDashboardTimerPhaseSelect(orderKey, phase) {
   closeDashboardTimerPopover();
 
   try {
+    const activeBench = benchFocusState.activeBench &&
+      String(benchFocusState.activeBench.orderNumber) === String(orderKey)
+      ? benchFocusState.activeBench
+      : null;
     await postJson({
       action: "startLaborSession",
       orderNumber: orderKey,
-      phase
+      phase,
+      ...(activeBench ? { benchSessionId: activeBench.id, benchStartMode: "now" } : {})
     }, true);
 
     broadcastBenchFocusChange();
@@ -2132,6 +2137,8 @@ async function handleDashboardTimerControl(orderKey, control) {
     } else if (control === "stop") {
       await postJson({ action: "stopLaborSession", sessionId: session.id }, true);
     }
+    broadcastBenchFocusChange();
+    await refreshBenchFocusState({ rerender: false });
     await refreshDashboardLaborSessions();
   } catch (err) {
     alert(err?.message || "Labor timer could not be updated.");
