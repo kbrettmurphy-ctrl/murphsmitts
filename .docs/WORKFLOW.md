@@ -41,6 +41,12 @@ Supported phases are Tear down, Cleaning, Relacing, Conditioning, Palm Pad, Cust
 - Only stopped sessions contribute to order economics, measured job times, summaries, and phase-hour reporting.
 - The client updates a running display every second; server timestamps/calculation are authoritative at state changes.
 
+## Bench Focus
+
+`Start Bench Work` records which In Progress glove is physically on the bench without changing workflow status or sending notifications. Customer Approved, In Transit to Me, Received, and Waiting on Lace/Parts require explicit confirmation; inactive/customer-waiting/finished statuses are prohibited. Exactly one Bench Focus may be active globally.
+
+Bench elapsed time is context, not labor. After 90 seconds without an open linked timer, the Clubhouse offers an exact backdate from the authoritative Bench start, a current-time start, or a ten-minute snooze. The first labor choice consumes backdating; later phases use current database time. A running same-order timer attaches automatically, while a paused one requires Resume and Attach, Leave Paused, or Cancel. Ending with running labor requires explicit pause-or-stop disposition. Untracked ended intervals remain visible until assigned to an exact stopped labor interval or discarded.
+
 ## Money, expenses, and economics
 
 Order economics are primarily computed in the admin client. Revenue is `price_quoted`; customer-charged `shipping_cost` is deliberately excluded as pass-through. Materials include lace, palm pad, cleaning consumables, and per-order packaging. Default lace usage is 3 pieces for a fielder (plus one for trapeze/modified trapeze), 4 for a catcher's mitt, and 5 for first base, unless `lace_pieces_used` overrides it.

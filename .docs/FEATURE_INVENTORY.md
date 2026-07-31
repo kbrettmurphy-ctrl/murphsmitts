@@ -11,12 +11,12 @@ As-built baseline reviewed 2026-07-19.
 | Public gallery | Sectioned photos, order albums, covers, lightbox, descriptor/order-backed search, query deep links |
 | Public store | Non-hidden glove listings, sold state, primary/hover photos, detail slider, purchase/contact action |
 | Public tracking | Token lookup, six-stage timeline, exception notes, promise/completion date, carrier links, curated finished photos |
-| Clubhouse | New/on-deck/bench/attention lists, timer controls, finance snapshot, unread/new badges |
+| Clubhouse | New/on-deck/bench/attention lists, Bench Focus context/reminders/reconciliation, timer controls, finance snapshot, unread/new badges |
 | Orders | Search and status filters, create/templates, detail editing, photos, activity, workflow menus, swipe/context actions, delivery resend, shipping/payment guard |
 | Customers | Contact grouping, order/glove history, linked gallery photos, maintenance-due view |
 | Calendar | Received/estimated/completed scheduling with unscheduled work |
 | Map | Shipped-order markers, persisted/fallback geocoding, quality handling, unmapped errors, detail deep links |
-| Labor | Phase timers, one open session per order, pause/resume/stop, notes, history, dashboard controls, summaries |
+| Labor | Phase timers, one open session per order, pause/resume/stop, notes, history, dashboard controls, Bench-linked phases/exact backdating, summaries |
 | Money | Job economics, effective rate, suggested pricing from measured work, rollups, labor coverage, phase hours, expenses, monthly P&L, per-service pricing intelligence |
 | Pricing | GUI-managed public service prices; draft/publish workflow, price history, rollback, business settings (target rate/min charge/rounding), pricing intelligence, add/hide/deactivate services |
 | Inventory admin | Add/edit/deactivate/restore, thresholds/alerts, low-stock banner, usage-delta adjustments |

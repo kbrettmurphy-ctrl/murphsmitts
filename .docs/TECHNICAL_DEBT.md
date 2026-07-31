@@ -17,6 +17,7 @@ Ranked from the 2026-07-19 repository baseline. This is a register, not authoriz
 ## Medium
 
 - **Business rules are duplicated.** Status groupings, labor phases, customer messages, and economics concepts exist in client and Function code and can drift.
+- **Legacy labor starts remain application-serialized.** Bench-linked labor uses database transactions and row locks, while unrelated legacy timer starts retain their established REST read-then-write conflict checks.
 - **Passkeys are owner-global.** WebAuthn credentials are not associated with admin user records; any accepted passkey produces an owner/admin session.
 - **Sessions are long-lived browser tokens.** Signed tokens last 14 days, live in `localStorage`, and have no server-side revocation list or per-session audit trail. Phase 1 clears persisted order/address caches and in-memory authenticated datasets on logout, but it does not revoke the signed token server-side.
 - **Inbound message association is heuristic.** Only the 100 newest orders are scanned and matching uses the last 10 phone digits, so older/shared-number conversations can attach incorrectly.

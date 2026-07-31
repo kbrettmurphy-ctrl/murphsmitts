@@ -92,7 +92,7 @@ begin
   end if;
 
   select * into v_existing from public.bench_work_sessions
-  where ended_at is null for update limit 1;
+  where ended_at is null limit 1 for update;
   if found then
     return jsonb_build_object('ok', false, 'error', 'Another Bench Focus is already active.', 'conflict', 'active_bench',
       'activeBenchId', v_existing.id, 'activeOrderNumber', v_existing.order_number);
@@ -100,7 +100,7 @@ begin
 
   select * into v_other from public.order_labor_sessions
   where ended_at is null and status = 'running' and order_number <> p_order_number
-  order by started_at desc for update limit 1;
+  order by started_at desc limit 1 for update;
   if found then
     if p_other_running_action = 'pause' then
       update public.order_labor_sessions set status = 'paused', paused_at = v_now, updated_at = v_now where id = v_other.id;
@@ -116,7 +116,7 @@ begin
 
   select * into v_labor from public.order_labor_sessions
   where order_number = p_order_number and ended_at is null
-  order by started_at desc for update limit 1;
+  order by started_at desc limit 1 for update;
   v_has_labor := found;
   if found and v_labor.status = 'paused' and p_paused_action = 'prompt' then
     return jsonb_build_object('ok', false, 'pausedLaborChoice', true, 'laborSessionId', v_labor.id);
@@ -171,7 +171,7 @@ begin
   if p_mode = 'bench' and v_bench.backdate_consumed_at is not null then
     return jsonb_build_object('ok', false, 'error', 'The Bench Work start time has already been used.');
   end if;
-  select * into v_open from public.order_labor_sessions where ended_at is null order by started_at desc for update limit 1;
+  select * into v_open from public.order_labor_sessions where ended_at is null order by started_at desc limit 1 for update;
   if found then return jsonb_build_object('ok', false, 'error', 'Pause or stop the current timer first.', 'conflict', 'open_labor',
     'laborSessionId', v_open.id, 'laborOrderNumber', v_open.order_number, 'laborStatus', v_open.status); end if;
   v_start := case when p_mode = 'bench' then v_bench.started_at else v_now end;
@@ -206,7 +206,7 @@ begin
   if not found then return jsonb_build_object('ok', false, 'error', 'Bench Work session not found.'); end if;
   if v_bench.ended_at is not null then return jsonb_build_object('ok', false, 'error', 'Bench Work has already ended.', 'bench', to_jsonb(v_bench)); end if;
   select * into v_labor from public.order_labor_sessions
-    where bench_work_session_id = v_bench.id and ended_at is null order by started_at desc for update limit 1;
+    where bench_work_session_id = v_bench.id and ended_at is null order by started_at desc limit 1 for update;
   if found and v_labor.status = 'running' then
     if p_running_action = 'pause' then
       update public.order_labor_sessions set status = 'paused', paused_at = v_now, updated_at = v_now where id = v_labor.id;
