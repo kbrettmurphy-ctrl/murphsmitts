@@ -240,6 +240,36 @@ await test("ADMIN_SESSION_SECRET uses the same second preflight", async () => {
   assertJsonHeaders(result.response);
 });
 
+await test("registry action still requires the global CORE preflight", async () => {
+  const missingSupabase = await invoke({
+    body: { action: "getPushPublicKey" },
+    env: {
+      ADMIN_PIN: CORE_ENV.ADMIN_PIN,
+      ADMIN_SESSION_SECRET: CORE_ENV.ADMIN_SESSION_SECRET
+    }
+  });
+  equal(missingSupabase.response.status, 500);
+  deepEqual(missingSupabase.json, {
+    ok: false,
+    error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variable."
+  });
+
+  const missingAdminSecret = await invoke({
+    body: { action: "getPushPublicKey" },
+    env: {
+      SUPABASE_URL: CORE_ENV.SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: CORE_ENV.SUPABASE_SERVICE_ROLE_KEY,
+      ADMIN_PIN: CORE_ENV.ADMIN_PIN
+    }
+  });
+  equal(missingAdminSecret.response.status, 500);
+  deepEqual(missingAdminSecret.json, {
+    ok: false,
+    error: "Missing ADMIN_PIN or ADMIN_SESSION_SECRET environment variable."
+  });
+  equal(missingSupabase.fetchCalls.length + missingAdminSecret.fetchCalls.length, 0);
+});
+
 console.log("Unknown actions and session validation");
 
 await test("unknown action", async () => {
@@ -365,10 +395,22 @@ await test("getPushPublicKey allows anonymous but denies demo token", async () =
   const anonymous = await invoke({ body: { action: "getPushPublicKey" } });
   equal(anonymous.response.status, 200);
   deepEqual(anonymous.json, { ok: true, publicKey: "" });
+  assertJsonHeaders(anonymous.response);
   equal(anonymous.fetchCalls.length, 0);
 
   const { demo } = await sessionTokens();
   await assertDemoDenied("getPushPublicKey", demo);
+});
+
+await test("getPushPublicKey returns a configured VAPID public key", async () => {
+  const result = await invoke({
+    body: { action: "getPushPublicKey" },
+    env: { ...CORE_ENV, VAPID_PUBLIC_KEY: "test-vapid-public-key" }
+  });
+  equal(result.response.status, 200);
+  deepEqual(result.json, { ok: true, publicKey: "test-vapid-public-key" });
+  assertJsonHeaders(result.response);
+  equal(result.fetchCalls.length, 0);
 });
 
 await test("searchPublicGloves allows anonymous but denies demo token", async () => {
@@ -525,28 +567,39 @@ await test("current database role overrides ordinary token role", async () => {
   equal(result.fetchCalls.length, 1);
 });
 
-console.log("Action source inventory");
+console.log("Action registry and legacy source inventory");
 
-await test("all 76 dispatcher actions match the plan exactly in source order", async () => {
+await test("one registry action plus 75 legacy actions match the plan", async () => {
   const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
   const plan = fs.readFileSync(new URL("../.docs/V1_2_ACTION_REGISTRY_PLAN.md", import.meta.url), "utf8");
   const dispatcher = source.split("/* =========================\n   RESPONSE HELPERS")[0];
+  const registryMatch = source.match(/const ACTIONS = \{([\s\S]*?)\n\};/);
+  ok(registryMatch, "ACTIONS registry is present");
+  const registryActions = [...registryMatch[1].matchAll(/^  ([A-Za-z][A-Za-z0-9]*): \{/gm)]
+    .map(match => match[1]);
 
-  const dispatchActions = [];
+  const legacyActions = [];
   for (const block of dispatcher.matchAll(/if\s*\(([^)]*\baction ===[^)]*)\)\s*\{/g)) {
     for (const match of block[1].matchAll(/action === "([^"]+)"/g)) {
-      dispatchActions.push(match[1]);
+      legacyActions.push(match[1]);
     }
   }
   const plannedActions = [...plan.matchAll(/^\| \d+ \| `([^`]+)` →/gm)].map(match => match[1]);
-  const counts = new Map();
-  for (const action of dispatchActions) counts.set(action, (counts.get(action) || 0) + 1);
+  const plannedLegacyActions = plannedActions.filter(action => action !== "getPushPublicKey");
+  const legacyCounts = new Map();
+  for (const action of legacyActions) {
+    legacyCounts.set(action, (legacyCounts.get(action) || 0) + 1);
+  }
 
-  equal(dispatchActions.length, 76);
-  equal(new Set(dispatchActions).size, 76);
+  deepEqual(registryActions, ["getPushPublicKey"]);
+  equal(registryActions.length, 1);
+  equal(legacyActions.includes("getPushPublicKey"), false);
+  equal(legacyActions.length, 75);
+  equal(new Set(legacyActions).size, 75);
   equal(plannedActions.length, 76);
-  deepEqual(dispatchActions, plannedActions);
-  deepEqual([...counts.entries()].filter(([, count]) => count !== 1), []);
+  deepEqual(legacyActions, plannedLegacyActions);
+  deepEqual([...legacyCounts.entries()].filter(([, count]) => count !== 1), []);
+  deepEqual([...registryActions, ...legacyActions].sort(), plannedActions.slice().sort());
 });
 
 console.log(`\n${testCount} tests, ${assertionCount} assertions passed`);

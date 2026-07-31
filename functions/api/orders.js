@@ -2,6 +2,24 @@ import { sendWebPushToAll } from "./_webpush.js";
 import { formatServiceDisplayPrice } from "./_pricing.js";
 import { isPreviewEnvironment } from "./_env.js";
 
+/* =========================
+   ACTION REGISTRY
+   Stage 3 routes one low-risk action through the registry. All other actions
+   continue through the legacy dispatcher below until migrated individually.
+========================= */
+const ACTIONS = {
+  getPushPublicKey: {
+    auth: "public",
+    demo: "deny",
+    handler: handleGetPushPublicKey,
+    effects: [],
+    bindings: {
+      required: ["CORE"],
+      optional: ["VAPID_PUBLIC_KEY"]
+    }
+  }
+};
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -75,6 +93,19 @@ export async function onRequest(context) {
           jsonHeaders
         );
       }
+    }
+
+    const registeredAction = ACTIONS[action];
+    if (registeredAction) {
+      return registeredAction.handler({
+        context,
+        request,
+        env,
+        body,
+        action,
+        jsonHeaders,
+        auth: null
+      });
     }
 
     if (action === "login") {
@@ -303,10 +334,6 @@ export async function onRequest(context) {
       );
       if (!resp.ok) return json({ ok: false, error: "Could not remove the user." }, 200, jsonHeaders);
       return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "getPushPublicKey") {
-      return json({ ok: true, publicKey: env.VAPID_PUBLIC_KEY || "" }, 200, jsonHeaders);
     }
 
     if (action === "savePushSubscription") {
@@ -2913,6 +2940,10 @@ export async function onRequest(context) {
       jsonHeaders
     );
   }
+}
+
+async function handleGetPushPublicKey({ env, jsonHeaders }) {
+  return json({ ok: true, publicKey: env.VAPID_PUBLIC_KEY || "" }, 200, jsonHeaders);
 }
 
 /* =========================
