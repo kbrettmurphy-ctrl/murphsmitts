@@ -1,6 +1,6 @@
 # MurphOS v1.2: Action Registry Plan
 
-Status: planning only
+Status: completed and verified
 
 Baseline: `main` at `3afc3cd95863ab25102de246377cb44eab11c504`
 
@@ -389,6 +389,6 @@ This planning stage is complete when:
 - Characterization suite: 107 tests and 2,382 assertions.
 - Pricing self-test: 66 tests passing.
 - Stage 13 verification: registry/auth/handler integrity, legacy-chain absence, high-risk ordering, external-call isolation, and branch hygiene reviewed successfully.
-- Stage 12 commit: `STAGE_12_COMMIT_SHA` (placeholder; use the commit recorded in Git history).
+- Stage 12 commit: `8e814cafd12e218e3ea9d92e684dbd41022f643b`.
 - Previously documented security findings, including current passkey-registration authorization, remain intentionally deferred.
 - This migration is intended to preserve behavior; no application-policy changes were made.

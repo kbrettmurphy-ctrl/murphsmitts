@@ -180,7 +180,7 @@ const ACTIONS = {
   },
   webauthnRegisterOptions: {
     auth: "session",
-    demo: "allow",
+    demo: "deny",
     handler: handleWebauthnRegisterOptions,
     effects: ["db:webauthn_credentials:read", "crypto:webauthn:challenge"],
     bindings: {
@@ -190,7 +190,7 @@ const ACTIONS = {
   },
   webauthnRegisterVerify: {
     auth: "session",
-    demo: "allow",
+    demo: "deny",
     handler: handleWebauthnRegisterVerify,
     effects: [
       "db:webauthn_credentials:read", "db:webauthn_credentials:write",
