@@ -20,6 +20,88 @@ const ACTIONS = {
   }
 };
 
+const ACTION_AUTH_POLICIES = new Set(["public", "session", "active-user", "admin"]);
+
+export function resolveActionAuthPolicy(policyOrResolver, ctx) {
+  const policy = typeof policyOrResolver === "function"
+    ? policyOrResolver(ctx)
+    : policyOrResolver;
+  if (!ACTION_AUTH_POLICIES.has(policy)) {
+    throw new Error(`Unsupported action auth policy: ${String(policy)}`);
+  }
+  return policy;
+}
+
+export async function authorizeAction(policy, ctx) {
+  const { env, body } = ctx;
+
+  if (policy === "public") {
+    return {
+      ok: true,
+      auth: { policy, payload: null, role: null, user: null, owner: false }
+    };
+  }
+
+  if (policy === "admin") {
+    const gate = await requireAdmin(env, body);
+    if (!gate.ok) return gate;
+    return {
+      ok: true,
+      auth: {
+        policy,
+        payload: gate.payload,
+        role: gate.role,
+        user: null,
+        owner: gate.payload?.sub === "owner"
+      }
+    };
+  }
+
+  const token = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
+  if (!token.ok) return token;
+
+  if (policy === "session") {
+    return {
+      ok: true,
+      auth: {
+        policy,
+        payload: token.payload,
+        role: token.payload?.role || null,
+        user: null,
+        owner: token.payload?.sub === "owner"
+      }
+    };
+  }
+
+  const identity = await resolveActiveAuthIdentity(env, token.payload);
+  if (!identity) {
+    return { ok: false, error: "Session is no longer active." };
+  }
+  return {
+    ok: true,
+    auth: {
+      policy,
+      payload: token.payload,
+      role: identity.role,
+      user: identity.user,
+      owner: identity.owner
+    }
+  };
+}
+
+export async function dispatchRegisteredAction(entry, ctx) {
+  const policy = resolveActionAuthPolicy(entry.auth, ctx);
+  const authorization = await authorizeAction(policy, ctx);
+  if (!authorization.ok) {
+    return json(
+      { ok: false, error: authorization.error },
+      200,
+      ctx.jsonHeaders
+    );
+  }
+  return entry.handler({ ...ctx, auth: authorization.auth });
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -97,14 +179,13 @@ export async function onRequest(context) {
 
     const registeredAction = ACTIONS[action];
     if (registeredAction) {
-      return registeredAction.handler({
+      return dispatchRegisteredAction(registeredAction, {
         context,
         request,
         env,
         body,
         action,
-        jsonHeaders,
-        auth: null
+        jsonHeaders
       });
     }
 
@@ -4779,13 +4860,23 @@ async function touchUserLogin(env, userId) {
    token's role for the owner/passkey escape hatches (sub === "owner"). */
 async function resolveAuthRole(env, payload) {
   if (!payload) return null;
-  if (payload.sub === "owner") return "admin";
   if (!payload.sub) return payload.role || null;
+
+  const identity = await resolveActiveAuthIdentity(env, payload);
+  return identity ? identity.role : null;
+}
+
+async function resolveActiveAuthIdentity(env, payload) {
+  if (!payload) return null;
+  if (payload.sub === "owner") {
+    return { role: "admin", user: null, owner: true };
+  }
+  if (!payload.sub) return null;
 
   const found = await getUserByEmail(env, payload.email || "");
   const user = found.ok ? found.user : null;
   if (!user || user.active === false) return null;
-  return user.role || null;
+  return { role: user.role || null, user, owner: false };
 }
 
 /* Gate for admin-only actions: valid token AND resolved role === "admin". */

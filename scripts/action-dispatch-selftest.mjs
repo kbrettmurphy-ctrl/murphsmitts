@@ -7,7 +7,12 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { webcrypto } from "node:crypto";
-import { onRequest } from "../functions/api/orders.js";
+import {
+  authorizeAction,
+  dispatchRegisteredAction,
+  onRequest,
+  resolveActionAuthPolicy
+} from "../functions/api/orders.js";
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
@@ -99,6 +104,20 @@ async function invoke({
   }
 }
 
+async function withFetchMock(fetchMock, fn) {
+  const previousFetch = globalThis.fetch;
+  fetchCalls = [];
+  globalThis.fetch = async (input, init = {}) => {
+    fetchCalls.push({ url: String(input), init });
+    return fetchMock(input, init, fetchCalls.length);
+  };
+  try {
+    return await fn();
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+}
+
 function assertJsonHeaders(response) {
   equal(response.headers.get("content-type"), JSON_HEADERS.contentType, "content type");
   equal(response.headers.get("cache-control"), JSON_HEADERS.cacheControl, "cache control");
@@ -137,6 +156,12 @@ async function sessionTokens() {
       sub: "user-admin",
       email: "admin@example.com",
       role: "admin",
+      exp: future
+    }),
+    user: await signedToken({
+      sub: "user-standard",
+      email: "user@example.com",
+      role: "staff",
       exp: future
     }),
     demo: await signedToken({
@@ -342,6 +367,241 @@ await test("valid admin session reaches listOrders", async () => {
 await test("valid demo session is globally denied", async () => {
   const { demo } = await sessionTokens();
   await assertDemoDenied("listOrders", demo);
+});
+
+console.log("Central registry authorization policies");
+
+await test("static public policy resolves and performs no token validation", async () => {
+  const ctx = { env: CORE_ENV, body: {} };
+  equal(resolveActionAuthPolicy("public", ctx), "public");
+  const result = await authorizeAction("public", ctx);
+  deepEqual(result, {
+    ok: true,
+    auth: {
+      policy: "public",
+      payload: null,
+      role: null,
+      user: null,
+      owner: false
+    }
+  });
+});
+
+await test("static session policy preserves token validation failures", async () => {
+  const { expired } = await sessionTokens();
+  const futurePayload = base64Url(new TextEncoder().encode(JSON.stringify({
+    sub: "owner",
+    role: "admin",
+    exp: Date.now() + 60_000
+  })));
+  const cases = [
+    [{}, { ok: false, error: "Missing session token." }],
+    [{ _token: "not-a-token" }, { ok: false, error: "Invalid session token." }],
+    [{ _token: `${futurePayload}.invalid` }, { ok: false, error: "Invalid session token." }],
+    [{ _token: expired }, { ok: false, error: "Session expired." }]
+  ];
+  for (const [body, expected] of cases) {
+    deepEqual(await authorizeAction("session", { env: CORE_ENV, body }), expected);
+  }
+});
+
+await test("static session policy returns admin, user, and demo payloads", async () => {
+  const { admin, user, demo } = await sessionTokens();
+  for (const [token, role] of [[admin, "admin"], [user, "staff"], [demo, "demo"]]) {
+    const result = await authorizeAction("session", {
+      env: CORE_ENV,
+      body: { _token: token }
+    });
+    equal(result.ok, true);
+    equal(result.auth.policy, "session");
+    equal(result.auth.role, role);
+    equal(result.auth.payload.role, role);
+    equal(result.auth.user, null);
+    equal(result.auth.owner, false);
+  }
+});
+
+await test("active-user policy preserves owner escape-hatch semantics", async () => {
+  const { owner } = await sessionTokens();
+  const result = await authorizeAction("active-user", {
+    env: CORE_ENV,
+    body: { _token: owner }
+  });
+  equal(result.ok, true);
+  deepEqual(result.auth, {
+    policy: "active-user",
+    payload: result.auth.payload,
+    role: "admin",
+    user: null,
+    owner: true
+  });
+  equal(result.auth.payload.sub, "owner");
+});
+
+await test("active-user policy reloads active user and accepts changed role", async () => {
+  const { user } = await sessionTokens();
+  const row = {
+    id: "user-standard",
+    email: "user@example.com",
+    role: "demo",
+    active: true
+  };
+  const result = await withFetchMock(
+    () => jsonResponse([row]),
+    () => authorizeAction("active-user", {
+      env: CORE_ENV,
+      body: { _token: user }
+    })
+  );
+  equal(result.ok, true);
+  equal(result.auth.policy, "active-user");
+  equal(result.auth.role, "demo");
+  deepEqual(result.auth.user, row);
+  equal(result.auth.owner, false);
+  equal(fetchCalls.length, 1);
+});
+
+await test("active-user policy rejects missing and inactive users", async () => {
+  const { user } = await sessionTokens();
+  const missing = await withFetchMock(
+    () => jsonResponse([]),
+    () => authorizeAction("active-user", {
+      env: CORE_ENV,
+      body: { _token: user }
+    })
+  );
+  deepEqual(missing, { ok: false, error: "Session is no longer active." });
+
+  const inactive = await withFetchMock(
+    () => jsonResponse([{
+      id: "user-standard",
+      email: "user@example.com",
+      role: "staff",
+      active: false
+    }]),
+    () => authorizeAction("active-user", {
+      env: CORE_ENV,
+      body: { _token: user }
+    })
+  );
+  deepEqual(inactive, { ok: false, error: "Session is no longer active." });
+});
+
+await test("admin policy accepts owner without user resolution", async () => {
+  const { owner } = await sessionTokens();
+  const result = await authorizeAction("admin", {
+    env: CORE_ENV,
+    body: { _token: owner }
+  });
+  equal(result.ok, true);
+  equal(result.auth.policy, "admin");
+  equal(result.auth.role, "admin");
+  equal(result.auth.owner, true);
+  equal(result.auth.user, null);
+});
+
+await test("admin policy accepts an active current admin", async () => {
+  const { admin } = await sessionTokens();
+  const result = await withFetchMock(
+    () => jsonResponse([{
+      id: "user-admin",
+      email: "admin@example.com",
+      role: "admin",
+      active: true
+    }]),
+    () => authorizeAction("admin", {
+      env: CORE_ENV,
+      body: { _token: admin }
+    })
+  );
+  equal(result.ok, true);
+  equal(result.auth.role, "admin");
+  equal(result.auth.owner, false);
+  equal(fetchCalls.length, 1);
+});
+
+await test("admin policy rejects active non-admin, inactive, and missing users", async () => {
+  const { admin, demo } = await sessionTokens();
+  const cases = [
+    [demo, [{ id: "user-demo", email: "demo@example.com", role: "demo", active: true }]],
+    [admin, [{ id: "user-admin", email: "admin@example.com", role: "admin", active: false }]],
+    [admin, []]
+  ];
+  for (const [token, rows] of cases) {
+    const result = await withFetchMock(
+      () => jsonResponse(rows),
+      () => authorizeAction("admin", {
+        env: CORE_ENV,
+        body: { _token: token }
+      })
+    );
+    deepEqual(result, { ok: false, error: "Admins only." });
+  }
+});
+
+await test("conditional resolver uses strict boolean branches", async () => {
+  const resolver = ({ body }) =>
+    body.includeHidden === true ? "session" : "public";
+  equal(resolveActionAuthPolicy(resolver, { body: {} }), "public");
+  equal(resolveActionAuthPolicy(resolver, { body: { includeHidden: false } }), "public");
+  equal(resolveActionAuthPolicy(resolver, { body: { includeHidden: "true" } }), "public");
+  equal(resolveActionAuthPolicy(resolver, { body: { includeHidden: true } }), "session");
+});
+
+await test("registry invocation authorizes once and passes auth context", async () => {
+  const { owner } = await sessionTokens();
+  let resolverCalls = 0;
+  let handlerCalls = 0;
+  let receivedAuth = null;
+  const entry = {
+    auth(ctx) {
+      resolverCalls += 1;
+      equal(ctx.body._token, owner);
+      return "session";
+    },
+    async handler(ctx) {
+      handlerCalls += 1;
+      receivedAuth = ctx.auth;
+      return jsonResponse({ ok: true, handled: true });
+    }
+  };
+  const response = await dispatchRegisteredAction(entry, {
+    env: CORE_ENV,
+    body: { _token: owner },
+    jsonHeaders: {
+      "Content-Type": JSON_HEADERS.contentType,
+      "Cache-Control": JSON_HEADERS.cacheControl
+    }
+  });
+  equal(response.status, 200);
+  deepEqual(await response.json(), { ok: true, handled: true });
+  equal(resolverCalls, 1);
+  equal(handlerCalls, 1);
+  equal(receivedAuth.policy, "session");
+  equal(receivedAuth.payload.sub, "owner");
+  equal(receivedAuth.owner, true);
+});
+
+await test("registry invocation does not call handler after authorization failure", async () => {
+  let handlerCalls = 0;
+  const response = await dispatchRegisteredAction({
+    auth: "session",
+    async handler() {
+      handlerCalls += 1;
+      return jsonResponse({ ok: true });
+    }
+  }, {
+    env: CORE_ENV,
+    body: {},
+    jsonHeaders: {
+      "Content-Type": JSON_HEADERS.contentType,
+      "Cache-Control": JSON_HEADERS.cacheControl
+    }
+  });
+  equal(response.status, 200);
+  deepEqual(await response.json(), { ok: false, error: "Missing session token." });
+  assertJsonHeaders(response);
+  equal(handlerCalls, 0);
 });
 
 console.log("Demo allowlist and public/demo policy");
