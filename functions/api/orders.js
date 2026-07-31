@@ -205,6 +205,49 @@ const ACTIONS = {
     auth: "session", demo: "deny", handler: handleUpdateLaborSessionNotes,
     effects: ["db:order_labor_sessions:read", "db:order_labor_sessions:write"], bindings: { required: ["CORE"], optional: [] }
   },
+  deleteOrder: {
+    auth: "session", demo: "deny", handler: handleDeleteOrder,
+    effects: ["db:orders:delete"], bindings: { required: ["CORE"], optional: [] }
+  },
+  uploadOrderPhoto: {
+    auth: "session", demo: "deny", handler: handleUploadOrderPhoto,
+    effects: ["db:orders:read", "storage:order-photos:write", "db:orders:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  removeOrderPhoto: {
+    auth: "session", demo: "deny", handler: handleRemoveOrderPhoto,
+    effects: ["db:orders:read", "db:orders:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  createOrder: {
+    auth: "session", demo: "deny", handler: handleCreateOrder,
+    effects: ["db:orders:read", "db:orders:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
+  resendStatusEmail: {
+    auth: "session", demo: "deny", handler: handleResendStatusEmail,
+    effects: ["db:orders:read", "external:email:send", "db:orders:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: ["RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO", "ENV-SIGNAL"] }
+  },
+  resendStatusText: {
+    auth: "session", demo: "deny", handler: handleResendStatusText,
+    effects: ["db:orders:read", "external:sms:send", "db:orders:write", "db:sms_messages:write", "db:order_activity:write"],
+    bindings: { required: ["CORE"], optional: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_MESSAGING_SERVICE_SID", "ENV-SIGNAL"] }
+  },
+  updateOrder: {
+    auth: "session", demo: "deny", handler: handleUpdateOrder,
+    effects: [
+      "db:orders:read", "db:orders:write", "db:lace_inventory:read", "db:lace_inventory:write",
+      "db:order_activity:write", "external:email:send", "external:sms:send", "db:sms_messages:write"
+    ],
+    bindings: {
+      required: ["CORE"],
+      optional: [
+        "RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO",
+        "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_MESSAGING_SERVICE_SID", "ENV-SIGNAL"
+      ]
+    }
+  },
   geocodeAddresses: {
     auth: "session", demo: "deny", handler: handleGeocodeAddresses,
     effects: ["external:geocoding:read"], bindings: { required: ["CORE"], optional: [] }
@@ -609,367 +652,6 @@ export async function onRequest(context) {
       }
 
       return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "deleteOrder") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const orderNumber = String(body.orderNumber || "").trim();
-      if (!orderNumber) {
-        return json(
-          {
-            ok: false,
-            error: "Missing orderNumber."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const del = await supabaseFetch(
-        env,
-        `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
-        {
-          method: "DELETE",
-          headers: {
-            Prefer: "return=representation"
-          }
-        }
-      );
-
-      if (!del.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to delete order from Supabase.",
-            details: del.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      return json(
-        {
-          ok: true,
-          deleted: true,
-          orderNumber
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "uploadOrderPhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await uploadOrderPhotoAction(env, body);
-      return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "removeOrderPhoto") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await removeOrderPhotoAction(env, body);
-      return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "createOrder") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await createOrderAction(env, body);
-      return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "resendStatusEmail") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await resendStatusEmailAction(env, body);
-      return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "resendStatusText") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const result = await resendStatusTextAction(env, body);
-      return json(result, 200, jsonHeaders);
-    }
-
-    if (action === "updateOrder") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const orderNumber = String(body.orderNumber || "").trim();
-      const updates = body.updates || {};
-
-      if (!orderNumber) {
-        return json(
-          {
-            ok: false,
-            error: "Missing orderNumber."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const existing = await fetchOrderByNumber(env, orderNumber);
-      if (!existing.ok || !existing.data) {
-        return json(
-          {
-            ok: false,
-            error: `Order not found: ${orderNumber}`
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const oldRow = existing.data;
-      const oldStatus = normalizeStatus(oldRow.status);
-      const lastStatusEmailed = normalizeStatus(oldRow.last_status_emailed);
-      const lastStatusTexted = normalizeStatus(oldRow.last_status_texted);
-      const oldPrimaryColor = cleanText(oldRow.primary_lace_color);
-      const oldSecondaryColor = cleanText(oldRow.secondary_lace_color);
-      const oldPrimaryUsed = Number(oldRow.primary_lace_used || 0);
-      const oldSecondaryUsed = Number(oldRow.secondary_lace_used || 0);
-      const dbUpdates = mapUpdatesToDb(updates);
-      const mergedPreview = { ...oldRow, ...dbUpdates };
-
-      const newStatus = normalizeStatus(mergedPreview.status);
-      const statusChanged = !!newStatus && newStatus !== oldStatus;
-      const shouldEmailForStatus =
-        statusChanged &&
-        !isInternalOnlyStatus(newStatus) &&
-        newStatus !== lastStatusEmailed;
-      const shouldTextForStatus =
-        statusChanged &&
-        toBoolean(mergedPreview.sms_opt_in) &&
-        shouldSendTextForStatus(newStatus) &&
-        newStatus !== lastStatusTexted;
-      
-      if (
-        newStatus === "completed" &&
-        looksLikeShipMethod(mergedPreview.drop_off_method) &&
-        normalizePaidValue(mergedPreview.paid) !== "paid" &&
-        !toBoolean(mergedPreview.allow_ship_without_payment)
-      ) {
-        return json(
-          {
-            ok: false,
-            error: "Cannot mark a shipped order completed unless it is paid or override is checked."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      if (newStatus === "completed" && !mergedPreview.date_completed) {
-        dbUpdates.date_completed = todayIsoDate();
-        mergedPreview.date_completed = dbUpdates.date_completed;
-      }
-
-      if (shouldEmailForStatus && !env.RESEND_API_KEY) {
-        return json(
-          {
-            ok: false,
-            error: "Missing RESEND_API_KEY environment variable."
-          },
-          500,
-          jsonHeaders
-        );
-      }
-
-      const patch = await supabaseFetch(
-        env,
-        `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
-        {
-          method: "PATCH",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify(dbUpdates)
-        }
-      );
-
-      if (!patch.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Failed to update order in Supabase.",
-            details: patch.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      let updated = Array.isArray(patch.data) ? patch.data[0] : null;
-      if (!updated) {
-        return json(
-          {
-            ok: false,
-            error: "Update succeeded but no row was returned."
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      await adjustLaceInventoryForOrderUpdate(env, {
-        oldPrimaryColor,
-        oldSecondaryColor,
-        oldPrimaryUsed,
-        oldSecondaryUsed,
-        newPrimaryColor: cleanText(updated.primary_lace_color),
-        newSecondaryColor: cleanText(updated.secondary_lace_color),
-        newPrimaryUsed: Number(updated.primary_lace_used || 0),
-        newSecondaryUsed: Number(updated.secondary_lace_used || 0)
-      });
-
-      await logOrderActivities(env, getOrderUpdateActivityEvents(oldRow, updated));
-      
-      if (shouldEmailForStatus) {
-        const emailResult = await sendStatusEmail(
-          env,
-          updated,
-          normalizeDisplayStatus(updated.status)
-        );
-
-        if (!emailResult.ok) {
-          return json(
-            {
-              ok: false,
-              error: "Order updated, but status email failed to send.",
-              details: emailResult.error
-            },
-            200,
-            jsonHeaders
-          );
-        }
-
-        const stamp = await supabaseFetch(
-          env,
-          `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
-          {
-            method: "PATCH",
-            headers: {
-              Prefer: "return=representation"
-            },
-            body: JSON.stringify({
-              last_status_emailed: normalizeDisplayStatus(updated.status)
-            })
-          }
-        );
-
-        if (stamp.ok && Array.isArray(stamp.data) && stamp.data[0]) {
-          updated = stamp.data[0];
-        }
-
-        await logOrderActivity(env, {
-          orderNumber,
-          eventType: "status_email_sent",
-          eventLabel: "Status email sent",
-          eventDetail: normalizeDisplayStatus(updated.status)
-        });
-      }
-
-      if (shouldTextForStatus) {
-        if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
-          return json(
-            {
-              ok: false,
-              error: "Order updated, but SMS was not sent because Twilio environment variables are missing."
-            },
-            200,
-            jsonHeaders
-          );
-        }
-
-        const textResult = await sendStatusText(
-          env,
-          updated,
-          normalizeDisplayStatus(updated.status)
-        );
-
-        if (textResult.skipped) {
-          return json(
-            {
-              ok: false,
-              error: "Order updated, but SMS was skipped.",
-              details: textResult.reason
-            },
-            200,
-            jsonHeaders
-          );
-        }
-
-        if (!textResult.ok) {
-          return json(
-            {
-              ok: false,
-              error: "Order updated, but status text failed to send.",
-              details: textResult.error
-            },
-            200,
-            jsonHeaders
-          );
-        }
-
-        const textStamp = await supabaseFetch(
-          env,
-          `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
-          {
-            method: "PATCH",
-            headers: {
-              Prefer: "return=representation"
-            },
-            body: JSON.stringify({
-              last_status_texted: normalizeDisplayStatus(updated.status)
-            })
-          }
-        );
-
-        if (textStamp.ok && Array.isArray(textStamp.data) && textStamp.data[0]) {
-          updated = textStamp.data[0];
-        }
-
-        await logOrderActivity(env, {
-          orderNumber,
-          eventType: "status_text_sent",
-          eventLabel: "Status text sent",
-          eventDetail: normalizeDisplayStatus(updated.status)
-        });
-      }
-
-      return json(
-        {
-          ok: true,
-          order: mapOrderFromDb(updated)
-        },
-        200,
-        jsonHeaders
-      );
     }
 
     if (action === "geocodeMissingOrderAddresses") {
@@ -2048,6 +1730,226 @@ async function handleUpdateLaborSessionNotes({ env, body, jsonHeaders }) {
     }, 200, jsonHeaders);
   }
   return json({ ok: true, session: result.session }, 200, jsonHeaders);
+}
+
+async function handleDeleteOrder({ env, body, jsonHeaders }) {
+  const orderNumber = String(body.orderNumber || "").trim();
+  if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+  const del = await supabaseFetch(
+    env,
+    `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+    { method: "DELETE", headers: { Prefer: "return=representation" } }
+  );
+  if (!del.ok) {
+    return json({
+      ok: false,
+      error: "Failed to delete order from Supabase.",
+      details: del.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true, deleted: true, orderNumber }, 200, jsonHeaders);
+}
+
+async function handleUploadOrderPhoto({ env, body, jsonHeaders }) {
+  const result = await uploadOrderPhotoAction(env, body);
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleRemoveOrderPhoto({ env, body, jsonHeaders }) {
+  const result = await removeOrderPhotoAction(env, body);
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleCreateOrder({ env, body, jsonHeaders }) {
+  const result = await createOrderAction(env, body);
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleResendStatusEmail({ env, body, jsonHeaders }) {
+  const result = await resendStatusEmailAction(env, body);
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleResendStatusText({ env, body, jsonHeaders }) {
+  const result = await resendStatusTextAction(env, body);
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleUpdateOrder({ env, body, jsonHeaders }) {
+  const orderNumber = String(body.orderNumber || "").trim();
+  const updates = body.updates || {};
+  if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
+
+  const existing = await fetchOrderByNumber(env, orderNumber);
+  if (!existing.ok || !existing.data) {
+    return json({ ok: false, error: `Order not found: ${orderNumber}` }, 200, jsonHeaders);
+  }
+
+  const oldRow = existing.data;
+  const oldStatus = normalizeStatus(oldRow.status);
+  const lastStatusEmailed = normalizeStatus(oldRow.last_status_emailed);
+  const lastStatusTexted = normalizeStatus(oldRow.last_status_texted);
+  const oldPrimaryColor = cleanText(oldRow.primary_lace_color);
+  const oldSecondaryColor = cleanText(oldRow.secondary_lace_color);
+  const oldPrimaryUsed = Number(oldRow.primary_lace_used || 0);
+  const oldSecondaryUsed = Number(oldRow.secondary_lace_used || 0);
+  const dbUpdates = mapUpdatesToDb(updates);
+  const mergedPreview = { ...oldRow, ...dbUpdates };
+
+  const newStatus = normalizeStatus(mergedPreview.status);
+  const statusChanged = !!newStatus && newStatus !== oldStatus;
+  const shouldEmailForStatus =
+    statusChanged &&
+    !isInternalOnlyStatus(newStatus) &&
+    newStatus !== lastStatusEmailed;
+  const shouldTextForStatus =
+    statusChanged &&
+    toBoolean(mergedPreview.sms_opt_in) &&
+    shouldSendTextForStatus(newStatus) &&
+    newStatus !== lastStatusTexted;
+
+  if (
+    newStatus === "completed" &&
+    looksLikeShipMethod(mergedPreview.drop_off_method) &&
+    normalizePaidValue(mergedPreview.paid) !== "paid" &&
+    !toBoolean(mergedPreview.allow_ship_without_payment)
+  ) {
+    return json({
+      ok: false,
+      error: "Cannot mark a shipped order completed unless it is paid or override is checked."
+    }, 200, jsonHeaders);
+  }
+
+  if (newStatus === "completed" && !mergedPreview.date_completed) {
+    dbUpdates.date_completed = todayIsoDate();
+    mergedPreview.date_completed = dbUpdates.date_completed;
+  }
+
+  if (shouldEmailForStatus && !env.RESEND_API_KEY) {
+    return json({
+      ok: false,
+      error: "Missing RESEND_API_KEY environment variable."
+    }, 500, jsonHeaders);
+  }
+
+  const patch = await supabaseFetch(
+    env,
+    `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(dbUpdates)
+    }
+  );
+  if (!patch.ok) {
+    return json({
+      ok: false,
+      error: "Failed to update order in Supabase.",
+      details: patch.error
+    }, 200, jsonHeaders);
+  }
+
+  let updated = Array.isArray(patch.data) ? patch.data[0] : null;
+  if (!updated) {
+    return json({ ok: false, error: "Update succeeded but no row was returned." }, 200, jsonHeaders);
+  }
+
+  await adjustLaceInventoryForOrderUpdate(env, {
+    oldPrimaryColor,
+    oldSecondaryColor,
+    oldPrimaryUsed,
+    oldSecondaryUsed,
+    newPrimaryColor: cleanText(updated.primary_lace_color),
+    newSecondaryColor: cleanText(updated.secondary_lace_color),
+    newPrimaryUsed: Number(updated.primary_lace_used || 0),
+    newSecondaryUsed: Number(updated.secondary_lace_used || 0)
+  });
+
+  await logOrderActivities(env, getOrderUpdateActivityEvents(oldRow, updated));
+
+  if (shouldEmailForStatus) {
+    const emailResult = await sendStatusEmail(
+      env,
+      updated,
+      normalizeDisplayStatus(updated.status)
+    );
+    if (!emailResult.ok) {
+      return json({
+        ok: false,
+        error: "Order updated, but status email failed to send.",
+        details: emailResult.error
+      }, 200, jsonHeaders);
+    }
+
+    const stamp = await supabaseFetch(
+      env,
+      `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          last_status_emailed: normalizeDisplayStatus(updated.status)
+        })
+      }
+    );
+    if (stamp.ok && Array.isArray(stamp.data) && stamp.data[0]) updated = stamp.data[0];
+    await logOrderActivity(env, {
+      orderNumber,
+      eventType: "status_email_sent",
+      eventLabel: "Status email sent",
+      eventDetail: normalizeDisplayStatus(updated.status)
+    });
+  }
+
+  if (shouldTextForStatus) {
+    if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
+      return json({
+        ok: false,
+        error: "Order updated, but SMS was not sent because Twilio environment variables are missing."
+      }, 200, jsonHeaders);
+    }
+
+    const textResult = await sendStatusText(
+      env,
+      updated,
+      normalizeDisplayStatus(updated.status)
+    );
+    if (textResult.skipped) {
+      return json({
+        ok: false,
+        error: "Order updated, but SMS was skipped.",
+        details: textResult.reason
+      }, 200, jsonHeaders);
+    }
+    if (!textResult.ok) {
+      return json({
+        ok: false,
+        error: "Order updated, but status text failed to send.",
+        details: textResult.error
+      }, 200, jsonHeaders);
+    }
+
+    const textStamp = await supabaseFetch(
+      env,
+      `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          last_status_texted: normalizeDisplayStatus(updated.status)
+        })
+      }
+    );
+    if (textStamp.ok && Array.isArray(textStamp.data) && textStamp.data[0]) updated = textStamp.data[0];
+    await logOrderActivity(env, {
+      orderNumber,
+      eventType: "status_text_sent",
+      eventLabel: "Status text sent",
+      eventDetail: normalizeDisplayStatus(updated.status)
+    });
+  }
+
+  return json({ ok: true, order: mapOrderFromDb(updated) }, 200, jsonHeaders);
 }
 
 async function handleGeocodeAddresses({ body, jsonHeaders }) {
