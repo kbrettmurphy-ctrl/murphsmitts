@@ -381,3 +381,12 @@ This planning stage is complete when:
 - no application, migration, configuration, or test file is modified;
 - JavaScript syntax checks and the existing pricing self-test pass;
 - the working tree is clean after the planning commit.
+
+## Implementation status
+
+- Stage 12 complete: all 76 documented actions are registry-backed.
+- The legacy linear dispatcher has been removed; unknown actions retain the existing response.
+- Characterization suite: 107 tests and 1,621 assertions.
+- Stage 12 commit: `STAGE_12_COMMIT_SHA` (placeholder; use the commit recorded in Git history).
+- Previously documented security findings, including current passkey-registration authorization, remain intentionally deferred.
+- This migration is intended to preserve behavior; no application-policy changes were made.

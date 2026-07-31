@@ -4,8 +4,7 @@ import { isPreviewEnvironment } from "./_env.js";
 
 /* =========================
    ACTION REGISTRY
-   Migrated actions route through the registry. All other actions continue
-   through the legacy dispatcher below until migrated individually.
+   All supported API actions route through this registry.
 ========================= */
 const ACTIONS = {
   login: {
@@ -179,6 +178,29 @@ const ACTIONS = {
       optional: ["WEBAUTHN_ORIGIN", "WEBAUTHN_RP_ID"]
     }
   },
+  webauthnRegisterOptions: {
+    auth: "session",
+    demo: "allow",
+    handler: handleWebauthnRegisterOptions,
+    effects: ["db:webauthn_credentials:read", "crypto:webauthn:challenge"],
+    bindings: {
+      required: ["CORE"],
+      optional: ["WEBAUTHN_ORIGIN", "WEBAUTHN_RP_ID"]
+    }
+  },
+  webauthnRegisterVerify: {
+    auth: "session",
+    demo: "allow",
+    handler: handleWebauthnRegisterVerify,
+    effects: [
+      "db:webauthn_credentials:read", "db:webauthn_credentials:write",
+      "crypto:webauthn:verify"
+    ],
+    bindings: {
+      required: ["CORE"],
+      optional: ["WEBAUTHN_ORIGIN", "WEBAUTHN_RP_ID"]
+    }
+  },
   listLaborSessions: {
     auth: "session", demo: "deny", handler: handleListLaborSessions,
     effects: ["db:order_labor_sessions:read"], bindings: { required: ["CORE"], optional: [] }
@@ -259,6 +281,11 @@ const ACTIONS = {
   geocodeAddresses: {
     auth: "session", demo: "deny", handler: handleGeocodeAddresses,
     effects: ["external:geocoding:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  geocodeMissingOrderAddresses: {
+    auth: "session", demo: "deny", handler: handleGeocodeMissingOrderAddresses,
+    effects: ["db:orders:read", "external:geocoding:read", "db:orders:write"],
+    bindings: { required: ["CORE"], optional: [] }
   },
   uploadGalleryPhoto: {
     auth: "session", demo: "deny", handler: handleUploadGalleryPhoto,
@@ -581,142 +608,6 @@ export async function onRequest(context) {
       });
     }
 
-
-    if (action === "webauthnRegisterOptions") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const cfg = getWebauthnConfig(env);
-      const challenge = randomChallengeB64Url();
-      const challengeToken = await createChallengeToken("reg", challenge, env.ADMIN_SESSION_SECRET);
-
-      const existing = await listWebauthnCredentials(env);
-      const excludeCredentials = (existing.ok ? existing.credentials : []).map(cred => ({
-        id: cred.credential_id,
-        type: "public-key"
-      }));
-
-      return json(
-        {
-          ok: true,
-          challengeToken,
-          options: {
-            challenge,
-            rp: { id: cfg.rpId, name: cfg.rpName },
-            user: {
-              id: arrayBufferToBase64Url(new TextEncoder().encode(cfg.userId)),
-              name: cfg.userName,
-              displayName: cfg.userDisplayName
-            },
-            pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-            authenticatorSelection: { residentKey: "preferred", userVerification: "preferred" },
-            timeout: 60000,
-            attestation: "none",
-            excludeCredentials
-          }
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-    if (action === "webauthnRegisterVerify") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const cfg = getWebauthnConfig(env);
-      const chk = await verifyChallengeToken(body.challengeToken, "reg", env.ADMIN_SESSION_SECRET);
-      if (!chk.ok) {
-        return json({ ok: false, error: chk.error }, 200, jsonHeaders);
-      }
-
-      const cred = body.credential || {};
-      const resp = cred.response || {};
-
-      let clientData;
-      try {
-        clientData = JSON.parse(new TextDecoder().decode(base64UrlToBytes(resp.clientDataJSON)));
-      } catch {
-        return json({ ok: false, error: "Could not read passkey response." }, 200, jsonHeaders);
-      }
-
-      if (clientData.type !== "webauthn.create") {
-        return json({ ok: false, error: "Unexpected passkey ceremony." }, 200, jsonHeaders);
-      }
-      if (clientData.challenge !== chk.challenge) {
-        return json({ ok: false, error: "Passkey challenge mismatch." }, 200, jsonHeaders);
-      }
-      if (!cfg.origins.includes(clientData.origin)) {
-        return json({ ok: false, error: "Passkey origin mismatch." }, 200, jsonHeaders);
-      }
-
-      let authDataInfo;
-      let keyInfo;
-      let credentialIdB64;
-      try {
-        const attestation = cborDecodeFirst(base64UrlToBytes(resp.attestationObject));
-        authDataInfo = parseAuthData(attestation.get("authData"));
-        if (!authDataInfo.at || !authDataInfo.credentialPublicKey) {
-          throw new Error("Passkey did not include a credential.");
-        }
-        const expectedRpIdHash = await sha256Bytes(cfg.rpId);
-        if (!bytesEqual(authDataInfo.rpIdHash, expectedRpIdHash)) {
-          throw new Error("Passkey domain mismatch.");
-        }
-        if (!authDataInfo.up) {
-          throw new Error("Passkey user presence missing.");
-        }
-        keyInfo = coseToKeyInfo(authDataInfo.credentialPublicKey);
-        credentialIdB64 = arrayBufferToBase64Url(authDataInfo.credentialId);
-      } catch (err) {
-        return json({ ok: false, error: err.message || "Passkey could not be verified." }, 200, jsonHeaders);
-      }
-
-      const stored = await insertWebauthnCredential(env, {
-        credential_id: credentialIdB64,
-        public_key: JSON.stringify(keyInfo),
-        sign_count: authDataInfo.signCount,
-        transports: Array.isArray(cred.transports) && cred.transports.length ? cred.transports.join(",") : null,
-        label: cleanText(body.label) || "Passkey"
-      });
-
-      if (!stored.ok) {
-        return json({ ok: false, error: "Could not save passkey.", details: stored.error }, 200, jsonHeaders);
-      }
-
-      return json({ ok: true }, 200, jsonHeaders);
-    }
-
-    if (action === "geocodeMissingOrderAddresses") {
-      const auth = await validateTokenFromBody(body, env.ADMIN_SESSION_SECRET);
-      if (!auth.ok) {
-        return json(auth, 200, jsonHeaders);
-      }
-
-      const items = Array.isArray(body.items) ? body.items : [];
-      const results = await geocodeMissingOrderAddresses(env, items);
-
-      return json(
-        {
-          ok: true,
-          results
-        },
-        200,
-        jsonHeaders
-      );
-    }
-
-
-    /* =========================
-       SERVICE PRICING (Pricing Management)
-       Live rows in service_pricing are what the public site reads. Editing
-       only ever writes a draft revision; publishing copies the draft into the
-       live row and turns that revision into an immutable history record.
-    ========================= */
     return json(
       {
         ok: false,
@@ -1276,6 +1167,12 @@ async function handleUpdateOrder({ env, body, jsonHeaders }) {
 async function handleGeocodeAddresses({ body, jsonHeaders }) {
   const items = Array.isArray(body.items) ? body.items : [];
   const results = await geocodeAddresses(items);
+  return json({ ok: true, results }, 200, jsonHeaders);
+}
+
+async function handleGeocodeMissingOrderAddresses({ env, body, jsonHeaders }) {
+  const items = Array.isArray(body.items) ? body.items : [];
+  const results = await geocodeMissingOrderAddresses(env, items);
   return json({ ok: true, results }, 200, jsonHeaders);
 }
 
@@ -2486,6 +2383,104 @@ async function handleWebauthnLoginVerify({ env, body, jsonHeaders }) {
   );
 
   return json({ ok: true, token, role: "admin" }, 200, jsonHeaders);
+}
+
+async function handleWebauthnRegisterOptions({ env, jsonHeaders }) {
+  const cfg = getWebauthnConfig(env);
+  const challenge = randomChallengeB64Url();
+  const challengeToken = await createChallengeToken("reg", challenge, env.ADMIN_SESSION_SECRET);
+  const existing = await listWebauthnCredentials(env);
+  const excludeCredentials = (existing.ok ? existing.credentials : []).map(cred => ({
+    id: cred.credential_id,
+    type: "public-key"
+  }));
+  return json({
+    ok: true,
+    challengeToken,
+    options: {
+      challenge,
+      rp: { id: cfg.rpId, name: cfg.rpName },
+      user: {
+        id: arrayBufferToBase64Url(new TextEncoder().encode(cfg.userId)),
+        name: cfg.userName,
+        displayName: cfg.userDisplayName
+      },
+      pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+      authenticatorSelection: {
+        residentKey: "preferred",
+        userVerification: "preferred"
+      },
+      timeout: 60000,
+      attestation: "none",
+      excludeCredentials
+    }
+  }, 200, jsonHeaders);
+}
+
+async function handleWebauthnRegisterVerify({ env, body, jsonHeaders }) {
+  const cfg = getWebauthnConfig(env);
+  const chk = await verifyChallengeToken(body.challengeToken, "reg", env.ADMIN_SESSION_SECRET);
+  if (!chk.ok) {
+    return json({ ok: false, error: chk.error }, 200, jsonHeaders);
+  }
+  const cred = body.credential || {};
+  const resp = cred.response || {};
+  let clientData;
+  try {
+    clientData = JSON.parse(new TextDecoder().decode(base64UrlToBytes(resp.clientDataJSON)));
+  } catch {
+    return json({ ok: false, error: "Could not read passkey response." }, 200, jsonHeaders);
+  }
+  if (clientData.type !== "webauthn.create") {
+    return json({ ok: false, error: "Unexpected passkey ceremony." }, 200, jsonHeaders);
+  }
+  if (clientData.challenge !== chk.challenge) {
+    return json({ ok: false, error: "Passkey challenge mismatch." }, 200, jsonHeaders);
+  }
+  if (!cfg.origins.includes(clientData.origin)) {
+    return json({ ok: false, error: "Passkey origin mismatch." }, 200, jsonHeaders);
+  }
+  let authDataInfo;
+  let keyInfo;
+  let credentialIdB64;
+  try {
+    const attestation = cborDecodeFirst(base64UrlToBytes(resp.attestationObject));
+    authDataInfo = parseAuthData(attestation.get("authData"));
+    if (!authDataInfo.at || !authDataInfo.credentialPublicKey) {
+      throw new Error("Passkey did not include a credential.");
+    }
+    const expectedRpIdHash = await sha256Bytes(cfg.rpId);
+    if (!bytesEqual(authDataInfo.rpIdHash, expectedRpIdHash)) {
+      throw new Error("Passkey domain mismatch.");
+    }
+    if (!authDataInfo.up) {
+      throw new Error("Passkey user presence missing.");
+    }
+    keyInfo = coseToKeyInfo(authDataInfo.credentialPublicKey);
+    credentialIdB64 = arrayBufferToBase64Url(authDataInfo.credentialId);
+  } catch (err) {
+    return json({
+      ok: false,
+      error: err.message || "Passkey could not be verified."
+    }, 200, jsonHeaders);
+  }
+  const stored = await insertWebauthnCredential(env, {
+    credential_id: credentialIdB64,
+    public_key: JSON.stringify(keyInfo),
+    sign_count: authDataInfo.signCount,
+    transports: Array.isArray(cred.transports) && cred.transports.length
+      ? cred.transports.join(",")
+      : null,
+    label: cleanText(body.label) || "Passkey"
+  });
+  if (!stored.ok) {
+    return json({
+      ok: false,
+      error: "Could not save passkey.",
+      details: stored.error
+    }, 200, jsonHeaders);
+  }
+  return json({ ok: true }, 200, jsonHeaders);
 }
 
 /* =========================

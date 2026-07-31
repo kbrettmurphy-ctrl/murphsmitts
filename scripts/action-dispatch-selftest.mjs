@@ -188,6 +188,50 @@ function rawEcdsaToDer(rawInput) {
   return Uint8Array.from([0x30, r.length + s.length, ...r, ...s]);
 }
 
+function concatBytes(...parts) {
+  return Uint8Array.from(parts.flatMap(part => [...part]));
+}
+
+function cborByteString(bytes) {
+  if (bytes.length < 24) return Uint8Array.from([0x40 + bytes.length, ...bytes]);
+  if (bytes.length < 256) return Uint8Array.from([0x58, bytes.length, ...bytes]);
+  return Uint8Array.from([0x59, bytes.length >> 8, bytes.length & 0xff, ...bytes]);
+}
+
+async function registrationAttestation(rpId, credentialId) {
+  const keyPair = await crypto.subtle.generateKey(
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["sign", "verify"]
+  );
+  const jwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+  const x = Uint8Array.from(Buffer.from(jwk.x, "base64url"));
+  const y = Uint8Array.from(Buffer.from(jwk.y, "base64url"));
+  const cose = concatBytes(
+    Uint8Array.from([0xa5, 0x01, 0x02, 0x03, 0x26, 0x20, 0x01, 0x21]),
+    cborByteString(x),
+    Uint8Array.from([0x22]),
+    cborByteString(y)
+  );
+  const rpHash = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rpId))
+  );
+  const authData = concatBytes(
+    rpHash,
+    Uint8Array.from([0x41, 0, 0, 0, 7]),
+    new Uint8Array(16),
+    Uint8Array.from([credentialId.length >> 8, credentialId.length & 0xff]),
+    credentialId,
+    cose
+  );
+  const key = new TextEncoder().encode("authData");
+  return concatBytes(
+    Uint8Array.from([0xa1, 0x60 + key.length]),
+    key,
+    cborByteString(authData)
+  );
+}
+
 async function sessionTokens() {
   const future = Date.now() + 60_000;
   return {
@@ -1098,6 +1142,200 @@ await test("webauthnLoginVerify verifies ES256, updates count, and issues owner 
   equal(failed.response.status, 200);
   deepEqual(failed.json, { ok: false, error: "Passkey signature was invalid." });
   equal(failed.fetchCalls.length, 1);
+});
+
+console.log("Registry-backed WebAuthn registration and stored geocoding");
+
+await test("webauthnRegisterOptions preserves session and option behavior", async () => {
+  const { owner, user, demo } = await sessionTokens();
+  const env = {
+    ...CORE_ENV,
+    WEBAUTHN_RP_ID: "admin.example.test",
+    WEBAUTHN_ORIGIN: "https://admin.example.test"
+  };
+  for (const token of [owner, user]) {
+    const result = await invoke({
+      env,
+      body: { action: "webauthnRegisterOptions", _token: token },
+      fetchMock: () => jsonResponse([
+        { credential_id: "credential-one" },
+        { credential_id: "credential-two" }
+      ])
+    });
+    equal(result.json.ok, true);
+    equal(result.json.options.rp.id, "admin.example.test");
+    equal(result.json.options.rp.name, "Murph's Mitt Maintenance");
+    equal(result.json.options.user.name, "murphsmitts");
+    equal(result.json.options.user.displayName, "Murph's Mitts Admin");
+    deepEqual(result.json.options.pubKeyCredParams, [{ type: "public-key", alg: -7 }]);
+    deepEqual(result.json.options.authenticatorSelection, {
+      residentKey: "preferred",
+      userVerification: "preferred"
+    });
+    equal(result.json.options.timeout, 60000);
+    equal(result.json.options.attestation, "none");
+    deepEqual(result.json.options.excludeCredentials, [
+      { id: "credential-one", type: "public-key" },
+      { id: "credential-two", type: "public-key" }
+    ]);
+    const challenge = decodeTokenPayload(result.json.challengeToken);
+    equal(challenge.k, "reg");
+    equal(challenge.c, result.json.options.challenge);
+    ok(challenge.exp > Date.now());
+    ok(challenge.exp <= Date.now() + 5 * 60 * 1000);
+    equal(result.fetchCalls.length, 1);
+  }
+  await assertDemoDenied("webauthnRegisterOptions", demo);
+  await assertDemoDenied("webauthnRegisterVerify", demo);
+});
+
+await test("webauthnRegisterVerify preserves validation and ES256 storage", async () => {
+  const { owner } = await sessionTokens();
+  const env = {
+    ...CORE_ENV,
+    WEBAUTHN_RP_ID: "admin.example.test",
+    WEBAUTHN_ORIGIN: "https://admin.example.test"
+  };
+  const invalid = await invoke({
+    env,
+    body: {
+      action: "webauthnRegisterVerify", _token: owner,
+      challengeToken: "invalid"
+    }
+  });
+  deepEqual(invalid.json, { ok: false, error: "Invalid passkey challenge." });
+  equal(invalid.fetchCalls.length, 0);
+
+  const options = await invoke({
+    env,
+    body: { action: "webauthnRegisterOptions", _token: owner },
+    fetchMock: () => jsonResponse([])
+  });
+  const challenge = options.json.options.challenge;
+  const wrongType = await invoke({
+    env,
+    body: {
+      action: "webauthnRegisterVerify", _token: owner,
+      challengeToken: options.json.challengeToken,
+      credential: {
+        response: {
+          clientDataJSON: base64Url(new TextEncoder().encode(JSON.stringify({
+            type: "webauthn.get",
+            challenge,
+            origin: "https://admin.example.test"
+          })))
+        }
+      }
+    }
+  });
+  deepEqual(wrongType.json, { ok: false, error: "Unexpected passkey ceremony." });
+
+  const credentialId = Uint8Array.from([1, 2, 3, 4, 5, 6]);
+  const attestation = await registrationAttestation("admin.example.test", credentialId);
+  let stored;
+  const success = await invoke({
+    env,
+    body: {
+      action: "webauthnRegisterVerify", _token: owner,
+      challengeToken: options.json.challengeToken,
+      label: " My Face ID ",
+      credential: {
+        transports: ["internal", "hybrid"],
+        response: {
+          clientDataJSON: base64Url(new TextEncoder().encode(JSON.stringify({
+            type: "webauthn.create",
+            challenge,
+            origin: "https://admin.example.test"
+          }))),
+          attestationObject: base64Url(attestation)
+        }
+      }
+    },
+    fetchMock(input, init) {
+      ok(String(input).endsWith("/rest/v1/webauthn_credentials"));
+      equal(init.method, "POST");
+      equal(init.headers.Prefer, "return=minimal");
+      stored = JSON.parse(init.body);
+      return jsonResponse(null);
+    }
+  });
+  deepEqual(success.json, { ok: true });
+  equal(stored.credential_id, base64Url(credentialId));
+  equal(JSON.parse(stored.public_key).alg, -7);
+  equal(stored.sign_count, 7);
+  equal(stored.transports, "internal,hybrid");
+  equal(stored.label, "My Face ID");
+  equal(success.fetchCalls.length, 1);
+});
+
+await test("geocodeMissingOrderAddresses preserves provider and patch ordering", async () => {
+  const { owner } = await sessionTokens();
+  const empty = await invoke({
+    body: {
+      action: "geocodeMissingOrderAddresses", _token: owner, items: [{ orderNumber: "0169" }]
+    }
+  });
+  deepEqual(empty.json, { ok: true, results: {} });
+  equal(empty.fetchCalls.length, 0);
+
+  const oldRow = {
+    order_number: "0169",
+    map_lat: null,
+    map_lng: null,
+    map_address_hash: null
+  };
+  const updatedRow = {
+    ...oldRow,
+    map_lat: 42.101,
+    map_lng: -72.589,
+    map_geocoded_address: "1 Main St, Springfield, MA",
+    map_geocode_source: "census",
+    map_geocode_status: "ok",
+    map_geocode_quality: "exact",
+    map_address_hash: "hash-1"
+  };
+  const result = await invoke({
+    body: {
+      action: "geocodeMissingOrderAddresses", _token: owner,
+      items: [{
+        orderNumber: "0169",
+        addressHash: "hash-1",
+        candidates: ["1 Main St, Springfield, MA"]
+      }]
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) {
+        ok(String(input).includes("/rest/v1/orders?"));
+        return jsonResponse([oldRow]);
+      }
+      if (callNumber === 2) {
+        ok(String(input).startsWith("https://geocoding.geo.census.gov/"));
+        return jsonResponse({
+          result: {
+            addressMatches: [{
+              matchedAddress: "1 MAIN ST, SPRINGFIELD, MA",
+              coordinates: { y: 42.101, x: -72.589 }
+            }]
+          }
+        });
+      }
+      ok(String(input).includes("order_number=eq.0169"));
+      equal(init.method, "PATCH");
+      equal(init.headers.Prefer, "return=representation");
+      const patch = JSON.parse(init.body);
+      equal(patch.map_lat, 42.101);
+      equal(patch.map_lng, -72.589);
+      equal(patch.map_geocode_source, "census");
+      equal(patch.map_geocode_status, "ok");
+      equal(patch.map_address_hash, "hash-1");
+      ok(!Number.isNaN(Date.parse(patch.map_geocoded_at)));
+      return jsonResponse([updatedRow]);
+    }
+  });
+  equal(result.json.ok, true);
+  equal(result.json.results["0169"].ok, true);
+  equal(result.json.results["0169"].source, "census");
+  equal(result.fetchCalls.length, 3);
 });
 
 console.log("Registry-backed pricing mutations");
@@ -2365,7 +2603,7 @@ await test("pricing, history, settings defaults, and empty geocoding remain unch
   equal(geocode.fetchCalls.length, 0);
 });
 
-await test("a remaining legacy write action still dispatches successfully", async () => {
+await test("geocodeMissingOrderAddresses dispatches through the registry", async () => {
   const { owner } = await sessionTokens();
   const result = await invoke({
     body: { action: "geocodeMissingOrderAddresses", _token: owner, items: [] }
@@ -2899,7 +3137,7 @@ await test("current database role overrides ordinary token role", async () => {
 
 console.log("Action registry and legacy source inventory");
 
-await test("73 registry actions plus 3 legacy actions match the plan", async () => {
+await test("all 76 documented actions are registry-backed with no legacy chain", async () => {
   const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
   const plan = fs.readFileSync(new URL("../.docs/V1_2_ACTION_REGISTRY_PLAN.md", import.meta.url), "utf8");
   const dispatcher = source.split("/* =========================\n   RESPONSE HELPERS")[0];
@@ -2941,6 +3179,8 @@ await test("73 registry actions plus 3 legacy actions match the plan", async () 
     "listOrdersWithActivity",
     "webauthnLoginOptions",
     "webauthnLoginVerify",
+    "webauthnRegisterOptions",
+    "webauthnRegisterVerify",
     "listLaborSessions",
     "startLaborSession",
     "stopLaborSession",
@@ -2957,6 +3197,7 @@ await test("73 registry actions plus 3 legacy actions match the plan", async () 
     "resendStatusText",
     "updateOrder",
     "geocodeAddresses",
+    "geocodeMissingOrderAddresses",
     "uploadGalleryPhoto",
     "listExpenses",
     "createExpense",
@@ -3016,6 +3257,8 @@ await test("73 registry actions plus 3 legacy actions match the plan", async () 
     ["listOrdersWithActivity", "deny"],
     ["webauthnLoginOptions", "allow"],
     ["webauthnLoginVerify", "allow"],
+    ["webauthnRegisterOptions", "allow"],
+    ["webauthnRegisterVerify", "allow"],
     ["listLaborSessions", "deny"],
     ["startLaborSession", "deny"],
     ["stopLaborSession", "deny"],
@@ -3032,6 +3275,7 @@ await test("73 registry actions plus 3 legacy actions match the plan", async () 
     ["resendStatusText", "deny"],
     ["updateOrder", "deny"],
     ["geocodeAddresses", "deny"],
+    ["geocodeMissingOrderAddresses", "deny"],
     ["uploadGalleryPhoto", "deny"],
     ["listExpenses", "deny"],
     ["createExpense", "deny"],
@@ -3073,7 +3317,7 @@ await test("73 registry actions plus 3 legacy actions match the plan", async () 
   }
 
   deepEqual(registryActions, expectedRegistryActions);
-  equal(registryActions.length, 73);
+  equal(registryActions.length, 76);
   equal(
     (dispatcher.match(/return dispatchRegisteredAction\(registeredAction,/g) || []).length,
     1,
@@ -3113,7 +3357,8 @@ await test("73 registry actions plus 3 legacy actions match the plan", async () 
           "setSalePhotoPrimary", "setSalePhotoHover", "deleteSaleGlovePhoto",
           "saveServicePricingDraft", "discardServicePricingDraft",
           "publishServicePricing", "restoreServicePricingRevision",
-          "createServicePricing"
+          "createServicePricing", "webauthnRegisterOptions",
+          "webauthnRegisterVerify", "geocodeMissingOrderAddresses"
         ].includes(action) ? "session" : "public";
     if (action === "listGalleryPhotos") {
       ok(
@@ -3231,8 +3476,23 @@ await test("73 registry actions plus 3 legacy actions match the plan", async () 
       `${handler} relies on centralized authorization`
     );
   }
-  equal(legacyActions.length, 3);
-  equal(new Set(legacyActions).size, 3);
+  for (const handler of [
+    "handleWebauthnRegisterOptions", "handleWebauthnRegisterVerify",
+    "handleGeocodeMissingOrderAddresses"
+  ]) {
+    const handlerSource = source.match(
+      new RegExp(`async function ${handler}\\([\\s\\S]*?(?=\\nasync function |\\/\\* =========================)`)
+    );
+    ok(handlerSource, `${handler} is present`);
+    equal(
+      /validateTokenFromBody|body(?:\._token|\["_token"\]|\['_token'\])/.test(handlerSource[0]),
+      false,
+      `${handler} relies on centralized authorization`
+    );
+  }
+  equal(legacyActions.length, 0);
+  equal(new Set(legacyActions).size, 0);
+  equal(/if\s*\([^)]*\baction ===/.test(dispatcher), false);
   equal(plannedActions.length, 76);
   deepEqual(legacyActions, plannedLegacyActions);
   deepEqual([...legacyCounts.entries()].filter(([, count]) => count !== 1), []);
