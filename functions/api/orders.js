@@ -244,6 +244,18 @@ const ACTIONS = {
     effects: ["db:orders:read", "db:bench_work_sessions:write", "db:order_labor_sessions:read", "db:order_labor_sessions:write", "db:order_activity:write"],
     bindings: { required: ["CORE"], optional: [] }
   },
+  snoozeBenchReminder: {
+    auth: "session", demo: "deny", handler: handleSnoozeBenchReminder,
+    effects: ["db:bench_work_sessions:read", "db:bench_work_sessions:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  endBenchWork: {
+    auth: "session", demo: "deny", handler: handleEndBenchWork,
+    effects: ["db:bench_work_sessions:write", "db:order_labor_sessions:write", "db:order_activity:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  resolveBenchWork: {
+    auth: "session", demo: "deny", handler: handleResolveBenchWork,
+    effects: ["db:bench_work_sessions:write", "db:order_labor_sessions:write", "db:order_activity:write"], bindings: { required: ["CORE"], optional: [] }
+  },
   deleteOrder: {
     auth: "session", demo: "deny", handler: handleDeleteOrder,
     effects: ["db:orders:delete"], bindings: { required: ["CORE"], optional: [] }
@@ -992,6 +1004,76 @@ async function handleStartBenchWork({ env, body, jsonHeaders, auth }) {
     eventType: "bench_work_started",
     eventLabel: "Bench Work started",
     metadata: { benchWorkSessionId: result.bench?.id || null }
+  });
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleSnoozeBenchReminder({ env, body, jsonHeaders }) {
+  const benchSessionId = cleanText(body.benchSessionId);
+  if (!benchSessionId) return json({ ok: false, error: "Missing benchSessionId." }, 200, jsonHeaders);
+  const snoozedUntil = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  const response = await supabaseFetch(
+    env,
+    `/rest/v1/bench_work_sessions?id=eq.${encodeURIComponent(benchSessionId)}&ended_at=is.null`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ reminder_snoozed_until: snoozedUntil, updated_at: new Date().toISOString() })
+    }
+  );
+  if (!response.ok) return json({ ok: false, error: "Reminder could not be snoozed.", details: response.error }, 200, jsonHeaders);
+  const row = Array.isArray(response.data) ? response.data[0] : response.data;
+  if (!row) return json({ ok: false, error: "Bench Work is no longer active." }, 200, jsonHeaders);
+  return json({ ok: true, bench: mapBenchWorkFromDb(row) }, 200, jsonHeaders);
+}
+
+async function handleEndBenchWork({ env, body, jsonHeaders }) {
+  const benchSessionId = cleanText(body.benchSessionId);
+  if (!benchSessionId) return json({ ok: false, error: "Missing benchSessionId." }, 200, jsonHeaders);
+  const runningAction = cleanText(body.runningAction) || "none";
+  if (!["none", "pause", "stop"].includes(runningAction)) {
+    return json({ ok: false, error: "Invalid running labor choice." }, 200, jsonHeaders);
+  }
+  const result = await callBenchRpc(env, "end_bench_work", {
+    p_bench_session_id: benchSessionId,
+    p_running_action: runningAction
+  });
+  if (!result.ok) return json(result, 200, jsonHeaders);
+  await logOrderActivity(env, {
+    orderNumber: result.bench?.orderNumber,
+    eventType: "bench_work_ended",
+    eventLabel: "Bench Work ended",
+    metadata: { benchWorkSessionId: benchSessionId, runningAction }
+  });
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleResolveBenchWork({ env, body, jsonHeaders }) {
+  const benchSessionId = cleanText(body.benchSessionId);
+  if (!benchSessionId) return json({ ok: false, error: "Missing benchSessionId." }, 200, jsonHeaders);
+  const resolution = cleanText(body.resolution);
+  if (!["labor_recorded", "discarded"].includes(resolution)) {
+    return json({ ok: false, error: "Invalid Bench Work resolution." }, 200, jsonHeaders);
+  }
+  const phase = cleanText(body.phase);
+  if (resolution === "labor_recorded" && !phase) {
+    return json({ ok: false, error: "Select a phase before assigning time." }, 200, jsonHeaders);
+  }
+  if (phase && !isValidLaborPhase(phase)) {
+    return json({ ok: false, error: "Invalid labor phase." }, 200, jsonHeaders);
+  }
+  const result = await callBenchRpc(env, "resolve_bench_work", {
+    p_bench_session_id: benchSessionId,
+    p_resolution: resolution,
+    p_phase: phase || null
+  });
+  if (!result.ok) return json(result, 200, jsonHeaders);
+  await logOrderActivity(env, {
+    orderNumber: result.bench?.orderNumber,
+    eventType: resolution === "discarded" ? "bench_work_discarded" : "bench_work_resolved",
+    eventLabel: resolution === "discarded" ? "Bench Work discarded" : "Bench Work assigned to labor",
+    eventDetail: phase || null,
+    metadata: { benchWorkSessionId, laborSessionId: result.session?.id || null, phase: phase || null }
   });
   return json(result, 200, jsonHeaders);
 }
