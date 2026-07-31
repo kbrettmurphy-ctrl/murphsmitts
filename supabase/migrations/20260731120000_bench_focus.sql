@@ -209,11 +209,13 @@ begin
     where bench_work_session_id = v_bench.id and ended_at is null order by started_at desc limit 1 for update;
   if found and v_labor.status = 'running' then
     if p_running_action = 'pause' then
-      update public.order_labor_sessions set status = 'paused', paused_at = v_now, updated_at = v_now where id = v_labor.id;
+      update public.order_labor_sessions set status = 'paused', paused_at = v_now, updated_at = v_now
+        where id = v_labor.id returning * into v_labor;
     elsif p_running_action = 'stop' then
       v_active_seconds := greatest(0, extract(epoch from (v_now - v_labor.started_at)) - coalesce(v_labor.pause_accumulated_seconds, 0));
       update public.order_labor_sessions set status = 'stopped', ended_at = v_now,
-        duration_minutes = round((v_active_seconds / 60.0)::numeric, 2), updated_at = v_now where id = v_labor.id;
+        duration_minutes = round((v_active_seconds / 60.0)::numeric, 2), updated_at = v_now
+        where id = v_labor.id returning * into v_labor;
     else
       return jsonb_build_object('ok', false, 'runningLaborChoice', true, 'laborSessionId', v_labor.id);
     end if;
@@ -221,7 +223,8 @@ begin
   update public.bench_work_sessions set ended_at = v_now,
     resolution = case when resolution = 'labor_recorded' then 'labor_recorded' else 'pending' end,
     reminder_snoozed_until = null, updated_at = v_now where id = v_bench.id returning * into v_bench;
-  return jsonb_build_object('ok', true, 'bench', to_jsonb(v_bench));
+  return jsonb_build_object('ok', true, 'bench', to_jsonb(v_bench),
+    'session', case when v_labor.id is null then null else to_jsonb(v_labor) end);
 end $$;
 
 create or replace function public.resolve_bench_work(

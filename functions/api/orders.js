@@ -1039,6 +1039,20 @@ async function handleEndBenchWork({ env, body, jsonHeaders }) {
     p_running_action: runningAction
   });
   if (!result.ok) return json(result, 200, jsonHeaders);
+  if (runningAction === "stop" && result.session) {
+    await logOrderActivity(env, {
+      orderNumber: result.session.orderNumber,
+      eventType: "labor_timer",
+      eventLabel: "Labor timer stopped",
+      eventDetail: result.session.phase,
+      metadata: {
+        sessionId: result.session.id,
+        phase: result.session.phase,
+        durationMinutes: result.session.durationMinutes,
+        benchWorkSessionId: benchSessionId
+      }
+    });
+  }
   await logOrderActivity(env, {
     orderNumber: result.bench?.orderNumber,
     eventType: "bench_work_ended",

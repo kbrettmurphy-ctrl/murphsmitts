@@ -80,6 +80,14 @@ await test("backdating and reconciliation use authoritative Bench timestamps onc
   ok(/extract\(epoch from \(v_bench\.ended_at - v_bench\.started_at\)\)/.test(migration));
 });
 
+await test("ending atomically pauses or stops linked labor and preserves stop activity", () => {
+  ok(/p_running_action = 'pause'[\s\S]*?returning \* into v_labor/.test(migration));
+  ok(/p_running_action = 'stop'[\s\S]*?duration_minutes[\s\S]*?returning \* into v_labor/.test(migration));
+  ok(migration.includes("runningLaborChoice"));
+  ok(source.includes('runningAction === "stop" && result.session'));
+  ok(source.includes('eventLabel: "Labor timer stopped"'));
+});
+
 await test("registry metadata denies demo and declares no external effects", () => {
   for (const action of ["getBenchFocus", "startBenchWork", "snoozeBenchReminder", "endBenchWork", "resolveBenchWork"]) {
     const entry = source.match(new RegExp(`${action}: \\{[\\s\\S]*?bindings: \\{ required: \\["CORE"\\], optional: \\[\\] \\}`));
