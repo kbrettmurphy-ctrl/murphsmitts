@@ -1576,11 +1576,94 @@ function renderDashboardOrderRow(order, { timerControls = false } = {}) {
       </div>
       ${timerControls ? `
         <div class="dashboard-bench-actions">
+          <button
+            type="button"
+            class="bench-focus-start-btn"
+            data-bench-start="${escapeAttr(orderKey)}"
+            ${benchFocusBusy || benchFocusState.activeBench?.orderNumber === orderKey ? "disabled" : ""}
+          >${benchFocusState.activeBench?.orderNumber === orderKey ? "On Bench" : "Start Bench Work"}</button>
           ${renderDashboardTimerButton(order, session)}
         </div>
       ` : ""}
     </div>
   `;
+}
+
+function getBenchFocusNow() {
+  return Date.now() + benchFocusClockOffsetMs;
+}
+
+function formatBenchElapsed(startedAt, endedAt = null) {
+  const start = Date.parse(startedAt);
+  const end = endedAt ? Date.parse(endedAt) : getBenchFocusNow();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return "—";
+  const minutes = Math.max(0, Math.floor((end - start) / 60000));
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
+function renderBenchFocusCard() {
+  const bench = benchFocusState.activeBench;
+  if (!bench) return "";
+  const order = allOrders.find(item => String(item.orderNumber) === String(bench.orderNumber)) || {};
+  const labor = benchFocusState.activeLabor;
+  const laborStatus = labor ? getLaborSessionStatus(labor) : "";
+  const services = parseServicesValue(order.servicesRequested || "").selected.join(", ") || order.servicesRequested || "—";
+  const lace = [order.primaryLaceColor, order.secondaryLaceColor].filter(Boolean).join(" · ") || "—";
+  return `
+    <section class="bench-focus-card" data-bench-focus-card>
+      <div class="bench-focus-context">
+        <div class="bench-focus-eyebrow">Bench Work</div>
+        <div class="bench-focus-heading">#${escapeHtml(bench.orderNumber)} · ${escapeHtml(order.customerName || "Customer")}</div>
+        <div class="bench-focus-summary">${escapeHtml([order.brandModel, order.gloveType].filter(Boolean).join(" · ") || "Glove")}</div>
+        <dl class="bench-focus-details">
+          <div><dt>Services</dt><dd>${escapeHtml(services)}</dd></div>
+          <div><dt>Lace</dt><dd>${escapeHtml(lace)}</dd></div>
+          <div><dt>Status</dt><dd>${escapeHtml(getOrderStatusDisplay(order.status || ""))}</dd></div>
+          <div><dt>Estimated</dt><dd>${escapeHtml(order.estimatedCompletion ? formatDate(order.estimatedCompletion) : "—")}</dd></div>
+        </dl>
+        <div class="bench-focus-time-grid">
+          <div><span>Started</span><strong>${escapeHtml(formatLaborDateTime(bench.startedAt))}</strong></div>
+          <div><span>Elapsed</span><strong data-bench-elapsed>${escapeHtml(formatBenchElapsed(bench.startedAt))}</strong></div>
+        </div>
+        <p class="bench-focus-not-labor">Bench context — not logged labor</p>
+        <button type="button" class="bench-focus-end-btn" data-bench-end>End Bench Work</button>
+      </div>
+      <div class="bench-focus-labor${labor ? " has-labor" : ""}">
+        <div class="bench-focus-labor-heading">${escapeHtml(labor?.phase || "No labor timer")}</div>
+        ${labor ? `
+          <div class="bench-focus-labor-status">${escapeHtml(laborStatus === "paused" ? "Paused" : "Running")}</div>
+          <div class="bench-focus-labor-time"><span>Labor elapsed</span><strong data-bench-labor-elapsed>${escapeHtml(formatLaborDuration(getLaborActiveSeconds(labor) / 60))}</strong></div>
+          <div class="bench-focus-labor-controls">${renderDashboardTimerButton(order, labor)}</div>
+        ` : `<p>Bench Work is active, but time is not being recorded as labor.</p>`}
+      </div>
+    </section>
+  `;
+}
+
+async function startBenchWorkFromDashboard(orderNumber, options = {}) {
+  if (benchFocusBusy) return;
+  benchFocusBusy = true;
+  renderHomeDashboard();
+  try {
+    await postJson({ action: "startBenchWork", orderNumber, ...options }, true);
+    broadcastBenchFocusChange();
+    await refreshBenchFocusState();
+    await refreshDashboardLaborSessions();
+  } catch (error) {
+    if (error.requiresConfirmation) {
+      const physical = error.receivedPhysicalPresence ? "\n\nContinue only if the glove is physically present." : "";
+      if (confirm(`This order is currently ${error.status}. Start Bench Work without changing its status?${physical}`)) {
+        benchFocusBusy = false;
+        return startBenchWorkFromDashboard(orderNumber, { ...options, confirmStatusOverride: true });
+      }
+    } else {
+      alert(error.message || "Bench Work could not be started.");
+    }
+  } finally {
+    benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
+  }
 }
 
 function renderDashboardOrderList(orders, emptyMessage, options = {}) {
@@ -2044,6 +2127,12 @@ function renderHomeDashboard() {
   dashboardPanel.innerHTML = `
     <div class="dashboard-shell">
       ${renderClubhouseGreeting()}
+      ${renderBenchFocusCard()}
+      ${benchFocusState.unresolved.length ? `
+        <button type="button" class="bench-unresolved-indicator bench-unresolved-indicator--${benchFocusState.unresolved.length >= 5 ? "high" : (benchFocusState.unresolved.length >= 3 ? "medium" : "low")}" data-bench-unresolved-open>
+          ${benchFocusState.unresolved.length} Bench Work ${benchFocusState.unresolved.length === 1 ? "interval needs" : "intervals need"} review
+        </button>
+      ` : ""}
       <section class="dashboard-section dashboard-section-bench">
         <div class="dashboard-section-heading-row">
           <h2 class="dashboard-section-title">Today's Bench</h2>
@@ -2188,6 +2277,12 @@ function wireHomeDashboardActions() {
       return;
     }
 
+    const benchStartBtn = e.target.closest("[data-bench-start]");
+    if (benchStartBtn) {
+      startBenchWorkFromDashboard(benchStartBtn.dataset.benchStart);
+      return;
+    }
+
     const timerControlBtn = e.target.closest("[data-timer-control]");
     if (timerControlBtn) {
       handleDashboardTimerControl(
@@ -2278,6 +2373,16 @@ function wireHomeDashboardActions() {
       if (session) el.textContent = getDashboardTimerStateLabel(session);
     });
   }, 30000);
+
+  setInterval(() => {
+    if (activeView !== "dashboard" || !benchFocusState.activeBench) return;
+    const benchElapsed = dashboardPanel.querySelector("[data-bench-elapsed]");
+    if (benchElapsed) benchElapsed.textContent = formatBenchElapsed(benchFocusState.activeBench.startedAt);
+    const laborElapsed = dashboardPanel.querySelector("[data-bench-labor-elapsed]");
+    if (laborElapsed && benchFocusState.activeLabor) {
+      laborElapsed.textContent = formatLaborDuration(getLaborActiveSeconds(benchFocusState.activeLabor) / 60);
+    }
+  }, 1000);
 
   /* Close the popover without re-rendering the dashboard — a full
      re-render here would destroy a focused custom date input and
