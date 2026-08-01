@@ -189,11 +189,23 @@ await test("client implements recovery, reminder, and separate Bench/Labor prese
   ok(admin.includes("window.addEventListener(\"storage\""));
   ok(admin.includes("window.addEventListener(\"focus\""));
   ok(admin.includes("Date.parse(bench.startedAt) + 90000"));
+  ok(admin.includes('data-bench-labor-reminder'));
+  ok(admin.includes('reminder.hidden = !isBenchLaborReminderDue(benchFocusState.activeBench)'));
   ok(source.includes("10 * 60 * 1000"));
   ok(admin.includes("Bench context — not logged labor"));
   ok(admin.includes("Labor elapsed"));
   ok((admin.match(/benchSessionId: activeBench\.id/g) || []).length >= 2);
   equal(/Keep Timer Running and End Bench Work/.test(admin), false);
+});
+
+await test("active Bench Work always exposes labor starts before the reminder", () => {
+  const render = admin.match(/function renderBenchFocusCard\([\s\S]*?\n\}/)?.[0] || "";
+  const noLaborBranch = render.split('` : `').at(-1);
+  ok(noLaborBranch.includes('data-bench-labor-start="bench"'));
+  ok(noLaborBranch.includes('data-bench-labor-start="now"'));
+  ok(noLaborBranch.includes('data-bench-labor-reminder'));
+  ok(noLaborBranch.includes('reminderDue ? "" : "hidden"'));
+  equal(/reminderDue \? `<div class="bench-focus-reminder-actions">/.test(noLaborBranch), false);
 });
 
 console.log(`\n${tests} tests, ${assertions} assertions passed`);

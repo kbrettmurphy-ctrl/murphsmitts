@@ -1602,6 +1602,12 @@ function formatBenchElapsed(startedAt, endedAt = null) {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
+function isBenchLaborReminderDue(bench, labor = benchFocusState.activeLabor) {
+  if (!bench || labor || benchFocusState.unlinkedPausedLabor) return false;
+  return getBenchFocusNow() >= Date.parse(bench.startedAt) + 90000 &&
+    (!bench.reminderSnoozedUntil || getBenchFocusNow() >= Date.parse(bench.reminderSnoozedUntil));
+}
+
 function renderBenchFocusCard() {
   const bench = benchFocusState.activeBench;
   if (!bench) return "";
@@ -1609,8 +1615,7 @@ function renderBenchFocusCard() {
   const labor = benchFocusState.activeLabor;
   const unlinkedPausedLabor = benchFocusState.unlinkedPausedLabor;
   const laborStatus = labor ? getLaborSessionStatus(labor) : "";
-  const reminderDue = !labor && getBenchFocusNow() >= Date.parse(bench.startedAt) + 90000 &&
-    (!bench.reminderSnoozedUntil || getBenchFocusNow() >= Date.parse(bench.reminderSnoozedUntil));
+  const reminderDue = isBenchLaborReminderDue(bench, labor);
   const services = parseServicesValue(order.servicesRequested || "").selected.join(", ") || order.servicesRequested || "—";
   const lace = [order.primaryLaceColor, order.secondaryLaceColor].filter(Boolean).join(" · ") || "—";
   return `
@@ -1646,12 +1651,15 @@ function renderBenchFocusCard() {
             <button type="button" data-bench-end>End Bench Work</button>
           </div>
         ` : `
-          <p>${reminderDue ? "No labor timer is running." : "Bench Work is active, but time is not being recorded as labor."}</p>
-          ${reminderDue ? `<div class="bench-focus-reminder-actions">
+          <p>Bench Work is active, but time is not being recorded as labor.</p>
+          <div class="bench-focus-reminder-actions">
             ${!bench.backdateConsumedAt ? `<button type="button" data-bench-labor-start="bench">Start from Bench Work</button>` : ""}
             <button type="button" data-bench-labor-start="now">Start Now</button>
+          </div>
+          <div class="bench-focus-reminder" data-bench-labor-reminder ${reminderDue ? "" : "hidden"}>
+            <p>No labor timer is running.</p>
             <button type="button" data-bench-remind-later>Remind Later</button>
-          </div>` : ""}
+          </div>
         `}
       </div>
     </section>
@@ -2708,6 +2716,8 @@ function wireHomeDashboardActions() {
     if (laborElapsed && benchFocusState.activeLabor) {
       laborElapsed.textContent = formatLaborDuration(getLaborActiveSeconds(benchFocusState.activeLabor) / 60);
     }
+    const reminder = dashboardPanel.querySelector("[data-bench-labor-reminder]");
+    if (reminder) reminder.hidden = !isBenchLaborReminderDue(benchFocusState.activeBench);
   }, 1000);
 
   /* Close the popover without re-rendering the dashboard — a full
