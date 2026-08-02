@@ -6402,7 +6402,7 @@ button.secondary,
 .bench-focus-labor{border-top:8px solid rgba(9,47,77,.05);background:#fffdf8}.bench-focus-labor.has-labor{background:rgba(9,47,77,.035)}
 .bench-focus-labor-heading{font-size:.78rem;color:var(--navy)}.bench-focus-labor-status{margin-top:4px;font-size:.76rem;font-weight:700;color:#28734f}
 .bench-focus-labor-time{margin-top:14px}.bench-focus-labor-time strong{font-size:1.15rem;color:var(--navy)}
-.bench-focus-labor-controls{display:flex;margin-top:12px}.bench-focus-labor p{margin:8px 0 0;font-size:.78rem;color:rgba(9,47,77,.66)}
+.bench-focus-labor-controls{position:relative;display:flex;margin-top:12px}.bench-focus-labor p{margin:8px 0 0;font-size:.78rem;color:rgba(9,47,77,.66)}
 .bench-focus-labor .bench-focus-paused-warning{color:#8a5a00;font-weight:700}.bench-unresolved-conflict{color:#8a5a00!important;font-weight:700}.bench-unresolved-actions button:disabled{opacity:.45;cursor:not-allowed}
 .bench-focus-reminder-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.bench-focus-reminder-actions button,.bench-choice-actions button{min-height:44px;border:1px solid rgba(9,47,77,.16);border-radius:10px;background:#fffaf3;color:var(--navy);font:inherit;font-size:.76rem;font-weight:700;padding:8px 11px;cursor:pointer}
 .bench-focus-reminder{margin-top:14px;padding:10px;border:1px solid rgba(195,138,25,.3);border-radius:10px;background:#fff8e7}.bench-focus-reminder[hidden]{display:none}.bench-focus-reminder button{min-height:44px;margin-top:9px;border:1px solid rgba(9,47,77,.16);border-radius:10px;background:#fffaf3;color:var(--navy);font:inherit;font-size:.76rem;font-weight:700;padding:8px 11px;cursor:pointer}

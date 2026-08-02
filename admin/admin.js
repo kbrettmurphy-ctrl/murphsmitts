@@ -1541,6 +1541,7 @@ function renderDashboardTimerButton(order, session) {
       data-timer-order="${escapeAttr(orderKey)}"
       aria-haspopup="menu"
       aria-label="${escapeAttr(ariaLabel)}"
+      ${dashboardTimerBusy ? "disabled" : ""}
     >${DASHBOARD_TIMER_ICONS[icon]}</button>
   `;
 }
@@ -2069,7 +2070,7 @@ function closeDashboardTimerPopover() {
 function openDashboardTimerPopover(button, orderKey) {
   closeDashboardTimerPopover();
 
-  const actions = button.closest(".dashboard-bench-actions");
+  const actions = button.closest(".dashboard-bench-actions, .bench-focus-labor-controls");
   if (!actions) return;
 
   dashboardTimerPopoverOrder = orderKey;
@@ -2091,7 +2092,7 @@ function openDashboardTimerPopover(button, orderKey) {
 function openDashboardTimerControlsPopover(button, orderKey, session) {
   closeDashboardTimerPopover();
 
-  const actions = button.closest(".dashboard-bench-actions");
+  const actions = button.closest(".dashboard-bench-actions, .bench-focus-labor-controls");
   if (!actions) return;
 
   const primary = getLaborSessionStatus(session) === "paused"
@@ -2179,7 +2180,7 @@ async function handleDashboardTimerAction(button) {
   }
 }
 
-async function handleDashboardTimerControl(orderKey, control) {
+async function handleDashboardTimerControl(orderKey, control, controlButton = null) {
   if (dashboardTimerBusy) return;
 
   const session = dashboardLaborSessions[orderKey] || null;
@@ -2191,6 +2192,10 @@ async function handleDashboardTimerControl(orderKey, control) {
     return;
   }
 
+  const timerButton = controlButton?.closest(".dashboard-bench-actions, .bench-focus-labor-controls")
+    ?.querySelector("[data-timer-action]");
+  if (controlButton) controlButton.disabled = true;
+  if (timerButton) timerButton.disabled = true;
   closeDashboardTimerPopover();
   dashboardTimerBusy = true;
   try {
@@ -2209,6 +2214,7 @@ async function handleDashboardTimerControl(orderKey, control) {
     refreshDashboardLaborSessions();
   } finally {
     dashboardTimerBusy = false;
+    if (timerButton?.isConnected) timerButton.disabled = false;
   }
 }
 
@@ -2619,15 +2625,20 @@ function wireHomeDashboardActions() {
 
     const timerControlBtn = e.target.closest("[data-timer-control]");
     if (timerControlBtn) {
+      e.preventDefault();
+      e.stopPropagation();
       handleDashboardTimerControl(
         timerControlBtn.dataset.timerOrder,
-        timerControlBtn.dataset.timerControl
+        timerControlBtn.dataset.timerControl,
+        timerControlBtn
       );
       return;
     }
 
     const timerActionBtn = e.target.closest("[data-timer-action]");
     if (timerActionBtn) {
+      e.preventDefault();
+      e.stopPropagation();
       handleDashboardTimerAction(timerActionBtn);
       return;
     }
@@ -2695,7 +2706,7 @@ function wireHomeDashboardActions() {
      (same hazard as the finance popover below). */
   document.addEventListener("click", (e) => {
     if (!dashboardTimerPopoverOrder) return;
-    if (e.target.closest?.(".dashboard-bench-actions")) return;
+    if (e.target.closest?.(".dashboard-bench-actions, .bench-focus-labor-controls")) return;
     closeDashboardTimerPopover();
   });
 
@@ -4747,6 +4758,19 @@ function ensureLaborTimerDelegation() {
 
   laborTimerDelegated = true;
   orderDetail.addEventListener("click", (e) => {
+    const endBenchBtn = e.target.closest("[data-detail-bench-end]");
+    if (endBenchBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!benchFocusBusy) {
+        endBenchBtn.disabled = true;
+        Promise.resolve(endActiveBenchWork()).finally(() => {
+          if (endBenchBtn.isConnected) endBenchBtn.disabled = false;
+        });
+      }
+      return;
+    }
+
     const startBtn = e.target.closest("[data-labor-start]");
     if (startBtn) {
       e.preventDefault();
@@ -6952,8 +6976,6 @@ function renderOrderDetail(order) {
     </div>
   `;
 
-  orderDetail.querySelector("[data-detail-bench-end]")?.addEventListener("click", () => endActiveBenchWork());
-
   document.getElementById("editStatus").value = order.status || "Received";
   document.getElementById("editPaid").value = normalizeText(order.paid) === "paid" ? "Paid" : "Unpaid";
   document.getElementById("editPriceQuoted").value = formatMoneyForInput(order.priceQuoted);
@@ -7020,13 +7042,14 @@ function renderOrderDetail(order) {
 
 function renderOrderDetailBenchBanner(order) {
   const bench = benchFocusState.activeBench;
-  if (!bench || String(bench.orderNumber) !== String(order.orderNumber)) return "";
+  if (!bench) return "";
   const labor = benchFocusState.activeLabor;
+  const viewingActiveBenchOrder = String(bench.orderNumber) === String(order.orderNumber);
   return `<aside class="detail-bench-focus-banner">
-    <div><span>Bench Work</span><strong>Active · ${escapeHtml(formatBenchElapsed(bench.startedAt))}</strong>
+    <div><span>${viewingActiveBenchOrder ? "Bench Work" : "Another glove is on the bench"}</span><strong>#${escapeHtml(bench.orderNumber)} · Active · ${escapeHtml(formatBenchElapsed(bench.startedAt))}</strong>
     <small>Bench context — not logged labor</small></div>
     <div><span>${escapeHtml(labor?.phase || "No labor timer")}</span><strong>${labor ? escapeHtml(getLaborSessionStatus(labor) === "paused" ? "Paused" : "Running") : "Not recording labor"}</strong></div>
-    <button type="button" data-detail-bench-end>End Bench Work</button>
+    <button type="button" data-detail-bench-end ${benchFocusBusy ? "disabled" : ""}>End Bench Work</button>
   </aside>`;
 }
 

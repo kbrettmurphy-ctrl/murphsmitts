@@ -208,4 +208,38 @@ await test("active Bench Work always exposes labor starts before the reminder", 
   equal(/reminderDue \? `<div class="bench-focus-reminder-actions">/.test(noLaborBranch), false);
 });
 
+await test("Bench Focus timer controls share stable Today’s Bench delegation", () => {
+  ok(admin.includes('button.closest(".dashboard-bench-actions, .bench-focus-labor-controls")'));
+  ok(admin.includes('e.target.closest?.(".dashboard-bench-actions, .bench-focus-labor-controls")'));
+  ok(admin.includes('const timerControlBtn = e.target.closest("[data-timer-control]")'));
+  ok(admin.includes('const timerActionBtn = e.target.closest("[data-timer-action]")'));
+  ok(admin.includes('handleDashboardTimerControl(\n        timerControlBtn.dataset.timerOrder,\n        timerControlBtn.dataset.timerControl,\n        timerControlBtn'));
+  ok(admin.includes('if (control === "pause")'));
+  ok(admin.includes('} else if (control === "resume")'));
+  ok(admin.includes('} else if (control === "stop")'));
+  ok(admin.includes('await refreshBenchFocusState({ rerender: false })'));
+  ok(admin.includes('await refreshDashboardLaborSessions()'));
+  ok(admin.includes('e.stopPropagation();\n      handleDashboardTimerAction(timerActionBtn)'));
+  equal((admin.match(/dashboardPanel\.addEventListener\("click"/g) || []).length, 1);
+});
+
+await test("nested timer targets and cross-order End Bench Work dispatch safely", () => {
+  for (const target of ["button", "svg", "path", "span", "icon"]) {
+    const actionButton = { dataset: { timerControl: "pause", timerOrder: "0169" } };
+    const eventTarget = { closest: selector => selector === "[data-timer-control]" ? actionButton : null };
+    equal(eventTarget.closest("[data-timer-control]"), actionButton, `${target} resolves through closest()`);
+  }
+  ok(admin.includes('const endBenchBtn = e.target.closest("[data-detail-bench-end]")'));
+  ok(admin.includes("endActiveBenchWork();"));
+  ok(admin.includes('if (!bench) return "";'));
+  ok(admin.includes('String(bench.orderNumber) === String(order.orderNumber)'));
+  ok(admin.includes('strong>#${escapeHtml(bench.orderNumber)} · Active'));
+  equal(admin.includes('querySelector("[data-detail-bench-end]")?.addEventListener'), false);
+  ok(admin.includes("if (laborTimerDelegated || !orderDetail) return;"));
+  equal((admin.match(/orderDetail\.addEventListener\("click"/g) || []).length, 2);
+  ok(admin.includes('benchSessionId: bench.id, runningAction'));
+  ok(admin.includes('title: switchToOrder ? "End current Bench Work and switch?" : "End Bench Work"'));
+  ok(admin.includes('openImmediateBenchResolution(unresolvedBench)'));
+});
+
 console.log(`\n${tests} tests, ${assertions} assertions passed`);
