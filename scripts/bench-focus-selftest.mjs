@@ -205,6 +205,24 @@ await test("Bench-aware labor sends no client timestamp and logs source metadata
   equal(activity.metadata.benchWorkSessionId, "b1");
 });
 
+await test("Custom Work is valid for Bench-linked labor", async () => {
+  const owner = await token();
+  const rpc = { ok: true, session: { id: "l-custom", order_number: "0194", phase: "Custom Work", status: "running" } };
+  const result = await invoke({
+    action: "startLaborSession",
+    _token: owner,
+    orderNumber: "0194",
+    phase: "Custom Work",
+    benchSessionId: "b-0194",
+    benchStartMode: "now"
+  }, [rpc, null]);
+  equal(result.json.ok, true);
+  equal(result.calls[0].url.endsWith("/rest/v1/rpc/start_labor_for_bench"), true);
+  equal(result.calls[0].body.p_phase, "Custom Work");
+  const serverPhases = source.match(/const LABOR_TIMER_PHASES = \[[\s\S]*?\];/)?.[0] || "";
+  ok(serverPhases.includes('"Custom Work"'));
+});
+
 await test("client implements recovery, reminder, and separate Bench/Labor presentation", () => {
   ok(admin.includes("setInterval(() => refreshBenchFocusState(), 15000)"));
   ok(admin.includes("BroadcastChannel(\"murphos-bench-focus\")"));
