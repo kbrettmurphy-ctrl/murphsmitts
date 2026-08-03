@@ -48,7 +48,13 @@ Associates a unique public gallery photo URL/path with an optional order number.
 
 ### `shop_expenses`
 
-Manual expenses contain date, category, description, amount, optional quantity and unit kind, and timestamp. The newest categorized unit purchase teaches the client-side economics model an effective unit cost.
+Manual expenses contain date, category, description, amount, optional quantity and unit kind, and timestamp. Valid `lace_piece` purchases use cumulative weighted-average landed cost (`sum(amount) / sum(quantity)`); other categorized units retain their existing newest-valid-purchase behavior.
+
+### Completed-order economics and deletion
+
+`orders.economics_snapshot` and `orders.economics_locked_at` freeze historical actual economics when an order first reaches Completed or Picked Up. A database trigger creates the snapshot transactionally, and the migration idempotently backfills terminal orders that predate the feature. Existing snapshots are immutable and remain in place if an order later leaves and re-enters a terminal state.
+
+`delete_order_completely` restores exactly matching stocked lace, deletes order-owned labor, Bench Work, activity, and legacy lace-usage rows, unlinks shared SMS/gallery references, and deletes the order in one database transaction. Storage objects are intentionally retained because Storage cannot participate in the database transaction.
 
 ### `gloves_for_sale` and `glove_sale_photos`
 
@@ -89,5 +95,6 @@ Bucket creation, public access configuration, size limits, and Storage policies 
 | `20260721140000_enable_rls_all_tables.sql` | Enables RLS on all existing public tables |
 | `20260724120000_service_pricing.sql` | Creates pricing tables, seeds seven services with approved published prices, business settings, and analytics mappings |
 | `20260731120000_bench_focus.sql` | Adds Bench Focus sessions, labor linkage, constraints, RLS, and transactional lifecycle RPCs |
+| `20260803170000_order_economics_snapshots_delete_cascade.sql` | Adds immutable completed-order economics snapshots/backfill and transactional complete-order deletion/orphan cleanup |
 
 Migrations are additive and should be reviewed/applied in timestamp order. There is no checked-in Supabase config or automated migration verification in this repository.

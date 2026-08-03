@@ -1962,7 +1962,7 @@ await test("Stage 9 actions centralize authorization and global demo denial", as
   }
 });
 
-await test("deleteOrder preserves exact delete and no-row/no-storage behavior", async () => {
+await test("deleteOrder invokes the atomic cascade RPC and returns its counts", async () => {
   const { owner } = await sessionTokens();
   const missing = await invoke({ body: { action: "deleteOrder", _token: owner } });
   deepEqual(missing.json, { ok: false, error: "Missing orderNumber." });
@@ -1971,13 +1971,21 @@ await test("deleteOrder preserves exact delete and no-row/no-storage behavior", 
     body: { action: "deleteOrder", _token: owner, orderNumber: " 0999 " },
     fetchMock(input, init) {
       requestUrl = String(input);
-      equal(init.method, "DELETE");
+      equal(init.method, "POST");
       equal(init.headers.Prefer, "return=representation");
-      return jsonResponse([]);
+      deepEqual(JSON.parse(init.body), { p_order_number: "0999" });
+      return jsonResponse({
+        ok: true, deleted: true, orderNumber: "0999", inventoryColorsRestored: 1,
+        laborDeleted: 2, benchWorkDeleted: 1, activityDeleted: 4, laceUsageDeleted: 0,
+        smsUnlinked: 3, galleryLinksUnlinked: 2, ordersDeleted: 1
+      });
     }
   });
-  deepEqual(result.json, { ok: true, deleted: true, orderNumber: "0999" });
-  ok(requestUrl.includes("/rest/v1/orders?order_number=eq.0999"));
+  equal(result.json.ok, true);
+  equal(result.json.orderNumber, "0999");
+  equal(result.json.laborDeleted, 2);
+  equal(result.json.smsUnlinked, 3);
+  ok(requestUrl.includes("/rest/v1/rpc/delete_order_completely"));
   equal(requestUrl.includes("/storage/"), false);
   equal(result.fetchCalls.length, 1);
 });
@@ -2057,6 +2065,96 @@ await test("createOrder preserves validation order and manual-order defaults", a
   equal(inserted.glove_photos.length, 0);
   equal(inserted.tracking_token.length, 64);
   equal(created.fetchCalls.length, 3);
+});
+
+await test("createOrder reports preview notification suppression without stamps", async () => {
+  const { owner } = await sessionTokens();
+  let inserted;
+  const result = await invoke({
+    env: {
+      ...CORE_ENV, MURPHOS_ENV: "preview", RESEND_API_KEY: "resend-test",
+      TWILIO_ACCOUNT_SID: "ACtest", TWILIO_AUTH_TOKEN: "twilio-test",
+      TWILIO_MESSAGING_SERVICE_SID: "MGtest"
+    },
+    body: {
+      action: "createOrder", _token: owner,
+      order: {
+        customerName: "Preview Customer", emailAddress: "preview@example.com",
+        phoneNumber: "9105550199", smsOptIn: true
+      }
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse([{ order_number: "0200" }]);
+      if (callNumber === 2) {
+        inserted = JSON.parse(init.body);
+        return jsonResponse([inserted]);
+      }
+      if (callNumber === 3) return new Response("activity unavailable", { status: 500 });
+      return noNetworkFetch(input);
+    }
+  });
+  equal(result.json.ok, true);
+  equal(result.json.delivery.email.status, "suppressed");
+  equal(result.json.delivery.sms.status, "suppressed");
+  equal(result.json.order.lastStatusEmailed, null);
+  equal(result.json.order.lastStatusTexted, null);
+  equal(result.fetchCalls.length, 3);
+});
+
+await test("createOrder keeps success authoritative when delivery fails", async () => {
+  const { owner } = await sessionTokens();
+  let inserted;
+  const result = await invoke({
+    env: { ...CORE_ENV, RESEND_API_KEY: "resend-test" },
+    body: {
+      action: "createOrder", _token: owner,
+      order: { customerName: "Email Customer", emailAddress: "customer@example.com" }
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse([{ order_number: "0200" }]);
+      if (callNumber === 2) {
+        inserted = JSON.parse(init.body);
+        return jsonResponse([inserted]);
+      }
+      if (callNumber === 3) return new Response("activity unavailable", { status: 500 });
+      equal(String(input), "https://api.resend.com/emails");
+      return jsonResponse({ error: "delivery failed" }, 500);
+    }
+  });
+  equal(result.json.ok, true);
+  equal(result.json.order.orderNumber, "0201");
+  equal(result.json.delivery.email.status, "failed");
+  equal(result.json.delivery.sms.status, "skipped");
+  equal(result.fetchCalls.length, 4);
+});
+
+await test("createOrder stamps Received only after live delivery succeeds", async () => {
+  const { owner } = await sessionTokens();
+  let inserted;
+  let stamp;
+  const result = await invoke({
+    env: { ...CORE_ENV, RESEND_API_KEY: "resend-test" },
+    body: {
+      action: "createOrder", _token: owner,
+      order: { customerName: "Email Customer", emailAddress: "customer@example.com" }
+    },
+    fetchMock(input, init, callNumber) {
+      if (callNumber === 1) return jsonResponse([{ order_number: "0200" }]);
+      if (callNumber === 2) {
+        inserted = JSON.parse(init.body);
+        return jsonResponse([inserted]);
+      }
+      if (callNumber === 3) return new Response("activity unavailable", { status: 500 });
+      if (String(input) === "https://api.resend.com/emails") return jsonResponse({ id: "email-id" });
+      stamp = JSON.parse(init.body);
+      return jsonResponse([{ ...inserted, ...stamp }]);
+    }
+  });
+  equal(result.json.ok, true);
+  equal(result.json.delivery.email.status, "sent");
+  deepEqual(stamp, { last_status_emailed: "Received" });
+  equal(result.json.order.lastStatusEmailed, "Received");
+  equal(result.fetchCalls.length, 5);
 });
 
 await test("resend handlers preserve early validation and binding checks", async () => {

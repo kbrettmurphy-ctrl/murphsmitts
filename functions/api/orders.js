@@ -266,7 +266,11 @@ const ACTIONS = {
   },
   deleteOrder: {
     auth: "session", demo: "deny", handler: handleDeleteOrder,
-    effects: ["db:orders:delete"], bindings: { required: ["CORE"], optional: [] }
+    effects: [
+      "db:lace_inventory:write", "db:order_labor_sessions:delete", "db:bench_work_sessions:delete",
+      "db:order_activity:delete", "db:order_lace_usage:delete", "db:sms_messages:write",
+      "db:gallery_photo_links:write", "db:orders:delete"
+    ], bindings: { required: ["CORE"], optional: [] }
   },
   uploadOrderPhoto: {
     auth: "session", demo: "deny", handler: handleUploadOrderPhoto,
@@ -280,8 +284,17 @@ const ACTIONS = {
   },
   createOrder: {
     auth: "session", demo: "deny", handler: handleCreateOrder,
-    effects: ["db:orders:read", "db:orders:write", "db:order_activity:write"],
-    bindings: { required: ["CORE"], optional: [] }
+    effects: [
+      "db:orders:read", "db:orders:write", "db:order_activity:write",
+      "external:email:send", "external:sms:send", "db:sms_messages:write"
+    ],
+    bindings: {
+      required: ["CORE"],
+      optional: [
+        "RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO",
+        "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_MESSAGING_SERVICE_SID", "ENV-SIGNAL"
+      ]
+    }
   },
   resendStatusEmail: {
     auth: "session", demo: "deny", handler: handleResendStatusEmail,
@@ -1132,19 +1145,23 @@ async function handleResolveBenchWork({ env, body, jsonHeaders }) {
 async function handleDeleteOrder({ env, body, jsonHeaders }) {
   const orderNumber = String(body.orderNumber || "").trim();
   if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
-  const del = await supabaseFetch(
-    env,
-    `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
-    { method: "DELETE", headers: { Prefer: "return=representation" } }
-  );
+  const del = await supabaseFetch(env, "/rest/v1/rpc/delete_order_completely", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ p_order_number: orderNumber })
+  });
   if (!del.ok) {
     return json({
       ok: false,
-      error: "Failed to delete order from Supabase.",
+      error: "Failed to delete order and its history from Supabase.",
       details: del.error
     }, 200, jsonHeaders);
   }
-  return json({ ok: true, deleted: true, orderNumber }, 200, jsonHeaders);
+  const result = Array.isArray(del.data) ? del.data[0] : del.data;
+  if (!result || result.ok !== true) {
+    return json(result || { ok: false, error: "Invalid delete response." }, 200, jsonHeaders);
+  }
+  return json(result, 200, jsonHeaders);
 }
 
 async function handleUploadOrderPhoto({ env, body, jsonHeaders }) {
@@ -1183,6 +1200,9 @@ async function handleUpdateOrder({ env, body, jsonHeaders }) {
   }
 
   const oldRow = existing.data;
+  if (isLaceColorSentinel(updates.primaryLaceColor ?? updates.lacePrimary) || isLaceColorSentinel(updates.secondaryLaceColor ?? updates.laceAccent)) {
+    return json({ ok: false, error: "Enter the supplier's actual special-order color name." }, 200, jsonHeaders);
+  }
   const oldStatus = normalizeStatus(oldRow.status);
   const lastStatusEmailed = normalizeStatus(oldRow.last_status_emailed);
   const lastStatusTexted = normalizeStatus(oldRow.last_status_texted);
@@ -1755,6 +1775,9 @@ async function handleSetGalleryPhotoOrder({ env, body, jsonHeaders }) {
   const orderNumber = cleanText(body.orderNumber);
   if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
   const d = body.descriptors && typeof body.descriptors === "object" ? body.descriptors : null;
+  if (isLaceColorSentinel(d?.primaryLaceColor) || isLaceColorSentinel(d?.secondaryLaceColor)) {
+    return json({ ok: false, error: "Enter the supplier's actual special-order color name." }, 200, jsonHeaders);
+  }
   const descriptors = {
     brand_model: cleanText(d?.brandModel) || null,
     glove_type: cleanText(d?.gloveType) || null,
@@ -3529,6 +3552,10 @@ async function createOrderAction(env, body) {
     }
   }
 
+  if (isLaceColorSentinel(input.primaryLaceColor ?? input.lacePrimary) || isLaceColorSentinel(input.secondaryLaceColor ?? input.laceAccent)) {
+    return { ok: false, error: "Enter the supplier's actual special-order color name." };
+  }
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const nextOrderNumber = await getNextAdminOrderNumber(env);
     const dbOrder = {
@@ -3578,6 +3605,7 @@ async function createOrderAction(env, body) {
     );
 
     if (insert.ok && Array.isArray(insert.data) && insert.data[0]) {
+      let createdRow = insert.data[0];
       await logOrderActivity(env, {
         orderNumber: insert.data[0].order_number,
         eventType: "order_created_manual",
@@ -3588,9 +3616,31 @@ async function createOrderAction(env, body) {
         }
       });
 
+      const delivery = await deliverCreatedOrderReceivedNotifications(env, createdRow);
+      const stamp = {};
+      if (delivery.email.status === "sent") stamp.last_status_emailed = "Received";
+      if (delivery.sms.status === "sent") stamp.last_status_texted = "Received";
+      if (Object.keys(stamp).length) {
+        const stamped = await supabaseFetch(
+          env,
+          `/rest/v1/orders?order_number=eq.${encodeURIComponent(createdRow.order_number)}`,
+          {
+            method: "PATCH",
+            headers: { Prefer: "return=representation" },
+            body: JSON.stringify(stamp)
+          }
+        );
+        if (stamped.ok && Array.isArray(stamped.data) && stamped.data[0]) {
+          createdRow = stamped.data[0];
+        } else {
+          delivery.warning = "Customer notification sent, but its delivery stamp could not be saved.";
+        }
+      }
+
       return {
         ok: true,
-        order: mapOrderFromDb(insert.data[0])
+        order: mapOrderFromDb(createdRow),
+        delivery
       };
     }
 
@@ -3608,6 +3658,53 @@ async function createOrderAction(env, body) {
     ok: false,
     error: "Could not reserve the next order number. Please try again."
   };
+}
+
+async function deliverCreatedOrderReceivedNotifications(env, row) {
+  const order = mapOrderFromDb(row);
+  const delivery = {
+    email: { status: "skipped", reason: "No email address on order." },
+    sms: { status: "skipped", reason: "Customer did not opt in to SMS." }
+  };
+
+  if (cleanText(order.emailAddress)) {
+    if (isPreviewEnvironment(env)) {
+      delivery.email = { status: "suppressed", reason: "Preview environment." };
+    } else if (!env.RESEND_API_KEY) {
+      delivery.email = { status: "failed", reason: "Missing RESEND_API_KEY environment variable." };
+    } else {
+      try {
+        const result = await sendStatusEmail(env, row, "Received");
+        delivery.email = result.ok
+          ? { status: result.suppressed ? "suppressed" : "sent" }
+          : { status: "failed", reason: "Received email failed to send.", details: result.error };
+      } catch (error) {
+        delivery.email = { status: "failed", reason: "Received email failed to send.", details: String(error?.message || error) };
+      }
+    }
+  }
+
+  if (order.smsOptIn) {
+    const to = toE164US(order.phoneNumber);
+    if (!to) {
+      delivery.sms = { status: "skipped", reason: "Invalid or missing phone number." };
+    } else if (isPreviewEnvironment(env)) {
+      delivery.sms = { status: "suppressed", reason: "Preview environment." };
+    } else if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
+      delivery.sms = { status: "failed", reason: "Missing Twilio environment variables." };
+    } else {
+      try {
+        const result = await sendStatusText(env, row, "Received");
+        delivery.sms = result.ok
+          ? { status: result.suppressed ? "suppressed" : "sent" }
+          : { status: "failed", reason: "Received text failed to send.", details: result.error };
+      } catch (error) {
+        delivery.sms = { status: "failed", reason: "Received text failed to send.", details: String(error?.message || error) };
+      }
+    }
+  }
+
+  return delivery;
 }
 
 async function getNextAdminOrderNumber(env) {
@@ -4691,6 +4788,8 @@ function mapOrderFromDb(row) {
     customAddonAmount: row.custom_addon_amount,
     customAddonLabel: row.custom_addon_label,
     lacePiecesUsed: row.lace_pieces_used != null ? Number(row.lace_pieces_used) : null,
+    economicsSnapshot: row.economics_snapshot || null,
+    economicsLockedAt: row.economics_locked_at || null,
     shippingCost: row.shipping_cost,
     paid: row.paid,
     allowShipWithoutPayment: row.allow_ship_without_payment,
@@ -6571,6 +6670,11 @@ function cleanText(value) {
   if (value === null || value === undefined) return null;
   const s = String(value).trim();
   return s === "" ? null : s;
+}
+
+function isLaceColorSentinel(value) {
+  const color = (cleanText(value) || "").toLowerCase().replace(/\u2026/g, "").trim();
+  return color === "__custom__" || color === "special-order color" || color === "custom color";
 }
 
 function cleanNumeric(value) {
