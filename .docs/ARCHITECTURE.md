@@ -52,6 +52,10 @@ Logout removes the session token and role plus persisted order/address caches an
 
 The public site has a favicon manifest but no public service worker. `/admin/` is installable with its own manifest and service worker. The admin service worker intentionally performs no caching: it claims clients, shows Web Push notifications, focuses/navigates an existing admin window on notification click, and notifies open clients to refresh messages. The SPA also hashes fetched admin assets periodically and reloads when it detects a changed build.
 
+## Bench Focus
+
+Bench Focus is a server-authoritative operational context separate from order status and official labor. One active `bench_work_sessions` row identifies the glove physically on the bench; ended unresolved rows remain reviewable without blocking later work. Linked `order_labor_sessions` remain the only measured time used by economics. Cross-table starts, endings, timer dispositions, and reconciliation run through transaction-safe Supabase RPCs. The admin refreshes state on navigation/focus/visibility, polls while active, and uses BroadcastChannel/storage events only as refetch hints.
+
 ## Generated and local-only paths
 
 `_site/`, `.jekyll-cache/`, `.wrangler/`, and `supabase/.temp/` are generated/local state and ignored by Git. Local secret files are ignored. Documentation must list variable names only, never values.

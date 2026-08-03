@@ -59,6 +59,9 @@ The current as-built system is documented in `.docs/ARCHITECTURE.md`, `.docs/FEA
 - Clubhouse dashboard: `renderHomeDashboard`, `renderDashboardOrderRow/List`,
   `wireHomeDashboardActions` (single delegated click listener on `dashboardPanel`),
   `getBenchPreviewOrders`, `getOnDeckOrders`; labor state in `dashboardLaborSessions`
+- Bench Focus: server state in `benchFocusState`; `refreshBenchFocusState`,
+  `renderBenchFocusCard`, `startBenchWorkFromDashboard`, and unresolved reconciliation.
+  Bench elapsed is never official labor; database RPCs own cross-table transitions.
 - Orders list: `renderOrderRow`-style card rendering, swipe actions, ••• menu
   (`toggleDesktopOrderActionMenu`), workflow sheet (`openWorkflowSheet(order, event)` —
   global + order-agnostic, right-click/long-press to open)
@@ -95,6 +98,7 @@ node --check admin/admin.js
 node --check functions/api/orders.js   # if touched
 node scripts/action-dispatch-selftest.mjs  # dispatcher/auth characterization
 node scripts/pricing-selftest.mjs
+node scripts/bench-focus-selftest.mjs
 git diff --check
 git status --short
 ```

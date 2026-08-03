@@ -24,7 +24,11 @@ Append-only activity events keyed by order number with type, label, optional det
 
 ### `order_labor_sessions`
 
-Sessions contain order number, phase, start/end timestamps, computed duration minutes, notes, status (`running`, `paused`, `stopped`), pause timestamp, accumulated paused seconds, and timestamps. A partial index covers open sessions.
+Sessions contain order number, phase, start/end timestamps, computed duration minutes, notes, status (`running`, `paused`, `stopped`), pause timestamp, accumulated paused seconds, and timestamps. A partial index covers open sessions. Optional `bench_work_session_id` and `started_from_bench` fields audit phases performed during Bench Focus and constrain the original Bench timestamp to one labor row.
+
+### `bench_work_sessions`
+
+Bench Work records physical workbench context independently from labor and workflow status. Start/end timestamps, resolution (`pending`, `labor_recorded`, `discarded`), one-time backdate consumption, reminder snooze, actor, and audit timestamps support recovery and reconciliation. A partial unique index permits one active row globally; ended pending rows remain non-blocking. Transactional RPCs coordinate Bench Work and labor changes.
 
 ### `admin_users` and `webauthn_credentials`
 
@@ -84,5 +88,6 @@ Bucket creation, public access configuration, size limits, and Storage policies 
 | `20260719120000_tracking_tokens.sql` | Adds/backfills unique public tracking tokens |
 | `20260721140000_enable_rls_all_tables.sql` | Enables RLS on all existing public tables |
 | `20260724120000_service_pricing.sql` | Creates pricing tables, seeds seven services with approved published prices, business settings, and analytics mappings |
+| `20260731120000_bench_focus.sql` | Adds Bench Focus sessions, labor linkage, constraints, RLS, and transactional lifecycle RPCs |
 
 Migrations are additive and should be reviewed/applied in timestamp order. There is no checked-in Supabase config or automated migration verification in this repository.

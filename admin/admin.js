@@ -154,6 +154,15 @@ let financeFilterMenuOpen = false;
 let dashboardLaborSessions = {};
 let dashboardTimerPopoverOrder = null;
 let dashboardTimerBusy = false;
+let benchChoiceRoot = null;
+let benchFocusState = { activeBench: null, activeLabor: null, unlinkedPausedLabor: null, unresolved: [], serverNow: null };
+let benchFocusBusy = false;
+let benchFocusPollInterval = null;
+let benchFocusClockOffsetMs = 0;
+const BENCH_FOCUS_SIGNAL_KEY = "mm_bench_focus_changed";
+const benchFocusChannel = typeof BroadcastChannel === "function"
+  ? new BroadcastChannel("murphos-bench-focus")
+  : null;
 
 /* Set of order numbers that have at least one real activity-log entry
    (the manual-creation event is excluded server-side). Drives the New
@@ -404,6 +413,8 @@ function clearToken() {
   laceInventory = [];
   galleryPhotos = [];
   dashboardLaborSessions = {};
+  benchFocusState = { activeBench: null, activeLabor: null, unlinkedPausedLabor: null, unresolved: [], serverNow: null };
+  stopBenchFocusPolling();
   dashboardActivityOrders = new Set();
   dashboardActivityLoaded = false;
   allMessages = [];
@@ -529,7 +540,9 @@ async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
       }
     }
 
-    throw new Error(message);
+    const error = new Error(message);
+    Object.assign(error, data);
+    throw error;
   }
 
   return data;
@@ -1529,7 +1542,25 @@ function renderDashboardTimerButton(order, session) {
       data-timer-order="${escapeAttr(orderKey)}"
       aria-haspopup="menu"
       aria-label="${escapeAttr(ariaLabel)}"
+      ${dashboardTimerBusy ? "disabled" : ""}
     >${DASHBOARD_TIMER_ICONS[icon]}</button>
+  `;
+}
+
+function renderBenchFocusTimerControls(order, session, bench) {
+  const orderKey = String(order.orderNumber || bench.orderNumber || "");
+  const status = getLaborSessionStatus(session);
+  const primary = status === "paused"
+    ? { control: "resume", label: "Resume", icon: "resume" }
+    : { control: "pause", label: "Pause", icon: "pause" };
+  const common = `data-timer-order="${escapeAttr(orderKey)}" data-session-id="${escapeAttr(session.id)}" data-bench-session-id="${escapeAttr(bench.id)}"`;
+  return `
+    <button type="button" class="bench-focus-timer-control" data-timer-control="${primary.control}" ${common} ${dashboardTimerBusy ? "disabled" : ""}>
+      ${DASHBOARD_TIMER_ICONS[primary.icon]}<span>${primary.label}</span>
+    </button>
+    <button type="button" class="bench-focus-timer-control is-stop" data-timer-control="stop" ${common} ${dashboardTimerBusy ? "disabled" : ""}>
+      <span aria-hidden="true" class="bench-focus-stop-icon">■</span><span>Stop</span>
+    </button>
   `;
 }
 
@@ -1539,6 +1570,7 @@ function renderDashboardOrderRow(order, { timerControls = false } = {}) {
   const brand = String(order.brandModel || "").trim();
   const meta = [brand, lace].filter(Boolean).join(" · ");
   const orderKey = String(order.orderNumber || "");
+  const isFocusedOrder = String(benchFocusState.activeBench?.orderNumber || "") === orderKey;
   const session = timerControls ? (dashboardLaborSessions[orderKey] || null) : null;
   const timerStateHtml = session
     ? `<span class="dashboard-bench-timer-state" data-bench-timer="${escapeAttr(orderKey)}">${escapeHtml(getDashboardTimerStateLabel(session))}</span>`
@@ -1564,11 +1596,484 @@ function renderDashboardOrderRow(order, { timerControls = false } = {}) {
       </div>
       ${timerControls ? `
         <div class="dashboard-bench-actions">
-          ${renderDashboardTimerButton(order, session)}
+          <button
+            type="button"
+            class="bench-focus-start-btn"
+            data-bench-start="${escapeAttr(orderKey)}"
+            ${benchFocusBusy || isFocusedOrder ? "disabled" : ""}
+          >${isFocusedOrder ? "On Bench" : "Start Bench Work"}</button>
+          ${isFocusedOrder ? "" : renderDashboardTimerButton(order, session)}
         </div>
       ` : ""}
     </div>
   `;
+}
+
+function getBenchFocusNow() {
+  return Date.now() + benchFocusClockOffsetMs;
+}
+
+function formatBenchElapsed(startedAt, endedAt = null) {
+  const start = Date.parse(startedAt);
+  const end = endedAt ? Date.parse(endedAt) : getBenchFocusNow();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return "—";
+  const minutes = Math.max(0, Math.floor((end - start) / 60000));
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
+function isBenchLaborReminderDue(bench, labor = benchFocusState.activeLabor) {
+  if (!bench || labor || benchFocusState.unlinkedPausedLabor) return false;
+  return getBenchFocusNow() >= Date.parse(bench.startedAt) + 90000 &&
+    (!bench.reminderSnoozedUntil || getBenchFocusNow() >= Date.parse(bench.reminderSnoozedUntil));
+}
+
+function renderBenchFocusCard() {
+  const bench = benchFocusState.activeBench;
+  if (!bench) return "";
+  const order = allOrders.find(item => String(item.orderNumber) === String(bench.orderNumber)) || {};
+  const labor = benchFocusState.activeLabor;
+  const unlinkedPausedLabor = benchFocusState.unlinkedPausedLabor;
+  const laborStatus = labor ? getLaborSessionStatus(labor) : "";
+  const reminderDue = isBenchLaborReminderDue(bench, labor);
+  return `
+    <section class="bench-focus-card" data-bench-focus-card>
+      <div class="bench-focus-context">
+        <div class="bench-focus-eyebrow">Bench Work</div>
+        <div class="bench-focus-heading">#${escapeHtml(bench.orderNumber)} · ${escapeHtml(order.customerName || "Customer")}</div>
+        <div class="bench-focus-summary">${escapeHtml(order.brandModel || order.gloveType || "Glove")}</div>
+        <div class="bench-focus-bench-time">
+          <span>Started ${escapeHtml(formatLaborDateTime(bench.startedAt))}</span>
+          <span>Bench <strong data-bench-elapsed>${escapeHtml(formatBenchElapsed(bench.startedAt))}</strong></span>
+        </div>
+      </div>
+      <div class="bench-focus-labor${labor ? " has-labor" : ""}">
+        <div class="bench-focus-labor-heading">${escapeHtml(labor?.phase || "No labor timer")}</div>
+        ${labor ? `
+          <div class="bench-focus-labor-status">${escapeHtml(laborStatus === "paused" ? "Paused" : "Running")} · Labor <strong data-bench-labor-elapsed>${escapeHtml(formatLaborDuration(getLaborActiveSeconds(labor) / 60))}</strong></div>
+          <div class="bench-focus-card-actions"><div class="bench-focus-labor-controls">${renderBenchFocusTimerControls(order, labor, bench)}</div><button type="button" class="bench-focus-end-btn" data-bench-end>End Bench Work</button></div>
+        ` : unlinkedPausedLabor ? `
+          <p class="bench-focus-paused-warning">A paused labor session is still open for this order.</p>
+          <div class="bench-focus-card-actions"><div class="bench-focus-reminder-actions">
+            <button type="button" data-bench-paused-resume>Resume Existing Timer</button>
+            <button type="button" data-bench-paused-stop>Stop Existing Timer</button>
+          </div><button type="button" class="bench-focus-end-btn" data-bench-end>End Bench Work</button></div>
+        ` : `
+          <div class="bench-focus-card-actions"><div class="bench-focus-reminder-actions">
+            ${!bench.backdateConsumedAt ? `<button type="button" data-bench-labor-start="bench">Start from Bench Work</button>` : ""}
+            <button type="button" data-bench-labor-start="now">Start Now</button>
+          </div><button type="button" class="bench-focus-end-btn" data-bench-end>End Bench Work</button></div>
+          <div class="bench-focus-reminder" data-bench-labor-reminder ${reminderDue ? "" : "hidden"}>
+            <span>No labor timer is running.</span>
+            <button type="button" data-bench-remind-later>Remind Later</button>
+          </div>
+        `}
+      </div>
+    </section>
+  `;
+}
+
+async function resumeExistingPausedLaborForBench() {
+  const bench = benchFocusState.activeBench;
+  const labor = benchFocusState.unlinkedPausedLabor;
+  if (!bench || !labor || benchFocusBusy) return;
+  benchFocusBusy = true;
+  try {
+    await postJson({
+      action: "resumePausedLaborForBench",
+      benchSessionId: bench.id,
+      laborSessionId: labor.id
+    }, true);
+    broadcastBenchFocusChange();
+    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+  } catch (error) {
+    alert(error.message || "The paused labor timer could not be resumed.");
+    await refreshBenchFocusState();
+  } finally {
+    benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
+  }
+}
+
+async function stopExistingPausedLaborForBench() {
+  const labor = benchFocusState.unlinkedPausedLabor;
+  if (!labor || benchFocusBusy) return;
+  benchFocusBusy = true;
+  try {
+    await postJson({ action: "stopLaborSession", sessionId: labor.id }, true);
+    broadcastBenchFocusChange();
+    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+  } catch (error) {
+    alert(error.message || "The paused labor timer could not be stopped.");
+    await refreshBenchFocusState();
+  } finally {
+    benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
+  }
+}
+
+async function resumePausedLaborWithNewBenchWork(session, anchor = null) {
+  if (!session?.id || dashboardTimerBusy || benchFocusBusy) return;
+  const choice = await openBenchChoiceSheet({
+    title: "Resume timer and put this glove back on the bench?",
+    anchor,
+    actions: [
+      { label: "Resume and Start Bench Work", value: "resume" },
+      { label: "Cancel", value: "" }
+    ]
+  });
+  if (choice !== "resume") return;
+
+  dashboardTimerBusy = true;
+  if (activeView === "dashboard") renderHomeDashboard();
+  try {
+    await postJson({ action: "resumeLaborWithNewBenchWork", laborSessionId: session.id }, true);
+    broadcastBenchFocusChange();
+  } catch (error) {
+    alert(error.message || "The paused labor timer could not be resumed on the bench.");
+  } finally {
+    dashboardTimerBusy = false;
+    await refreshBenchFocusSurfaces();
+  }
+}
+
+function closeBenchChoiceSheet(value = null) {
+  const sheet = benchChoiceRoot;
+  if (!sheet) return;
+  document.removeEventListener("keydown", handleBenchChoiceKeydown);
+  if (sheet._reposition) {
+    window.removeEventListener("resize", sheet._reposition);
+    window.removeEventListener("scroll", sheet._reposition, true);
+  }
+  const resolve = sheet._resolve;
+  sheet._resolve = null;
+  sheet._reposition = null;
+  sheet.hidden = true;
+  sheet.className = "bench-choice-sheet";
+  sheet.innerHTML = "";
+  if (resolve) resolve(value);
+}
+
+function handleBenchChoiceKeydown(event) {
+  if (event.key === "Escape") closeBenchChoiceSheet();
+}
+
+function getBenchChoiceRoot() {
+  if (benchChoiceRoot?.isConnected) return benchChoiceRoot;
+  benchChoiceRoot = document.createElement("div");
+  benchChoiceRoot.className = "bench-choice-sheet";
+  benchChoiceRoot.hidden = true;
+  benchChoiceRoot.addEventListener("click", event => {
+    const action = event.target.closest?.("[data-action]");
+    const dismiss = event.target.closest?.("[data-overlay-dismiss]");
+    if (!action && !dismiss) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    closeBenchChoiceSheet(action?.dataset.action ?? null);
+  });
+  document.body.appendChild(benchChoiceRoot);
+  return benchChoiceRoot;
+}
+
+function openBenchChoiceSheet({ title, message = "", content = "", actions = [], anchor = null }) {
+  closeBenchChoiceSheet();
+  return new Promise(resolve => {
+    const sheet = getBenchChoiceRoot();
+    const anchorElement = anchor?.x == null && anchor?.getBoundingClientRect ? anchor : null;
+    const anchorPosition = anchor?.x != null ? anchor : (anchor ? getAdminAnchorPosition(null, anchor) : null);
+    sheet.className = `bench-choice-sheet${anchorPosition ? " is-anchored" : ""}`;
+    sheet.hidden = false;
+    sheet._resolve = resolve;
+    sheet.innerHTML = `<div class="bench-choice-backdrop" data-overlay-dismiss></div><div class="bench-choice-panel" role="dialog" aria-modal="false" aria-labelledby="benchChoiceTitle">
+      <div id="benchChoiceTitle" class="bench-choice-title">${escapeHtml(title)}</div>
+      ${message ? `<p>${escapeHtml(message)}</p>` : ""}
+      ${content}
+      <div class="bench-choice-actions">${actions.map(action => `<button type="button" data-action="${escapeAttr(action.value)}" class="${action.danger ? "is-danger" : ""}"><span>${escapeHtml(action.label)}</span></button>`).join("")}</div>
+    </div>`;
+    document.addEventListener("keydown", handleBenchChoiceKeydown);
+    if (anchorPosition) {
+      const panel = sheet.querySelector(".bench-choice-panel");
+      const reposition = () => {
+        if (!sheet.isConnected) return;
+        let position = anchorPosition;
+        if (anchorElement?.isConnected) {
+          const rect = anchorElement.getBoundingClientRect();
+          const panelHeight = panel.getBoundingClientRect().height;
+          const below = rect.bottom + 6;
+          position = {
+            x: rect.left,
+            y: below + panelHeight <= window.innerHeight - 12
+              ? below
+              : Math.max(12, rect.top - panelHeight - 6)
+          };
+        }
+        positionWorkflowMenu(panel, position);
+      };
+      sheet._reposition = () => requestAnimationFrame(reposition);
+      window.addEventListener("resize", sheet._reposition);
+      window.addEventListener("scroll", sheet._reposition, true);
+      reposition();
+    }
+  });
+}
+
+async function chooseBenchLaborPhase(title, anchor = null) {
+  return openBenchChoiceSheet({
+    title,
+    anchor,
+    actions: [...LABOR_TIMER_PHASES.map(phase => ({ label: phase, value: phase })), { label: "Cancel", value: "" }]
+  });
+}
+
+async function startLaborForActiveBench(mode, anchor = null) {
+  const bench = benchFocusState.activeBench;
+  if (!bench || benchFocusBusy) return;
+  const phase = await chooseBenchLaborPhase(mode === "bench" ? "Start from Bench Work" : "Start labor now", anchor);
+  if (!phase) return;
+  benchFocusBusy = true;
+  try {
+    await postJson({
+      action: "startLaborSession",
+      orderNumber: bench.orderNumber,
+      phase,
+      benchSessionId: bench.id,
+      benchStartMode: mode
+    }, true);
+    broadcastBenchFocusChange();
+    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+  } catch (error) {
+    alert(error.message || "Labor timer could not be started.");
+    await refreshBenchFocusState();
+  } finally {
+    benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
+  }
+}
+
+async function snoozeBenchReminder() {
+  const bench = benchFocusState.activeBench;
+  if (!bench || benchFocusBusy) return;
+  benchFocusBusy = true;
+  try {
+    await postJson({ action: "snoozeBenchReminder", benchSessionId: bench.id }, true);
+    broadcastBenchFocusChange();
+    await refreshBenchFocusState();
+  } catch (error) {
+    alert(error.message || "Reminder could not be snoozed.");
+  } finally {
+    benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
+  }
+}
+
+async function refreshBenchFocusSurfaces({ refreshViewedLabor = false } = {}) {
+  await Promise.all([
+    refreshBenchFocusState({ rerender: false }),
+    refreshDashboardLaborSessions({ rerender: false })
+  ]);
+  if (dashboardPanel) renderHomeDashboard();
+  refreshOrderDetailBenchBanner();
+  if (refreshViewedLabor && detailView?.classList.contains("active") && currentOrder?.orderNumber) {
+    await loadLaborSessions(currentOrder.orderNumber);
+  }
+}
+
+async function endActiveBenchWork({ switchToOrder = "", anchor = null } = {}) {
+  const bench = benchFocusState.activeBench;
+  if (!bench || benchFocusBusy) return false;
+  const choiceAnchor = anchor?.x != null ? anchor : (anchor ? getAdminAnchorPosition(null, anchor) : null);
+  let runningAction = "none";
+  if (getLaborSessionStatus(benchFocusState.activeLabor) === "running") {
+    runningAction = await openBenchChoiceSheet({
+      title: switchToOrder ? "End current Bench Work and switch?" : "End Bench Work",
+      message: "A linked labor timer is running. Choose how to resolve it.",
+      actions: [
+        { label: switchToOrder ? "Pause Timer and Switch" : "Pause Timer and End Bench Work", value: "pause" },
+        { label: switchToOrder ? "Stop Timer and Switch" : "Stop Timer and End Bench Work", value: "stop", danger: true },
+        { label: "Cancel", value: "" }
+      ],
+      anchor: choiceAnchor
+    });
+    if (!runningAction) return false;
+  }
+  benchFocusBusy = true;
+  try {
+    const result = await postJson({ action: "endBenchWork", benchSessionId: bench.id, runningAction }, true);
+    broadcastBenchFocusChange();
+    await refreshBenchFocusSurfaces({ refreshViewedLabor: true });
+    if (result.bench?.resolution === "pending") {
+      const unresolvedBench = benchFocusState.unresolved.find(item => item.id === result.bench.id) || result.bench;
+      openImmediateBenchResolution(unresolvedBench, choiceAnchor);
+    }
+    if (switchToOrder) {
+      benchFocusBusy = false;
+      await startBenchWorkFromDashboard(switchToOrder, {}, choiceAnchor);
+    }
+    return true;
+  } catch (error) {
+    if (error.runningLaborChoice) return endActiveBenchWork({ switchToOrder, anchor: choiceAnchor });
+    alert(error.message || "Bench Work could not be ended.");
+    await refreshBenchFocusState();
+    return false;
+  } finally {
+    benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
+    refreshOrderDetailBenchBanner();
+  }
+}
+
+async function resolveBenchInterval(bench, resolution, anchor = null) {
+  if (!bench || benchFocusBusy) return;
+  if (resolution === "labor_recorded" && bench.hasOpenLabor) {
+    alert("Stop or resolve the open labor session before assigning this Bench Work interval.");
+    return;
+  }
+  let phase = "";
+  if (resolution === "labor_recorded") {
+    phase = await chooseBenchLaborPhase("Assign Bench Work time", anchor);
+    if (!phase) return;
+  } else {
+    const confirmed = await openBenchChoiceSheet({
+      title: "Discard Bench Work time?",
+      message: "This interval will remain in history but will not count as labor.",
+      actions: [{ label: "Discard", value: "discard", danger: true }, { label: "Cancel", value: "" }],
+      anchor
+    });
+    if (confirmed !== "discard") return;
+  }
+  benchFocusBusy = true;
+  try {
+    await postJson({ action: "resolveBenchWork", benchSessionId: bench.id, resolution, phase }, true);
+    broadcastBenchFocusChange();
+    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+    if (activeView === "dashboard") renderHomeDashboard();
+  } catch (error) {
+    await refreshBenchFocusState({ rerender: false });
+    const stillUnresolved = benchFocusState.unresolved.some(item => String(item.id) === String(bench.id));
+    if (!stillUnresolved) {
+      broadcastBenchFocusChange();
+      await refreshDashboardLaborSessions({ rerender: false });
+      return;
+    }
+    alert(String(error.message || "").startsWith("Non-JSON response:")
+      ? "The server response was interrupted. Bench Work was rechecked and is still unresolved. Try again."
+      : (error.message || "Bench Work could not be resolved."));
+  } finally {
+    benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
+  }
+}
+
+async function openImmediateBenchResolution(bench, anchor = null) {
+  const choice = await openBenchChoiceSheet({
+    title: "Bench Work ended without labor.",
+    message: bench.hasOpenLabor
+      ? `#${bench.orderNumber} · A separate paused labor session remains open. Stop or resolve it before assigning the entire Bench interval.`
+      : `#${bench.orderNumber} · ${formatBenchElapsed(bench.startedAt, bench.endedAt)}`,
+    actions: [
+      ...(!bench.hasOpenLabor ? [{ label: "Assign Time", value: "labor_recorded" }] : []),
+      { label: "Discard", value: "discarded", danger: true },
+      { label: "Resolve Later", value: "" }
+    ],
+    anchor
+  });
+  if (choice) resolveBenchInterval(bench, choice, anchor);
+}
+
+async function openUnresolvedBenchList(anchor = null) {
+  const choiceAnchor = anchor?.x != null ? anchor : (anchor ? getAdminAnchorPosition(null, anchor) : null);
+  const content = `<div class="bench-unresolved-list">${benchFocusState.unresolved.map(bench => {
+      const order = allOrders.find(item => String(item.orderNumber) === String(bench.orderNumber)) || {};
+      return `<article class="bench-unresolved-row">
+        <div><strong>#${escapeHtml(bench.orderNumber)} · ${escapeHtml(order.customerName || "Customer")}</strong>
+        <span>${escapeHtml(formatLaborDateTime(bench.startedAt))} – ${escapeHtml(formatLaborDateTime(bench.endedAt))}</span>
+        <span>${escapeHtml(formatBenchElapsed(bench.startedAt, bench.endedAt))}</span>
+        ${bench.hasOpenLabor ? `<span class="bench-unresolved-conflict">Paused labor remains open — stop it before assigning.</span>` : ""}</div>
+        <div class="bench-unresolved-actions">
+          <button type="button" data-action="assign:${escapeAttr(bench.id)}" ${bench.hasOpenLabor ? "disabled" : ""}>Assign</button>
+          <button type="button" class="is-danger" data-action="discard:${escapeAttr(bench.id)}">Discard</button>
+        </div>
+      </article>`;
+    }).join("")}</div>`;
+  const choice = await openBenchChoiceSheet({
+    title: "Bench Work time to review",
+    content,
+    actions: [{ label: "Close", value: "" }],
+    anchor: choiceAnchor
+  });
+  const [resolution, id] = String(choice || "").split(":");
+  if (!id) return;
+  const bench = benchFocusState.unresolved.find(item => String(item.id) === id);
+  if (bench) resolveBenchInterval(bench, resolution === "assign" ? "labor_recorded" : "discarded", choiceAnchor);
+}
+
+async function startBenchWorkFromDashboard(orderNumber, options = {}, anchor = null) {
+  if (benchFocusBusy) return;
+  const choiceAnchor = anchor?.x != null ? anchor : (anchor ? getAdminAnchorPosition(null, anchor) : null);
+  benchFocusBusy = true;
+  renderHomeDashboard();
+  try {
+    await postJson({ action: "startBenchWork", orderNumber, ...options }, true);
+    broadcastBenchFocusChange();
+    await refreshBenchFocusState();
+    await refreshDashboardLaborSessions();
+  } catch (error) {
+    if (error.requiresConfirmation) {
+      const physical = error.receivedPhysicalPresence ? "\n\nContinue only if the glove is physically present." : "";
+      if (confirm(`This order is currently ${error.status}. Start Bench Work without changing its status?${physical}`)) {
+        benchFocusBusy = false;
+        return startBenchWorkFromDashboard(orderNumber, { ...options, confirmStatusOverride: true }, choiceAnchor);
+      }
+    } else if (error.pausedLaborChoice) {
+      const choice = await openBenchChoiceSheet({
+        title: `Paused timer for #${orderNumber}`,
+        message: "Resume this order’s timer and start Bench Work for the same glove?",
+        actions: [
+          { label: "Resume Timer and Start Bench Work", value: "resume_attach" },
+          { label: "Start Bench Work and Leave Timer Paused", value: "leave" },
+          { label: "Cancel", value: "cancel" }
+        ],
+        anchor: choiceAnchor
+      });
+      if (choice && choice !== "cancel") {
+        benchFocusBusy = false;
+        return startBenchWorkFromDashboard(orderNumber, { ...options, pausedAction: choice }, choiceAnchor);
+      }
+    } else if (error.conflict === "active_bench") {
+      const choice = await openBenchChoiceSheet({
+        title: "Another glove is on the bench.",
+        message: `End Bench Work for #${error.activeOrderNumber || "current order"} before switching.`,
+        actions: [{ label: "End Current and Switch", value: "switch" }, { label: "Stay on Current Glove", value: "" }],
+        anchor: choiceAnchor
+      });
+      if (choice === "switch") {
+        benchFocusBusy = false;
+        return endActiveBenchWork({ switchToOrder: orderNumber });
+      }
+    } else if (error.conflict === "other_running_labor") {
+      const choice = await openBenchChoiceSheet({
+        title: "Another labor timer is running.",
+        message: `Resolve the timer for #${error.laborOrderNumber || "another order"} before switching.`,
+        actions: [
+          { label: "Pause Timer and Switch", value: "pause" },
+          { label: "Stop Timer and Switch", value: "stop", danger: true },
+          { label: "Stay on Current Glove", value: "" },
+          { label: "Cancel", value: "" }
+        ],
+        anchor: choiceAnchor
+      });
+      if (choice) {
+        benchFocusBusy = false;
+        return startBenchWorkFromDashboard(orderNumber, { ...options, otherRunningAction: choice }, choiceAnchor);
+      }
+    } else {
+      alert(error.message || "Bench Work could not be started.");
+    }
+  } finally {
+    benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
+  }
 }
 
 function renderDashboardOrderList(orders, emptyMessage, options = {}) {
@@ -1598,6 +2103,59 @@ async function refreshDashboardLaborSessions({ rerender = true } = {}) {
   }
 }
 
+function stopBenchFocusPolling() {
+  if (benchFocusPollInterval) {
+    clearInterval(benchFocusPollInterval);
+    benchFocusPollInterval = null;
+  }
+}
+
+function syncBenchFocusPolling() {
+  if (!getToken() || !benchFocusState.activeBench) {
+    stopBenchFocusPolling();
+    return;
+  }
+  if (!benchFocusPollInterval) {
+    benchFocusPollInterval = setInterval(() => refreshBenchFocusState(), 15000);
+  }
+}
+
+function broadcastBenchFocusChange() {
+  benchFocusChannel?.postMessage({ type: "changed" });
+  try { localStorage.setItem(BENCH_FOCUS_SIGNAL_KEY, String(Date.now())); } catch {}
+}
+
+async function refreshBenchFocusState({ rerender = true } = {}) {
+  if (!getToken() || isDemoRole()) return;
+  try {
+    const data = await postJson({ action: "getBenchFocus" }, true);
+    const next = {
+      activeBench: data.activeBench || null,
+      activeLabor: data.activeLabor || null,
+      unlinkedPausedLabor: data.unlinkedPausedLabor || null,
+      unresolved: data.unresolved || [],
+      serverNow: data.serverNow || null
+    };
+    const changed = JSON.stringify({ ...next, serverNow: null }) !==
+      JSON.stringify({ ...benchFocusState, serverNow: null });
+    const parsedServerNow = Date.parse(next.serverNow);
+    if (Number.isFinite(parsedServerNow)) benchFocusClockOffsetMs = parsedServerNow - Date.now();
+    benchFocusState = next;
+    syncBenchFocusPolling();
+    if (changed && rerender && activeView === "dashboard") renderHomeDashboard();
+  } catch {
+    /* Preserve the last confirmed state during transient network loss. */
+  }
+}
+
+benchFocusChannel?.addEventListener("message", event => {
+  if (event.data?.type === "changed") refreshBenchFocusState();
+});
+window.addEventListener("storage", event => {
+  if (event.key === BENCH_FOCUS_SIGNAL_KEY) refreshBenchFocusState();
+});
+window.addEventListener("focus", () => refreshBenchFocusState());
+
 async function refreshDashboardActivityIndex({ rerender = true } = {}) {
   try {
     const data = await postJson({ action: "listOrdersWithActivity" }, true);
@@ -1620,59 +2178,38 @@ async function refreshDashboardActivityIndex({ rerender = true } = {}) {
 
 function closeDashboardTimerPopover() {
   dashboardTimerPopoverOrder = null;
-  document.querySelectorAll(".dashboard-timer-popover").forEach(el => el.remove());
+  closeBenchChoiceSheet();
 }
 
-function openDashboardTimerPopover(button, orderKey) {
+async function openDashboardTimerPopover(button, orderKey) {
   closeDashboardTimerPopover();
-
-  const actions = button.closest(".dashboard-bench-actions");
-  if (!actions) return;
-
   dashboardTimerPopoverOrder = orderKey;
-  const popover = document.createElement("div");
-  popover.className = "dashboard-timer-popover";
-  popover.innerHTML = LABOR_TIMER_PHASES.map(phase => `
-    <button
-      type="button"
-      class="dashboard-timer-phase-option"
-      data-timer-phase="${escapeAttr(phase)}"
-      data-timer-order="${escapeAttr(orderKey)}"
-    >${escapeHtml(phase)}</button>
-  `).join("");
-  actions.appendChild(popover);
+  const phase = await openBenchChoiceSheet({
+    title: "Start labor",
+    anchor: button,
+    actions: LABOR_TIMER_PHASES.map(value => ({ label: value, value }))
+  });
+  dashboardTimerPopoverOrder = null;
+  if (phase) await handleDashboardTimerPhaseSelect(orderKey, phase);
 }
 
 /* Options menu shown once a timer is running/paused: Pause or Resume,
    plus Stop. Reuses the phase popover styling. */
-function openDashboardTimerControlsPopover(button, orderKey, session) {
+async function openDashboardTimerControlsPopover(button, orderKey, session) {
   closeDashboardTimerPopover();
-
-  const actions = button.closest(".dashboard-bench-actions");
-  if (!actions) return;
-
   const primary = getLaborSessionStatus(session) === "paused"
     ? { control: "resume", label: "Resume" }
     : { control: "pause", label: "Pause" };
 
   dashboardTimerPopoverOrder = orderKey;
-  const popover = document.createElement("div");
-  popover.className = "dashboard-timer-popover";
-  popover.innerHTML = `
-    <button
-      type="button"
-      class="dashboard-timer-phase-option"
-      data-timer-control="${escapeAttr(primary.control)}"
-      data-timer-order="${escapeAttr(orderKey)}"
-    >${escapeHtml(primary.label)}</button>
-    <button
-      type="button"
-      class="dashboard-timer-phase-option dashboard-timer-stop-option"
-      data-timer-control="stop"
-      data-timer-order="${escapeAttr(orderKey)}"
-    >Stop</button>
-  `;
-  actions.appendChild(popover);
+  const control = await openBenchChoiceSheet({
+    title: "Labor timer",
+    anchor: button,
+    actions: [primary, { control: "stop", label: "Stop" }]
+      .map(item => ({ label: item.label, value: item.control, danger: item.control === "stop" }))
+  });
+  dashboardTimerPopoverOrder = null;
+  if (control) await handleDashboardTimerControl(orderKey, control, button);
 }
 
 function hasRunningDashboardSessionOtherThan(orderKey) {
@@ -1688,11 +2225,19 @@ async function handleDashboardTimerPhaseSelect(orderKey, phase) {
   closeDashboardTimerPopover();
 
   try {
+    const activeBench = benchFocusState.activeBench &&
+      String(benchFocusState.activeBench.orderNumber) === String(orderKey)
+      ? benchFocusState.activeBench
+      : null;
     await postJson({
       action: "startLaborSession",
       orderNumber: orderKey,
-      phase
+      phase,
+      ...(activeBench ? { benchSessionId: activeBench.id, benchStartMode: "now" } : {})
     }, true);
+
+    broadcastBenchFocusChange();
+    await refreshBenchFocusState({ rerender: false });
     await refreshDashboardLaborSessions();
   } catch (err) {
     alert(err?.message || "Labor timer could not be started.");
@@ -1706,7 +2251,11 @@ async function handleDashboardTimerAction(button) {
 
   const orderKey = String(button.dataset.timerOrder || "");
   const action = button.dataset.timerAction;
-  const session = dashboardLaborSessions[orderKey] || null;
+  const session = dashboardLaborSessions[orderKey] || (
+    String(benchFocusState.activeBench?.orderNumber) === orderKey
+      ? benchFocusState.activeLabor
+      : null
+  );
 
   if (dashboardTimerPopoverOrder === orderKey) {
     closeDashboardTimerPopover();
@@ -1728,11 +2277,48 @@ async function handleDashboardTimerAction(button) {
   }
 }
 
-async function handleDashboardTimerControl(orderKey, control) {
+async function handleDashboardTimerControl(orderKey, control, controlButton = null) {
   if (dashboardTimerBusy) return;
 
-  const session = dashboardLaborSessions[orderKey] || null;
+  const focusedSession = String(benchFocusState.activeBench?.orderNumber) === String(orderKey)
+    ? benchFocusState.activeLabor
+    : null;
+  const session = dashboardLaborSessions[orderKey] || focusedSession || null;
   if (!session?.id) return;
+  const emittedSessionId = String(controlButton?.dataset.sessionId || "");
+  if (emittedSessionId && emittedSessionId !== String(session.id)) return;
+
+  if (control === "resume" && getLaborSessionStatus(session) === "paused") {
+    const activeBench = benchFocusState.activeBench;
+    const linkedToActiveBench = activeBench &&
+      String(activeBench.orderNumber) === String(orderKey) &&
+      String(session.benchWorkSessionId || "") === String(activeBench.id);
+    const choiceAnchor = getAdminAnchorPosition(null, controlButton);
+
+    if (!activeBench) {
+      closeDashboardTimerPopover();
+      await resumePausedLaborWithNewBenchWork(session, choiceAnchor);
+      return;
+    }
+
+    if (!linkedToActiveBench) {
+      closeDashboardTimerPopover();
+      const choice = await openBenchChoiceSheet({
+        title: "Another glove is on the bench.",
+        message: "End the current Bench Work before resuming this timer.",
+        anchor: choiceAnchor,
+        actions: [
+          { label: "End Current Bench Work and Resume", value: "end" },
+          { label: "Cancel", value: "" }
+        ]
+      });
+      if (choice !== "end") return;
+      const ended = await endActiveBenchWork({ anchor: choiceAnchor });
+      if (!ended || benchFocusState.activeBench) return;
+      await resumePausedLaborWithNewBenchWork(session, choiceAnchor);
+      return;
+    }
+  }
 
   if (control === "resume" && hasRunningDashboardSessionOtherThan(orderKey)) {
     closeDashboardTimerPopover();
@@ -1742,6 +2328,7 @@ async function handleDashboardTimerControl(orderKey, control) {
 
   closeDashboardTimerPopover();
   dashboardTimerBusy = true;
+  if (activeView === "dashboard") renderHomeDashboard();
   try {
     if (control === "pause") {
       await postJson({ action: "pauseLaborSession", sessionId: session.id }, true);
@@ -1750,12 +2337,12 @@ async function handleDashboardTimerControl(orderKey, control) {
     } else if (control === "stop") {
       await postJson({ action: "stopLaborSession", sessionId: session.id }, true);
     }
-    await refreshDashboardLaborSessions();
+    broadcastBenchFocusChange();
   } catch (err) {
     alert(err?.message || "Labor timer could not be updated.");
-    refreshDashboardLaborSessions();
   } finally {
     dashboardTimerBusy = false;
+    await refreshBenchFocusSurfaces();
   }
 }
 
@@ -1977,6 +2564,12 @@ function renderHomeDashboard() {
   dashboardPanel.innerHTML = `
     <div class="dashboard-shell">
       ${renderClubhouseGreeting()}
+      ${renderBenchFocusCard()}
+      ${benchFocusState.unresolved.length ? `
+        <button type="button" class="bench-unresolved-indicator bench-unresolved-indicator--${benchFocusState.unresolved.length >= 5 ? "high" : (benchFocusState.unresolved.length >= 3 ? "medium" : "low")}" data-bench-unresolved-open>
+          ${benchFocusState.unresolved.length} Bench Work ${benchFocusState.unresolved.length === 1 ? "interval needs" : "intervals need"} review
+        </button>
+      ` : ""}
       <section class="dashboard-section dashboard-section-bench">
         <div class="dashboard-section-heading-row">
           <h2 class="dashboard-section-title">Today's Bench</h2>
@@ -2112,26 +2705,67 @@ function wireHomeDashboardActions() {
       return;
     }
 
-    const timerPhaseBtn = e.target.closest("[data-timer-phase]");
-    if (timerPhaseBtn) {
-      handleDashboardTimerPhaseSelect(
-        timerPhaseBtn.dataset.timerOrder,
-        timerPhaseBtn.dataset.timerPhase
-      );
+    const benchStartBtn = e.target.closest("[data-bench-start]");
+    if (benchStartBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      startBenchWorkFromDashboard(benchStartBtn.dataset.benchStart, {}, benchStartBtn);
+      return;
+    }
+
+    const benchLaborStartBtn = e.target.closest("[data-bench-labor-start]");
+    if (benchLaborStartBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      startLaborForActiveBench(benchLaborStartBtn.dataset.benchLaborStart, benchLaborStartBtn);
+      return;
+    }
+
+    if (e.target.closest("[data-bench-remind-later]")) {
+      snoozeBenchReminder();
+      return;
+    }
+
+    const benchEndBtn = e.target.closest("[data-bench-end]");
+    if (benchEndBtn) {
+      endActiveBenchWork({ anchor: benchEndBtn });
+      return;
+    }
+
+    if (e.target.closest("[data-bench-paused-resume]")) {
+      resumeExistingPausedLaborForBench();
+      return;
+    }
+
+    if (e.target.closest("[data-bench-paused-stop]")) {
+      stopExistingPausedLaborForBench();
+      return;
+    }
+
+    const unresolvedBtn = e.target.closest("[data-bench-unresolved-open]");
+    if (unresolvedBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      openUnresolvedBenchList(unresolvedBtn);
       return;
     }
 
     const timerControlBtn = e.target.closest("[data-timer-control]");
     if (timerControlBtn) {
+      e.preventDefault();
+      e.stopPropagation();
       handleDashboardTimerControl(
         timerControlBtn.dataset.timerOrder,
-        timerControlBtn.dataset.timerControl
+        timerControlBtn.dataset.timerControl,
+        timerControlBtn
       );
       return;
     }
 
     const timerActionBtn = e.target.closest("[data-timer-action]");
     if (timerActionBtn) {
+      e.preventDefault();
+      e.stopPropagation();
       handleDashboardTimerAction(timerActionBtn);
       return;
     }
@@ -2167,7 +2801,6 @@ function wireHomeDashboardActions() {
   const resolveDashboardRowOrder = (e) => {
     if (
       e.target.closest?.(".dashboard-bench-actions") ||
-      e.target.closest?.(".dashboard-timer-popover") ||
       e.target.closest?.("button")
     ) {
       return null;
@@ -2194,15 +2827,6 @@ function wireHomeDashboardActions() {
   dashboardPanel.addEventListener("touchend", cancelWorkflowPress);
   dashboardPanel.addEventListener("touchcancel", cancelWorkflowPress);
 
-  /* Close the bench timer phase popover on outside clicks by removing
-     the element directly — never re-render the dashboard from here
-     (same hazard as the finance popover below). */
-  document.addEventListener("click", (e) => {
-    if (!dashboardTimerPopoverOrder) return;
-    if (e.target.closest?.(".dashboard-bench-actions")) return;
-    closeDashboardTimerPopover();
-  });
-
   /* Keep bench timer elapsed text from going stale without re-rendering. */
   setInterval(() => {
     if (activeView !== "dashboard") return;
@@ -2211,6 +2835,18 @@ function wireHomeDashboardActions() {
       if (session) el.textContent = getDashboardTimerStateLabel(session);
     });
   }, 30000);
+
+  setInterval(() => {
+    if (activeView !== "dashboard" || !benchFocusState.activeBench) return;
+    const benchElapsed = dashboardPanel.querySelector("[data-bench-elapsed]");
+    if (benchElapsed) benchElapsed.textContent = formatBenchElapsed(benchFocusState.activeBench.startedAt);
+    const laborElapsed = dashboardPanel.querySelector("[data-bench-labor-elapsed]");
+    if (laborElapsed && benchFocusState.activeLabor) {
+      laborElapsed.textContent = formatLaborDuration(getLaborActiveSeconds(benchFocusState.activeLabor) / 60);
+    }
+    const reminder = dashboardPanel.querySelector("[data-bench-labor-reminder]");
+    if (reminder) reminder.hidden = !isBenchLaborReminderDue(benchFocusState.activeBench);
+  }, 1000);
 
   /* Close the popover without re-rendering the dashboard — a full
      re-render here would destroy a focused custom date input and
@@ -2819,6 +3455,14 @@ function ensureDetailCollapseDelegation() {
 
   detailCollapseDelegated = true;
   orderDetail.addEventListener("click", (e) => {
+    const clubhouseBtn = e.target.closest("[data-detail-bench-clubhouse]");
+    if (clubhouseBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveView("dashboard");
+      return;
+    }
+
     const toggle = e.target.closest("[data-section-toggle]");
     if (!toggle) return;
 
@@ -4093,6 +4737,7 @@ async function loadLaborSessions(orderNumber, { preserveError = "" } = {}) {
   stopLaborTimerTick();
 
   try {
+    refreshBenchFocusState({ rerender: false });
     const data = await postJson({
       action: "listLaborSessions",
       orderNumber
@@ -4140,11 +4785,16 @@ async function handleLaborTimerStart(orderNumber) {
   if (startBtn) startBtn.disabled = true;
 
   try {
+    const activeBench = benchFocusState.activeBench &&
+      String(benchFocusState.activeBench.orderNumber) === String(orderNumber)
+      ? benchFocusState.activeBench
+      : null;
     await postJson({
       action: "startLaborSession",
       orderNumber,
       phase,
-      notes
+      notes,
+      ...(activeBench ? { benchSessionId: activeBench.id, benchStartMode: "now" } : {})
     }, true);
 
     await loadLaborSessions(orderNumber);
@@ -4168,6 +4818,9 @@ async function handleLaborTimerPause(orderNumber, sessionId) {
       notes
     }, true);
 
+    broadcastBenchFocusChange();
+    await refreshBenchFocusState({ rerender: false });
+
     stopLaborTimerTick();
     await loadLaborSessions(orderNumber);
   } catch (err) {
@@ -4189,6 +4842,9 @@ async function handleLaborTimerResume(orderNumber, sessionId) {
       notes
     }, true);
 
+    broadcastBenchFocusChange();
+    await refreshBenchFocusState({ rerender: false });
+
     await loadLaborSessions(orderNumber);
   } catch (err) {
     await loadLaborSessions(orderNumber, {
@@ -4209,6 +4865,9 @@ async function handleLaborTimerStop(orderNumber, sessionId) {
       notes
     }, true);
 
+    broadcastBenchFocusChange();
+    await refreshBenchFocusState({ rerender: false });
+
     stopLaborTimerTick();
     await loadLaborSessions(orderNumber);
     loadOrderActivity(orderNumber);
@@ -4224,6 +4883,19 @@ function ensureLaborTimerDelegation() {
 
   laborTimerDelegated = true;
   orderDetail.addEventListener("click", (e) => {
+    const endBenchBtn = e.target.closest("[data-detail-bench-end]");
+    if (endBenchBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!benchFocusBusy) {
+        endBenchBtn.disabled = true;
+        Promise.resolve(endActiveBenchWork({ anchor: endBenchBtn })).finally(() => {
+          if (endBenchBtn.isConnected) endBenchBtn.disabled = false;
+        });
+      }
+      return;
+    }
+
     const startBtn = e.target.closest("[data-labor-start]");
     if (startBtn) {
       e.preventDefault();
@@ -5409,6 +6081,7 @@ function setActiveView(viewName) {
     renderHomeDashboard();
     refreshDashboardLaborSessions();
     refreshDashboardActivityIndex();
+    refreshBenchFocusState();
     markOrdersSeen();
     showView(homeDashboardView);
     closeMenu();
@@ -6409,6 +7082,7 @@ function renderOrderDetail(order) {
 
   orderDetail.innerHTML = `
     <div class="detail-form-shell">
+      ${renderOrderDetailBenchBanner(order)}
       ${customerSection}
       ${orderStatusSection}
       ${laborTimerSection}
@@ -6489,6 +7163,33 @@ function renderOrderDetail(order) {
   loadLaborSessions(order.orderNumber);
   loadOrderActivity(order.orderNumber);
   renderPromiseProposal();
+}
+
+function renderOrderDetailBenchBanner(order) {
+  const bench = benchFocusState.activeBench;
+  if (!bench) return "";
+  const labor = benchFocusState.activeLabor;
+  const viewingActiveBenchOrder = String(bench.orderNumber) === String(order.orderNumber);
+  return `<aside class="detail-bench-focus-banner">
+    <div><span>${viewingActiveBenchOrder ? "Bench Work" : "Another glove is on the bench"}</span><strong>#${escapeHtml(bench.orderNumber)} · Active · ${escapeHtml(formatBenchElapsed(bench.startedAt))}</strong>
+    <small>${escapeHtml(labor?.phase || "No labor timer")} · ${labor ? escapeHtml(getLaborSessionStatus(labor) === "paused" ? "Paused" : "Running") : "Not recording labor"}</small></div>
+    <div class="detail-bench-focus-actions">${!viewingActiveBenchOrder ? '<button type="button" data-detail-bench-clubhouse>Go to Clubhouse</button>' : ""}<button type="button" data-detail-bench-end ${benchFocusBusy ? "disabled" : ""}>End Bench Work</button></div>
+  </aside>`;
+}
+
+function refreshOrderDetailBenchBanner() {
+  if (!orderDetail || !currentOrder) return;
+  const shell = orderDetail.querySelector(".detail-form-shell");
+  if (!shell) return;
+  const existing = shell.querySelector(".detail-bench-focus-banner");
+  const html = renderOrderDetailBenchBanner(currentOrder);
+  if (!html) {
+    existing?.remove();
+  } else if (existing) {
+    existing.outerHTML = html;
+  } else {
+    shell.insertAdjacentHTML("afterbegin", html);
+  }
 }
 
 function getBlankAdminOrder() {
@@ -12914,7 +13615,10 @@ async function checkForNewBuild() {
 
 checkForNewBuild();
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") checkForNewBuild();
+  if (document.visibilityState === "visible") {
+    checkForNewBuild();
+    refreshBenchFocusState();
+  }
 });
 
 /* =========================
