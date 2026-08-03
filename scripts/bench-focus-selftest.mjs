@@ -368,6 +368,33 @@ await test("same-order paused Start Bench Work is explicit and trigger-anchored"
   equal(start.includes("Resume previous labor?"), false);
 });
 
+await test("all Bench menus avoid bottom pinning and unresolved actions share the portal", () => {
+  equal(adminCss.includes(".bench-choice-sheet{position:fixed;inset:0;z-index:1300;display:flex;align-items:flex-end"), false);
+  ok(adminCss.includes(".bench-choice-sheet{position:fixed;inset:0;z-index:1300;display:flex;align-items:center"));
+  const unresolved = admin.match(/async function openUnresolvedBenchList\([\s\S]*?\n\}/)?.[0] || "";
+  ok(unresolved.includes("await openBenchChoiceSheet({"));
+  ok(unresolved.includes("anchor: choiceAnchor"));
+  ok(unresolved.includes('data-action="assign:'));
+  ok(unresolved.includes('data-action="discard:'));
+  equal(unresolved.includes("document.createElement"), false);
+  equal(admin.includes("bench-unresolved-sheet"), false);
+  ok(admin.includes("openUnresolvedBenchList(unresolvedBtn)"));
+  const resolve = admin.match(/async function resolveBenchInterval\([\s\S]*?\n\}/)?.[0] || "";
+  ok(resolve.includes('chooseBenchLaborPhase("Assign Bench Work time", anchor)'));
+  ok(resolve.includes("anchor\n    })") || resolve.includes("anchor\r\n    })"));
+});
+
+await test("Bench resolution reconciles ambiguous responses and unlocks rendered controls", () => {
+  const resolve = admin.match(/async function resolveBenchInterval\([\s\S]*?\n\}/)?.[0] || "";
+  ok(resolve.includes("await refreshBenchFocusState({ rerender: false })"));
+  ok(resolve.includes("const stillUnresolved = benchFocusState.unresolved.some"));
+  ok(resolve.includes("if (!stillUnresolved)"));
+  ok(resolve.includes("The server response was interrupted. Bench Work was rechecked"));
+  ok(resolve.includes('action: "resolveBenchWork"'));
+  ok(resolve.includes('finally {\n    benchFocusBusy = false;\n    if (activeView === "dashboard") renderHomeDashboard();'));
+  equal(resolve.indexOf("benchFocusBusy = false") < resolve.lastIndexOf("renderHomeDashboard()"), true);
+});
+
 await test("Bench end performs one authoritative multi-surface refresh", () => {
   const refresh = admin.match(/async function refreshBenchFocusSurfaces\([\s\S]*?\n\}/)?.[0] || "";
   ok(refresh.includes("refreshBenchFocusState({ rerender: false })"));

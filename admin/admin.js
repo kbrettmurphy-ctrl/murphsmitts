@@ -1691,6 +1691,7 @@ async function resumeExistingPausedLaborForBench() {
     await refreshBenchFocusState();
   } finally {
     benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
   }
 }
 
@@ -1707,6 +1708,7 @@ async function stopExistingPausedLaborForBench() {
     await refreshBenchFocusState();
   } finally {
     benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
   }
 }
 
@@ -1736,7 +1738,6 @@ async function resumePausedLaborWithNewBenchWork(session, anchor = null) {
 }
 
 function closeBenchChoiceSheet(value = null) {
-  document.querySelectorAll(".bench-unresolved-sheet").forEach(sheet => sheet.remove());
   const sheet = benchChoiceRoot;
   if (!sheet) return;
   document.removeEventListener("keydown", handleBenchChoiceKeydown);
@@ -1775,7 +1776,7 @@ function getBenchChoiceRoot() {
   return benchChoiceRoot;
 }
 
-function openBenchChoiceSheet({ title, message = "", actions = [], anchor = null }) {
+function openBenchChoiceSheet({ title, message = "", content = "", actions = [], anchor = null }) {
   closeBenchChoiceSheet();
   return new Promise(resolve => {
     const sheet = getBenchChoiceRoot();
@@ -1787,6 +1788,7 @@ function openBenchChoiceSheet({ title, message = "", actions = [], anchor = null
     sheet.innerHTML = `<div class="bench-choice-backdrop" data-overlay-dismiss></div><div class="bench-choice-panel" role="dialog" aria-modal="false" aria-labelledby="benchChoiceTitle">
       <div id="benchChoiceTitle" class="bench-choice-title">${escapeHtml(title)}</div>
       ${message ? `<p>${escapeHtml(message)}</p>` : ""}
+      ${content}
       <div class="bench-choice-actions">${actions.map(action => `<button type="button" data-action="${escapeAttr(action.value)}" class="${action.danger ? "is-danger" : ""}"><span>${escapeHtml(action.label)}</span></button>`).join("")}</div>
     </div>`;
     document.addEventListener("keydown", handleBenchChoiceKeydown);
@@ -1845,6 +1847,7 @@ async function startLaborForActiveBench(mode, anchor = null) {
     await refreshBenchFocusState();
   } finally {
     benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
   }
 }
 
@@ -1860,6 +1863,7 @@ async function snoozeBenchReminder() {
     alert(error.message || "Reminder could not be snoozed.");
   } finally {
     benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
   }
 }
 
@@ -1914,10 +1918,12 @@ async function endActiveBenchWork({ switchToOrder = "", anchor = null } = {}) {
     return false;
   } finally {
     benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
+    refreshOrderDetailBenchBanner();
   }
 }
 
-async function resolveBenchInterval(bench, resolution) {
+async function resolveBenchInterval(bench, resolution, anchor = null) {
   if (!bench || benchFocusBusy) return;
   if (resolution === "labor_recorded" && bench.hasOpenLabor) {
     alert("Stop or resolve the open labor session before assigning this Bench Work interval.");
@@ -1925,13 +1931,14 @@ async function resolveBenchInterval(bench, resolution) {
   }
   let phase = "";
   if (resolution === "labor_recorded") {
-    phase = await chooseBenchLaborPhase("Assign Bench Work time");
+    phase = await chooseBenchLaborPhase("Assign Bench Work time", anchor);
     if (!phase) return;
   } else {
     const confirmed = await openBenchChoiceSheet({
       title: "Discard Bench Work time?",
       message: "This interval will remain in history but will not count as labor.",
-      actions: [{ label: "Discard", value: "discard", danger: true }, { label: "Cancel", value: "" }]
+      actions: [{ label: "Discard", value: "discard", danger: true }, { label: "Cancel", value: "" }],
+      anchor
     });
     if (confirmed !== "discard") return;
   }
@@ -1942,10 +1949,19 @@ async function resolveBenchInterval(bench, resolution) {
     await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
     if (activeView === "dashboard") renderHomeDashboard();
   } catch (error) {
-    alert(error.message || "Bench Work could not be resolved.");
-    await refreshBenchFocusState();
+    await refreshBenchFocusState({ rerender: false });
+    const stillUnresolved = benchFocusState.unresolved.some(item => String(item.id) === String(bench.id));
+    if (!stillUnresolved) {
+      broadcastBenchFocusChange();
+      await refreshDashboardLaborSessions({ rerender: false });
+      return;
+    }
+    alert(String(error.message || "").startsWith("Non-JSON response:")
+      ? "The server response was interrupted. Bench Work was rechecked and is still unresolved. Try again."
+      : (error.message || "Bench Work could not be resolved."));
   } finally {
     benchFocusBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
   }
 }
 
@@ -1962,16 +1978,12 @@ async function openImmediateBenchResolution(bench, anchor = null) {
     ],
     anchor
   });
-  if (choice) resolveBenchInterval(bench, choice);
+  if (choice) resolveBenchInterval(bench, choice, anchor);
 }
 
-function openUnresolvedBenchList() {
-  closeBenchChoiceSheet();
-  const sheet = document.createElement("div");
-  sheet.className = "bench-choice-sheet bench-unresolved-sheet";
-  sheet.innerHTML = `<div class="bench-choice-panel" role="dialog" aria-modal="false">
-    <div class="bench-choice-title">Bench Work time to review</div>
-    <div class="bench-unresolved-list">${benchFocusState.unresolved.map(bench => {
+async function openUnresolvedBenchList(anchor = null) {
+  const choiceAnchor = anchor?.x != null ? anchor : (anchor ? getAdminAnchorPosition(null, anchor) : null);
+  const content = `<div class="bench-unresolved-list">${benchFocusState.unresolved.map(bench => {
       const order = allOrders.find(item => String(item.orderNumber) === String(bench.orderNumber)) || {};
       return `<article class="bench-unresolved-row">
         <div><strong>#${escapeHtml(bench.orderNumber)} · ${escapeHtml(order.customerName || "Customer")}</strong>
@@ -1979,24 +1991,21 @@ function openUnresolvedBenchList() {
         <span>${escapeHtml(formatBenchElapsed(bench.startedAt, bench.endedAt))}</span>
         ${bench.hasOpenLabor ? `<span class="bench-unresolved-conflict">Paused labor remains open — stop it before assigning.</span>` : ""}</div>
         <div class="bench-unresolved-actions">
-          <button type="button" data-unresolved-assign="${escapeAttr(bench.id)}" ${bench.hasOpenLabor ? "disabled" : ""}>Assign</button>
-          <button type="button" class="is-danger" data-unresolved-discard="${escapeAttr(bench.id)}">Discard</button>
+          <button type="button" data-action="assign:${escapeAttr(bench.id)}" ${bench.hasOpenLabor ? "disabled" : ""}>Assign</button>
+          <button type="button" class="is-danger" data-action="discard:${escapeAttr(bench.id)}">Discard</button>
         </div>
       </article>`;
-    }).join("")}</div>
-    <div class="bench-choice-actions"><button type="button" data-unresolved-close>Close</button></div>
-  </div>`;
-  sheet.addEventListener("click", event => {
-    if (event.target.closest("[data-unresolved-close]")) return sheet.remove();
-    const assign = event.target.closest("[data-unresolved-assign]");
-    const discard = event.target.closest("[data-unresolved-discard]");
-    const id = assign?.dataset.unresolvedAssign || discard?.dataset.unresolvedDiscard;
-    if (!id) return;
-    const bench = benchFocusState.unresolved.find(item => item.id === id);
-    sheet.remove();
-    resolveBenchInterval(bench, assign ? "labor_recorded" : "discarded");
+    }).join("")}</div>`;
+  const choice = await openBenchChoiceSheet({
+    title: "Bench Work time to review",
+    content,
+    actions: [{ label: "Close", value: "" }],
+    anchor: choiceAnchor
   });
-  document.body.appendChild(sheet);
+  const [resolution, id] = String(choice || "").split(":");
+  if (!id) return;
+  const bench = benchFocusState.unresolved.find(item => String(item.id) === id);
+  if (bench) resolveBenchInterval(bench, resolution === "assign" ? "labor_recorded" : "discarded", choiceAnchor);
 }
 
 async function startBenchWorkFromDashboard(orderNumber, options = {}, anchor = null) {
@@ -2733,8 +2742,11 @@ function wireHomeDashboardActions() {
       return;
     }
 
-    if (e.target.closest("[data-bench-unresolved-open]")) {
-      openUnresolvedBenchList();
+    const unresolvedBtn = e.target.closest("[data-bench-unresolved-open]");
+    if (unresolvedBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      openUnresolvedBenchList(unresolvedBtn);
       return;
     }
 
