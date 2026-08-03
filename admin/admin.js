@@ -1566,7 +1566,7 @@ function renderBenchFocusTimerControls(order, session, bench) {
 
 function renderDashboardOrderRow(order, { timerControls = false } = {}) {
   const laceRaw = String(order.primaryLaceColor || order.lacePrimary || "").trim();
-  const lace = laceRaw ? adminLaceLabel(laceRaw) : "";
+  const lace = laceRaw ? adminOrderLaceLabel(laceRaw) : "";
   const brand = String(order.brandModel || "").trim();
   const meta = [brand, lace].filter(Boolean).join(" · ");
   const orderKey = String(order.orderNumber || "");
@@ -3178,8 +3178,8 @@ function summarizeLace(order) {
   const primaryUsed = order.primaryLaceUsed;
   const secondaryUsed = order.secondaryLaceUsed;
 
-  if (primary) parts.push(adminLaceLabel(primary));
-  if (secondary) parts.push(adminLaceLabel(secondary));
+  if (primary) parts.push(adminOrderLaceLabel(primary));
+  if (secondary) parts.push(adminOrderLaceLabel(secondary));
   if (!primary && !secondary && custom) parts.push(custom);
   if (primaryUsed !== null && primaryUsed !== undefined && primaryUsed !== "") {
     parts.push(`${primaryUsed} primary used`);
@@ -3345,8 +3345,8 @@ function summarizeLaceFromForm() {
   const primaryUsed = String(document.getElementById("editPrimaryLaceUsed")?.value || "").trim();
   const secondaryUsed = String(document.getElementById("editSecondaryLaceUsed")?.value || "").trim();
 
-  if (primary) parts.push(adminLaceLabel(primary));
-  if (secondary) parts.push(adminLaceLabel(secondary));
+  if (primary) parts.push(adminOrderLaceLabel(primary));
+  if (secondary) parts.push(adminOrderLaceLabel(secondary));
   if (!primary && !secondary && custom) parts.push(custom);
   if (primaryUsed) parts.push(`${primaryUsed} primary used`);
   if (secondaryUsed) parts.push(`${secondaryUsed} secondary used`);
@@ -3825,8 +3825,26 @@ const SHOP_PRICING = {
   loopReplacement: 30 // per loop (thumb or pinky); web replacement varies — priced manually
 };
 
+function getHistoricalOrderBasis(order) {
+  const snapshot = getOrderEconomicsSnapshot(order);
+  const inputs = snapshot?.inputs;
+  if (!inputs || typeof inputs !== "object") return order || {};
+  return {
+    ...(order || {}),
+    servicesRequested: inputs.services_requested ?? order?.servicesRequested,
+    gloveType: inputs.glove_type ?? order?.gloveType,
+    webType: inputs.web_type ?? order?.webType,
+    customAddonAmount: inputs.custom_addon_amount ?? order?.customAddonAmount,
+    customAddonLabel: inputs.custom_addon_label ?? order?.customAddonLabel,
+    referralSource: inputs.referral_source ?? order?.referralSource,
+    dateCompleted: snapshot.date_completed ?? order?.dateCompleted,
+    priceQuoted: snapshot.price_quoted ?? order?.priceQuoted
+  };
+}
+
 function getOrderSelectedServices(order) {
-  return parseServicesValue(order?.servicesRequested || "").selected;
+  const basis = getHistoricalOrderBasis(order);
+  return parseServicesValue(basis?.servicesRequested || "").selected;
 }
 
 function orderHasRelacingService(order) {
@@ -3847,20 +3865,22 @@ function orderHasPalmPadService(order) {
    a job can have 0, 1, or 2. Falls back to the free-text "Other" box for older
    orders recorded before these were structured checkboxes. */
 function orderLoopCount(order) {
+  const basis = getHistoricalOrderBasis(order);
   const selected = getOrderSelectedServices(order);
   let count = 0;
   if (selected.includes("Thumb Loop Replacement")) count += 1;
   if (selected.includes("Pinky Loop Replacement")) count += 1;
   if (count === 0) {
-    const other = String(parseServicesValue(order?.servicesRequested || "").otherText || "").toLowerCase();
+    const other = String(parseServicesValue(basis?.servicesRequested || "").otherText || "").toLowerCase();
     if (/\b(loop|thumb|pinky)\b/.test(other)) count = 1;
   }
   return count;
 }
 
 function orderHasWebReplacement(order) {
+  const basis = getHistoricalOrderBasis(order);
   if (getOrderSelectedServices(order).includes("Web Replacement")) return true;
-  const other = String(parseServicesValue(order?.servicesRequested || "").otherText || "").toLowerCase();
+  const other = String(parseServicesValue(basis?.servicesRequested || "").otherText || "").toLowerCase();
   return /\bweb\b/.test(other);
 }
 
@@ -3869,17 +3889,18 @@ function orderHasWebReplacement(order) {
    when unset. Carved out of the base in pricing intelligence; the matching
    labor is timed under the "Custom Work" phase. */
 function orderCustomAddonAmount(order) {
-  const n = Number(order?.customAddonAmount);
+  const n = Number(getHistoricalOrderBasis(order)?.customAddonAmount);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function orderHasTrapezeWeb(order) {
-  return String(order?.webType || "").toLowerCase().includes("trapeze");
+  return String(getHistoricalOrderBasis(order)?.webType || "").toLowerCase().includes("trapeze");
 }
 
 function getDefaultLacePieces(order) {
-  const base = SHOP_ECONOMICS.lacePieceDefaults[String(order?.gloveType || "")] ?? 4;
-  const trapezeBonus = String(order?.gloveType || "") === "Fielders Glove" && orderHasTrapezeWeb(order)
+  const basis = getHistoricalOrderBasis(order);
+  const base = SHOP_ECONOMICS.lacePieceDefaults[String(basis?.gloveType || "")] ?? 4;
+  const trapezeBonus = String(basis?.gloveType || "") === "Fielders Glove" && orderHasTrapezeWeb(order)
     ? SHOP_ECONOMICS.lacePiecesTrapezeBonus
     : 0;
   return base + trapezeBonus;
@@ -3895,9 +3916,33 @@ function getOrderActualLacePieces(order) {
   return total > 0 ? total : null;
 }
 
+function getOrderEconomicsSnapshot(order) {
+  const snapshot = order?.economicsSnapshot;
+  return snapshot && typeof snapshot === "object" && Number(snapshot.version) >= 1
+    ? snapshot
+    : null;
+}
+
+function materialsFromEconomicsSnapshot(snapshot) {
+  return {
+    available: true,
+    locked: true,
+    lacePieces: Number(snapshot.lace_pieces) || 0,
+    laceUnitCost: Number(snapshot.lace_unit_cost) || 0,
+    laceCost: Number(snapshot.lace_material_cost) || 0,
+    palmPadCost: Number(snapshot.palm_pad_material_cost) || 0,
+    consumables: Number(snapshot.consumables_cost) || 0,
+    packaging: Number(snapshot.packaging_cost) || 0,
+    total: Number(snapshot.total_materials) || 0
+  };
+}
+
 /* Lace pieces precedence: manual override > actual recorded usage >
    glove-type estimate (estimate only applies to relacing orders). */
 function getOrderMaterialsCost(order) {
+  const snapshot = getOrderEconomicsSnapshot(order);
+  if (snapshot) return materialsFromEconomicsSnapshot(snapshot);
+
   const override = order?.lacePiecesUsed != null && Number.isFinite(Number(order.lacePiecesUsed))
     ? Number(order.lacePiecesUsed)
     : null;
@@ -3912,13 +3957,30 @@ function getOrderMaterialsCost(order) {
     lacePieces = orderHasRelacingService(order) ? getDefaultLacePieces(order) : 0;
   }
 
-  const laceCost = lacePieces * getUnitCost("lace_piece", SHOP_ECONOMICS.laceCostPerPiece);
+  const laceUnitCost = getResolvedLaceUnitCost();
+  if (laceUnitCost === null) {
+    return {
+      available: false,
+      locked: false,
+      lacePieces,
+      laceUnitCost: null,
+      laceCost: null,
+      palmPadCost: null,
+      consumables: null,
+      packaging: null,
+      total: null
+    };
+  }
+  const laceCost = lacePieces * laceUnitCost;
   const palmPadCost = orderHasPalmPadService(order) ? SHOP_ECONOMICS.palmPadUnitCost : 0;
   const consumables = orderHasCleaningService(order) ? getConsumablesPerGlove() : 0;
   const packaging = getUnitCost("business_card", 0.41) + getUnitCost("sticker", 0.41);
 
   return {
+    available: true,
+    locked: false,
     lacePieces,
+    laceUnitCost,
     laceCost,
     palmPadCost,
     consumables,
@@ -3928,12 +3990,30 @@ function getOrderMaterialsCost(order) {
 }
 
 function getOrderEconomics(order, laborMinutes) {
+  const snapshot = getOrderEconomicsSnapshot(order);
+  if (snapshot) {
+    const materials = materialsFromEconomicsSnapshot(snapshot);
+    const net = snapshot.net == null ? null : Number(snapshot.net);
+    const hourlyRate = snapshot.effective_hourly_rate == null ? null : Number(snapshot.effective_hourly_rate);
+    return {
+      materials,
+      price: snapshot.price_quoted == null ? null : Number(snapshot.price_quoted),
+      net,
+      laborMinutes: Number(snapshot.labor_minutes) || 0,
+      hourlyRate,
+      reason: net === null ? "No price set" : (hourlyRate === null ? "No labor logged" : ""),
+      locked: true
+    };
+  }
   const materials = getOrderMaterialsCost(order);
   const minutes = Number(laborMinutes);
   const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
   const price = Number(order?.priceQuoted);
   const hasPrice = order?.priceQuoted != null && order?.priceQuoted !== "" && Number.isFinite(price);
 
+  if (!materials.available) {
+    return { materials, price: hasPrice ? price : null, net: null, laborMinutes: safeMinutes, hourlyRate: null, reason: "Material costs unavailable", locked: false };
+  }
   const net = hasPrice ? price - materials.total : null;
 
   let hourlyRate = null;
@@ -3946,40 +4026,43 @@ function getOrderEconomics(order, laborMinutes) {
     hourlyRate = net / (safeMinutes / 60);
   }
 
-  return { materials, net, laborMinutes: safeMinutes, hourlyRate, reason };
+  return { materials, price: hasPrice ? price : null, net, laborMinutes: safeMinutes, hourlyRate, reason, locked: false };
 }
 
 function getOrderEconomicsSummaryText(order) {
-  if (orderDetailLaborMinutes === null) return "";
+  if (orderDetailLaborMinutes === null && !getOrderEconomicsSnapshot(order)) return "";
   const econ = getOrderEconomics(order, orderDetailLaborMinutes);
   return econ.hourlyRate !== null ? `${formatCurrency(econ.hourlyRate)}/hr` : "";
 }
 
 function renderOrderEconomicsBody(order) {
-  const laborLoaded = orderDetailLaborMinutes !== null;
+  const laborLoaded = orderDetailLaborMinutes !== null || !!getOrderEconomicsSnapshot(order);
   const econ = getOrderEconomics(order, laborLoaded ? orderDetailLaborMinutes : 0);
   const m = econ.materials;
   const hasPrice = econ.net !== null;
-  const suggestion = getSuggestedPrice(order);
+  const suggestion = m.available ? getSuggestedPrice(order) : null;
   const isOverride = order?.lacePiecesUsed != null;
+  const snapshot = getOrderEconomicsSnapshot(order);
   const actualPieces = getOrderActualLacePieces(order);
   const defaultPieces = getDefaultLacePieces(order);
-  const piecesSourceLabel = isOverride
+  const piecesSourceLabel = snapshot
+    ? `(locked ${String(snapshot.lace_pieces_source || "historical")})`
+    : isOverride
     ? `(override${actualPieces !== null ? ` — actual used ${actualPieces}` : ` — estimate ${defaultPieces}`})`
     : (actualPieces !== null
         ? "(actual lace used)"
         : `(estimate for glove type: ${defaultPieces})`);
 
   let suggestionHtml = "";
-  const measured = getMeasuredSuggestion(order);
+  const measured = m.available ? getMeasuredSuggestion(order) : null;
   const suggestedPrice = measured ? measured.price : (suggestion ? suggestion.price : null);
   if (suggestedPrice !== null) {
     let deltaText = "";
     if (hasPrice) {
-      const delta = Number(order.priceQuoted) - suggestedPrice;
+      const delta = Number(econ.price) - suggestedPrice;
       if (delta !== 0) {
         const sign = delta > 0 ? "+" : "−";
-        deltaText = ` (quoted ${formatCurrency(Number(order.priceQuoted))}, ${sign}${formatCurrency(Math.abs(delta))} vs suggested)`;
+        deltaText = ` (quoted ${formatCurrency(Number(econ.price))}, ${sign}${formatCurrency(Math.abs(delta))} vs suggested)`;
       }
     }
     let basis = measured
@@ -3998,7 +4081,7 @@ function renderOrderEconomicsBody(order) {
 
   const rateDisplay = econ.hourlyRate !== null
     ? escapeHtml(`${formatCurrency(econ.hourlyRate)}/hr`)
-    : `— <span class="order-economics-reason muted">${escapeHtml(laborLoaded ? econ.reason : "Loading labor…")}</span>`;
+    : `— <span class="order-economics-reason muted">${escapeHtml(!m.available ? "Loading material costs…" : (laborLoaded ? econ.reason : "Loading labor…"))}</span>`;
 
   return `
     <div class="order-economics">
@@ -4008,14 +4091,15 @@ function renderOrderEconomicsBody(order) {
       </div>
       ${suggestionHtml}
       <div class="order-economics-lines">
-        <div class="order-economics-line"><span>Price</span><span>${hasPrice ? escapeHtml(formatCurrency(Number(order.priceQuoted))) : "—"}</span></div>
-        ${m.lacePieces > 0 ? `<div class="order-economics-line"><span>Lace</span><span>${m.lacePieces} × ${escapeHtml(formatCurrency(getUnitCost("lace_piece", SHOP_ECONOMICS.laceCostPerPiece)))} = ${escapeHtml(formatCurrency(m.laceCost))}</span></div>` : ""}
+        <div class="order-economics-line"><span>Price</span><span>${hasPrice ? escapeHtml(formatCurrency(econ.price)) : "—"}</span></div>
+        ${m.available && m.lacePieces > 0 ? `<div class="order-economics-line"><span>Lace</span><span>${m.lacePieces} × ${escapeHtml(formatCurrency(m.laceUnitCost))} = ${escapeHtml(formatCurrency(m.laceCost))}</span></div>` : ""}
         ${m.palmPadCost > 0 ? `<div class="order-economics-line"><span>Palm pad</span><span>${escapeHtml(formatCurrency(m.palmPadCost))}</span></div>` : ""}
         ${m.consumables > 0 ? `<div class="order-economics-line"><span>Consumables</span><span>${escapeHtml(formatCurrency(m.consumables))}</span></div>` : ""}
         ${m.packaging > 0 ? `<div class="order-economics-line"><span>Card + sticker</span><span>${escapeHtml(formatCurrency(m.packaging))}</span></div>` : ""}
-        <div class="order-economics-line order-economics-line--strong"><span>Materials</span><span>${escapeHtml(formatCurrency(m.total))}</span></div>
+        <div class="order-economics-line order-economics-line--strong"><span>Materials</span><span>${m.available ? escapeHtml(formatCurrency(m.total)) : "Loading…"}</span></div>
         <div class="order-economics-line order-economics-line--strong"><span>Net</span><span>${econ.net !== null ? escapeHtml(formatCurrency(econ.net)) : "—"}</span></div>
-        <div class="order-economics-line"><span>Labor</span><span>${laborLoaded ? escapeHtml(formatLaborDuration(econ.laborMinutes)) : "—"}</span></div>
+        <div class="order-economics-line"><span>Labor</span><span>${econ.locked || laborLoaded ? escapeHtml(formatLaborDuration(econ.laborMinutes)) : "—"}</span></div>
+        ${econ.locked ? `<div class="order-economics-line"><span>Historical actuals</span><span>Locked ${escapeHtml(formatDeliveryDateTime(order.economicsLockedAt || getOrderEconomicsSnapshot(order)?.locked_at || ""))}</span></div>` : ""}
       </div>
       ${orderHasRelacingService(order) ? `
         <div class="order-economics-pieces">
@@ -4030,6 +4114,7 @@ function renderOrderEconomicsBody(order) {
             step="1"
             inputmode="numeric"
             value="${escapeAttr(String(m.lacePieces))}"
+            ${snapshot ? "disabled" : ""}
           >
         </div>
       ` : ""}
@@ -4170,7 +4255,8 @@ async function renderMoneyView() {
 
   let sessions = [];
   let loadError = "";
-  await warmExpensesCache();
+  const expensesReady = await warmExpensesCache();
+  if (!expensesReady) loadError = expensesCacheError || "Material costs could not be loaded. Retry the Money view.";
   await warmPricingCache();
   try {
     const data = await postJson({ action: "listLaborSummary" }, true);
@@ -4213,7 +4299,7 @@ function buildMoneyRollup(items, keyFn, { sortByLabelDesc = false } = {}) {
     const jobs = groupItems.length;
     const priced = groupItems.filter(i => i.econ.net !== null);
     const avgPrice = priced.length
-      ? priced.reduce((s, i) => s + Number(i.order.priceQuoted), 0) / priced.length
+      ? priced.reduce((s, i) => s + Number(i.econ.price), 0) / priced.length
       : null;
     const avgMaterials = groupItems.reduce((s, i) => s + i.econ.materials.total, 0) / jobs;
     const avgMinutes = groupItems.reduce((s, i) => s + i.econ.laborMinutes, 0) / jobs;
@@ -4278,7 +4364,7 @@ function renderMoneyJobsTable(title, items) {
                   <td>${escapeHtml(item.order.customerName || "Customer")}</td>
                   <td>#${escapeHtml(String(item.order.orderNumber || ""))}</td>
                   <td>${escapeHtml(getOrderSelectedServices(item.order).join(" + ") || "—")}</td>
-                  <td>${escapeHtml(formatCurrency(Number(item.order.priceQuoted)))}${unpaid ? ` <span class="money-unpaid muted">unpaid</span>` : ""}</td>
+                  <td>${escapeHtml(formatCurrency(item.econ.price))}${unpaid ? ` <span class="money-unpaid muted">unpaid</span>` : ""}</td>
                   <td>${escapeHtml(formatLaborDuration(item.econ.laborMinutes))}</td>
                   <td>${escapeHtml(`${formatCurrency(item.econ.hourlyRate)}/hr`)}</td>
                 </tr>
@@ -4347,8 +4433,10 @@ function isArchivedOrder(order) {
    or $0 gift jobs are treated as no-charge so they never drag down average
    charged price or effective labor rate (their labor time still counts). */
 function orderChargedPrice(order) {
-  if (order?.priceQuoted == null || order.priceQuoted === "") return null;
-  const p = Number(order.priceQuoted);
+  const snapshot = getOrderEconomicsSnapshot(order);
+  const value = snapshot ? snapshot.price_quoted : order?.priceQuoted;
+  if (value == null || value === "") return null;
+  const p = Number(value);
   return Number.isFinite(p) && p > 0 ? p : null;
 }
 
@@ -4377,6 +4465,9 @@ function isAfterPricingCutoff(order) {
 }
 
 function renderMoneyViewContent(sessions, loadError) {
+  if (!Array.isArray(expensesCache)) {
+    return `<div class="money-error">${escapeHtml(loadError || "Material costs are unavailable. Retry before reviewing job economics.")}</div>`;
+  }
   const laborByOrder = {};
   (Array.isArray(sessions) ? sessions : []).forEach(session => {
     const key = String(session.orderNumber || "");
@@ -4427,18 +4518,18 @@ function renderMoneyViewContent(sessions, loadError) {
   }
 
   const byService = buildMoneyRollup(withLabor, r => getOrderSelectedServices(r.order).join(" + ") || "Other");
-  const byGlove = buildMoneyRollup(withLabor, r => String(r.order.gloveType || "Unknown"));
+  const byGlove = buildMoneyRollup(withLabor, r => String(getHistoricalOrderBasis(r.order).gloveType || "Unknown"));
   /* Referral ROI uses ALL money-eligible orders — revenue per source
      doesn't require labor logs; $/hr fills in as timers cover more jobs. */
   const byReferral = buildMoneyRollup(rows, r => {
-    const src = String(r.order.referralSource || "").trim();
+    const src = String(getHistoricalOrderBasis(r.order).referralSource || "").trim();
     if (!src) return "Unknown";
     return src.toLowerCase().startsWith("other") ? "Other" : src;
   });
 
   const byMonth = buildMoneyRollup(
     withLabor,
-    r => String(r.order.dateCompleted || r.order.createdAt || r.order.timestampSubmitted || "").slice(0, 7) || "Unknown",
+    r => String(getHistoricalOrderBasis(r.order).dateCompleted || r.order.createdAt || r.order.timestampSubmitted || "").slice(0, 7) || "Unknown",
     { sortByLabelDesc: true }
   );
 
@@ -5050,6 +5141,12 @@ function adminLaceLabel(color) {
   return titled;
 }
 
+function adminOrderLaceLabel(color) {
+  const raw = String(color || "").trim();
+  const stocked = adminLaceOptionsCache?.find(item => item.normalized === normalizeAdminLaceColor(raw));
+  return stocked ? stocked.label : raw;
+}
+
 function loadAdminLaceOptions() {
   if (adminLaceOptionsCache) return Promise.resolve(adminLaceOptionsCache);
   if (!adminLaceOptionsPromise) {
@@ -5097,12 +5194,36 @@ function adminLaceOptionMarkup(current, placeholder = "Choose") {
 function refreshAdminLaceSelects() {
   document.querySelectorAll("select[data-lace-color-select]").forEach(select => {
     const current = select.value || select.dataset.current || "";
+    const isSpecialOrder = !!current && !adminLaceOptionsCache?.some(item => item.normalized === normalizeAdminLaceColor(current));
+    if (isSpecialOrder && select.dataset.allowSpecialOrder === "true") {
+      replaceLaceSelectWithSpecialOrderInput(select, current, { focus: false });
+      return;
+    }
     select.innerHTML = adminLaceOptionMarkup(current, select.dataset.placeholder || "Choose");
-    if ("allowCustom" in select.dataset) {
-      select.insertAdjacentHTML("beforeend", `<option value="__custom__">Custom color…</option>`);
+    if (select.dataset.allowSpecialOrder === "true" || "allowCustom" in select.dataset) {
+      select.insertAdjacentHTML("beforeend", `<option value="__custom__">Special-order color…</option>`);
     }
   });
 }
+
+function replaceLaceSelectWithSpecialOrderInput(select, value = "", { focus = true } = {}) {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.id = select.id;
+  input.value = String(value || "").trim();
+  input.placeholder = "Supplier color name";
+  if (select.dataset.describeField) input.dataset.describeField = select.dataset.describeField;
+  input.dataset.specialOrderLaceColor = "true";
+  select.replaceWith(input);
+  if (focus) input.focus();
+  return input;
+}
+
+document.addEventListener("change", (event) => {
+  const select = event.target.closest?.("select[data-lace-color-select]");
+  if (!select || select.value !== "__custom__") return;
+  replaceLaceSelectWithSpecialOrderInput(select);
+});
 
 const STATE_OPTIONS = [
   { value: "AL", label: "Alabama" },
@@ -5229,11 +5350,22 @@ function renderPhoneInput(label, id, value) {
 
 function renderLaceInput(label, id, value, placeholder = "Choose") {
   loadAdminLaceOptions();
+  const current = String(value || "").trim();
+  const known = !current || adminLaceOptionsCache?.some(item => item.normalized === normalizeAdminLaceColor(current));
+  if (adminLaceOptionsCache && !known) {
+    return `
+      <div class="detail-block">
+        <div class="label">${escapeHtml(label)}</div>
+        <input id="${escapeAttr(id)}" type="text" data-special-order-lace-color="true" value="${escapeAttr(current)}" placeholder="Supplier color name">
+      </div>
+    `;
+  }
   return `
     <div class="detail-block">
       <div class="label">${escapeHtml(label)}</div>
-      <select id="${escapeAttr(id)}" data-lace-color-select data-current="${escapeAttr(String(value || "").trim())}" data-placeholder="${escapeAttr(placeholder)}">
+      <select id="${escapeAttr(id)}" data-lace-color-select data-allow-special-order="true" data-current="${escapeAttr(current)}" data-placeholder="${escapeAttr(placeholder)}">
         ${adminLaceOptionMarkup(value, placeholder)}
+        <option value="__custom__">Special-order color…</option>
       </select>
     </div>
   `;
@@ -6604,12 +6736,18 @@ async function deleteOrder(orderNumber) {
   }, true);
 
   allOrders = allOrders.filter(o => String(o.orderNumber) !== String(orderNumber));
+  delete dashboardLaborSessions[String(orderNumber)];
+  dashboardActivityOrders.delete(String(orderNumber));
+  moneyLaborSummaryCache = Array.isArray(moneyLaborSummaryCache)
+    ? moneyLaborSummaryCache.filter(session => String(session.orderNumber) !== String(orderNumber))
+    : moneyLaborSummaryCache;
 
   if (currentOrder && String(currentOrder.orderNumber) === String(orderNumber)) {
     currentOrder = null;
   }
 
   localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
+  await refreshBenchFocusState({ rerender: false });
   applyFilters();
   showView(dashboardView);
 
@@ -6617,7 +6755,7 @@ async function deleteOrder(orderNumber) {
 }
 
 async function confirmAndDeleteOrder(orderNumber) {
-  const ok = confirm(`Delete order #${orderNumber}? This cannot be undone.`);
+  const ok = confirm(`Delete order #${orderNumber}? This permanently removes its labor sessions, Bench Work, activity, and order history. Shared messages and gallery photos will be unlinked. This cannot be undone.`);
   if (!ok) return;
 
   try {
@@ -7158,6 +7296,13 @@ function renderOrderDetail(order) {
   wireStatusDeliveryControls(order);
   ensureDetailCollapseDelegation();
   wireDetailSectionSummaries();
+  if (!getOrderEconomicsSnapshot(order) && !Array.isArray(expensesCache)) {
+    warmExpensesCache().then(ready => {
+      if (ready && currentOrder && String(currentOrder.orderNumber) === String(order.orderNumber)) {
+        updateOrderEconomicsSection();
+      }
+    });
+  }
   wireShowOnMapControl();
   ensureLaborTimerDelegation();
   ensureOrderEconomicsDelegation();
@@ -12715,8 +12860,8 @@ function openGalleryDescribeDialog(photo) {
       <label>Brand / Model<span class="gallery-describe-suggest-wrap"><input type="text" data-describe-field="brandModel" value="${escapeHtml(meta.brandModel || "")}" placeholder="Wilson A2000 1786" autocomplete="off"><div class="gallery-describe-suggest" data-describe-suggest hidden></div></span></label>
       <label>Glove Type<select data-describe-field="gloveType">${renderSelectOptions(meta.gloveType || "", GLOVE_TYPE_OPTIONS, "Select glove type")}</select></label>
       <label>Web Type<select data-describe-field="webType">${renderSelectOptions(meta.webType || "", WEB_TYPE_OPTIONS, "Select web type")}</select></label>
-      <label>Primary Lace<select data-describe-field="primaryLaceColor" data-lace-color-select data-allow-custom data-current="${escapeAttr(meta.primaryLaceColor || "")}" data-placeholder="Choose">${adminLaceOptionMarkup(meta.primaryLaceColor || "", "Choose")}<option value="__custom__">Custom color…</option></select></label>
-      <label>Secondary Lace<select data-describe-field="secondaryLaceColor" data-lace-color-select data-allow-custom data-current="${escapeAttr(meta.secondaryLaceColor || "")}" data-placeholder="None">${adminLaceOptionMarkup(meta.secondaryLaceColor || "", "None")}<option value="__custom__">Custom color…</option></select></label>
+      <label>Primary Lace<select data-describe-field="primaryLaceColor" data-lace-color-select data-allow-special-order="true" data-current="${escapeAttr(meta.primaryLaceColor || "")}" data-placeholder="Choose">${adminLaceOptionMarkup(meta.primaryLaceColor || "", "Choose")}<option value="__custom__">Special-order color…</option></select></label>
+      <label>Secondary Lace<select data-describe-field="secondaryLaceColor" data-lace-color-select data-allow-special-order="true" data-current="${escapeAttr(meta.secondaryLaceColor || "")}" data-placeholder="None">${adminLaceOptionMarkup(meta.secondaryLaceColor || "", "None")}<option value="__custom__">Special-order color…</option></select></label>
       <div class="gallery-describe-actions">
         ${photo.gloveMeta ? `<button type="button" class="gallery-describe-remove" data-describe-remove>Remove</button>` : ""}
         <span class="gallery-describe-spacer"></span>
@@ -12767,7 +12912,7 @@ function openGalleryDescribeDialog(photo) {
     suggestEl.innerHTML = matches.map((g, i) => `
       <button type="button" data-suggest-index="${i}">
         <strong>${escapeHtml(g.brandModel)}</strong>
-        <span>${escapeHtml([g.gloveType, g.webType, [g.primaryLaceColor && adminLaceLabel(g.primaryLaceColor), g.secondaryLaceColor && adminLaceLabel(g.secondaryLaceColor)].filter(Boolean).join("/")].filter(Boolean).join(" · "))}</span>
+        <span>${escapeHtml([g.gloveType, g.webType, [g.primaryLaceColor && adminOrderLaceLabel(g.primaryLaceColor), g.secondaryLaceColor && adminOrderLaceLabel(g.secondaryLaceColor)].filter(Boolean).join("/")].filter(Boolean).join(" · "))}</span>
       </button>
     `).join("");
     suggestEl.hidden = false;
@@ -12782,19 +12927,6 @@ function openGalleryDescribeDialog(photo) {
   /* Any click outside the suggestion list dismisses it. */
   overlay.addEventListener("click", (e) => {
     if (!e.target.closest(".gallery-describe-suggest-wrap")) hideDescribeSuggest();
-  });
-
-  /* One-off colors bought per order and never stocked: "Custom color…"
-     swaps the dropdown for a free-text field. */
-  overlay.addEventListener("change", (e) => {
-    const select = e.target.closest("select[data-describe-field]");
-    if (!select || select.value !== "__custom__") return;
-    const input = document.createElement("input");
-    input.type = "text";
-    input.dataset.describeField = select.dataset.describeField;
-    input.placeholder = "Type the color";
-    select.replaceWith(input);
-    input.focus();
   });
 
   document.body.appendChild(overlay);
@@ -13799,7 +13931,7 @@ function buildCustomerIndex() {
     }
     /* Only claim a "go-to" when a color actually repeats — with all-distinct
        colors there is no preference to report. */
-    c.favoriteLace = fav && favCount >= 2 ? adminLaceLabel(fav) : "";
+    c.favoriteLace = fav && favCount >= 2 ? adminOrderLaceLabel(fav) : "";
   }
 
   customers.sort((a, b) => new Date(b.lastDate || 0) - new Date(a.lastDate || 0));
@@ -13982,7 +14114,7 @@ function renderCustomerProfile(panel, count, c) {
             <button class="customer-order-row" type="button" data-customer-order="${escapeAttr(String(o.orderNumber))}">
               <span class="customer-row-main">
                 <span class="customer-row-name">#${escapeHtml(String(o.orderNumber))} · ${escapeHtml(getOrderSelectedServices(o).join(" + ") || o.status || "Service")}</span>
-                <span class="customer-row-sub">${escapeHtml([customerDisplayDate(o.timestampSubmitted || o.dateCompleted), [o.primaryLaceColor ? adminLaceLabel(o.primaryLaceColor) : "", o.secondaryLaceColor ? adminLaceLabel(o.secondaryLaceColor) : ""].filter(Boolean).join("/"), o.status].filter(Boolean).join(" · "))}</span>
+                <span class="customer-row-sub">${escapeHtml([customerDisplayDate(o.timestampSubmitted || o.dateCompleted), [o.primaryLaceColor ? adminOrderLaceLabel(o.primaryLaceColor) : "", o.secondaryLaceColor ? adminOrderLaceLabel(o.secondaryLaceColor) : ""].filter(Boolean).join("/"), o.status].filter(Boolean).join(" · "))}</span>
               </span>
               <span class="customer-row-side">
                 ${o.priceQuoted ? `<span class="customer-row-spend">$${Number(o.priceQuoted).toLocaleString()}</span>` : ""}
@@ -14363,7 +14495,7 @@ function getPricingSettings() {
    sort order), so add-ons never steal a job's labor. */
 function attributeOrderToServiceKey(order, services) {
   const selected = getOrderSelectedServices(order);
-  const glove = String(order?.gloveType || "");
+  const glove = String(getHistoricalOrderBasis(order)?.gloveType || "");
   let best = null;
   let bestRank = Infinity;
   for (const svc of services) {
@@ -14406,7 +14538,7 @@ const PRICING_TREND_LABELS = {
    trapeze/modified-trapeze fielders are the premium tier. A job lands in exactly
    ONE tier, so standard and premium never double-count each other. */
 function orderPricingTier(order) {
-  const glove = String(order?.gloveType || "");
+  const glove = String(getHistoricalOrderBasis(order)?.gloveType || "");
   if (glove === "Catchers Mitt" || glove === "First Base Mitt") return "premium";
   if (glove === "Fielders Glove" && orderHasTrapezeWeb(order)) return "premium";
   return "standard";
@@ -14446,6 +14578,10 @@ function buildPalmPadMinutesByOrder() {
     const k = String(s.orderNumber || "");
     if (k) map[k] = (map[k] || 0) + (Number(s.durationMinutes) || 0);
   });
+  allOrders.forEach(order => {
+    const snapshot = getOrderEconomicsSnapshot(order);
+    if (snapshot) map[String(order.orderNumber || "")] = Number(snapshot.phase_minutes?.[PALM_PAD_PHASE]) || 0;
+  });
   return map;
 }
 
@@ -14457,6 +14593,10 @@ function buildCustomWorkMinutesByOrder() {
     if (String(s.phase || "") !== LABOR_CUSTOM_PHASE) return;
     const k = String(s.orderNumber || "");
     if (k) map[k] = (map[k] || 0) + (Number(s.durationMinutes) || 0);
+  });
+  allOrders.forEach(order => {
+    const snapshot = getOrderEconomicsSnapshot(order);
+    if (snapshot) map[String(order.orderNumber || "")] = Number(snapshot.phase_minutes?.[LABOR_CUSTOM_PHASE]) || 0;
   });
   return map;
 }
@@ -14471,7 +14611,8 @@ function buildCustomWorkMinutesByOrder() {
    - minutesUnallocated: true when labor exists but can't be attributed. */
 function allocateOrderForService(order, service, totalMinutes, palmPadMinutes, customWorkMinutes) {
   const orderNumber = String(order.orderNumber || "");
-  const date = order.dateCompleted || order.createdAt || order.timestampSubmitted || "";
+  const basis = getHistoricalOrderBasis(order);
+  const date = basis.dateCompleted || order.createdAt || order.timestampSubmitted || "";
   const total = orderChargedPrice(order); // positive price, or null (gift/blank)
   const mats = getOrderMaterialsCost(order);
   const key = service.serviceKey;
@@ -14654,7 +14795,9 @@ function computeServicePricingIntel(service, services, laborByOrder) {
 
   const allocations = relevant.map((o) => allocateOrderForService(
     o, service,
-    laborByOrder[String(o.orderNumber)] || 0,
+    getOrderEconomicsSnapshot(o)
+      ? Number(getOrderEconomicsSnapshot(o).labor_minutes) || 0
+      : laborByOrder[String(o.orderNumber)] || 0,
     palmPadByOrder[String(o.orderNumber)] || 0,
     customWorkByOrder[String(o.orderNumber)] || 0
   ));
@@ -14743,9 +14886,9 @@ async function renderPricingView() {
   panel.innerHTML = `<div class="dashboard-card money-empty muted">Loading pricing…</div>`;
 
   await warmLaborSummaryCache();
-  await warmExpensesCache();
+  const expensesReady = await warmExpensesCache();
 
-  let loadError = "";
+  let loadError = expensesReady ? "" : (expensesCacheError || "Material costs could not be loaded. Retry Pricing Intelligence.");
   try {
     const data = await postJson({ action: "listServicePricing" }, true);
     if (data && data.ok !== false) pricingStateCache = data;
@@ -14759,6 +14902,9 @@ async function renderPricingView() {
 }
 
 function renderPricingViewContent(loadError) {
+  if (!Array.isArray(expensesCache)) {
+    return `<div class="money-error">${escapeHtml(loadError || "Material costs are unavailable. Retry before reviewing pricing intelligence.")}</div>`;
+  }
   const state = pricingStateCache || { services: [], settings: {} };
   const services = Array.isArray(state.services) ? state.services : [];
   const settings = getPricingSettings();
@@ -15381,13 +15527,13 @@ const MEASURED_MIN_JOB_MINUTES = 1;
 const MEASURED_MIN_BUCKET_JOBS = 3;
 
 function orderHasCustomWork(order) {
-  const parsed = parseServicesValue(order?.servicesRequested || "");
+  const parsed = parseServicesValue(getHistoricalOrderBasis(order)?.servicesRequested || "");
   return !!(parsed.otherChecked || String(parsed.otherText || "").trim());
 }
 
 function measuredBucketKey(order) {
   const services = getOrderSelectedServices(order).slice().sort().join(" + ") || "Other";
-  const glove = String(order?.gloveType || "Unknown");
+  const glove = String(getHistoricalOrderBasis(order)?.gloveType || "Unknown");
   const trapeze = glove === "Fielders Glove" && orderHasTrapezeWeb(order) ? " (Trapeze)" : "";
   return `${glove}${trapeze} · ${services}`;
 }
@@ -15403,6 +15549,16 @@ function buildMeasuredJobStats(sessions) {
     const slot = perOrder.get(key);
     if (String(s.phase || "") === LABOR_CUSTOM_PHASE) slot.custom += Number(s.durationMinutes) || 0;
     else slot.standard += Number(s.durationMinutes) || 0;
+  });
+  allOrders.forEach(order => {
+    const snapshot = getOrderEconomicsSnapshot(order);
+    if (!snapshot) return;
+    const key = String(order.orderNumber || "");
+    const custom = Number(snapshot.phase_minutes?.[LABOR_CUSTOM_PHASE]) || 0;
+    perOrder.set(key, {
+      custom,
+      standard: Math.max(0, (Number(snapshot.labor_minutes) || 0) - custom)
+    });
   });
 
   const buckets = new Map();
@@ -15435,6 +15591,7 @@ function getMeasuredSuggestion(order) {
   const stats = buildMeasuredJobStats(moneyLaborSummaryCache).get(measuredBucketKey(order));
   if (!stats || stats.n < MEASURED_MIN_BUCKET_JOBS) return null;
   const materials = getOrderMaterialsCost(order).total;
+  if (materials === null) return null;
   const raw = materials + (stats.medianMinutes / 60) * SHOP_ECONOMICS.targetHourlyRate;
   return { ...stats, price: Math.round(raw / 5) * 5 };
 }
@@ -15700,12 +15857,14 @@ function renderPhaseHoursTable(sessions) {
 /* =========================
    EXPENSES (Phase 2.4 — Brett's design)
    Manual shop expenses -> true profit after expenses on the Money view,
-   and dynamic unit costs: the latest purchase tagged with a unit kind
-   (lace piece / business card / sticker) teaches the economics its real
-   cost (amount / quantity). SHOP_ECONOMICS constants stay as fallbacks.
+   and dynamic unit costs. Lace uses cumulative weighted-average landed cost;
+   business cards and stickers retain latest-valid-purchase behavior.
+   SHOP_ECONOMICS constants stay as fallbacks after a successful load.
 ========================= */
 
 let expensesCache = null;
+let expensesCacheStatus = "idle";
+let expensesCacheError = "";
 let expensesShowAll = false;
 
 const EXPENSE_CATEGORIES = ["Lace", "Packaging", "Products", "Shipping Supplies", "Equipment", "Other"];
@@ -15740,12 +15899,40 @@ function getUnitCost(kind, fallback) {
   return latest ? latest.amount / latest.quantity : fallback;
 }
 
+function getWeightedAverageUnitCost(expenses, kind) {
+  if (!Array.isArray(expenses)) return null;
+  let amount = 0;
+  let quantity = 0;
+  for (const expense of expenses) {
+    const rowAmount = Number(expense?.amount);
+    const rowQuantity = Number(expense?.quantity);
+    if (expense?.unitKind !== kind || !Number.isFinite(rowAmount) || rowAmount <= 0 || !Number.isFinite(rowQuantity) || rowQuantity <= 0) continue;
+    amount += rowAmount;
+    quantity += rowQuantity;
+  }
+  return quantity > 0 ? amount / quantity : null;
+}
+
+function getResolvedLaceUnitCost() {
+  if (!Array.isArray(expensesCache)) return null;
+  return getWeightedAverageUnitCost(expensesCache, "lace_piece") ?? SHOP_ECONOMICS.laceCostPerPiece;
+}
+
 async function warmExpensesCache() {
-  if (Array.isArray(expensesCache) || !isAuthenticated()) return;
+  if (Array.isArray(expensesCache)) return true;
+  if (!isAuthenticated()) return false;
+  expensesCacheStatus = "loading";
+  expensesCacheError = "";
   try {
     const data = await postJson({ action: "listExpenses" }, true);
     expensesCache = data.expenses || [];
-  } catch {}
+    expensesCacheStatus = "ready";
+    return true;
+  } catch (error) {
+    expensesCacheStatus = "error";
+    expensesCacheError = error?.message || "Material costs could not be loaded.";
+    return false;
+  }
 }
 setTimeout(warmExpensesCache, 3000);
 
@@ -15760,7 +15947,7 @@ function renderExpensesCard() {
   const monthOrders = allOrders.filter(o =>
     String(o.paid || "").toLowerCase() === "paid" &&
     String(o.dateCompleted || "").startsWith(monthKey));
-  const monthRevenue = monthOrders.reduce((sum, o) => sum + (Number(o.priceQuoted) || 0), 0);
+  const monthRevenue = monthOrders.reduce((sum, o) => sum + (orderChargedPrice(o) || 0), 0);
   const monthMaterials = monthOrders.reduce((sum, o) => sum + getOrderMaterialsCost(o).total, 0);
   const monthProfit = monthRevenue - monthMaterials - monthExpenses;
 
@@ -15841,6 +16028,8 @@ document.addEventListener("click", async (e) => {
     }
     const data = await postJson({ action: "listExpenses" }, true);
     expensesCache = data.expenses || [];
+    expensesCacheStatus = "ready";
+    expensesCacheError = "";
     if (activeView === "money") renderMoneyView();
   } catch (err) {
     if (status) status.textContent = err.message || "Expense action failed.";
@@ -15849,8 +16038,9 @@ document.addEventListener("click", async (e) => {
 
 /* =========================
    MONTHLY P&L — one row per month: collected − materials − expenses =
-   profit. Materials use today's rates (same live lens as everything else);
-   the expenses table remains the historical ledger.
+   profit. Completed/Picked Up materials use immutable snapshots; other
+   eligible orders use the current live cost lens. The expenses table remains
+   the historical ledger.
 ========================= */
 
 function renderMonthlyPnlTable() {
@@ -15865,7 +16055,7 @@ function renderMonthlyPnlTable() {
     const key = String(o.dateCompleted || "").slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(key)) return;
     const m = slot(key);
-    m.revenue += Number(o.priceQuoted) || 0;
+    m.revenue += orderChargedPrice(o) || 0;
     m.materials += getOrderMaterialsCost(o).total;
   });
 

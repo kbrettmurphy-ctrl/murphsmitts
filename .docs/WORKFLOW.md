@@ -53,7 +53,11 @@ Order economics are primarily computed in the admin client. Revenue is `price_qu
 
 Effective rate is `(quote - materials) / stopped labor hours`. Money rollups include only `Ready to Go`, `Completed`, or `Picked Up` jobs as applicable and exclude jobs with less than 15 logged minutes from rate rollups. Views include service/glove/month/referral summaries, measured times, phase hours, best/worst jobs, expenses, monthly P&L, and customer reach/maintenance signals.
 
-Expense rows are manual. If an expense supplies a recognized unit kind and quantity, the latest purchase's `amount / quantity` overrides the matching fallback unit cost in client calculations. Monthly P&L subtracts materials and recorded expenses from job revenue; it is an operating estimate, not accounting software.
+Expense rows are manual. Valid lace-piece purchases use cumulative weighted-average landed cost: total qualifying expense amount divided by total qualifying quantity. Other recognized unit kinds retain their latest-valid-purchase unit cost. The lace fallback is used only after expenses load successfully and contain no valid lace-piece purchases. Monthly P&L subtracts materials and recorded expenses from job revenue; it is an operating estimate, not accounting software.
+
+When an order first becomes Completed or Picked Up, the database locks an immutable economics snapshot containing its charged price, stopped labor and phase totals, lace-piece basis and unit cost, material components, net, and effective hourly rate. Order Detail, Money, pricing intelligence, service allocations, and monthly history resolve terminal historical actuals from that snapshot. The additive migration backfills existing terminal orders once from the data available at deployment and labels those snapshots `backfill`.
+
+Hard deletion is one transaction: matching stocked lace is restored; labor is deleted before Bench Work; activity and legacy order-owned usage are removed; SMS and gallery links are unlinked; then the order is deleted. Gallery and order-photo Storage objects are retained.
 
 ## Inventory
 

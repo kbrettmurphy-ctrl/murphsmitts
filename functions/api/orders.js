@@ -266,7 +266,11 @@ const ACTIONS = {
   },
   deleteOrder: {
     auth: "session", demo: "deny", handler: handleDeleteOrder,
-    effects: ["db:orders:delete"], bindings: { required: ["CORE"], optional: [] }
+    effects: [
+      "db:lace_inventory:write", "db:order_labor_sessions:delete", "db:bench_work_sessions:delete",
+      "db:order_activity:delete", "db:order_lace_usage:delete", "db:sms_messages:write",
+      "db:gallery_photo_links:write", "db:orders:delete"
+    ], bindings: { required: ["CORE"], optional: [] }
   },
   uploadOrderPhoto: {
     auth: "session", demo: "deny", handler: handleUploadOrderPhoto,
@@ -1132,19 +1136,23 @@ async function handleResolveBenchWork({ env, body, jsonHeaders }) {
 async function handleDeleteOrder({ env, body, jsonHeaders }) {
   const orderNumber = String(body.orderNumber || "").trim();
   if (!orderNumber) return json({ ok: false, error: "Missing orderNumber." }, 200, jsonHeaders);
-  const del = await supabaseFetch(
-    env,
-    `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
-    { method: "DELETE", headers: { Prefer: "return=representation" } }
-  );
+  const del = await supabaseFetch(env, "/rest/v1/rpc/delete_order_completely", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ p_order_number: orderNumber })
+  });
   if (!del.ok) {
     return json({
       ok: false,
-      error: "Failed to delete order from Supabase.",
+      error: "Failed to delete order and its history from Supabase.",
       details: del.error
     }, 200, jsonHeaders);
   }
-  return json({ ok: true, deleted: true, orderNumber }, 200, jsonHeaders);
+  const result = Array.isArray(del.data) ? del.data[0] : del.data;
+  if (!result || result.ok !== true) {
+    return json(result || { ok: false, error: "Invalid delete response." }, 200, jsonHeaders);
+  }
+  return json(result, 200, jsonHeaders);
 }
 
 async function handleUploadOrderPhoto({ env, body, jsonHeaders }) {
@@ -1183,6 +1191,9 @@ async function handleUpdateOrder({ env, body, jsonHeaders }) {
   }
 
   const oldRow = existing.data;
+  if (isLaceColorSentinel(updates.primaryLaceColor ?? updates.lacePrimary) || isLaceColorSentinel(updates.secondaryLaceColor ?? updates.laceAccent)) {
+    return json({ ok: false, error: "Enter the supplier's actual special-order color name." }, 200, jsonHeaders);
+  }
   const oldStatus = normalizeStatus(oldRow.status);
   const lastStatusEmailed = normalizeStatus(oldRow.last_status_emailed);
   const lastStatusTexted = normalizeStatus(oldRow.last_status_texted);
@@ -1755,6 +1766,9 @@ async function handleSetGalleryPhotoOrder({ env, body, jsonHeaders }) {
   const orderNumber = cleanText(body.orderNumber);
   if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
   const d = body.descriptors && typeof body.descriptors === "object" ? body.descriptors : null;
+  if (isLaceColorSentinel(d?.primaryLaceColor) || isLaceColorSentinel(d?.secondaryLaceColor)) {
+    return json({ ok: false, error: "Enter the supplier's actual special-order color name." }, 200, jsonHeaders);
+  }
   const descriptors = {
     brand_model: cleanText(d?.brandModel) || null,
     glove_type: cleanText(d?.gloveType) || null,
@@ -3529,6 +3543,10 @@ async function createOrderAction(env, body) {
     }
   }
 
+  if (isLaceColorSentinel(input.primaryLaceColor ?? input.lacePrimary) || isLaceColorSentinel(input.secondaryLaceColor ?? input.laceAccent)) {
+    return { ok: false, error: "Enter the supplier's actual special-order color name." };
+  }
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const nextOrderNumber = await getNextAdminOrderNumber(env);
     const dbOrder = {
@@ -4691,6 +4709,8 @@ function mapOrderFromDb(row) {
     customAddonAmount: row.custom_addon_amount,
     customAddonLabel: row.custom_addon_label,
     lacePiecesUsed: row.lace_pieces_used != null ? Number(row.lace_pieces_used) : null,
+    economicsSnapshot: row.economics_snapshot || null,
+    economicsLockedAt: row.economics_locked_at || null,
     shippingCost: row.shipping_cost,
     paid: row.paid,
     allowShipWithoutPayment: row.allow_ship_without_payment,
@@ -6571,6 +6591,11 @@ function cleanText(value) {
   if (value === null || value === undefined) return null;
   const s = String(value).trim();
   return s === "" ? null : s;
+}
+
+function isLaceColorSentinel(value) {
+  const color = (cleanText(value) || "").toLowerCase().replace(/\u2026/g, "").trim();
+  return color === "__custom__" || color === "special-order color" || color === "custom color";
 }
 
 function cleanNumeric(value) {

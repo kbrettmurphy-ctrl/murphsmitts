@@ -1962,7 +1962,7 @@ await test("Stage 9 actions centralize authorization and global demo denial", as
   }
 });
 
-await test("deleteOrder preserves exact delete and no-row/no-storage behavior", async () => {
+await test("deleteOrder invokes the atomic cascade RPC and returns its counts", async () => {
   const { owner } = await sessionTokens();
   const missing = await invoke({ body: { action: "deleteOrder", _token: owner } });
   deepEqual(missing.json, { ok: false, error: "Missing orderNumber." });
@@ -1971,13 +1971,21 @@ await test("deleteOrder preserves exact delete and no-row/no-storage behavior", 
     body: { action: "deleteOrder", _token: owner, orderNumber: " 0999 " },
     fetchMock(input, init) {
       requestUrl = String(input);
-      equal(init.method, "DELETE");
+      equal(init.method, "POST");
       equal(init.headers.Prefer, "return=representation");
-      return jsonResponse([]);
+      deepEqual(JSON.parse(init.body), { p_order_number: "0999" });
+      return jsonResponse({
+        ok: true, deleted: true, orderNumber: "0999", inventoryColorsRestored: 1,
+        laborDeleted: 2, benchWorkDeleted: 1, activityDeleted: 4, laceUsageDeleted: 0,
+        smsUnlinked: 3, galleryLinksUnlinked: 2, ordersDeleted: 1
+      });
     }
   });
-  deepEqual(result.json, { ok: true, deleted: true, orderNumber: "0999" });
-  ok(requestUrl.includes("/rest/v1/orders?order_number=eq.0999"));
+  equal(result.json.ok, true);
+  equal(result.json.orderNumber, "0999");
+  equal(result.json.laborDeleted, 2);
+  equal(result.json.smsUnlinked, 3);
+  ok(requestUrl.includes("/rest/v1/rpc/delete_order_completely"));
   equal(requestUrl.includes("/storage/"), false);
   equal(result.fetchCalls.length, 1);
 });
