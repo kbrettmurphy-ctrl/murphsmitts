@@ -2238,11 +2238,12 @@ async function handleDashboardTimerPhaseSelect(orderKey, phase) {
 
     broadcastBenchFocusChange();
     await refreshBenchFocusState({ rerender: false });
-    await refreshDashboardLaborSessions();
+    await refreshDashboardLaborSessions({ rerender: false });
   } catch (err) {
     alert(err?.message || "Labor timer could not be started.");
   } finally {
     dashboardTimerBusy = false;
+    if (activeView === "dashboard") renderHomeDashboard();
   }
 }
 
