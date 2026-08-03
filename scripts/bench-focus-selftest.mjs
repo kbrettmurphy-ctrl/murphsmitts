@@ -38,6 +38,7 @@ async function invoke(body, responses = []) {
 const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
 const migration = fs.readFileSync(new URL("../supabase/migrations/20260731120000_bench_focus.sql", import.meta.url), "utf8");
 const admin = fs.readFileSync(new URL("../admin/admin.js", import.meta.url), "utf8");
+const adminCss = fs.readFileSync(new URL("../admin/admin.css", import.meta.url), "utf8");
 
 await test("schema is additive and enforces the Bench Focus invariants", () => {
   ok(/create table if not exists public\.bench_work_sessions/.test(migration));
@@ -230,7 +231,7 @@ await test("nested timer targets and cross-order End Bench Work dispatch safely"
     equal(eventTarget.closest("[data-timer-control]"), actionButton, `${target} resolves through closest()`);
   }
   ok(admin.includes('const endBenchBtn = e.target.closest("[data-detail-bench-end]")'));
-  ok(admin.includes("endActiveBenchWork();"));
+  ok(admin.includes("endActiveBenchWork({ anchor: endBenchBtn })"));
   ok(admin.includes('if (!bench) return "";'));
   ok(admin.includes('String(bench.orderNumber) === String(order.orderNumber)'));
   ok(admin.includes('strong>#${escapeHtml(bench.orderNumber)} · Active'));
@@ -239,7 +240,51 @@ await test("nested timer targets and cross-order End Bench Work dispatch safely"
   equal((admin.match(/orderDetail\.addEventListener\("click"/g) || []).length, 2);
   ok(admin.includes('benchSessionId: bench.id, runningAction'));
   ok(admin.includes('title: switchToOrder ? "End current Bench Work and switch?" : "End Bench Work"'));
-  ok(admin.includes('openImmediateBenchResolution(unresolvedBench)'));
+  ok(admin.includes('openImmediateBenchResolution(unresolvedBench, choiceAnchor)'));
+});
+
+await test("Clubhouse Bench controls stay compact and single-line", () => {
+  ok(adminCss.includes(".dashboard-bench-actions .bench-focus-start-btn{box-sizing:border-box;min-height:32px;height:32px"));
+  ok(adminCss.includes("white-space:nowrap"));
+  ok(adminCss.includes(".dashboard-bench-actions{align-items:center;flex-direction:row;flex-wrap:nowrap}"));
+  equal(adminCss.includes(".dashboard-bench-actions{align-items:flex-end;flex-direction:column}"), false);
+  equal(adminCss.includes(".bench-focus-start-btn{max-width:120px;white-space:normal}"), false);
+});
+
+await test("focused-card controls emit authoritative identifiers and reuse labor controls", () => {
+  const renderer = admin.match(/function renderBenchFocusTimerControls\([\s\S]*?\n\}/)?.[0] || "";
+  ok(renderer.includes('data-timer-control="${primary.control}"'));
+  ok(renderer.includes('data-timer-control="stop"'));
+  ok(renderer.includes('data-session-id="${escapeAttr(session.id)}"'));
+  ok(renderer.includes('data-bench-session-id="${escapeAttr(bench.id)}"'));
+  ok(renderer.includes("DASHBOARD_TIMER_ICONS[primary.icon]"));
+  ok(admin.includes("dashboardLaborSessions[orderKey] || focusedSession || null"));
+  ok(admin.includes("emittedSessionId !== String(session.id)"));
+  ok(admin.includes("await refreshBenchFocusSurfaces();"));
+});
+
+await test("Bench end choices anchor and clamp through the existing menu utility", () => {
+  ok(admin.includes("anchor: choiceAnchor"));
+  ok(admin.includes('endActiveBenchWork({ anchor: endBenchBtn })'));
+  ok(admin.includes('positionWorkflowMenu(sheet.querySelector(".bench-choice-panel"), anchorPosition)'));
+  ok(admin.includes('sheet.className = `bench-choice-sheet${anchorPosition ? " is-anchored" : ""}`'));
+  ok(admin.includes('event.target.closest("[data-bench-choice-dismiss]")'));
+  ok(admin.includes('if (event.key === "Escape") closeBenchChoiceSheet()'));
+  ok(adminCss.includes(".bench-choice-sheet.is-anchored{display:block;padding:0;background:transparent}"));
+  ok(adminCss.includes("max-height:calc(100vh - 24px)"));
+  equal(adminCss.includes(".bench-choice-sheet.is-anchored{align-items:flex-end"), false);
+});
+
+await test("Bench end performs one authoritative multi-surface refresh", () => {
+  const refresh = admin.match(/async function refreshBenchFocusSurfaces\([\s\S]*?\n\}/)?.[0] || "";
+  ok(refresh.includes("refreshBenchFocusState({ rerender: false })"));
+  ok(refresh.includes("refreshDashboardLaborSessions({ rerender: false })"));
+  ok(refresh.includes("renderHomeDashboard()"));
+  ok(refresh.includes("refreshOrderDetailBenchBanner()"));
+  ok(refresh.includes("loadLaborSessions(currentOrder.orderNumber)"));
+  ok(admin.includes("await refreshBenchFocusSurfaces({ refreshViewedLabor: true })"));
+  ok(admin.includes("existing?.remove()"));
+  equal((admin.match(/async function refreshBenchFocusSurfaces/g) || []).length, 1);
 });
 
 console.log(`\n${tests} tests, ${assertions} assertions passed`);

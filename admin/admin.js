@@ -1546,6 +1546,23 @@ function renderDashboardTimerButton(order, session) {
   `;
 }
 
+function renderBenchFocusTimerControls(order, session, bench) {
+  const orderKey = String(order.orderNumber || bench.orderNumber || "");
+  const status = getLaborSessionStatus(session);
+  const primary = status === "paused"
+    ? { control: "resume", label: "Resume", icon: "resume" }
+    : { control: "pause", label: "Pause", icon: "pause" };
+  const common = `data-timer-order="${escapeAttr(orderKey)}" data-session-id="${escapeAttr(session.id)}" data-bench-session-id="${escapeAttr(bench.id)}"`;
+  return `
+    <button type="button" class="bench-focus-timer-control" data-timer-control="${primary.control}" ${common} ${dashboardTimerBusy ? "disabled" : ""}>
+      ${DASHBOARD_TIMER_ICONS[primary.icon]}<span>${primary.label}</span>
+    </button>
+    <button type="button" class="bench-focus-timer-control is-stop" data-timer-control="stop" ${common} ${dashboardTimerBusy ? "disabled" : ""}>
+      <span aria-hidden="true" class="bench-focus-stop-icon">■</span><span>Stop</span>
+    </button>
+  `;
+}
+
 function renderDashboardOrderRow(order, { timerControls = false } = {}) {
   const laceRaw = String(order.primaryLaceColor || order.lacePrimary || "").trim();
   const lace = laceRaw ? adminLaceLabel(laceRaw) : "";
@@ -1643,7 +1660,7 @@ function renderBenchFocusCard() {
         ${labor ? `
           <div class="bench-focus-labor-status">${escapeHtml(laborStatus === "paused" ? "Paused" : "Running")}</div>
           <div class="bench-focus-labor-time"><span>Labor elapsed</span><strong data-bench-labor-elapsed>${escapeHtml(formatLaborDuration(getLaborActiveSeconds(labor) / 60))}</strong></div>
-          <div class="bench-focus-labor-controls">${renderDashboardTimerButton(order, labor)}</div>
+          <div class="bench-focus-labor-controls">${renderBenchFocusTimerControls(order, labor, bench)}</div>
         ` : unlinkedPausedLabor ? `
           <p class="bench-focus-paused-warning">A paused labor session is still open for this order.</p>
           <div class="bench-focus-reminder-actions">
@@ -1707,27 +1724,38 @@ async function stopExistingPausedLaborForBench() {
 function closeBenchChoiceSheet(value = null) {
   const sheet = document.querySelector(".bench-choice-sheet");
   if (!sheet) return;
+  document.removeEventListener("keydown", handleBenchChoiceKeydown);
   const resolve = sheet._resolve;
   sheet.remove();
   if (resolve) resolve(value);
 }
 
-function openBenchChoiceSheet({ title, message = "", actions = [] }) {
+function handleBenchChoiceKeydown(event) {
+  if (event.key === "Escape") closeBenchChoiceSheet();
+}
+
+function openBenchChoiceSheet({ title, message = "", actions = [], anchor = null }) {
   closeBenchChoiceSheet();
   return new Promise(resolve => {
     const sheet = document.createElement("div");
-    sheet.className = "bench-choice-sheet";
+    const anchorPosition = anchor?.x != null ? anchor : (anchor ? getAdminAnchorPosition(null, anchor) : null);
+    sheet.className = `bench-choice-sheet${anchorPosition ? " is-anchored" : ""}`;
     sheet._resolve = resolve;
-    sheet.innerHTML = `<div class="bench-choice-panel" role="dialog" aria-modal="false" aria-labelledby="benchChoiceTitle">
+    sheet.innerHTML = `${anchorPosition ? '<div class="bench-choice-backdrop" data-bench-choice-dismiss></div>' : ""}<div class="bench-choice-panel" role="dialog" aria-modal="false" aria-labelledby="benchChoiceTitle">
       <div id="benchChoiceTitle" class="bench-choice-title">${escapeHtml(title)}</div>
       ${message ? `<p>${escapeHtml(message)}</p>` : ""}
       <div class="bench-choice-actions">${actions.map(action => `<button type="button" data-bench-choice="${escapeAttr(action.value)}" class="${action.danger ? "is-danger" : ""}">${escapeHtml(action.label)}</button>`).join("")}</div>
     </div>`;
     sheet.addEventListener("click", event => {
+      if (event.target.closest("[data-bench-choice-dismiss]")) return closeBenchChoiceSheet();
       const button = event.target.closest("[data-bench-choice]");
       if (button) closeBenchChoiceSheet(button.dataset.benchChoice);
     });
     document.body.appendChild(sheet);
+    document.addEventListener("keydown", handleBenchChoiceKeydown);
+    if (anchorPosition) {
+      requestAnimationFrame(() => positionWorkflowMenu(sheet.querySelector(".bench-choice-panel"), anchorPosition));
+    }
   });
 }
 
@@ -1777,9 +1805,22 @@ async function snoozeBenchReminder() {
   }
 }
 
-async function endActiveBenchWork({ switchToOrder = "" } = {}) {
+async function refreshBenchFocusSurfaces({ refreshViewedLabor = false } = {}) {
+  await Promise.all([
+    refreshBenchFocusState({ rerender: false }),
+    refreshDashboardLaborSessions({ rerender: false })
+  ]);
+  if (dashboardPanel) renderHomeDashboard();
+  refreshOrderDetailBenchBanner();
+  if (refreshViewedLabor && detailView?.classList.contains("active") && currentOrder?.orderNumber) {
+    await loadLaborSessions(currentOrder.orderNumber);
+  }
+}
+
+async function endActiveBenchWork({ switchToOrder = "", anchor = null } = {}) {
   const bench = benchFocusState.activeBench;
   if (!bench || benchFocusBusy) return false;
+  const choiceAnchor = anchor?.x != null ? anchor : (anchor ? getAdminAnchorPosition(null, anchor) : null);
   let runningAction = "none";
   if (getLaborSessionStatus(benchFocusState.activeLabor) === "running") {
     runningAction = await openBenchChoiceSheet({
@@ -1789,7 +1830,8 @@ async function endActiveBenchWork({ switchToOrder = "" } = {}) {
         { label: switchToOrder ? "Pause Timer and Switch" : "Pause Timer and End Bench Work", value: "pause" },
         { label: switchToOrder ? "Stop Timer and Switch" : "Stop Timer and End Bench Work", value: "stop", danger: true },
         { label: "Cancel", value: "" }
-      ]
+      ],
+      anchor: choiceAnchor
     });
     if (!runningAction) return false;
   }
@@ -1797,10 +1839,10 @@ async function endActiveBenchWork({ switchToOrder = "" } = {}) {
   try {
     const result = await postJson({ action: "endBenchWork", benchSessionId: bench.id, runningAction }, true);
     broadcastBenchFocusChange();
-    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+    await refreshBenchFocusSurfaces({ refreshViewedLabor: true });
     if (result.bench?.resolution === "pending") {
       const unresolvedBench = benchFocusState.unresolved.find(item => item.id === result.bench.id) || result.bench;
-      openImmediateBenchResolution(unresolvedBench);
+      openImmediateBenchResolution(unresolvedBench, choiceAnchor);
     }
     if (switchToOrder) {
       benchFocusBusy = false;
@@ -1808,7 +1850,7 @@ async function endActiveBenchWork({ switchToOrder = "" } = {}) {
     }
     return true;
   } catch (error) {
-    if (error.runningLaborChoice) return endActiveBenchWork({ switchToOrder });
+    if (error.runningLaborChoice) return endActiveBenchWork({ switchToOrder, anchor: choiceAnchor });
     alert(error.message || "Bench Work could not be ended.");
     await refreshBenchFocusState();
     return false;
@@ -1849,7 +1891,7 @@ async function resolveBenchInterval(bench, resolution) {
   }
 }
 
-async function openImmediateBenchResolution(bench) {
+async function openImmediateBenchResolution(bench, anchor = null) {
   const choice = await openBenchChoiceSheet({
     title: "Bench Work ended without labor.",
     message: bench.hasOpenLabor
@@ -1859,7 +1901,8 @@ async function openImmediateBenchResolution(bench) {
       ...(!bench.hasOpenLabor ? [{ label: "Assign Time", value: "labor_recorded" }] : []),
       { label: "Discard", value: "discarded", danger: true },
       { label: "Resolve Later", value: "" }
-    ]
+    ],
+    anchor
   });
   if (choice) resolveBenchInterval(bench, choice);
 }
@@ -2158,7 +2201,11 @@ async function handleDashboardTimerAction(button) {
 
   const orderKey = String(button.dataset.timerOrder || "");
   const action = button.dataset.timerAction;
-  const session = dashboardLaborSessions[orderKey] || null;
+  const session = dashboardLaborSessions[orderKey] || (
+    String(benchFocusState.activeBench?.orderNumber) === orderKey
+      ? benchFocusState.activeLabor
+      : null
+  );
 
   if (dashboardTimerPopoverOrder === orderKey) {
     closeDashboardTimerPopover();
@@ -2183,8 +2230,13 @@ async function handleDashboardTimerAction(button) {
 async function handleDashboardTimerControl(orderKey, control, controlButton = null) {
   if (dashboardTimerBusy) return;
 
-  const session = dashboardLaborSessions[orderKey] || null;
+  const focusedSession = String(benchFocusState.activeBench?.orderNumber) === String(orderKey)
+    ? benchFocusState.activeLabor
+    : null;
+  const session = dashboardLaborSessions[orderKey] || focusedSession || null;
   if (!session?.id) return;
+  const emittedSessionId = String(controlButton?.dataset.sessionId || "");
+  if (emittedSessionId && emittedSessionId !== String(session.id)) return;
 
   if (control === "resume" && hasRunningDashboardSessionOtherThan(orderKey)) {
     closeDashboardTimerPopover();
@@ -2207,8 +2259,7 @@ async function handleDashboardTimerControl(orderKey, control, controlButton = nu
       await postJson({ action: "stopLaborSession", sessionId: session.id }, true);
     }
     broadcastBenchFocusChange();
-    await refreshBenchFocusState({ rerender: false });
-    await refreshDashboardLaborSessions();
+    await refreshBenchFocusSurfaces();
   } catch (err) {
     alert(err?.message || "Labor timer could not be updated.");
     refreshDashboardLaborSessions();
@@ -2603,8 +2654,9 @@ function wireHomeDashboardActions() {
       return;
     }
 
-    if (e.target.closest("[data-bench-end]")) {
-      endActiveBenchWork();
+    const benchEndBtn = e.target.closest("[data-bench-end]");
+    if (benchEndBtn) {
+      endActiveBenchWork({ anchor: benchEndBtn });
       return;
     }
 
@@ -4764,7 +4816,7 @@ function ensureLaborTimerDelegation() {
       e.stopPropagation();
       if (!benchFocusBusy) {
         endBenchBtn.disabled = true;
-        Promise.resolve(endActiveBenchWork()).finally(() => {
+        Promise.resolve(endActiveBenchWork({ anchor: endBenchBtn })).finally(() => {
           if (endBenchBtn.isConnected) endBenchBtn.disabled = false;
         });
       }
@@ -7051,6 +7103,21 @@ function renderOrderDetailBenchBanner(order) {
     <div><span>${escapeHtml(labor?.phase || "No labor timer")}</span><strong>${labor ? escapeHtml(getLaborSessionStatus(labor) === "paused" ? "Paused" : "Running") : "Not recording labor"}</strong></div>
     <button type="button" data-detail-bench-end ${benchFocusBusy ? "disabled" : ""}>End Bench Work</button>
   </aside>`;
+}
+
+function refreshOrderDetailBenchBanner() {
+  if (!orderDetail || !currentOrder) return;
+  const shell = orderDetail.querySelector(".detail-form-shell");
+  if (!shell) return;
+  const existing = shell.querySelector(".detail-bench-focus-banner");
+  const html = renderOrderDetailBenchBanner(currentOrder);
+  if (!html) {
+    existing?.remove();
+  } else if (existing) {
+    existing.outerHTML = html;
+  } else {
+    shell.insertAdjacentHTML("afterbegin", html);
+  }
 }
 
 function getBlankAdminOrder() {
