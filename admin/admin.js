@@ -154,6 +154,7 @@ let financeFilterMenuOpen = false;
 let dashboardLaborSessions = {};
 let dashboardTimerPopoverOrder = null;
 let dashboardTimerBusy = false;
+let benchChoiceRoot = null;
 let benchFocusState = { activeBench: null, activeLabor: null, unlinkedPausedLabor: null, unresolved: [], serverNow: null };
 let benchFocusBusy = false;
 let benchFocusPollInterval = null;
@@ -1735,7 +1736,8 @@ async function resumePausedLaborWithNewBenchWork(session, anchor = null) {
 }
 
 function closeBenchChoiceSheet(value = null) {
-  const sheet = document.querySelector(".bench-choice-sheet");
+  document.querySelectorAll(".bench-unresolved-sheet").forEach(sheet => sheet.remove());
+  const sheet = benchChoiceRoot;
   if (!sheet) return;
   document.removeEventListener("keydown", handleBenchChoiceKeydown);
   if (sheet._reposition) {
@@ -1743,7 +1745,11 @@ function closeBenchChoiceSheet(value = null) {
     window.removeEventListener("scroll", sheet._reposition, true);
   }
   const resolve = sheet._resolve;
-  sheet.remove();
+  sheet._resolve = null;
+  sheet._reposition = null;
+  sheet.hidden = true;
+  sheet.className = "bench-choice-sheet";
+  sheet.innerHTML = "";
   if (resolve) resolve(value);
 }
 
@@ -1751,29 +1757,38 @@ function handleBenchChoiceKeydown(event) {
   if (event.key === "Escape") closeBenchChoiceSheet();
 }
 
+function getBenchChoiceRoot() {
+  if (benchChoiceRoot?.isConnected) return benchChoiceRoot;
+  benchChoiceRoot = document.createElement("div");
+  benchChoiceRoot.className = "bench-choice-sheet";
+  benchChoiceRoot.hidden = true;
+  benchChoiceRoot.addEventListener("click", event => {
+    const action = event.target.closest?.("[data-action]");
+    const dismiss = event.target.closest?.("[data-overlay-dismiss]");
+    if (!action && !dismiss) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    closeBenchChoiceSheet(action?.dataset.action ?? null);
+  });
+  document.body.appendChild(benchChoiceRoot);
+  return benchChoiceRoot;
+}
+
 function openBenchChoiceSheet({ title, message = "", actions = [], anchor = null }) {
   closeBenchChoiceSheet();
   return new Promise(resolve => {
-    const sheet = document.createElement("div");
+    const sheet = getBenchChoiceRoot();
     const anchorElement = anchor?.x == null && anchor?.getBoundingClientRect ? anchor : null;
     const anchorPosition = anchor?.x != null ? anchor : (anchor ? getAdminAnchorPosition(null, anchor) : null);
     sheet.className = `bench-choice-sheet${anchorPosition ? " is-anchored" : ""}`;
+    sheet.hidden = false;
     sheet._resolve = resolve;
-    sheet.innerHTML = `${anchorPosition ? '<div class="bench-choice-backdrop" data-bench-choice-dismiss></div>' : ""}<div class="bench-choice-panel" role="dialog" aria-modal="false" aria-labelledby="benchChoiceTitle">
+    sheet.innerHTML = `<div class="bench-choice-backdrop" data-overlay-dismiss></div><div class="bench-choice-panel" role="dialog" aria-modal="false" aria-labelledby="benchChoiceTitle">
       <div id="benchChoiceTitle" class="bench-choice-title">${escapeHtml(title)}</div>
       ${message ? `<p>${escapeHtml(message)}</p>` : ""}
-      <div class="bench-choice-actions">${actions.map(action => `<button type="button" data-bench-choice="${escapeAttr(action.value)}" class="${action.danger ? "is-danger" : ""}"><span>${escapeHtml(action.label)}</span></button>`).join("")}</div>
+      <div class="bench-choice-actions">${actions.map(action => `<button type="button" data-action="${escapeAttr(action.value)}" class="${action.danger ? "is-danger" : ""}"><span>${escapeHtml(action.label)}</span></button>`).join("")}</div>
     </div>`;
-    sheet.addEventListener("click", event => {
-      if (event.target.closest("[data-bench-choice-dismiss]")) return closeBenchChoiceSheet();
-      const button = event.target.closest("[data-bench-choice]");
-      if (button) {
-        event.preventDefault();
-        event.stopPropagation();
-        closeBenchChoiceSheet(button.dataset.benchChoice);
-      }
-    });
-    document.body.appendChild(sheet);
     document.addEventListener("keydown", handleBenchChoiceKeydown);
     if (anchorPosition) {
       const panel = sheet.querySelector(".bench-choice-panel");
@@ -2150,59 +2165,38 @@ async function refreshDashboardActivityIndex({ rerender = true } = {}) {
 
 function closeDashboardTimerPopover() {
   dashboardTimerPopoverOrder = null;
-  document.querySelectorAll(".dashboard-timer-popover").forEach(el => el.remove());
+  closeBenchChoiceSheet();
 }
 
-function openDashboardTimerPopover(button, orderKey) {
+async function openDashboardTimerPopover(button, orderKey) {
   closeDashboardTimerPopover();
-
-  const actions = button.closest(".dashboard-bench-actions, .bench-focus-labor-controls");
-  if (!actions) return;
-
   dashboardTimerPopoverOrder = orderKey;
-  const popover = document.createElement("div");
-  popover.className = "dashboard-timer-popover";
-  popover.innerHTML = LABOR_TIMER_PHASES.map(phase => `
-    <button
-      type="button"
-      class="dashboard-timer-phase-option"
-      data-timer-phase="${escapeAttr(phase)}"
-      data-timer-order="${escapeAttr(orderKey)}"
-    >${escapeHtml(phase)}</button>
-  `).join("");
-  actions.appendChild(popover);
+  const phase = await openBenchChoiceSheet({
+    title: "Start labor",
+    anchor: button,
+    actions: LABOR_TIMER_PHASES.map(value => ({ label: value, value }))
+  });
+  dashboardTimerPopoverOrder = null;
+  if (phase) await handleDashboardTimerPhaseSelect(orderKey, phase);
 }
 
 /* Options menu shown once a timer is running/paused: Pause or Resume,
    plus Stop. Reuses the phase popover styling. */
-function openDashboardTimerControlsPopover(button, orderKey, session) {
+async function openDashboardTimerControlsPopover(button, orderKey, session) {
   closeDashboardTimerPopover();
-
-  const actions = button.closest(".dashboard-bench-actions, .bench-focus-labor-controls");
-  if (!actions) return;
-
   const primary = getLaborSessionStatus(session) === "paused"
     ? { control: "resume", label: "Resume" }
     : { control: "pause", label: "Pause" };
 
   dashboardTimerPopoverOrder = orderKey;
-  const popover = document.createElement("div");
-  popover.className = "dashboard-timer-popover";
-  popover.innerHTML = `
-    <button
-      type="button"
-      class="dashboard-timer-phase-option"
-      data-timer-control="${escapeAttr(primary.control)}"
-      data-timer-order="${escapeAttr(orderKey)}"
-    >${escapeHtml(primary.label)}</button>
-    <button
-      type="button"
-      class="dashboard-timer-phase-option dashboard-timer-stop-option"
-      data-timer-control="stop"
-      data-timer-order="${escapeAttr(orderKey)}"
-    >Stop</button>
-  `;
-  actions.appendChild(popover);
+  const control = await openBenchChoiceSheet({
+    title: "Labor timer",
+    anchor: button,
+    actions: [primary, { control: "stop", label: "Stop" }]
+      .map(item => ({ label: item.label, value: item.control, danger: item.control === "stop" }))
+  });
+  dashboardTimerPopoverOrder = null;
+  if (control) await handleDashboardTimerControl(orderKey, control, button);
 }
 
 function hasRunningDashboardSessionOtherThan(orderKey) {
@@ -2698,15 +2692,6 @@ function wireHomeDashboardActions() {
       return;
     }
 
-    const timerPhaseBtn = e.target.closest("[data-timer-phase]");
-    if (timerPhaseBtn) {
-      handleDashboardTimerPhaseSelect(
-        timerPhaseBtn.dataset.timerOrder,
-        timerPhaseBtn.dataset.timerPhase
-      );
-      return;
-    }
-
     const benchStartBtn = e.target.closest("[data-bench-start]");
     if (benchStartBtn) {
       startBenchWorkFromDashboard(benchStartBtn.dataset.benchStart);
@@ -2798,7 +2783,6 @@ function wireHomeDashboardActions() {
   const resolveDashboardRowOrder = (e) => {
     if (
       e.target.closest?.(".dashboard-bench-actions") ||
-      e.target.closest?.(".dashboard-timer-popover") ||
       e.target.closest?.("button")
     ) {
       return null;
@@ -2824,15 +2808,6 @@ function wireHomeDashboardActions() {
   dashboardPanel.addEventListener("touchmove", cancelWorkflowPress, { passive: true });
   dashboardPanel.addEventListener("touchend", cancelWorkflowPress);
   dashboardPanel.addEventListener("touchcancel", cancelWorkflowPress);
-
-  /* Close the bench timer phase popover on outside clicks by removing
-     the element directly — never re-render the dashboard from here
-     (same hazard as the finance popover below). */
-  document.addEventListener("click", (e) => {
-    if (!dashboardTimerPopoverOrder) return;
-    if (e.target.closest?.(".dashboard-bench-actions, .bench-focus-labor-controls")) return;
-    closeDashboardTimerPopover();
-  });
 
   /* Keep bench timer elapsed text from going stale without re-rendering. */
   setInterval(() => {

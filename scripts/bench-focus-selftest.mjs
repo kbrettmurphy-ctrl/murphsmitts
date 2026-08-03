@@ -231,8 +231,8 @@ await test("active Bench Work always exposes labor starts before the reminder", 
 });
 
 await test("Bench Focus timer controls share stable Today’s Bench delegation", () => {
-  ok(admin.includes('button.closest(".dashboard-bench-actions, .bench-focus-labor-controls")'));
-  ok(admin.includes('e.target.closest?.(".dashboard-bench-actions, .bench-focus-labor-controls")'));
+  ok(admin.includes("await openBenchChoiceSheet({\n    title: \"Labor timer\""));
+  ok(admin.includes("if (control) await handleDashboardTimerControl(orderKey, control, button)"));
   ok(admin.includes('const timerControlBtn = e.target.closest("[data-timer-control]")'));
   ok(admin.includes('const timerActionBtn = e.target.closest("[data-timer-action]")'));
   ok(admin.includes('handleDashboardTimerControl(\n        timerControlBtn.dataset.timerOrder,\n        timerControlBtn.dataset.timerControl,\n        timerControlBtn'));
@@ -292,7 +292,7 @@ await test("Bench end choices anchor and clamp through the existing menu utility
   ok(admin.includes('endActiveBenchWork({ anchor: endBenchBtn })'));
   ok(admin.includes("positionWorkflowMenu(panel, position)"));
   ok(admin.includes('sheet.className = `bench-choice-sheet${anchorPosition ? " is-anchored" : ""}`'));
-  ok(admin.includes('event.target.closest("[data-bench-choice-dismiss]")'));
+  ok(admin.includes('event.target.closest?.("[data-action]")'));
   ok(admin.includes('if (event.key === "Escape") closeBenchChoiceSheet()'));
   ok(adminCss.includes(".bench-choice-sheet.is-anchored{display:block;padding:0;background:transparent}"));
   ok(adminCss.includes("max-height:calc(100vh - 24px)"));
@@ -302,13 +302,41 @@ await test("Bench end choices anchor and clamp through the existing menu utility
 await test("labor phase choices anchor to their trigger and remain portal-safe", () => {
   ok(admin.includes("startLaborForActiveBench(benchLaborStartBtn.dataset.benchLaborStart, benchLaborStartBtn)"));
   ok(admin.includes("chooseBenchLaborPhase(mode === \"bench\" ? \"Start from Bench Work\" : \"Start labor now\", anchor)"));
-  ok(admin.includes("document.body.appendChild(sheet)"));
+  ok(admin.includes("document.body.appendChild(benchChoiceRoot)"));
   ok(admin.includes('window.addEventListener("resize", sheet._reposition)'));
   ok(admin.includes('window.addEventListener("scroll", sheet._reposition, true)'));
   ok(admin.includes("rect.bottom + 6"));
   ok(admin.includes("rect.top - panelHeight - 6"));
-  ok(admin.includes('event.target.closest("[data-bench-choice]")'));
-  ok(admin.includes("event.stopPropagation();\n        closeBenchChoiceSheet(button.dataset.benchChoice)"));
+  ok(admin.includes('benchChoiceRoot.addEventListener("click"'));
+  ok(admin.includes('event.target.closest?.("[data-action]")'));
+  ok(admin.includes("event.stopImmediatePropagation()"));
+  ok(admin.includes("closeBenchChoiceSheet(action?.dataset.action ?? null)"));
+  equal(admin.includes("actions.appendChild(popover)"), false);
+  equal(admin.includes('document.addEventListener("click", (e) => {\n    if (!dashboardTimerPopoverOrder)'), false);
+  ok(adminCss.includes(".bench-choice-sheet{position:fixed"));
+  ok(adminCss.includes("pointer-events:auto"));
+  ok(adminCss.includes(".bench-choice-backdrop{position:fixed;inset:0;z-index:0"));
+  ok(adminCss.includes(".bench-choice-panel{position:relative;z-index:1"));
+});
+
+await test("Safari timer menu events stay inside one global portal boundary", () => {
+  const root = admin.match(/function getBenchChoiceRoot\(\) \{[\s\S]*?\n\}/)?.[0] || "";
+  ok(root.includes('benchChoiceRoot.addEventListener("click"'));
+  equal((root.match(/addEventListener\("click"/g) || []).length, 1);
+  ok(root.includes('event.target.closest?.("[data-action]")'));
+  ok(root.includes("event.preventDefault()"));
+  ok(root.includes("event.stopPropagation()"));
+  ok(root.includes("event.stopImmediatePropagation()"));
+  ok(root.includes("document.body.appendChild(benchChoiceRoot)"));
+  for (const target of ["button", "span", "svg", "path"]) {
+    const actionButton = { dataset: { action: "resume" } };
+    const eventTarget = { closest: selector => selector === "[data-action]" ? actionButton : null };
+    equal(eventTarget.closest("[data-action]"), actionButton, `${target} resolves to portal action`);
+  }
+  ok(admin.includes('<div class="bench-choice-backdrop" data-overlay-dismiss>'));
+  equal(admin.includes("actions.appendChild(popover)"), false);
+  equal((admin.match(/function getBenchChoiceRoot\(/g) || []).length, 1);
+  equal((admin.match(/document\.addEventListener\("click", \(e\) => \{\n    if \(!dashboardTimerPopoverOrder/g) || []).length, 0);
 });
 
 await test("paused dashboard resume explicitly creates Bench Work or cancels", () => {
