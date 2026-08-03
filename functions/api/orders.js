@@ -2863,6 +2863,7 @@ const LABOR_TIMER_PHASES = [
   "Relacing",
   "Conditioning",
   "Palm Pad",
+  "Custom Work",
   "Photos",
   "Packing/Shipping",
   "Admin/Messaging",
