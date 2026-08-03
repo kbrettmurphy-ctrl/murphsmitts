@@ -37,6 +37,7 @@ async function invoke(body, responses = []) {
 
 const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
 const migration = fs.readFileSync(new URL("../supabase/migrations/20260731120000_bench_focus.sql", import.meta.url), "utf8");
+const resumeMigration = fs.readFileSync(new URL("../supabase/migrations/20260803120000_resume_labor_with_new_bench_work.sql", import.meta.url), "utf8");
 const admin = fs.readFileSync(new URL("../admin/admin.js", import.meta.url), "utf8");
 const adminCss = fs.readFileSync(new URL("../admin/admin.css", import.meta.url), "utf8");
 
@@ -61,6 +62,8 @@ await test("all cross-table transitions are SECURITY INVOKER RPCs", () => {
   ok(/clock_timestamp\(\)/.test(migration));
   ok(/for update/g.test(migration));
   equal(/p_started_at|p_ended_at|client_timestamp/i.test(migration), false);
+  ok(/function public\.resume_labor_with_new_bench_work\(/.test(resumeMigration));
+  ok(/security invoker/.test(resumeMigration));
 });
 
 await test("eligibility and paused-session decisions are database enforced", () => {
@@ -90,13 +93,31 @@ await test("ending atomically pauses or stops linked labor and preserves stop ac
 });
 
 await test("registry metadata denies demo and declares no external effects", () => {
-  for (const action of ["getBenchFocus", "startBenchWork", "resumePausedLaborForBench", "snoozeBenchReminder", "endBenchWork", "resolveBenchWork"]) {
+  for (const action of ["getBenchFocus", "startBenchWork", "resumePausedLaborForBench", "resumeLaborWithNewBenchWork", "snoozeBenchReminder", "endBenchWork", "resolveBenchWork"]) {
     const entry = source.match(new RegExp(`${action}: \\{[\\s\\S]*?bindings: \\{ required: \\["CORE"\\], optional: \\[\\] \\}`));
     ok(entry, `${action} registry entry`);
     ok(/auth: "session"/.test(entry[0]));
     ok(/demo: "deny"/.test(entry[0]));
     equal(/email|sms|push|storage|geocod/i.test(entry[0]), false);
   }
+});
+
+await test("paused labor resumes into new Bench Work with one atomic RPC", async () => {
+  const owner = await token();
+  const rpc = { ok: true, bench: { id: "b2", order_number: "0169", resolution: "labor_recorded" }, session: { id: "old1", order_number: "0169", status: "running", bench_work_session_id: "b2" } };
+  const result = await invoke({ action: "resumeLaborWithNewBenchWork", _token: owner, laborSessionId: "old1" }, [rpc, null]);
+  equal(result.json.ok, true);
+  equal(result.calls[0].url.endsWith("/rest/v1/rpc/resume_labor_with_new_bench_work"), true);
+  equal(result.calls[0].body.p_labor_session_id, "old1");
+  equal(result.calls.length, 2);
+  ok(/pg_advisory_xact_lock/.test(resumeMigration));
+  ok(/clock_timestamp\(\)/.test(resumeMigration));
+  ok((resumeMigration.match(/for update/g) || []).length >= 3);
+  ok(/insert into public\.bench_work_sessions/.test(resumeMigration));
+  equal(/insert into public\.order_labor_sessions/.test(resumeMigration), false);
+  ok(/pause_accumulated_seconds = coalesce\(pause_accumulated_seconds, 0\) \+ v_paused_seconds/.test(resumeMigration));
+  ok(/bench_work_session_id = v_bench\.id/.test(resumeMigration));
+  ok(/'labor_recorded', v_now/.test(resumeMigration));
 });
 
 await test("demo tokens are denied before Bench Focus I/O", async () => {
@@ -269,13 +290,39 @@ await test("focused-card controls emit authoritative identifiers and reuse labor
 await test("Bench end choices anchor and clamp through the existing menu utility", () => {
   ok(admin.includes("anchor: choiceAnchor"));
   ok(admin.includes('endActiveBenchWork({ anchor: endBenchBtn })'));
-  ok(admin.includes('positionWorkflowMenu(sheet.querySelector(".bench-choice-panel"), anchorPosition)'));
+  ok(admin.includes("positionWorkflowMenu(panel, position)"));
   ok(admin.includes('sheet.className = `bench-choice-sheet${anchorPosition ? " is-anchored" : ""}`'));
   ok(admin.includes('event.target.closest("[data-bench-choice-dismiss]")'));
   ok(admin.includes('if (event.key === "Escape") closeBenchChoiceSheet()'));
   ok(adminCss.includes(".bench-choice-sheet.is-anchored{display:block;padding:0;background:transparent}"));
   ok(adminCss.includes("max-height:calc(100vh - 24px)"));
   equal(adminCss.includes(".bench-choice-sheet.is-anchored{align-items:flex-end"), false);
+});
+
+await test("labor phase choices anchor to their trigger and remain portal-safe", () => {
+  ok(admin.includes("startLaborForActiveBench(benchLaborStartBtn.dataset.benchLaborStart, benchLaborStartBtn)"));
+  ok(admin.includes("chooseBenchLaborPhase(mode === \"bench\" ? \"Start from Bench Work\" : \"Start labor now\", anchor)"));
+  ok(admin.includes("document.body.appendChild(sheet)"));
+  ok(admin.includes('window.addEventListener("resize", sheet._reposition)'));
+  ok(admin.includes('window.addEventListener("scroll", sheet._reposition, true)'));
+  ok(admin.includes("rect.bottom + 6"));
+  ok(admin.includes("rect.top - panelHeight - 6"));
+  ok(admin.includes('event.target.closest("[data-bench-choice]")'));
+  ok(admin.includes("event.stopPropagation();\n        closeBenchChoiceSheet(button.dataset.benchChoice)"));
+});
+
+await test("paused dashboard resume explicitly creates Bench Work or cancels", () => {
+  const resume = admin.match(/async function resumePausedLaborWithNewBenchWork\([\s\S]*?\n\}/)?.[0] || "";
+  ok(resume.includes("Resume timer and put this glove back on the bench?"));
+  ok(resume.includes("Resume and Start Bench Work"));
+  ok(resume.includes('action: "resumeLaborWithNewBenchWork"'));
+  ok(resume.includes("if (choice !== \"resume\") return"));
+  ok(resume.includes("await refreshBenchFocusSurfaces()"));
+  const control = admin.match(/async function handleDashboardTimerControl\([\s\S]*?\n\}/)?.[0] || "";
+  ok(control.includes("if (!activeBench)"));
+  ok(control.includes("Another glove is on the bench."));
+  ok(control.includes("endActiveBenchWork({ anchor: choiceAnchor })"));
+  ok(control.includes('action: "resumeLaborSession"'));
 });
 
 await test("Bench end performs one authoritative multi-surface refresh", () => {

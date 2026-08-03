@@ -248,6 +248,10 @@ const ACTIONS = {
     auth: "session", demo: "deny", handler: handleResumePausedLaborForBench,
     effects: ["db:bench_work_sessions:write", "db:order_labor_sessions:write"], bindings: { required: ["CORE"], optional: [] }
   },
+  resumeLaborWithNewBenchWork: {
+    auth: "session", demo: "deny", handler: handleResumeLaborWithNewBenchWork,
+    effects: ["db:bench_work_sessions:write", "db:order_labor_sessions:write", "db:order_activity:write"], bindings: { required: ["CORE"], optional: [] }
+  },
   snoozeBenchReminder: {
     auth: "session", demo: "deny", handler: handleSnoozeBenchReminder,
     effects: ["db:bench_work_sessions:read", "db:bench_work_sessions:write"], bindings: { required: ["CORE"], optional: [] }
@@ -1020,6 +1024,23 @@ async function handleResumePausedLaborForBench({ env, body, jsonHeaders }) {
   const result = await callBenchRpc(env, "resume_paused_labor_for_bench", {
     p_bench_session_id: benchSessionId,
     p_labor_session_id: laborSessionId
+  });
+  return json(result, 200, jsonHeaders);
+}
+
+async function handleResumeLaborWithNewBenchWork({ env, body, jsonHeaders, auth }) {
+  const laborSessionId = cleanText(body.laborSessionId);
+  if (!laborSessionId) return json({ ok: false, error: "Missing laborSessionId." }, 200, jsonHeaders);
+  const result = await callBenchRpc(env, "resume_labor_with_new_bench_work", {
+    p_labor_session_id: laborSessionId,
+    p_created_by: auth?.payload?.email || (auth?.owner ? "owner" : "admin")
+  });
+  if (!result.ok) return json(result, 200, jsonHeaders);
+  await logOrderActivity(env, {
+    orderNumber: result.bench?.orderNumber,
+    eventType: "bench_work_started",
+    eventLabel: "Bench Work started",
+    metadata: { benchWorkSessionId: result.bench?.id || null, resumedLaborSessionId: result.session?.id || null }
   });
   return json(result, 200, jsonHeaders);
 }
