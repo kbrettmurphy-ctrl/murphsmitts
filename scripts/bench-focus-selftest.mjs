@@ -355,6 +355,19 @@ await test("paused dashboard resume explicitly creates Bench Work or cancels", (
   ok(control.includes('action: "resumeLaborSession"'));
 });
 
+await test("same-order paused Start Bench Work is explicit and trigger-anchored", () => {
+  const start = admin.match(/async function startBenchWorkFromDashboard\([\s\S]*?\n\}/)?.[0] || "";
+  ok(start.includes("const choiceAnchor = anchor?.x != null ? anchor"));
+  ok(start.includes("Paused timer for #${orderNumber}"));
+  ok(start.includes("Resume this order’s timer and start Bench Work for the same glove?"));
+  ok(start.includes("Resume Timer and Start Bench Work"));
+  ok(start.includes("Start Bench Work and Leave Timer Paused"));
+  ok(start.includes("anchor: choiceAnchor"));
+  ok(start.includes("pausedAction: choice }, choiceAnchor"));
+  ok(admin.includes("startBenchWorkFromDashboard(benchStartBtn.dataset.benchStart, {}, benchStartBtn)"));
+  equal(start.includes("Resume previous labor?"), false);
+});
+
 await test("Bench end performs one authoritative multi-surface refresh", () => {
   const refresh = admin.match(/async function refreshBenchFocusSurfaces\([\s\S]*?\n\}/)?.[0] || "";
   ok(refresh.includes("refreshBenchFocusState({ rerender: false })"));

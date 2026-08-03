@@ -1904,7 +1904,7 @@ async function endActiveBenchWork({ switchToOrder = "", anchor = null } = {}) {
     }
     if (switchToOrder) {
       benchFocusBusy = false;
-      await startBenchWorkFromDashboard(switchToOrder);
+      await startBenchWorkFromDashboard(switchToOrder, {}, choiceAnchor);
     }
     return true;
   } catch (error) {
@@ -1999,8 +1999,9 @@ function openUnresolvedBenchList() {
   document.body.appendChild(sheet);
 }
 
-async function startBenchWorkFromDashboard(orderNumber, options = {}) {
+async function startBenchWorkFromDashboard(orderNumber, options = {}, anchor = null) {
   if (benchFocusBusy) return;
+  const choiceAnchor = anchor?.x != null ? anchor : (anchor ? getAdminAnchorPosition(null, anchor) : null);
   benchFocusBusy = true;
   renderHomeDashboard();
   try {
@@ -2013,27 +2014,29 @@ async function startBenchWorkFromDashboard(orderNumber, options = {}) {
       const physical = error.receivedPhysicalPresence ? "\n\nContinue only if the glove is physically present." : "";
       if (confirm(`This order is currently ${error.status}. Start Bench Work without changing its status?${physical}`)) {
         benchFocusBusy = false;
-        return startBenchWorkFromDashboard(orderNumber, { ...options, confirmStatusOverride: true });
+        return startBenchWorkFromDashboard(orderNumber, { ...options, confirmStatusOverride: true }, choiceAnchor);
       }
     } else if (error.pausedLaborChoice) {
       const choice = await openBenchChoiceSheet({
-        title: "Paused labor session detected.",
-        message: "Resume previous labor?",
+        title: `Paused timer for #${orderNumber}`,
+        message: "Resume this order’s timer and start Bench Work for the same glove?",
         actions: [
-          { label: "Resume and attach to Bench Work", value: "resume_attach" },
-          { label: "Leave paused", value: "leave" },
+          { label: "Resume Timer and Start Bench Work", value: "resume_attach" },
+          { label: "Start Bench Work and Leave Timer Paused", value: "leave" },
           { label: "Cancel", value: "cancel" }
-        ]
+        ],
+        anchor: choiceAnchor
       });
       if (choice && choice !== "cancel") {
         benchFocusBusy = false;
-        return startBenchWorkFromDashboard(orderNumber, { ...options, pausedAction: choice });
+        return startBenchWorkFromDashboard(orderNumber, { ...options, pausedAction: choice }, choiceAnchor);
       }
     } else if (error.conflict === "active_bench") {
       const choice = await openBenchChoiceSheet({
         title: "Another glove is on the bench.",
         message: `End Bench Work for #${error.activeOrderNumber || "current order"} before switching.`,
-        actions: [{ label: "End Current and Switch", value: "switch" }, { label: "Stay on Current Glove", value: "" }]
+        actions: [{ label: "End Current and Switch", value: "switch" }, { label: "Stay on Current Glove", value: "" }],
+        anchor: choiceAnchor
       });
       if (choice === "switch") {
         benchFocusBusy = false;
@@ -2048,11 +2051,12 @@ async function startBenchWorkFromDashboard(orderNumber, options = {}) {
           { label: "Stop Timer and Switch", value: "stop", danger: true },
           { label: "Stay on Current Glove", value: "" },
           { label: "Cancel", value: "" }
-        ]
+        ],
+        anchor: choiceAnchor
       });
       if (choice) {
         benchFocusBusy = false;
-        return startBenchWorkFromDashboard(orderNumber, { ...options, otherRunningAction: choice });
+        return startBenchWorkFromDashboard(orderNumber, { ...options, otherRunningAction: choice }, choiceAnchor);
       }
     } else {
       alert(error.message || "Bench Work could not be started.");
@@ -2694,7 +2698,9 @@ function wireHomeDashboardActions() {
 
     const benchStartBtn = e.target.closest("[data-bench-start]");
     if (benchStartBtn) {
-      startBenchWorkFromDashboard(benchStartBtn.dataset.benchStart);
+      e.preventDefault();
+      e.stopPropagation();
+      startBenchWorkFromDashboard(benchStartBtn.dataset.benchStart, {}, benchStartBtn);
       return;
     }
 
