@@ -245,6 +245,14 @@ await test("Bench Focus timer controls share stable Today’s Bench delegation",
   equal((admin.match(/dashboardPanel\.addEventListener\("click"/g) || []).length, 1);
 });
 
+await test("ordinary Clubhouse timer start clears pending state before rendering controls", () => {
+  const handler = admin.match(/async function handleDashboardTimerPhaseSelect\([\s\S]*?\n\}/)?.[0] || "";
+  ok(handler.includes("await refreshDashboardLaborSessions({ rerender: false })"));
+  ok(handler.includes('dashboardTimerBusy = false;\n    if (activeView === "dashboard") renderHomeDashboard();'));
+  equal(handler.includes("await refreshDashboardLaborSessions();"), false);
+  ok(handler.indexOf("dashboardTimerBusy = false") < handler.indexOf("renderHomeDashboard()"));
+});
+
 await test("nested timer targets and cross-order End Bench Work dispatch safely", () => {
   for (const target of ["button", "svg", "path", "span", "icon"]) {
     const actionButton = { dataset: { timerControl: "pause", timerOrder: "0169" } };
