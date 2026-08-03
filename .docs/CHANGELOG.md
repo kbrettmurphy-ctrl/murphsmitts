@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-08-03 — MurphOS v1.3: Bench Focus
+
+### Added
+- Bench Focus as the Clubhouse context for the glove physically on the bench, kept visually distinct from official labor timing.
+- Start Bench Work workflows for running, paused, and absent labor sessions, including explicit same-order paused-timer decisions.
+- Authoritative Bench-linked labor starts from the exact Bench start time or the current time.
+- Unresolved Bench interval review with Assign, Discard, and Resolve Later paths.
+- Cross-order protection and explicit resolution when another glove or labor timer is active.
+
+### Changed
+- Simplified the Clubhouse Bench presentation while preserving Today’s Bench labor controls.
+- Centralized Bench and timer action menus in a viewport-clamped, body-level portal with anchored contextual positioning.
+- Synchronized Bench Focus and labor state across dashboard, Order Detail, tabs, focus changes, and recovery refreshes.
+
+### Fixed
+- Prevented paused labor from being silently attached to unrelated Bench Work.
+- Removed unusable labor-start controls while an unlinked paused session remains open.
+- Corrected timer action dispatch, nested icon clicks, cross-order End Bench Work, and Safari popover hit testing.
+- Eliminated bottom-pinned Bench menus and ensured unlocked controls are rerendered after failed or interrupted mutations.
+- Reconciled interrupted/non-JSON resolution responses against authoritative Bench state to avoid leaving the UI stuck.
+
+### Notes
+- Bench elapsed time remains contextual and never counts as official labor unless explicitly assigned or captured by a linked labor session.
+- Existing notification, workflow-status, finance, order-save, and public-site behavior is unchanged.
+
 ## 2026-07-24 — Pricing Management
 
 ### Added
