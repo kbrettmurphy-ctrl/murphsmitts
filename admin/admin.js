@@ -3813,18 +3813,6 @@ const SHOP_ECONOMICS = {
   packagingPerOrder: 0.82
 };
 
-const SHOP_PRICING = {
-  /* Full Service = clean + condition + relace. Full Relace = relace only.
-     Catcher's/first-base bases already include the +$20 the price list adds. */
-  fullServiceBase: { "Fielders Glove": 80, "Catchers Mitt": 100, "First Base Mitt": 100 },
-  fullRelaceBase:  { "Fielders Glove": 60, "Catchers Mitt": 80,  "First Base Mitt": 80 },
-  cleanConditionBase: 50,
-  laceRepairBase: 40, // varies in practice — measured data supersedes once the bucket fills
-  trapezeUpcharge: 20, // fielders w/ Trapeze or Modified Trapeze web
-  palmPadAddOn: 20,
-  loopReplacement: 30 // per loop (thumb or pinky); web replacement varies — priced manually
-};
-
 function getHistoricalOrderBasis(order) {
   const snapshot = getOrderEconomicsSnapshot(order);
   const inputs = snapshot?.inputs;
@@ -4077,6 +4065,8 @@ function renderOrderEconomicsBody(order) {
       <div class="order-economics-suggestion muted">Suggested price: ${escapeHtml(formatCurrency(suggestedPrice))}${escapeHtml(deltaText)}</div>
       <div class="order-economics-basis">${escapeHtml(basis)}</div>
     `;
+  } else if (m.available && !pricingStateCache) {
+    suggestionHtml = `<div class="order-economics-suggestion muted">Pricing unavailable.</div>`;
   }
 
   const rateDisplay = econ.hourlyRate !== null
@@ -4181,11 +4171,29 @@ function ensureOrderEconomicsDelegation() {
   });
 }
 
-/* Rule-based quote suggestion from SHOP_PRICING only — never derived
-   from historical quoted prices. The price table is swappable: a
-   future sprint will replace it with measured timer data. */
+function getPublishedService(serviceKey) {
+  const services = pricingStateCache && Array.isArray(pricingStateCache.services)
+    ? pricingStateCache.services
+    : null;
+  if (!services) return null;
+  return services.find(service => (
+    service.serviceKey === serviceKey && service.isActive && service.publishedAt
+  )) || null;
+}
+
+function getPublishedServiceUnitPrice(serviceKey, order) {
+  const service = getPublishedService(serviceKey);
+  if (!service || service.pricingType === "variable") return null;
+  const usePremium = service.pricingType === "tiered" && orderPricingTier(order) === "premium";
+  const value = usePremium ? service.premiumPrice : service.basePrice;
+  if (value === null || value === undefined || value === "") return null;
+  const price = Number(value);
+  return Number.isFinite(price) ? price : null;
+}
+
+/* Rule-based quote suggestion from published service_pricing only — never from
+   historical quotes or a client-side duplicate price table. */
 function getSuggestedPrice(order) {
-  const gloveType = String(order?.gloveType || "");
   const hasRelace = orderHasRelacingService(order);
   const hasClean = orderHasCleaningService(order);
   const hasLaceRepair = getOrderSelectedServices(order).includes("Lace Repair");
@@ -4199,34 +4207,39 @@ function getSuggestedPrice(order) {
   if (hasRelace) {
     /* Relace bundles clean into "Full Service" and supersedes a lace repair. */
     const fullService = hasClean;
-    const table = fullService ? SHOP_PRICING.fullServiceBase : SHOP_PRICING.fullRelaceBase;
-    const base = table[gloveType] ?? table["Fielders Glove"];
+    const serviceKey = fullService ? "standard_full_service" : "full_relace";
+    const base = getPublishedServiceUnitPrice(serviceKey, order);
+    if (base === null) return null;
     price += base; priced = true;
     parts.push(`${fullService ? "Full service" : "Full relace"}: ${formatCurrency(base)}`);
-    if (gloveType === "Fielders Glove" && orderHasTrapezeWeb(order)) {
-      price += SHOP_PRICING.trapezeUpcharge;
-      parts.push(`Trapeze web: +${formatCurrency(SHOP_PRICING.trapezeUpcharge)}`);
-    }
   } else {
     /* Non-relace primaries are independent services — sum whatever's selected
        (e.g. Clean & Condition + Lace Repair), not one-or-the-other. */
     if (hasClean) {
-      price += SHOP_PRICING.cleanConditionBase; priced = true;
-      parts.push(`Clean & condition: ${formatCurrency(SHOP_PRICING.cleanConditionBase)}`);
+      const amount = getPublishedServiceUnitPrice("clean_condition", order);
+      if (amount === null) return null;
+      price += amount; priced = true;
+      parts.push(`Clean & condition: ${formatCurrency(amount)}`);
     }
     if (hasLaceRepair) {
-      price += SHOP_PRICING.laceRepairBase; priced = true;
-      parts.push(`Lace repair: ${formatCurrency(SHOP_PRICING.laceRepairBase)} (varies)`);
+      const amount = getPublishedServiceUnitPrice("lace_repair", order);
+      if (amount === null) return null;
+      price += amount; priced = true;
+      parts.push(`Lace repair: ${formatCurrency(amount)}`);
     }
   }
 
   /* Add-ons. */
   if (orderHasPalmPadService(order)) {
-    price += SHOP_PRICING.palmPadAddOn; priced = true;
-    parts.push(`Palm pad: +${formatCurrency(SHOP_PRICING.palmPadAddOn)}`);
+    const amount = getPublishedServiceUnitPrice("palm_padding", order);
+    if (amount === null) return null;
+    price += amount; priced = true;
+    parts.push(`Palm pad: +${formatCurrency(amount)}`);
   }
   if (loopCount > 0) {
-    const loop = loopCount * SHOP_PRICING.loopReplacement;
+    const unit = getPublishedServiceUnitPrice("loop_replacement", order);
+    if (unit === null) return null;
+    const loop = loopCount * unit;
     price += loop; priced = true;
     parts.push(`Loop replacement ×${loopCount}: +${formatCurrency(loop)}`);
   }
@@ -7382,6 +7395,7 @@ function renderNewOrderForm() {
     saveOrderBtn.textContent = "Create";
   }
   clearSaveStatus();
+  newOrderQuoteManuallyEdited = false;
 
   orderDetail.innerHTML = `
     <div class="detail-form-shell">
@@ -7449,6 +7463,7 @@ function renderNewOrderForm() {
           <div class="detail-block">
             <div class="label">Price Quoted</div>
             <input id="editPriceQuoted" type="text" inputmode="decimal" placeholder="$0.00" />
+            <div id="newOrderPriceSuggestion" class="price-suggest-hint muted">${escapeHtml(getNewOrderSuggestionText())}</div>
           </div>
 
           <div class="detail-block">
@@ -7474,7 +7489,7 @@ function renderNewOrderForm() {
             <div class="label">Template</div>
             <select id="orderTemplateSelect">
               <option value="">Start from a template…</option>
-              ${ORDER_TEMPLATES.map((t, i) => `<option value="${i}">${escapeHtml(t.label)}</option>`).join("")}
+              ${ORDER_TEMPLATES.map((t, i) => `<option value="${i}">${escapeHtml(getOrderTemplateLabel(t))}</option>`).join("")}
             </select>
           </div>
           <div class="detail-block">
@@ -8527,7 +8542,18 @@ async function createNewOrderFromForm() {
   applyFilters();
   openOrder(created.orderNumber);
   if (saveStatusEl) {
-    saveStatusEl.textContent = "Created.";
+    const statuses = data.delivery || {};
+    const failed = [statuses.email, statuses.sms].filter(item => item?.status === "failed");
+    const suppressed = [statuses.email, statuses.sms].filter(item => item?.status === "suppressed");
+    if (statuses.warning) {
+      saveStatusEl.textContent = `Created. ${statuses.warning}`;
+    } else if (failed.length) {
+      saveStatusEl.textContent = `Created. Customer notification issue: ${failed.map(item => item.reason).filter(Boolean).join(" ")}`;
+    } else if (suppressed.length) {
+      saveStatusEl.textContent = "Created. Customer notifications were suppressed in Preview.";
+    } else {
+      saveStatusEl.textContent = "Created. Customer notifications processed.";
+    }
   }
 }
 
@@ -13361,15 +13387,17 @@ orderFilterButtons.forEach(btn => {
   });
 });
 
-orderNewBtn?.addEventListener("click", () => {
+orderNewBtn?.addEventListener("click", async () => {
   listScrollY = getAdminScrollTop();
   orderDetailReturnView = activeView || "current";
   orderFiltersExpanded = false;
   inventoryFiltersExpanded = false;
   syncOrderFilterUI();
   syncInventoryFilterUI();
-  renderNewOrderForm();
   showView(detailView);
+  orderDetail.innerHTML = `<div class="detail-form-shell"><div class="muted">Loading published pricing…</div></div>`;
+  await warmPricingCache(true);
+  renderNewOrderForm();
   resetViewScroll(detailView, { blurActive: true });
 });
 
@@ -14618,10 +14646,11 @@ function allocateOrderForService(order, service, totalMinutes, palmPadMinutes, c
   const key = service.serviceKey;
 
   if (key === "palm_padding") {
+    const publishedPalmPrice = getPublishedServiceUnitPrice("palm_padding", basis);
     return {
       order, orderNumber, date,
-      revenue: total != null ? SHOP_PRICING.palmPadAddOn : null, // gift order → no palm-pad revenue
-      revenueUnallocated: false,
+      revenue: total != null ? publishedPalmPrice : null, // gift order → no revenue
+      revenueUnallocated: total != null && publishedPalmPrice === null,
       minutes: palmPadMinutes,
       minutesUnallocated: palmPadMinutes <= 0 && totalMinutes > 0, // present but no Palm Pad phase → can't measure it
       materials: mats.palmPadCost,
@@ -14630,13 +14659,12 @@ function allocateOrderForService(order, service, totalMinutes, palmPadMinutes, c
   }
 
   if (key === "loop_replacement") {
-    // $30 per loop is a known price, so revenue IS separable. Loop labor has no
-    // dedicated phase, so its time stays unallocated.
+    const publishedLoopPrice = getPublishedServiceUnitPrice("loop_replacement", basis);
     const loopCount = orderLoopCount(order);
     return {
       order, orderNumber, date,
-      revenue: total != null ? loopCount * SHOP_PRICING.loopReplacement : null,
-      revenueUnallocated: false,
+      revenue: total != null && publishedLoopPrice !== null ? loopCount * publishedLoopPrice : null,
+      revenueUnallocated: total != null && publishedLoopPrice === null,
       minutes: 0,
       minutesUnallocated: totalMinutes > 0,
       materials: null, materialsUnallocated: false
@@ -14662,15 +14690,19 @@ function allocateOrderForService(order, service, totalMinutes, palmPadMinutes, c
   const loopCount = hasLoop ? orderLoopCount(order) : 0;
   const customAddon = orderCustomAddonAmount(order) || 0; // $ carved out, 0 if none
   const customMinutes = customAddon > 0 ? (Number(customWorkMinutes) || 0) : 0;
+  const publishedPalmPrice = getPublishedServiceUnitPrice("palm_padding", basis);
+  const publishedLoopPrice = getPublishedServiceUnitPrice("loop_replacement", basis);
+  const addonPricingUnavailable =
+    (hasPalmPad && publishedPalmPrice === null) || (hasLoop && publishedLoopPrice === null);
   const separableAddonRevenue =
-    (hasPalmPad ? SHOP_PRICING.palmPadAddOn : 0)
-    + loopCount * SHOP_PRICING.loopReplacement
+    (hasPalmPad ? publishedPalmPrice || 0 : 0)
+    + loopCount * (publishedLoopPrice || 0)
     + customAddon;
 
   let revenue = null, revenueUnallocated = false;
   if (total == null) {
     revenue = null;                       // gift — no revenue (not "unallocated")
-  } else if (hasWeb) {
+  } else if (hasWeb || addonPricingUnavailable) {
     revenueUnallocated = true;            // web price is unknown — can't split it off
   } else {
     revenue = total - separableAddonRevenue; // includes the declared custom add-on
@@ -14869,13 +14901,18 @@ function getPublishedPriceForOrder(order) {
   return { serviceName: svc.serviceName, display: svc.display, basePrice: svc.basePrice, premiumPrice: svc.premiumPrice };
 }
 
-async function warmPricingCache() {
-  if (pricingStateCache) return;
-  if (!isAuthenticated()) return;
+async function warmPricingCache(force = false) {
+  if (pricingStateCache && !force) return true;
+  if (!isAuthenticated()) return false;
+  if (force) pricingStateCache = null;
   try {
     const data = await postJson({ action: "listServicePricing" }, true);
-    if (data && data.ok !== false) pricingStateCache = data;
+    if (data && data.ok !== false) {
+      pricingStateCache = data;
+      return true;
+    }
   } catch {}
+  return false;
 }
 setTimeout(warmPricingCache, 3000);
 
@@ -15453,31 +15490,54 @@ async function onPricingClick(e) {
   }
 }
 
-/* =========================
-   ORDER TEMPLATES (Phase 1.4) — admin New Order only.
-   Prefills the typical job shapes from the real price list (SHOP_PRICING /
-   services page tiers). Templates never touch customer fields or lace color,
-   and everything stays editable after applying.
-========================= */
+/* Admin New Order job-shape templates. Labels and quotes are resolved from the
+   currently published service_pricing rows every time the form opens. */
 
 const ORDER_TEMPLATES = [
-  { label: "Standard Full Service — Fielders ($80)", gloveType: "Fielders Glove",
-    services: ["Cleaning + Conditioning + Relacing"], price: 80, turnaroundDays: 14 },
-  { label: "Standard Full Service — Catchers Mitt ($100)", gloveType: "Catchers Mitt",
-    services: ["Cleaning + Conditioning + Relacing"], price: 100, turnaroundDays: 14 },
-  { label: "Standard Full Service — First Base Mitt ($100)", gloveType: "First Base Mitt",
-    services: ["Cleaning + Conditioning + Relacing"], price: 100, turnaroundDays: 14 },
-  { label: "Full Service + Palm Pad — Fielders ($100)", gloveType: "Fielders Glove",
-    services: ["Cleaning + Conditioning + Relacing", "ShockTec Air2Gel Palm Pad"], price: 100, turnaroundDays: 14 },
-  { label: "Full Relace — Fielders ($60)", gloveType: "Fielders Glove",
-    services: ["Relacing"], price: 60, turnaroundDays: 10 },
-  { label: "Full Relace — Catchers Mitt ($80)", gloveType: "Catchers Mitt",
-    services: ["Relacing"], price: 80, turnaroundDays: 10 },
-  { label: "Full Relace — First Base Mitt ($80)", gloveType: "First Base Mitt",
-    services: ["Relacing"], price: 80, turnaroundDays: 10 },
-  { label: "Clean & Condition ($50)",
-    services: ["Cleaning + Conditioning"], price: 50, turnaroundDays: 7 }
+  { name: "Standard Full Service — Fielders", gloveType: "Fielders Glove", webType: "",
+    services: ["Cleaning + Conditioning + Relacing"] },
+  { name: "Standard Full Service — Catchers Mitt", gloveType: "Catchers Mitt", webType: "",
+    services: ["Cleaning + Conditioning + Relacing"] },
+  { name: "Standard Full Service — First Base Mitt", gloveType: "First Base Mitt", webType: "",
+    services: ["Cleaning + Conditioning + Relacing"] },
+  { name: "Full Service + Palm Pad — Fielders", gloveType: "Fielders Glove", webType: "",
+    services: ["Cleaning + Conditioning + Relacing", "ShockTec Air2Gel Palm Pad"] },
+  { name: "Full Relace — Fielders", gloveType: "Fielders Glove", webType: "", services: ["Relacing"] },
+  { name: "Full Relace — Catchers Mitt", gloveType: "Catchers Mitt", webType: "", services: ["Relacing"] },
+  { name: "Full Relace — First Base Mitt", gloveType: "First Base Mitt", webType: "", services: ["Relacing"] },
+  { name: "Clean & Condition", gloveType: "Fielders Glove", webType: "", services: ["Cleaning + Conditioning"] }
 ];
+
+let newOrderQuoteManuallyEdited = false;
+
+function getNewOrderPricingShape() {
+  if (detailMode !== "new" || !document.getElementById("editGloveType")) return getBlankAdminOrder();
+  return {
+    gloveType: document.getElementById("editGloveType")?.value || "Fielders Glove",
+    webType: document.getElementById("editWebType")?.value || "",
+    servicesRequested: getSelectedServices()
+  };
+}
+
+function getNewOrderSuggestionText(order = getNewOrderPricingShape()) {
+  const suggestion = getSuggestedPrice(order);
+  if (suggestion) return `Published price suggestion: ${formatCurrency(suggestion.price)}`;
+  return pricingStateCache ? "Select services for a published price suggestion." : "Pricing unavailable.";
+}
+
+function getOrderTemplateLabel(template) {
+  const suggestion = getSuggestedPrice({
+    gloveType: template.gloveType,
+    webType: template.webType,
+    servicesRequested: template.services
+  });
+  return `${template.name} (${suggestion ? formatCurrency(suggestion.price) : "pricing unavailable"})`;
+}
+
+function updateNewOrderPriceSuggestion() {
+  const hint = document.getElementById("newOrderPriceSuggestion");
+  if (hint) hint.textContent = getNewOrderSuggestionText();
+}
 
 function applyOrderTemplate(index) {
   const template = ORDER_TEMPLATES[index];
@@ -15490,29 +15550,36 @@ function applyOrderTemplate(index) {
       gloveType.dispatchEvent(new Event("change", { bubbles: true }));
     }
   }
+  const webType = document.getElementById("editWebType");
+  if (webType) webType.value = template.webType || "";
 
   document.querySelectorAll('input[name="editServicesRequested"]').forEach(box => {
     box.checked = template.services.includes(box.value);
   });
 
+  const suggestion = getSuggestedPrice(getNewOrderPricingShape());
   const price = document.getElementById("editPriceQuoted");
-  if (price) price.value = String(template.price);
-
-  const received = document.getElementById("editDateReceived");
-  const est = document.getElementById("editEstimatedCompletion");
-  const today = new Date();
-  if (received && !received.value) received.value = calDateKey(today);
-  if (est) {
-    const done = new Date(today.getFullYear(), today.getMonth(), today.getDate() + template.turnaroundDays);
-    est.value = calDateKey(done);
-  }
+  if (price && suggestion) price.value = String(suggestion.price);
+  newOrderQuoteManuallyEdited = false;
+  updateNewOrderPriceSuggestion();
 }
 
 document.addEventListener("change", (e) => {
-  if (e.target?.id !== "orderTemplateSelect") return;
-  const value = e.target.value;
-  if (value === "") return;
-  applyOrderTemplate(Number(value));
+  if (e.target?.id === "orderTemplateSelect") {
+    const value = e.target.value;
+    if (value !== "") applyOrderTemplate(Number(value));
+    return;
+  }
+  if (detailMode === "new" && (
+    e.target?.id === "editGloveType" || e.target?.id === "editWebType" ||
+    e.target?.name === "editServicesRequested"
+  )) updateNewOrderPriceSuggestion();
+});
+
+document.addEventListener("input", (e) => {
+  if (detailMode === "new" && e.target?.id === "editPriceQuoted") {
+    newOrderQuoteManuallyEdited = true;
+  }
 });
 
 /* =========================
@@ -15520,7 +15587,7 @@ document.addEventListener("change", (e) => {
    Suggested prices from YOUR measured job times, per-bucket honesty:
    a bucket (glove type [+trapeze] + service set) with 3+ jobs of 15+
    logged minutes uses its median; thinner buckets fall back to the
-   SHOP_PRICING rules and say so. Self-improves with every timer session.
+   published service_pricing rules and say so. Self-improves with every timer session.
 ========================= */
 
 const MEASURED_MIN_JOB_MINUTES = 1;

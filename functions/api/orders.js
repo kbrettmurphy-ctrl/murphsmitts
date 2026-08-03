@@ -284,8 +284,17 @@ const ACTIONS = {
   },
   createOrder: {
     auth: "session", demo: "deny", handler: handleCreateOrder,
-    effects: ["db:orders:read", "db:orders:write", "db:order_activity:write"],
-    bindings: { required: ["CORE"], optional: [] }
+    effects: [
+      "db:orders:read", "db:orders:write", "db:order_activity:write",
+      "external:email:send", "external:sms:send", "db:sms_messages:write"
+    ],
+    bindings: {
+      required: ["CORE"],
+      optional: [
+        "RESEND_API_KEY", "RESEND_FROM", "RESEND_REPLY_TO",
+        "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_MESSAGING_SERVICE_SID", "ENV-SIGNAL"
+      ]
+    }
   },
   resendStatusEmail: {
     auth: "session", demo: "deny", handler: handleResendStatusEmail,
@@ -3596,6 +3605,7 @@ async function createOrderAction(env, body) {
     );
 
     if (insert.ok && Array.isArray(insert.data) && insert.data[0]) {
+      let createdRow = insert.data[0];
       await logOrderActivity(env, {
         orderNumber: insert.data[0].order_number,
         eventType: "order_created_manual",
@@ -3606,9 +3616,31 @@ async function createOrderAction(env, body) {
         }
       });
 
+      const delivery = await deliverCreatedOrderReceivedNotifications(env, createdRow);
+      const stamp = {};
+      if (delivery.email.status === "sent") stamp.last_status_emailed = "Received";
+      if (delivery.sms.status === "sent") stamp.last_status_texted = "Received";
+      if (Object.keys(stamp).length) {
+        const stamped = await supabaseFetch(
+          env,
+          `/rest/v1/orders?order_number=eq.${encodeURIComponent(createdRow.order_number)}`,
+          {
+            method: "PATCH",
+            headers: { Prefer: "return=representation" },
+            body: JSON.stringify(stamp)
+          }
+        );
+        if (stamped.ok && Array.isArray(stamped.data) && stamped.data[0]) {
+          createdRow = stamped.data[0];
+        } else {
+          delivery.warning = "Customer notification sent, but its delivery stamp could not be saved.";
+        }
+      }
+
       return {
         ok: true,
-        order: mapOrderFromDb(insert.data[0])
+        order: mapOrderFromDb(createdRow),
+        delivery
       };
     }
 
@@ -3626,6 +3658,53 @@ async function createOrderAction(env, body) {
     ok: false,
     error: "Could not reserve the next order number. Please try again."
   };
+}
+
+async function deliverCreatedOrderReceivedNotifications(env, row) {
+  const order = mapOrderFromDb(row);
+  const delivery = {
+    email: { status: "skipped", reason: "No email address on order." },
+    sms: { status: "skipped", reason: "Customer did not opt in to SMS." }
+  };
+
+  if (cleanText(order.emailAddress)) {
+    if (isPreviewEnvironment(env)) {
+      delivery.email = { status: "suppressed", reason: "Preview environment." };
+    } else if (!env.RESEND_API_KEY) {
+      delivery.email = { status: "failed", reason: "Missing RESEND_API_KEY environment variable." };
+    } else {
+      try {
+        const result = await sendStatusEmail(env, row, "Received");
+        delivery.email = result.ok
+          ? { status: result.suppressed ? "suppressed" : "sent" }
+          : { status: "failed", reason: "Received email failed to send.", details: result.error };
+      } catch (error) {
+        delivery.email = { status: "failed", reason: "Received email failed to send.", details: String(error?.message || error) };
+      }
+    }
+  }
+
+  if (order.smsOptIn) {
+    const to = toE164US(order.phoneNumber);
+    if (!to) {
+      delivery.sms = { status: "skipped", reason: "Invalid or missing phone number." };
+    } else if (isPreviewEnvironment(env)) {
+      delivery.sms = { status: "suppressed", reason: "Preview environment." };
+    } else if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_MESSAGING_SERVICE_SID) {
+      delivery.sms = { status: "failed", reason: "Missing Twilio environment variables." };
+    } else {
+      try {
+        const result = await sendStatusText(env, row, "Received");
+        delivery.sms = result.ok
+          ? { status: result.suppressed ? "suppressed" : "sent" }
+          : { status: "failed", reason: "Received text failed to send.", details: result.error };
+      } catch (error) {
+        delivery.sms = { status: "failed", reason: "Received text failed to send.", details: String(error?.message || error) };
+      }
+    }
+  }
+
+  return delivery;
 }
 
 async function getNextAdminOrderNumber(env) {

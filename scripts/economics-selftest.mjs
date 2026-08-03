@@ -25,6 +25,28 @@ function weighted(expenses) {
   return quantity > 0 ? amount / quantity : null;
 }
 
+function publishedSuggestion(order, services) {
+  const selected = order.services || [];
+  const premium = order.gloveType === "Catchers Mitt" || order.gloveType === "First Base Mitt" ||
+    (order.gloveType === "Fielders Glove" && /trapeze/i.test(order.webType || ""));
+  const unit = (key) => {
+    const service = services.find(row => row.serviceKey === key && row.isActive && row.publishedAt);
+    if (!service || service.pricingType === "variable") return null;
+    const value = service.pricingType === "tiered" && premium ? service.premiumPrice : service.basePrice;
+    return Number.isFinite(Number(value)) ? Number(value) : null;
+  };
+  let total = 0;
+  if (selected.includes("Cleaning + Conditioning + Relacing")) total += unit("standard_full_service");
+  else if (selected.includes("Relacing")) total += unit("full_relace");
+  else {
+    if (selected.includes("Cleaning + Conditioning")) total += unit("clean_condition");
+    if (selected.includes("Lace Repair")) total += unit("lace_repair");
+  }
+  if (selected.includes("ShockTec Air2Gel Palm Pad")) total += unit("palm_padding");
+  total += (order.loopCount || 0) * (unit("loop_replacement") || 0);
+  return total;
+}
+
 await test("lace cost uses a cumulative weighted average", () => {
   const expenses = [
     { unitKind: "lace_piece", amount: 90, quantity: 30 },
@@ -92,6 +114,46 @@ await test("orphan cleanup preserves shared records and removes order-owned ghos
   ok(migration.includes("update public.gallery_photo_links g set order_number = null"));
   equal(/delete from public\.sms_messages m/.test(migration), false);
   equal(/delete from public\.gallery_photo_links g/.test(migration), false);
+});
+
+await test("published service rows are the only rule-price authority", () => {
+  const services = [
+    { serviceKey: "standard_full_service", pricingType: "tiered", basePrice: 87, premiumPrice: 113, isActive: true, publishedAt: "2026-08-03" },
+    { serviceKey: "full_relace", pricingType: "tiered", basePrice: 67, premiumPrice: 93, isActive: true, publishedAt: "2026-08-03" },
+    { serviceKey: "clean_condition", pricingType: "fixed", basePrice: 54, isActive: true, publishedAt: "2026-08-03" },
+    { serviceKey: "lace_repair", pricingType: "starting_at", basePrice: 43, isActive: true, publishedAt: "2026-08-03" },
+    { serviceKey: "palm_padding", pricingType: "fixed", basePrice: 24, isActive: true, publishedAt: "2026-08-03" },
+    { serviceKey: "loop_replacement", pricingType: "per_item", basePrice: 34, isActive: true, publishedAt: "2026-08-03" }
+  ];
+  equal(publishedSuggestion({ gloveType: "Fielders Glove", services: ["Cleaning + Conditioning + Relacing"] }, services), 87);
+  equal(publishedSuggestion({ gloveType: "Fielders Glove", webType: "Modified Trapeze", services: ["Cleaning + Conditioning + Relacing"] }, services), 113);
+  equal(publishedSuggestion({ gloveType: "Catchers Mitt", services: ["Relacing"] }, services), 93);
+  equal(publishedSuggestion({ gloveType: "Fielders Glove", services: ["Cleaning + Conditioning", "Lace Repair", "ShockTec Air2Gel Palm Pad"], loopCount: 2 }, services), 189);
+  equal(admin.includes("SHOP_PRICING"), false);
+  for (const key of ["standard_full_service", "full_relace", "clean_condition", "lace_repair", "palm_padding", "loop_replacement"]) {
+    ok(admin.includes(`"${key}"`), key);
+  }
+});
+
+await test("New Order templates contain job shape only and preserve unrelated fields", () => {
+  const templateBlock = admin.slice(admin.indexOf("const ORDER_TEMPLATES"), admin.indexOf("function applyOrderTemplate"));
+  equal(/\bprice\s*:/.test(templateBlock), false);
+  equal(/turnaroundDays/.test(templateBlock), false);
+  ok(admin.includes("getOrderTemplateLabel(t)"));
+  ok(admin.includes("getSuggestedPrice(getNewOrderPricingShape())"));
+  equal(/editDateReceived[\s\S]{0,500}calDateKey/.test(admin.slice(admin.indexOf("function applyOrderTemplate"), admin.indexOf("document.addEventListener(\"change\"", admin.indexOf("function applyOrderTemplate")))), false);
+  ok(admin.includes("Loading published pricing…"));
+  ok(admin.includes("await warmPricingCache(true)"));
+  ok(admin.includes('e.target?.id === "editPriceQuoted"'));
+});
+
+await test("manual order creation has structured Received delivery semantics", () => {
+  ok(api.includes("deliverCreatedOrderReceivedNotifications"));
+  ok(api.includes('status: "suppressed", reason: "Preview environment."'));
+  ok(api.includes('delivery.email.status === "sent"'));
+  ok(api.includes('delivery.sms.status === "sent"'));
+  ok(admin.includes("Customer notification issue:"));
+  ok(admin.includes("Customer notifications were suppressed in Preview."));
 });
 
 console.log(`\n${tests} tests, ${assertions} assertions passed`);
