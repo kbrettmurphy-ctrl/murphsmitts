@@ -1777,7 +1777,7 @@ function openBenchChoiceSheet({ title, message = "", actions = [], anchor = null
     document.addEventListener("keydown", handleBenchChoiceKeydown);
     if (anchorPosition) {
       const panel = sheet.querySelector(".bench-choice-panel");
-      sheet._reposition = () => requestAnimationFrame(() => {
+      const reposition = () => {
         if (!sheet.isConnected) return;
         let position = anchorPosition;
         if (anchorElement?.isConnected) {
@@ -1792,10 +1792,11 @@ function openBenchChoiceSheet({ title, message = "", actions = [], anchor = null
           };
         }
         positionWorkflowMenu(panel, position);
-      });
+      };
+      sheet._reposition = () => requestAnimationFrame(reposition);
       window.addEventListener("resize", sheet._reposition);
       window.addEventListener("scroll", sheet._reposition, true);
-      sheet._reposition();
+      reposition();
     }
   });
 }
