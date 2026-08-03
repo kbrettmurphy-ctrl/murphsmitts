@@ -193,8 +193,8 @@ await test("client implements recovery, reminder, and separate Bench/Labor prese
   ok(admin.includes('data-bench-labor-reminder'));
   ok(admin.includes('reminder.hidden = !isBenchLaborReminderDue(benchFocusState.activeBench)'));
   ok(source.includes("10 * 60 * 1000"));
-  ok(admin.includes("Bench context — not logged labor"));
-  ok(admin.includes("Labor elapsed"));
+  ok(admin.includes("Bench <strong data-bench-elapsed>"));
+  ok(admin.includes("· Labor <strong data-bench-labor-elapsed>"));
   ok((admin.match(/benchSessionId: activeBench\.id/g) || []).length >= 2);
   equal(/Keep Timer Running and End Bench Work/.test(admin), false);
 });
@@ -260,7 +260,10 @@ await test("focused-card controls emit authoritative identifiers and reuse labor
   ok(renderer.includes("DASHBOARD_TIMER_ICONS[primary.icon]"));
   ok(admin.includes("dashboardLaborSessions[orderKey] || focusedSession || null"));
   ok(admin.includes("emittedSessionId !== String(session.id)"));
-  ok(admin.includes("await refreshBenchFocusSurfaces();"));
+  const control = admin.match(/async function handleDashboardTimerControl\([\s\S]*?\n\}/)?.[0] || "";
+  ok(control.includes("finally {\n    dashboardTimerBusy = false;\n    await refreshBenchFocusSurfaces();"));
+  equal(control.includes("timerButton?.isConnected"), false);
+  equal(control.includes("controlButton.disabled"), false);
 });
 
 await test("Bench end choices anchor and clamp through the existing menu utility", () => {
@@ -285,6 +288,42 @@ await test("Bench end performs one authoritative multi-surface refresh", () => {
   ok(admin.includes("await refreshBenchFocusSurfaces({ refreshViewedLabor: true })"));
   ok(admin.includes("existing?.remove()"));
   equal((admin.match(/async function refreshBenchFocusSurfaces/g) || []).length, 1);
+});
+
+await test("simplified Bench card omits duplicated administrative detail", () => {
+  const render = admin.match(/function renderBenchFocusCard\([\s\S]*?\n\}/)?.[0] || "";
+  ok(render.includes("bench-focus-heading"));
+  ok(render.includes("bench-focus-summary"));
+  ok(render.includes("bench-focus-bench-time"));
+  ok(render.includes("bench-focus-labor-status"));
+  ok(render.includes("bench-focus-card-actions"));
+  equal(render.includes("bench-focus-details"), false);
+  equal(render.includes("Services</dt>"), false);
+  equal(render.includes("Lace</dt>"), false);
+  equal(render.includes("Status</dt>"), false);
+  equal(render.includes("Estimated</dt>"), false);
+  equal(render.includes("servicesRequested"), false);
+  equal(render.includes("estimatedCompletion"), false);
+});
+
+await test("focused Today’s Bench row is status-only while ordinary timers remain", () => {
+  const render = admin.match(/function renderDashboardOrderRow\([\s\S]*?\n\}/)?.[0] || "";
+  ok(render.includes('const isFocusedOrder = String(benchFocusState.activeBench?.orderNumber || "") === orderKey'));
+  ok(render.includes('isFocusedOrder ? "" : renderDashboardTimerButton(order, session)'));
+  ok(render.includes('isFocusedOrder ? "On Bench" : "Start Bench Work"'));
+  ok(render.includes("timerStateHtml"));
+  equal((admin.match(/function renderDashboardTimerButton/g) || []).length, 1);
+});
+
+await test("cross-order warning stays compact and routes back to Clubhouse", () => {
+  const render = admin.match(/function renderOrderDetailBenchBanner\([\s\S]*?\n\}/)?.[0] || "";
+  ok(render.includes("Another glove is on the bench"));
+  ok(render.includes("data-detail-bench-clubhouse"));
+  ok(render.includes("data-detail-bench-end"));
+  equal(render.includes("data-timer-control"), false);
+  equal(render.includes("data-timer-action"), false);
+  ok(admin.includes('const clubhouseBtn = e.target.closest("[data-detail-bench-clubhouse]")'));
+  ok(admin.includes('setActiveView("dashboard")'));
 });
 
 console.log(`\n${tests} tests, ${assertions} assertions passed`);

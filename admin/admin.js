@@ -1569,6 +1569,7 @@ function renderDashboardOrderRow(order, { timerControls = false } = {}) {
   const brand = String(order.brandModel || "").trim();
   const meta = [brand, lace].filter(Boolean).join(" · ");
   const orderKey = String(order.orderNumber || "");
+  const isFocusedOrder = String(benchFocusState.activeBench?.orderNumber || "") === orderKey;
   const session = timerControls ? (dashboardLaborSessions[orderKey] || null) : null;
   const timerStateHtml = session
     ? `<span class="dashboard-bench-timer-state" data-bench-timer="${escapeAttr(orderKey)}">${escapeHtml(getDashboardTimerStateLabel(session))}</span>`
@@ -1598,9 +1599,9 @@ function renderDashboardOrderRow(order, { timerControls = false } = {}) {
             type="button"
             class="bench-focus-start-btn"
             data-bench-start="${escapeAttr(orderKey)}"
-            ${benchFocusBusy || benchFocusState.activeBench?.orderNumber === orderKey ? "disabled" : ""}
-          >${benchFocusState.activeBench?.orderNumber === orderKey ? "On Bench" : "Start Bench Work"}</button>
-          ${renderDashboardTimerButton(order, session)}
+            ${benchFocusBusy || isFocusedOrder ? "disabled" : ""}
+          >${isFocusedOrder ? "On Bench" : "Start Bench Work"}</button>
+          ${isFocusedOrder ? "" : renderDashboardTimerButton(order, session)}
         </div>
       ` : ""}
     </div>
@@ -1634,48 +1635,35 @@ function renderBenchFocusCard() {
   const unlinkedPausedLabor = benchFocusState.unlinkedPausedLabor;
   const laborStatus = labor ? getLaborSessionStatus(labor) : "";
   const reminderDue = isBenchLaborReminderDue(bench, labor);
-  const services = parseServicesValue(order.servicesRequested || "").selected.join(", ") || order.servicesRequested || "—";
-  const lace = [order.primaryLaceColor, order.secondaryLaceColor].filter(Boolean).join(" · ") || "—";
   return `
     <section class="bench-focus-card" data-bench-focus-card>
       <div class="bench-focus-context">
         <div class="bench-focus-eyebrow">Bench Work</div>
         <div class="bench-focus-heading">#${escapeHtml(bench.orderNumber)} · ${escapeHtml(order.customerName || "Customer")}</div>
-        <div class="bench-focus-summary">${escapeHtml([order.brandModel, order.gloveType].filter(Boolean).join(" · ") || "Glove")}</div>
-        <dl class="bench-focus-details">
-          <div><dt>Services</dt><dd>${escapeHtml(services)}</dd></div>
-          <div><dt>Lace</dt><dd>${escapeHtml(lace)}</dd></div>
-          <div><dt>Status</dt><dd>${escapeHtml(getOrderStatusDisplay(order.status || ""))}</dd></div>
-          <div><dt>Estimated</dt><dd>${escapeHtml(order.estimatedCompletion ? formatDate(order.estimatedCompletion) : "—")}</dd></div>
-        </dl>
-        <div class="bench-focus-time-grid">
-          <div><span>Started</span><strong>${escapeHtml(formatLaborDateTime(bench.startedAt))}</strong></div>
-          <div><span>Elapsed</span><strong data-bench-elapsed>${escapeHtml(formatBenchElapsed(bench.startedAt))}</strong></div>
+        <div class="bench-focus-summary">${escapeHtml(order.brandModel || order.gloveType || "Glove")}</div>
+        <div class="bench-focus-bench-time">
+          <span>Started ${escapeHtml(formatLaborDateTime(bench.startedAt))}</span>
+          <span>Bench <strong data-bench-elapsed>${escapeHtml(formatBenchElapsed(bench.startedAt))}</strong></span>
         </div>
-        <p class="bench-focus-not-labor">Bench context — not logged labor</p>
-        <button type="button" class="bench-focus-end-btn" data-bench-end>End Bench Work</button>
       </div>
       <div class="bench-focus-labor${labor ? " has-labor" : ""}">
         <div class="bench-focus-labor-heading">${escapeHtml(labor?.phase || "No labor timer")}</div>
         ${labor ? `
-          <div class="bench-focus-labor-status">${escapeHtml(laborStatus === "paused" ? "Paused" : "Running")}</div>
-          <div class="bench-focus-labor-time"><span>Labor elapsed</span><strong data-bench-labor-elapsed>${escapeHtml(formatLaborDuration(getLaborActiveSeconds(labor) / 60))}</strong></div>
-          <div class="bench-focus-labor-controls">${renderBenchFocusTimerControls(order, labor, bench)}</div>
+          <div class="bench-focus-labor-status">${escapeHtml(laborStatus === "paused" ? "Paused" : "Running")} · Labor <strong data-bench-labor-elapsed>${escapeHtml(formatLaborDuration(getLaborActiveSeconds(labor) / 60))}</strong></div>
+          <div class="bench-focus-card-actions"><div class="bench-focus-labor-controls">${renderBenchFocusTimerControls(order, labor, bench)}</div><button type="button" class="bench-focus-end-btn" data-bench-end>End Bench Work</button></div>
         ` : unlinkedPausedLabor ? `
           <p class="bench-focus-paused-warning">A paused labor session is still open for this order.</p>
-          <div class="bench-focus-reminder-actions">
+          <div class="bench-focus-card-actions"><div class="bench-focus-reminder-actions">
             <button type="button" data-bench-paused-resume>Resume Existing Timer</button>
             <button type="button" data-bench-paused-stop>Stop Existing Timer</button>
-            <button type="button" data-bench-end>End Bench Work</button>
-          </div>
+          </div><button type="button" class="bench-focus-end-btn" data-bench-end>End Bench Work</button></div>
         ` : `
-          <p>Bench Work is active, but time is not being recorded as labor.</p>
-          <div class="bench-focus-reminder-actions">
+          <div class="bench-focus-card-actions"><div class="bench-focus-reminder-actions">
             ${!bench.backdateConsumedAt ? `<button type="button" data-bench-labor-start="bench">Start from Bench Work</button>` : ""}
             <button type="button" data-bench-labor-start="now">Start Now</button>
-          </div>
+          </div><button type="button" class="bench-focus-end-btn" data-bench-end>End Bench Work</button></div>
           <div class="bench-focus-reminder" data-bench-labor-reminder ${reminderDue ? "" : "hidden"}>
-            <p>No labor timer is running.</p>
+            <span>No labor timer is running.</span>
             <button type="button" data-bench-remind-later>Remind Later</button>
           </div>
         `}
@@ -2244,12 +2232,9 @@ async function handleDashboardTimerControl(orderKey, control, controlButton = nu
     return;
   }
 
-  const timerButton = controlButton?.closest(".dashboard-bench-actions, .bench-focus-labor-controls")
-    ?.querySelector("[data-timer-action]");
-  if (controlButton) controlButton.disabled = true;
-  if (timerButton) timerButton.disabled = true;
   closeDashboardTimerPopover();
   dashboardTimerBusy = true;
+  if (activeView === "dashboard") renderHomeDashboard();
   try {
     if (control === "pause") {
       await postJson({ action: "pauseLaborSession", sessionId: session.id }, true);
@@ -2259,13 +2244,11 @@ async function handleDashboardTimerControl(orderKey, control, controlButton = nu
       await postJson({ action: "stopLaborSession", sessionId: session.id }, true);
     }
     broadcastBenchFocusChange();
-    await refreshBenchFocusSurfaces();
   } catch (err) {
     alert(err?.message || "Labor timer could not be updated.");
-    refreshDashboardLaborSessions();
   } finally {
     dashboardTimerBusy = false;
-    if (timerButton?.isConnected) timerButton.disabled = false;
+    await refreshBenchFocusSurfaces();
   }
 }
 
@@ -3390,6 +3373,14 @@ function ensureDetailCollapseDelegation() {
 
   detailCollapseDelegated = true;
   orderDetail.addEventListener("click", (e) => {
+    const clubhouseBtn = e.target.closest("[data-detail-bench-clubhouse]");
+    if (clubhouseBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveView("dashboard");
+      return;
+    }
+
     const toggle = e.target.closest("[data-section-toggle]");
     if (!toggle) return;
 
@@ -7099,9 +7090,8 @@ function renderOrderDetailBenchBanner(order) {
   const viewingActiveBenchOrder = String(bench.orderNumber) === String(order.orderNumber);
   return `<aside class="detail-bench-focus-banner">
     <div><span>${viewingActiveBenchOrder ? "Bench Work" : "Another glove is on the bench"}</span><strong>#${escapeHtml(bench.orderNumber)} · Active · ${escapeHtml(formatBenchElapsed(bench.startedAt))}</strong>
-    <small>Bench context — not logged labor</small></div>
-    <div><span>${escapeHtml(labor?.phase || "No labor timer")}</span><strong>${labor ? escapeHtml(getLaborSessionStatus(labor) === "paused" ? "Paused" : "Running") : "Not recording labor"}</strong></div>
-    <button type="button" data-detail-bench-end ${benchFocusBusy ? "disabled" : ""}>End Bench Work</button>
+    <small>${escapeHtml(labor?.phase || "No labor timer")} · ${labor ? escapeHtml(getLaborSessionStatus(labor) === "paused" ? "Paused" : "Running") : "Not recording labor"}</small></div>
+    <div class="detail-bench-focus-actions">${!viewingActiveBenchOrder ? '<button type="button" data-detail-bench-clubhouse>Go to Clubhouse</button>' : ""}<button type="button" data-detail-bench-end ${benchFocusBusy ? "disabled" : ""}>End Bench Work</button></div>
   </aside>`;
 }
 
