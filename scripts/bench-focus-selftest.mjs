@@ -314,6 +314,7 @@ await test("labor phase choices anchor to their trigger and remain portal-safe",
   equal(admin.includes("actions.appendChild(popover)"), false);
   equal(admin.includes('document.addEventListener("click", (e) => {\n    if (!dashboardTimerPopoverOrder)'), false);
   ok(adminCss.includes(".bench-choice-sheet{position:fixed"));
+  ok(adminCss.includes(".bench-choice-sheet{z-index:1300}"));
   ok(adminCss.includes("pointer-events:auto"));
   ok(adminCss.includes(".bench-choice-backdrop{position:fixed;inset:0;z-index:0"));
   ok(adminCss.includes(".bench-choice-panel{position:relative;z-index:1"));
