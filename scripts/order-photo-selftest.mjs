@@ -3,6 +3,7 @@ import fs from "node:fs";
 
 const admin = fs.readFileSync(new URL("../admin/admin.js", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../admin/admin.css", import.meta.url), "utf8");
+const html = fs.readFileSync(new URL("../admin/index.html", import.meta.url), "utf8");
 let tests = 0;
 let assertions = 0;
 
@@ -69,12 +70,13 @@ await test("upload menus use the anchored body-level portal", () => {
 });
 
 await test("gallery toolbar changes are vertical-only", () => {
-  ok(/\.gallery-refresh-btn\{[\s\S]*?align-items:center;[\s\S]*?justify-content:center;[\s\S]*?height:34px;/.test(css));
   ok(/\.gallery-manager-filter\{[\s\S]*?height:34px;[\s\S]*?min-height:34px;/.test(css));
   ok(/\.gallery-manager-search\{[\s\S]*?height:34px;[\s\S]*?min-height:34px;/.test(css));
   ok(/@media \(min-width:900px\)\{[\s\S]*?\.gallery-manager-search\{[\s\S]*?font-size:\.82rem;/.test(css));
   equal(css.includes("grid-template-columns:repeat(2,minmax(0,1fr))"), false);
   equal(css.includes("grid-column:2"), false);
+  equal(html.includes('id="galleryRefreshBtn"'), false);
+  equal(css.includes(".gallery-refresh-btn"), false);
 });
 
 console.log(`\nOrder photo self-test: ${tests} tests, ${assertions} assertions passed.`);

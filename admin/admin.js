@@ -12573,7 +12573,6 @@ function initUploadView() {
   const preview = document.getElementById("galleryUploadPreview");
   const uploadBtn = document.getElementById("galleryUploadBtn");
   const clearBtn = document.getElementById("galleryClearBtn");
-  const refreshBtn = document.getElementById("galleryRefreshBtn");
   const managerFilter = document.getElementById("galleryManagerFilter");
 
   if (!input || !status || !preview || !uploadBtn || !clearBtn) return;
@@ -12732,7 +12731,6 @@ function initUploadView() {
     await loadGalleryManagerPhotos();
   });
 
-  refreshBtn?.addEventListener("click", loadGalleryManagerPhotos);
   managerFilter?.addEventListener("change", () => {
     galleryManagerFilter = managerFilter.value || "all";
     renderGalleryManagerPhotos();
@@ -12761,11 +12759,9 @@ function getGallerySectionLabel(section) {
 async function loadGalleryManagerPhotos() {
   const list = document.getElementById("galleryManagerList");
   const status = document.getElementById("galleryManagerStatus");
-  const refreshBtn = document.getElementById("galleryRefreshBtn");
   if (!list || !status) return;
 
   try {
-    if (refreshBtn) refreshBtn.disabled = true;
     status.textContent = "Loading gallery photos...";
     list.innerHTML = "";
 
@@ -12788,8 +12784,6 @@ async function loadGalleryManagerPhotos() {
     galleryPhotos = [];
     list.innerHTML = `<p class="muted gallery-manager-empty">Gallery photos could not be loaded.</p>`;
     status.textContent = err.message || "Gallery photos could not be loaded.";
-  } finally {
-    if (refreshBtn) refreshBtn.disabled = false;
   }
 }
 

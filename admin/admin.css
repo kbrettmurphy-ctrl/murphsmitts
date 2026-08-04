@@ -665,19 +665,6 @@ button.secondary{
   white-space:nowrap;
 }
 
-.gallery-refresh-btn{
-  box-sizing:border-box;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  height:34px;
-  min-height:34px;
-  padding:0 12px;
-  border-radius:12px;
-  font-size:.82rem;
-  font-weight:600;
-}
-
 .gallery-manager-controls{
   display:flex;
   align-items:center;
@@ -4633,10 +4620,6 @@ button.dashboard-metric:active{
     width:100%;
     min-width:0;
     max-width:none;
-  }
-
-  .gallery-refresh-btn{
-    flex:0 0 auto;
   }
 
   .topbar-icon-action{
