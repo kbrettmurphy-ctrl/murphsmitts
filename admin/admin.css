@@ -7741,6 +7741,11 @@ body.has-notifications .topbar-menu-btn::after{
     line-height:1.15;
   }
 }
+@media (max-width:560px){
+  .gallery-manager-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
 
 /* Gallery photo action menu: compact. Scoped to gallery-photo-menu-root so
    the orders workflow sheet keeps its own sizing. */
