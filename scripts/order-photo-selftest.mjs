@@ -68,17 +68,13 @@ await test("upload menus use the anchored body-level portal", () => {
   equal(admin.includes('className = "order-gallery-bottom-sheet"'), false);
 });
 
-await test("gallery toolbar controls share one compact footprint", () => {
-  ok(/\.gallery-refresh-btn\{[\s\S]*?width:180px;[\s\S]*?height:34px;/.test(css));
-  ok(/\.gallery-manager-filter\{[\s\S]*?width:180px;[\s\S]*?height:34px;/.test(css));
-  ok(/\.gallery-manager-search\{[\s\S]*?font-size:\.82rem;[\s\S]*?font-weight:600;[\s\S]*?line-height:1\.15;/.test(css));
-  ok(/\.gallery-refresh-btn\{[\s\S]*?display:inline-flex;[\s\S]*?align-items:center;[\s\S]*?justify-content:center;/.test(css));
-  ok(/@media \(max-width:899px\)\{[\s\S]*?\.gallery-manager-search,[\s\S]*?\.gallery-manager-filter,[\s\S]*?\.gallery-refresh-btn\{[\s\S]*?font-size:16px;/.test(css));
-  ok(/@media \(max-width:560px\)\{[\s\S]*?\.gallery-manager-grid\{[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\);/.test(css));
-  ok(/@media \(max-width:560px\)\{[\s\S]*?\.gallery-manager-controls\{[\s\S]*?display:grid;[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\);/.test(css));
-  ok(/\.gallery-refresh-btn\{[\s\S]*?grid-column:2;/.test(css));
-  ok(/\.gallery-manager-list\{[\s\S]*?min-width:0;[\s\S]*?max-width:100%;/.test(css));
-  ok(/\.gallery-refresh-btn\{[\s\S]*?flex:1 1 0;[\s\S]*?width:auto;/.test(css));
+await test("gallery toolbar changes are vertical-only", () => {
+  ok(/\.gallery-refresh-btn\{[\s\S]*?align-items:center;[\s\S]*?justify-content:center;[\s\S]*?height:34px;/.test(css));
+  ok(/\.gallery-manager-filter\{[\s\S]*?height:34px;[\s\S]*?min-height:34px;/.test(css));
+  ok(/\.gallery-manager-search\{[\s\S]*?height:34px;[\s\S]*?min-height:34px;/.test(css));
+  ok(/@media \(min-width:900px\)\{[\s\S]*?\.gallery-manager-search\{[\s\S]*?font-size:\.82rem;/.test(css));
+  equal(css.includes("grid-template-columns:repeat(2,minmax(0,1fr))"), false);
+  equal(css.includes("grid-column:2"), false);
 });
 
 console.log(`\nOrder photo self-test: ${tests} tests, ${assertions} assertions passed.`);
