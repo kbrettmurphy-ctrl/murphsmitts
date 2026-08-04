@@ -2,13 +2,21 @@
 
 ## 2026-08-04 — MurphOS v1.4.1: Record and Refinement
 
+### Added
+- Added a Hidden Photos gallery filter so hidden photos can be found and restored from the Gallery manager.
+
 ### Changed
 - Reconciled the as-built architecture, database, workflow, feature inventory, technical-debt register, and release history through Durable Economics.
 - Corrected measured-job documentation to the implemented one-minute labor floor and recorded special-order lace costing without stocked-color inventory impact.
 - Added explicit mobile navigation control state and corrected maintenance-reminder documentation to match the device SMS composer.
+- Persisted the Messages and Users admin views in the URL so refreshes and direct navigation restore the selected view.
 
 ### Fixed
 - Pricing mutations now restore disabled controls and show a usable error when the shared request helper throws on network or server failures.
+
+### Notes
+- MurphOS v1.4.1 is deployed and production-verified through commit `03f7372`.
+- All six self-test suites passed: 227 tests and 2,905 assertions. JavaScript syntax checks also passed.
 
 ## 2026-08-03 — MurphOS v1.4: Durable Economics
 
