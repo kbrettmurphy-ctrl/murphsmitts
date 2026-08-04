@@ -12857,7 +12857,7 @@ function renderGalleryManagerPhotos() {
     <div class="gallery-manager-grid">
       ${entries.map(({ photo, index }) => `
         <article
-          class="gallery-manager-item${photo.hidden ? " is-hidden" : ""}"
+          class="gallery-manager-item${photo.hidden ? " is-gallery-hidden" : ""}"
           data-gallery-index="${index}"
           tabindex="0">
           <button class="gallery-manager-thumb" type="button" data-gallery-action="view">

@@ -83,8 +83,8 @@ await test("gallery toolbar changes are vertical-only", () => {
 await test("hidden gallery photos can be isolated and restored", () => {
   ok(html.includes('<option value="hidden">Hidden Photos</option>'));
   ok(admin.includes('activeFilter === "hidden" ? photo.hidden : photo.section === activeFilter'));
-  ok(admin.includes('No hidden gallery photos.'));
-  ok(admin.includes('const toggleLabel = photo.hidden ? "Restore" : "Hide"'));
+  ok(admin.includes('gallery-manager-item${photo.hidden ? " is-gallery-hidden" : ""}'));
+  equal(admin.includes('gallery-manager-item${photo.hidden ? " is-hidden" : ""}'), false);
   ok(admin.includes('? "restoreGalleryPhoto"'));
 });
 

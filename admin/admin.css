@@ -720,7 +720,7 @@ button.secondary{
   outline-offset:2px;
 }
 
-.gallery-manager-item.is-hidden{
+.gallery-manager-item.is-gallery-hidden{
   opacity:.74;
 }
 
@@ -783,7 +783,7 @@ button.secondary{
   font-weight:700;
 }
 
-.gallery-manager-item.is-hidden .gallery-manager-pill{
+.gallery-manager-item.is-gallery-hidden .gallery-manager-pill{
   background:rgba(146,26,36,.18);
   color:#ffb8bf;
 }
@@ -5238,7 +5238,7 @@ button.secondary:active,
   color:rgba(9,47,77,.66);
 }
 
-.gallery-manager-item.is-hidden .gallery-manager-pill{
+.gallery-manager-item.is-gallery-hidden .gallery-manager-pill{
   background:rgba(146,26,36,.10);
   color:var(--red);
 }
