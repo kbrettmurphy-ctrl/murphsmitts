@@ -148,6 +148,7 @@ async function invokeSms({ params, signature, fetchMock, env = SMS_ENV }) {
 await test("migration serializes concurrent allocation and records idempotency", () => {
   ok(migration.includes("create table if not exists public.intake_submissions"));
   ok(migration.includes("create or replace function public.create_intake_orders"));
+  ok(migration.includes("coalesce(v_order->>'glove_photos', '[]')"));
   ok(migration.includes("pg_advisory_xact_lock"));
   ok(migration.includes("murphos_intake_order_numbers"));
   ok(migration.includes("for update"));

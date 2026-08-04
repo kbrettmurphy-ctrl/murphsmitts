@@ -12,7 +12,7 @@ The repository does not contain the original schema migration for the core table
 
 Core customer/job fields used by the application include identity and timestamps; customer contact; glove type/model/web; requested services and lace colors; delivery/address; notes/photos; order number and status; received/estimated/completed dates; quote/payment/shipping; email/SMS delivery stamps; SMS opt-in and latest inbound message; approval time; lace usage; map/geocoding metadata; and `tracking_token`.
 
-`order_number` is the application-facing key used by related tables and URLs. `glove_photos` holds an array of order/intake/SMS photo URLs; readers tolerate either a native array or serialized JSON text.
+`order_number` is the application-facing key used by related tables and URLs. In production, `glove_photos` is a text column containing a serialized JSON array of order/intake/SMS photo URLs; readers also tolerate a native array.
 
 Public intake allocates order numbers inside `create_intake_orders`, which holds a
 transaction advisory lock while checking idempotency, choosing a consecutive

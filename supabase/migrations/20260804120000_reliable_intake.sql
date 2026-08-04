@@ -144,7 +144,7 @@ begin
       nullif(v_order->>'social_tag', ''),
       nullif(v_order->>'turnaround_acknowledged', ''),
       nullif(v_order->>'referral_source', ''),
-      coalesce(v_order->'glove_photos', '[]'::jsonb),
+      coalesce(v_order->>'glove_photos', '[]'),
       v_order_number,
       coalesce(nullif(v_order->>'status', ''), 'Received'),
       nullif(v_order->>'date_received', '')::date,
