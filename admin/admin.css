@@ -708,6 +708,8 @@ button.secondary{
 
 .gallery-manager-list{
   min-height:48px;
+  min-width:0;
+  max-width:100%;
 }
 
 .gallery-manager-empty{
@@ -719,6 +721,8 @@ button.secondary{
   display:grid;
   grid-template-columns:repeat(auto-fill,minmax(138px,1fr));
   gap:10px;
+  min-width:0;
+  max-width:100%;
 }
 
 .gallery-manager-item{
@@ -7742,6 +7746,25 @@ body.has-notifications .topbar-menu-btn::after{
   }
 }
 @media (max-width:560px){
+  .gallery-manager-card{
+    min-width:0;
+    max-width:100%;
+    overflow:hidden;
+  }
+  .gallery-manager-controls{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    width:100%;
+  }
+  .gallery-manager-filter,
+  .gallery-refresh-btn{
+    width:100%;
+    min-width:0;
+    max-width:100%;
+  }
+  .gallery-refresh-btn{
+    grid-column:2;
+  }
   .gallery-manager-grid{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
