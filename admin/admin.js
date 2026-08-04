@@ -6268,6 +6268,7 @@ function setActiveView(viewName) {
       setActiveView("dashboard");
       return;
     }
+    syncAdminViewUrl(resolvedView);
     showView(usersView);
     renderUsersView();
     closeMenu();
@@ -6294,6 +6295,7 @@ function setActiveView(viewName) {
   }
 
   if (resolvedView === "messages") {
+    syncAdminViewUrl(resolvedView);
     showView(messagesView);
     renderMessagesView();
     closeMenu();
@@ -12832,10 +12834,13 @@ function renderGalleryManagerPhotos() {
   const entries = getFilteredGalleryManagerEntries();
   const activeCount = entries.filter(entry => !entry.photo.hidden).length;
   const hiddenCount = entries.filter(entry => entry.photo.hidden).length;
+  const hiddenOnly = activeFilter === "hidden";
   const filterLabel = activeFilter === "all" ? "" : ` ${getGallerySectionLabel(activeFilter)}`;
 
   status.textContent = galleryPhotos.length
-    ? `${activeCount}${filterLabel} visible${hiddenCount ? ` · ${hiddenCount} hidden` : ""}`
+    ? hiddenOnly
+      ? `${hiddenCount} hidden photo${hiddenCount === 1 ? "" : "s"}`
+      : `${activeCount}${filterLabel} visible${hiddenCount ? ` · ${hiddenCount} hidden` : ""}`
     : "No gallery photos have been uploaded yet.";
 
   if (!galleryPhotos.length) {
@@ -12844,7 +12849,7 @@ function renderGalleryManagerPhotos() {
   }
 
   if (!entries.length) {
-    list.innerHTML = `<p class="muted gallery-manager-empty">No ${escapeHtml(getGallerySectionLabel(activeFilter))} photos found.</p>`;
+    list.innerHTML = `<p class="muted gallery-manager-empty">${hiddenOnly ? "No hidden gallery photos." : `No ${escapeHtml(getGallerySectionLabel(activeFilter))} photos found.`}</p>`;
     return;
   }
 
@@ -12886,7 +12891,7 @@ function getFilteredGalleryManagerEntries() {
 
   return galleryPhotos
     .map((photo, index) => ({ photo, index }))
-    .filter(({ photo }) => activeFilter === "all" || photo.section === activeFilter)
+    .filter(({ photo }) => activeFilter === "all" || (activeFilter === "hidden" ? photo.hidden : photo.section === activeFilter))
     .filter(({ photo }) => {
       if (!galleryManagerSearch) return true;
       const hay = [photo.linkedOrder, photo.name, photo.sectionLabel, photo.gloveMeta?.brandModel]
