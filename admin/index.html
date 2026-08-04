@@ -16,7 +16,7 @@
 </head>
 <body>
   <div class="app-shell">
-    <aside id="sideMenu" class="side-menu">
+    <aside id="sideMenu" class="side-menu" aria-label="MurphOS navigation">
       <div class="side-menu-header">
         <div class="brand-row">
           <img src="/assets/img/logo.png" alt="Murph's Mitt Maintenance logo" class="brand-logo">
@@ -84,7 +84,7 @@
       <section id="homeDashboardView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="homeMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <button id="homeMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu" aria-controls="sideMenu" aria-expanded="false">☰</button>
             <div class="topbar-heading">
               <h1 class="topbar-title">Clubhouse</h1>
               <p id="clubhouseCount" class="topbar-subtitle muted">Here's today's lineup.</p>
@@ -98,7 +98,7 @@
       <section id="dashboardView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="menuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <button id="menuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu" aria-controls="sideMenu" aria-expanded="false">☰</button>
             <div class="topbar-heading">
               <h1 id="viewTitle" class="topbar-title">Orders</h1>
               <p id="orderCount" class="topbar-subtitle muted"></p>
@@ -176,7 +176,7 @@
       <section id="mapView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="mapMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <button id="mapMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu" aria-controls="sideMenu" aria-expanded="false">☰</button>
             <div class="topbar-heading">
               <h1 class="topbar-title">Map</h1>
               <p id="mapCount" class="topbar-subtitle muted">Customer reach</p>
@@ -202,7 +202,7 @@
       <section id="uploadView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="uploadMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <button id="uploadMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu" aria-controls="sideMenu" aria-expanded="false">☰</button>
             <div class="topbar-heading">
               <h1 class="topbar-title">Gallery</h1>
               <p id="uploadCount" class="topbar-subtitle muted">Photo Manager</p>
@@ -303,7 +303,7 @@
       <section id="saleGlovesView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="saleGlovesMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <button id="saleGlovesMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu" aria-controls="sideMenu" aria-expanded="false">☰</button>
             <div class="topbar-heading">
               <h1 class="topbar-title">Store</h1>
               <p id="saleGlovesCount" class="topbar-subtitle muted">Manage glove listings</p>
@@ -320,7 +320,7 @@
       <section id="moneyView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="moneyMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <button id="moneyMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu" aria-controls="sideMenu" aria-expanded="false">☰</button>
             <div class="topbar-heading">
               <h1 class="topbar-title">Money</h1>
               <p id="moneyCount" class="topbar-subtitle muted">Job costing &amp; effective rates</p>
@@ -337,7 +337,7 @@
       <section id="pricingView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="pricingMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <button id="pricingMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu" aria-controls="sideMenu" aria-expanded="false">☰</button>
             <div class="topbar-heading">
               <h1 class="topbar-title">Pricing</h1>
               <p id="pricingCount" class="topbar-subtitle muted">Public service prices &amp; drafts</p>
@@ -371,7 +371,7 @@
       <section id="messagesView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="messagesMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <button id="messagesMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu" aria-controls="sideMenu" aria-expanded="false">☰</button>
             <div class="topbar-heading">
               <h1 class="topbar-title">Messages</h1>
               <p id="messagesCount" class="topbar-subtitle muted">Text inbox</p>
@@ -389,7 +389,7 @@
       <section id="usersView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="usersMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <button id="usersMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu" aria-controls="sideMenu" aria-expanded="false">☰</button>
             <div class="topbar-heading">
               <h1 class="topbar-title">Users</h1>
               <p id="usersCount" class="topbar-subtitle muted">Accounts &amp; roles</p>
@@ -403,7 +403,7 @@
       <section id="customersView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="customersMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <button id="customersMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu" aria-controls="sideMenu" aria-expanded="false">☰</button>
             <div class="topbar-heading">
               <h1 class="topbar-title">Customers</h1>
               <p id="customersCount" class="topbar-subtitle muted"></p>
@@ -417,7 +417,7 @@
       <section id="calendarView" class="view">
         <header class="topbar">
           <div class="topbar-left">
-            <button id="calendarMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu">☰</button>
+            <button id="calendarMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu" aria-controls="sideMenu" aria-expanded="false">☰</button>
             <div class="topbar-heading">
               <h1 class="topbar-title">Calendar</h1>
               <p id="calendarCount" class="topbar-subtitle muted"></p>

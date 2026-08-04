@@ -1,6 +1,6 @@
 # MurphOS Workflows
 
-As-built baseline reviewed 2026-07-19.
+As-built baseline reviewed 2026-08-04.
 
 ## Order creation
 
@@ -49,9 +49,9 @@ Bench elapsed time is context, not labor. After 90 seconds without an open linke
 
 ## Money, expenses, and economics
 
-Order economics are primarily computed in the admin client. Revenue is `price_quoted`; customer-charged `shipping_cost` is deliberately excluded as pass-through. Materials include lace, palm pad, cleaning consumables, and per-order packaging. Default lace usage is 3 pieces for a fielder (plus one for trapeze/modified trapeze), 4 for a catcher's mitt, and 5 for first base, unless `lace_pieces_used` overrides it.
+Current and nonterminal order economics are computed in the admin client; terminal historical actuals resolve from immutable database snapshots. Revenue is `price_quoted`; customer-charged `shipping_cost` is deliberately excluded as pass-through. Materials include lace, palm pad, cleaning consumables, and per-order packaging. Default lace usage is 3 pieces for a fielder (plus one for trapeze/modified trapeze), 4 for a catcher's mitt, and 5 for first base, unless `lace_pieces_used` overrides it. Special-order lace records the actual supplier color and piece count for costing without adjusting stocked-color inventory.
 
-Effective rate is `(quote - materials) / stopped labor hours`. Money rollups include only `Ready to Go`, `Completed`, or `Picked Up` jobs as applicable and exclude jobs with less than 15 logged minutes from rate rollups. Views include service/glove/month/referral summaries, measured times, phase hours, best/worst jobs, expenses, monthly P&L, and customer reach/maintenance signals.
+Effective rate is `(quote - materials) / stopped labor hours`. Money rollups include only `Ready to Go`, `Completed`, or `Picked Up` jobs as applicable and require at least one logged minute for measured-job rate rollups. Views include service/glove/month/referral summaries, measured times, phase hours, best/worst jobs, expenses, monthly P&L, and customer reach/maintenance signals.
 
 Expense rows are manual. Valid lace-piece purchases use cumulative weighted-average landed cost: total qualifying expense amount divided by total qualifying quantity. Other recognized unit kinds retain their latest-valid-purchase unit cost. The lace fallback is used only after expenses load successfully and contain no valid lace-piece purchases. Monthly P&L subtracts materials and recorded expenses from job revenue; it is an operating estimate, not accounting software.
 
@@ -66,6 +66,8 @@ The public services/contact interfaces read active lace colors and quantities. A
 ## Gallery and tracking linkage
 
 Gallery uploads choose a section and may link directly to an order. Existing photos can be linked to an order or described without one, moved between sections, hidden/restored, deleted, and designated as an album cover. Public gallery photos sharing an order number collapse into one album; public search matches order data for linked photos and stored descriptors for orderless photos.
+
+Maintenance-due customer cards use the most recent service record and, after ten months without an active shop order, open the device's SMS composer with a personal reminder prefilled. The reminder is not sent automatically and does not currently open a MurphOS message thread.
 
 The public tracking URL uses `?t=<64-hex token>`. It maps internal statuses to six customer stages and may show an estimate/completion date, shipment carrier/tracking link, and only gallery photos explicitly linked to the order. It never returns address, contact details, price, payment state, or internal notes.
 

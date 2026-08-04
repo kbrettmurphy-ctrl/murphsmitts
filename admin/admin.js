@@ -448,15 +448,23 @@ function isDemoRole() {
   return getCurrentRole() === "demo";
 }
 
+function syncMenuTriggerState(expanded) {
+  document.querySelectorAll(".topbar-menu-btn").forEach((button) => {
+    button.setAttribute("aria-expanded", expanded ? "true" : "false");
+  });
+}
+
 function openMenu() {
   if (!isAuthenticated()) return;
   sideMenu.classList.add("open");
   menuBackdrop.classList.add("show");
+  syncMenuTriggerState(true);
 }
 
 function closeMenu() {
   sideMenu.classList.remove("open");
   menuBackdrop.classList.remove("show");
+  syncMenuTriggerState(false);
 }
 
 function clearSaveStatus() {
@@ -15513,6 +15521,7 @@ async function onPricingClick(e) {
     return;
   }
 
+  try {
   if (action === "save-settings") {
     const rate = document.getElementById("pricingSettingRate")?.value;
     const min = document.getElementById("pricingSettingMin")?.value;
@@ -15608,6 +15617,11 @@ async function onPricingClick(e) {
     if (res.service) pricingExpandedKey = res.service.serviceKey;
     renderPricingView();
     return;
+  }
+  } catch (error) {
+    alert(error?.message || "Pricing could not be updated. Please try again.");
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -16312,9 +16326,8 @@ document.addEventListener("click", async (e) => {
 /* =========================
    MAINTENANCE REMINDERS (3.3, lean v1)
    Gloves whose last service was 10+ months ago, derived from service
-   records. One tap opens Messages with a personal reminder prefilled —
-   sent from Brett's own thread, not a robot. Cron automation can layer
-   on later; the revenue behavior ships now.
+   records. One tap opens the device's SMS composer with a personal
+   reminder prefilled. Cron automation can layer on later.
 ========================= */
 
 const MAINTENANCE_DUE_MONTHS = 10;

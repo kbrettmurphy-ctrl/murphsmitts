@@ -2,6 +2,8 @@
 
 Status: completed and verified
 
+Historical implementation plan: preserved for design and verification context. The Action Registry described here shipped in MurphOS v1.2; present-tense behavior is documented in `ARCHITECTURE.md`, `FEATURE_INVENTORY.md`, and current source.
+
 Baseline: `main` at `3afc3cd95863ab25102de246377cb44eab11c504`
 
 Audited implementation: `functions/api/orders.js` (6,964 lines)

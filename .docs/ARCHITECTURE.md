@@ -1,6 +1,6 @@
 # MurphOS Architecture
 
-As-built baseline reviewed 2026-07-19. Source code and checked-in migrations are authoritative; `_site/` is generated output and local caches are not architecture sources.
+As-built baseline reviewed 2026-08-04. Source code and checked-in migrations are authoritative; `_site/` is generated output and local caches are not architecture sources.
 
 ## Runtime
 
@@ -35,7 +35,7 @@ The browser never receives the Supabase service-role key. Most admin operations 
 
 The admin is a single HTML/CSS/JavaScript application, not a framework build. Its views are Clubhouse, Orders and Order Detail, Customers, Calendar, Map, Money, Pricing, Lace Inventory, Gallery, Gloves For Sale, Messages, and admin-only Users. The browser stores the signed session token and role in `localStorage`. Demo users operate entirely against an in-browser seeded sandbox; the API independently rejects demo tokens for real-data actions.
 
-`admin/admin.js` owns both rendering and business presentation logic. `functions/api/orders.js` repeats security-sensitive validation and server-side calculations where required. This duplication is intentional in the current system but is a maintenance risk recorded in `TECHNICAL_DEBT.md`.
+`admin/admin.js` owns both rendering and business presentation logic. `functions/api/orders.js` uses a declarative Action Registry to centralize each action's authentication requirement, demo policy, handler, required bindings, and declared effects. Security-sensitive validation and server-side calculations remain in the Function; related presentation rules also exist in the client. This duplication is intentional in the current system but is a maintenance risk recorded in `TECHNICAL_DEBT.md`.
 
 Logout removes the session token and role plus persisted order/address caches and authenticated in-memory datasets. Dashboard-collapse and build-hash preferences are intentionally retained because they contain no customer data.
 
@@ -55,6 +55,10 @@ The public site has a favicon manifest but no public service worker. `/admin/` i
 ## Bench Focus
 
 Bench Focus is a server-authoritative operational context separate from order status and official labor. One active `bench_work_sessions` row identifies the glove physically on the bench; ended unresolved rows remain reviewable without blocking later work. Linked `order_labor_sessions` remain the only measured time used by economics. Cross-table starts, endings, timer dispositions, and reconciliation run through transaction-safe Supabase RPCs. The admin refreshes state on navigation/focus/visibility, polls while active, and uses BroadcastChannel/storage events only as refetch hints.
+
+## Durable terminal economics
+
+Completed and Picked Up orders use immutable database snapshots for historical actuals. The database trigger creates the snapshot the first time an order enters a terminal state, the v1.4 migration backfills older terminal orders, and later edits do not rewrite the locked economics. Current/nonterminal estimates remain operational calculations in the admin. Full-order deletion runs through a transaction-safe RPC that restores stocked lace, removes owned database records in dependency order, and intentionally retains Storage objects.
 
 ## Generated and local-only paths
 

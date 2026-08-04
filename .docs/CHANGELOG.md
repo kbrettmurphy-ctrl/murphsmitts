@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-08-04 — MurphOS v1.4.1: Record and Refinement
+
+### Changed
+- Reconciled the as-built architecture, database, workflow, feature inventory, technical-debt register, and release history through Durable Economics.
+- Corrected measured-job documentation to the implemented one-minute labor floor and recorded special-order lace costing without stocked-color inventory impact.
+- Added explicit mobile navigation control state and corrected maintenance-reminder documentation to match the device SMS composer.
+
+### Fixed
+- Pricing mutations now restore disabled controls and show a usable error when the shared request helper throws on network or server failures.
+
+## 2026-08-03 — MurphOS v1.4: Durable Economics
+
+### Added
+- Immutable economics snapshots for orders first reaching Completed or Picked Up, including idempotent backfill for existing terminal orders.
+- Transaction-safe complete-order deletion with stocked-lace restoration, dependency-ordered cleanup, and intentional Storage retention.
+- Structured special-order lace and custom add-on economics so actual material/revenue allocations remain honest without changing stocked-color inventory.
+
+### Changed
+- Order Detail, Money, Pricing intelligence, service allocations, and monthly history resolve terminal actuals from the locked snapshot.
+- Quote suggestions read current published Pricing Management data while historical order prices remain unchanged.
+- Manual-order delivery reports structured channel results instead of hiding partial notification outcomes.
+
+### Fixed
+- Custom Work labor and negotiated add-on allocations remain separated from the base service where structured data exists.
+
 ## 2026-08-03 — MurphOS v1.3: Bench Focus
 
 ### Added
@@ -24,6 +49,18 @@
 ### Notes
 - Bench elapsed time remains contextual and never counts as official labor unless explicitly assigned or captured by a linked labor session.
 - Existing notification, workflow-status, finance, order-save, and public-site behavior is unchanged.
+
+## 2026-07-31 — MurphOS v1.2: Action Registry
+
+### Added
+- Declarative registry entries for every `/api/orders` action, including authentication requirement, demo policy, handler, declared effects, and required environment bindings.
+- Registry self-tests that fail on duplicate actions, missing metadata, invalid policies, and incomplete dispatch coverage.
+
+### Changed
+- Centralized action dispatch and authorization/demo enforcement instead of maintaining separate linear action branches.
+
+### Notes
+- The registry reduces dispatch drift; it does not split the large admin Function or remove duplicated client/server business rules.
 
 ## 2026-07-24 — Pricing Management
 

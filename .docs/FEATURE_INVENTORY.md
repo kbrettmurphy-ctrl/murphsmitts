@@ -1,6 +1,6 @@
 # MurphOS Feature Inventory
 
-As-built baseline reviewed 2026-07-19.
+As-built baseline reviewed 2026-08-04.
 
 | Surface | Implemented features |
 | --- | --- |
@@ -12,19 +12,20 @@ As-built baseline reviewed 2026-07-19.
 | Public store | Non-hidden glove listings, sold state, primary/hover photos, detail slider, purchase/contact action |
 | Public tracking | Token lookup, six-stage timeline, exception notes, promise/completion date, carrier links, curated finished photos |
 | Clubhouse | New/on-deck/bench/attention lists, Bench Focus context/reminders/reconciliation, timer controls, finance snapshot, unread/new badges |
-| Orders | Search and status filters, create/templates, detail editing, photos, activity, workflow menus, swipe/context actions, delivery resend, shipping/payment guard |
-| Customers | Contact grouping, order/glove history, linked gallery photos, maintenance-due view |
+| Orders | Search and status filters, create/templates, detail editing, order/gallery photo destinations, activity, workflow menus, swipe/context actions, delivery resend, shipping/payment guard, transaction-safe full deletion |
+| Customers | Contact grouping, order/glove history, linked gallery photos, lifetime paid/unpaid and go-to lace summaries, maintenance-due view with device-SMS reminders |
 | Calendar | Received/estimated/completed scheduling with unscheduled work |
 | Map | Shipped-order markers, persisted/fallback geocoding, quality handling, unmapped errors, detail deep links |
 | Labor | Phase timers, one open session per order, pause/resume/stop, notes, history, dashboard controls, Bench-linked phases/exact backdating, summaries |
-| Money | Job economics, effective rate, suggested pricing from measured work, rollups, labor coverage, phase hours, expenses, monthly P&L, per-service pricing intelligence |
+| Money | Current job estimates plus immutable terminal actuals, effective rate, one-minute measured-job eligibility, suggested pricing, tiered rollups, labor coverage, phase hours, expenses, monthly P&L, per-service pricing intelligence, special-order/custom-add-on allocation |
 | Pricing | GUI-managed public service prices; draft/publish workflow, price history, rollback, business settings (target rate/min charge/rounding), pricing intelligence, add/hide/deactivate services |
 | Inventory admin | Add/edit/deactivate/restore, thresholds/alerts, low-stock banner, usage-delta adjustments |
 | Gallery admin | Upload/link/describe/cover/move/hide/restore/delete and search/filter |
 | Store admin | Listing CRUD, status/featured/order, photo upload and primary/hover roles |
 | Messaging | Twilio inbox/threading/read state, compose/reply, photo attachments, message/thread deletion, inbound MMS |
 | Authentication | Email/password, owner PIN fallback, owner passkey, signed 14-day sessions, admin/demo roles, invites and user administration |
-| Demo | Seeded browser-only sandbox; API backstop denies demo access to real-data actions |
+| Action Registry | Declarative authentication/demo policy, handlers, effects, required bindings, and self-test validation for every `/api/orders` action |
+| Demo | Seeded browser-only sandbox; Action Registry backstop denies demo access to real-data actions |
 | PWA/push | Installable admin manifest, no-cache service worker, Web Push subscription/test/fan-out, notification navigation, build-change reload |
 
-Not implemented as repository-managed infrastructure: a complete baseline database schema, Storage policies/bucket creation, automated test suite, CI workflow, dependency-managed admin build, or offline application caching.
+Not implemented as repository-managed infrastructure: a complete baseline database schema, Storage policies/bucket creation, CI workflow, dependency-managed admin build, or offline application caching. Targeted repository self-tests cover the Action Registry, Bench Focus, pricing, durable economics, and order-photo behavior but are not yet run automatically by CI.

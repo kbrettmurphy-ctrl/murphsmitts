@@ -1,6 +1,6 @@
 # MurphOS Database and Migrations
 
-As-built baseline reviewed 2026-07-19.
+As-built baseline reviewed 2026-08-04.
 
 ## Important limitation
 
@@ -94,7 +94,9 @@ Bucket creation, public access configuration, size limits, and Storage policies 
 | `20260719120000_tracking_tokens.sql` | Adds/backfills unique public tracking tokens |
 | `20260721140000_enable_rls_all_tables.sql` | Enables RLS on all existing public tables |
 | `20260724120000_service_pricing.sql` | Creates pricing tables, seeds seven services with approved published prices, business settings, and analytics mappings |
+| `20260730120000_order_custom_addon.sql` | Adds structured custom add-on amount and note fields used to separate negotiated one-off work |
 | `20260731120000_bench_focus.sql` | Adds Bench Focus sessions, labor linkage, constraints, RLS, and transactional lifecycle RPCs |
+| `20260803120000_resume_labor_with_new_bench_work.sql` | Atomically resumes paused labor while starting and linking new Bench Work |
 | `20260803170000_order_economics_snapshots_delete_cascade.sql` | Adds immutable completed-order economics snapshots/backfill and transactional complete-order deletion/orphan cleanup |
 
 Migrations are additive and should be reviewed/applied in timestamp order. There is no checked-in Supabase config or automated migration verification in this repository.
