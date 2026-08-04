@@ -7853,8 +7853,17 @@ function wireOrderPhotoControls(order) {
   const addBtn = document.getElementById("orderPhotoAddBtn");
   const input = document.getElementById("orderPhotoInput");
 
-  addBtn?.addEventListener("click", () => {
-    input?.click();
+  addBtn?.addEventListener("click", async () => {
+    const destination = await chooseOrderPhotoDestination(addBtn);
+    if (destination === "order") {
+      input?.click();
+      return;
+    }
+    if (destination !== "gallery") return;
+
+    const selection = await chooseOrderGalleryUpload(order, addBtn);
+    if (!selection) return;
+    await uploadOrderGalleryPhotos(order, selection.files, selection.section);
   });
 
   input?.addEventListener("change", async () => {
@@ -8082,6 +8091,124 @@ async function uploadOrderPhotos(order, files) {
     setOrderPhotoStatus("Upload failed.");
   }
 
+  if (addBtn) addBtn.disabled = false;
+}
+
+function gallerySectionForGloveType(gloveType) {
+  const normalized = String(gloveType || "").trim().toLowerCase();
+  if (normalized === "catchers mitt") return "catchers-mitts";
+  if (normalized === "first base mitt") return "first-base-mitts";
+  return "fielding-gloves";
+}
+
+function chooseOrderPhotoDestination(anchor) {
+  return openBenchChoiceSheet({
+    title: "Add Photo",
+    message: "Where should this photo appear?",
+    anchor,
+    actions: [
+      { label: "Customer / Order Photo", value: "order" },
+      { label: "Gallery Photo", value: "gallery" },
+      { label: "Cancel", value: "" }
+    ]
+  });
+}
+
+async function chooseOrderGalleryUpload(order, anchor) {
+  const visibleGloveType = document.getElementById("editGloveType")?.value || order.gloveType;
+  let section = gallerySectionForGloveType(visibleGloveType);
+  let files = [];
+  const orderNumber = String(order.orderNumber || "").trim();
+  const choice = openBenchChoiceSheet({
+    title: "Add to Gallery",
+    message: `Photos will be linked to order #${orderNumber}.`,
+    anchor,
+    content: `
+      <div class="order-gallery-upload-fields">
+        <label for="orderGallerySection">Gallery section</label>
+        <select id="orderGallerySection">
+          ${Object.entries(GALLERY_SECTION_LABELS).map(([value, label]) => `
+            <option value="${escapeAttr(value)}"${value === section ? " selected" : ""}>${escapeHtml(label)}</option>
+          `).join("")}
+        </select>
+        <label for="orderGalleryFiles">Photos</label>
+        <input id="orderGalleryFiles" type="file" accept="image/*" multiple>
+        <p id="orderGalleryFileStatus" class="order-gallery-file-status">No photos selected.</p>
+      </div>
+    `,
+    actions: [
+      { label: "Upload to Gallery", value: "upload" },
+      { label: "Cancel", value: "" }
+    ]
+  });
+
+  const root = getBenchChoiceRoot();
+  const sectionSelect = root.querySelector("#orderGallerySection");
+  const fileInput = root.querySelector("#orderGalleryFiles");
+  const fileStatus = root.querySelector("#orderGalleryFileStatus");
+  const uploadBtn = root.querySelector('[data-action="upload"]');
+  if (uploadBtn) uploadBtn.disabled = true;
+
+  sectionSelect?.addEventListener("change", () => {
+    section = sectionSelect.value || section;
+  });
+  fileInput?.addEventListener("change", () => {
+    files = Array.from(fileInput.files || []).filter(file => (file.type || "image/jpeg").startsWith("image/"));
+    if (fileStatus) {
+      fileStatus.textContent = files.length
+        ? `${files.length} photo${files.length === 1 ? "" : "s"} selected.`
+        : "No photos selected.";
+    }
+    if (uploadBtn) uploadBtn.disabled = files.length === 0;
+  });
+
+  const action = await choice;
+  return action === "upload" && files.length ? { files, section } : null;
+}
+
+async function uploadOrderGalleryPhotos(order, files, section) {
+  const addBtn = document.getElementById("orderPhotoAddBtn");
+  const total = files.length;
+  const orderNumber = String(order.orderNumber || "").trim();
+  let linked = 0;
+  const failed = [];
+
+  if (addBtn) addBtn.disabled = true;
+  setOrderPhotoStatus(`Uploading ${total} photo${total === 1 ? "" : "s"} to Gallery...`);
+
+  for (const file of files) {
+    try {
+      const type = file.type || "image/jpeg";
+      const dataUrl = await fileToDataUrl(file);
+      const result = await postJson({
+        action: "uploadGalleryPhoto",
+        section,
+        filename: file.name,
+        contentType: type,
+        dataUrl
+      }, true);
+
+      await postJson({
+        action: "setGalleryPhotoOrder",
+        url: result.url,
+        path: result.path,
+        orderNumber
+      }, true);
+      linked += 1;
+      setOrderPhotoStatus(`Uploading to Gallery... ${linked}/${total}`);
+    } catch (error) {
+      failed.push(`${file.name}: ${error.message || "Upload failed"}`);
+    }
+  }
+
+  galleryPhotos = [];
+  if (linked && failed.length) {
+    setOrderPhotoStatus(`${linked} added to Gallery and linked to #${orderNumber}; ${failed.length} failed.`);
+  } else if (linked) {
+    setOrderPhotoStatus(`${linked} photo${linked === 1 ? "" : "s"} added to Gallery and linked to #${orderNumber}.`);
+  } else {
+    setOrderPhotoStatus(failed[0] || "Gallery upload failed.");
+  }
   if (addBtn) addBtn.disabled = false;
 }
 
