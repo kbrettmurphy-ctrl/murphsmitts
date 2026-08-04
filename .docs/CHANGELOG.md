@@ -14,8 +14,8 @@
 - Twilio media downloads send account credentials only to trusted HTTPS Twilio API hosts and enforce a 10 MB streaming limit.
 
 ### Notes
-- Migration `20260804120000_reliable_intake.sql` must be owner-reviewed and applied before the application changes are deployed.
-- This release is implemented on a feature branch but is not yet deployed or production-verified.
+- Migration `20260804120000_reliable_intake.sql` is applied to production and recorded by Supabase as `20260804183247_reliable_intake`.
+- The application release is implemented on a feature branch but is not yet deployed or production-verified.
 
 ## 2026-08-04 — MurphOS v1.4.1: Record and Refinement
 

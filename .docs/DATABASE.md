@@ -111,6 +111,6 @@ Bucket creation, public access configuration, size limits, and Storage policies 
 | `20260731120000_bench_focus.sql` | Adds Bench Focus sessions, labor linkage, constraints, RLS, and transactional lifecycle RPCs |
 | `20260803120000_resume_labor_with_new_bench_work.sql` | Atomically resumes paused labor while starting and linking new Bench Work |
 | `20260803170000_order_economics_snapshots_delete_cascade.sql` | Adds immutable completed-order economics snapshots/backfill and transactional complete-order deletion/orphan cleanup |
-| `20260804120000_reliable_intake.sql` | Adds intake idempotency state and transaction-safe multi-glove creation/order-number allocation RPC |
+| `20260804120000_reliable_intake.sql` | Adds intake idempotency state and transaction-safe multi-glove creation/order-number allocation RPC; applied to production as `20260804183247_reliable_intake` |
 
 Migrations are additive and should be reviewed/applied in timestamp order. There is no checked-in Supabase config or automated migration verification in this repository.

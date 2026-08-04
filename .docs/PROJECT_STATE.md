@@ -33,6 +33,8 @@ JavaScript syntax checks passed.
 
 Phase 2, MurphOS v1.4.2 **Reliable Intake**, is implemented on the
 `codex/reliable-intake` feature branch but is not deployed or production-verified.
+The matching database migration is applied to production and recorded in the
+Supabase migration history as `20260804183247_reliable_intake`.
 
 Implemented scope:
 
@@ -45,8 +47,7 @@ Implemented scope:
 
 Next checkpoint:
 
-1. Owner reviews and applies `supabase/migrations/20260804120000_reliable_intake.sql`.
-2. Deploy the feature branch preview with preview notification suppression configured.
-3. Manually verify intake retry behavior, multi-glove allocation, partial-success
+1. Deploy the feature branch preview with preview notification suppression configured.
+2. Manually verify intake retry behavior, multi-glove allocation, partial-success
    messaging, valid/invalid Twilio signatures, and inbound MMS media.
-4. Merge and production-verify only after those checks pass.
+3. Merge and production-verify only after those checks pass.

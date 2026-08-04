@@ -58,9 +58,10 @@ The app has feature-specific graceful skips for some optional bindings, but inta
 6. Run the perimeter verification above and confirm the vendored Leaflet CSS, JavaScript, and marker images return 200 from `/assets/vendor/leaflet/1.9.4/`.
 
 For Reliable Intake, apply `20260804120000_reliable_intake.sql` before deploying
-the matching Function code. Confirm Twilio's incoming-message webhook is the
-exact public HTTPS URL `https://murphsmitts.com/api/sms-reply`; the signature is
-calculated from that configured URL and every submitted form field.
+the matching Function code. Production application is recorded in Supabase as
+`20260804183247_reliable_intake`. Confirm Twilio's incoming-message webhook is
+the exact public HTTPS URL `https://murphsmitts.com/api/sms-reply`; the signature
+is calculated from that configured URL and every submitted form field.
 
 ## Login rate limiting: manual Cloudflare action
 
