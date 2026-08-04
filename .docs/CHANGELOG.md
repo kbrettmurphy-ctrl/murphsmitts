@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-08-04 — MurphOS v1.4.2: Reliable Intake
+
+### Added
+- Transaction-safe public intake order creation with serialized order-number allocation and atomic multi-glove inserts.
+- Client-generated intake idempotency keys and request hashes so retries return the original orders instead of creating duplicates.
+- Persisted, structured notification delivery outcomes and explicit partial-success responses after an order has been created.
+- Twilio webhook signature validation before order lookup, status changes, alerts, or authenticated media downloads.
+- Focused Reliable Intake self-tests for concurrency safeguards, retries, notification failures, signed requests, and authenticated media.
+
+### Changed
+- Public intake photo uploads no longer depend on Resend configuration after an order has already been created.
+- Twilio media downloads send account credentials only to trusted HTTPS Twilio API hosts and enforce a 10 MB streaming limit.
+
+### Notes
+- Migration `20260804120000_reliable_intake.sql` must be owner-reviewed and applied before the application changes are deployed.
+- This release is implemented on a feature branch but is not yet deployed or production-verified.
+
 ## 2026-08-04 — MurphOS v1.4.1: Record and Refinement
 
 ### Added

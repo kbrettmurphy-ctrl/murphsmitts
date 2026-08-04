@@ -25,8 +25,8 @@ The browser never receives the Supabase service-role key. Most admin operations 
 | Admin shell | `admin/index.html`, `admin/admin.css`, `assets/vendor/leaflet/1.9.4/` | SPA views, presentation, and locally served map library/assets |
 | Admin behavior | `admin/admin.js` | Authentication UI, demo sandbox, orders, dashboard, customers, calendar, map, labor, money, inventory, gallery, store, messages, users, PWA update/push behavior |
 | Admin API | `functions/api/orders.js` | Signed sessions, WebAuthn, action dispatch, database/storage writes, notifications, geocoding, job logic |
-| Intake | `functions/api/intake.js` | Multi-glove request validation/insertion, post-submit photos, confirmation and owner notifications |
-| Inbound SMS | `functions/api/sms-reply.js` | Twilio webhook, SMS/MMS storage, YES/NO estimate response handling, alerts |
+| Intake | `functions/api/intake.js` | Idempotent multi-glove validation/transactional insertion, post-submit photos, explicit confirmation and owner-notification outcomes |
+| Inbound SMS | `functions/api/sms-reply.js` | Signed Twilio webhook validation, SMS/MMS storage, YES/NO estimate response handling, alerts |
 | Push helper | `functions/api/_webpush.js` | VAPID payload encryption, fan-out, expired-subscription removal |
 | Data changes | `supabase/migrations/` | Additive migrations after the original live schema |
 | Deployment | `wrangler.jsonc`, `_config.yml`, `Gemfile` | Pages/Workers compatibility and Jekyll build inputs |

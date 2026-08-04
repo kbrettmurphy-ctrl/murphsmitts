@@ -100,8 +100,12 @@ Before finishing:
 node --check admin/admin.js
 node --check functions/api/orders.js   # if touched
 node scripts/action-dispatch-selftest.mjs  # dispatcher/auth characterization
+node scripts/admin-navigation-selftest.mjs
 node scripts/pricing-selftest.mjs
 node scripts/bench-focus-selftest.mjs
+node scripts/economics-selftest.mjs
+node scripts/order-photo-selftest.mjs
+node scripts/intake-selftest.mjs
 git diff --check
 git status --short
 ```

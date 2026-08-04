@@ -42,7 +42,7 @@ Pass condition: none of the responses contains the requested repository source. 
 | `WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN` | Optional explicit passkey relying-party/origin configuration |
 | `RESEND_API_KEY`, `RESEND_FROM`, `RESEND_REPLY_TO` | Customer status, owner, and invite email |
 | `OWNER_NOTIFICATION_EMAIL` | Optional explicit new-order recipient |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_SERVICE_SID` | Outbound SMS/MMS and inbound media download authentication |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_SERVICE_SID` | Outbound SMS/MMS, inbound webhook signature validation, and media download authentication |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Admin Web Push |
 | `PUSHOVER_APP_TOKEN`, `PUSHOVER_USER_KEY` | Optional owner alerts |
 
@@ -56,6 +56,11 @@ The app has feature-specific graceful skips for some optional bindings, but inta
 4. Deploy Pages assets and Functions.
 5. Smoke-test public intake/tracking/gallery/store and authenticated admin operations without recording secret values.
 6. Run the perimeter verification above and confirm the vendored Leaflet CSS, JavaScript, and marker images return 200 from `/assets/vendor/leaflet/1.9.4/`.
+
+For Reliable Intake, apply `20260804120000_reliable_intake.sql` before deploying
+the matching Function code. Confirm Twilio's incoming-message webhook is the
+exact public HTTPS URL `https://murphsmitts.com/api/sms-reply`; the signature is
+calculated from that configured URL and every submitted form field.
 
 ## Login rate limiting: manual Cloudflare action
 

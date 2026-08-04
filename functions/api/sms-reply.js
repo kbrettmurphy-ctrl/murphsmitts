@@ -1,6 +1,8 @@
 import { sendWebPushToAll } from "./_webpush.js";
 import { isPreviewEnvironment } from "./_env.js";
 
+const TWILIO_MEDIA_MAX_BYTES = 10 * 1024 * 1024;
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -10,10 +12,17 @@ export async function onRequest(context) {
 
   try {
     if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
-      return twiml("Configuration error.");
+      return twiml("Configuration error.", 500);
+    }
+    if (!env.TWILIO_AUTH_TOKEN) {
+      return twiml("Configuration error.", 500);
     }
 
     const form = await request.formData();
+    const signatureValid = await validateTwilioRequest(request, form, env.TWILIO_AUTH_TOKEN);
+    if (!signatureValid) {
+      return twiml("Invalid signature.", 403);
+    }
 
     const from = cleanText(form.get("From"));
     const body = cleanText(form.get("Body"));
@@ -142,16 +151,62 @@ export async function onRequest(context) {
   }
 }
 
-function twiml(message) {
+function twiml(message, status = 200) {
   const safe = escapeXml(message || "");
   const inner = safe ? `<Message>${safe}</Message>` : "";
   return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response>${inner}</Response>`, {
-    status: 200,
+    status,
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
       "Cache-Control": "no-store"
     }
   });
+}
+
+async function validateTwilioRequest(request, form, authToken) {
+  const provided = String(request.headers.get("X-Twilio-Signature") || "").trim();
+  if (!provided) return false;
+
+  let signature;
+  try {
+    const binary = atob(provided);
+    signature = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) signature[i] = binary.charCodeAt(i);
+  } catch {
+    return false;
+  }
+
+  const grouped = new Map();
+  for (const [name, rawValue] of form.entries()) {
+    const value = String(rawValue);
+    const values = grouped.get(name) || [];
+    values.push(value);
+    grouped.set(name, values);
+  }
+
+  let signedValue = request.url;
+  for (const name of Array.from(grouped.keys()).sort()) {
+    const values = Array.from(new Set(grouped.get(name))).sort();
+    for (const value of values) signedValue += `${name}${value}`;
+  }
+
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(authToken),
+      { name: "HMAC", hash: "SHA-1" },
+      false,
+      ["verify"]
+    );
+    return await crypto.subtle.verify(
+      "HMAC",
+      key,
+      signature,
+      new TextEncoder().encode(signedValue)
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function supabaseFetch(env, path, options = {}) {
@@ -278,10 +333,10 @@ async function saveIncomingMedia(env, form, orderNumber) {
     const mediaUrl = String(form.get(`MediaUrl${i}`) || "").trim();
     const contentType = String(form.get(`MediaContentType${i}`) || "image/jpeg").trim();
 
-    if (!mediaUrl || !contentType.startsWith("image/")) continue;
+    if (!mediaUrl || !contentType.startsWith("image/") || !isTrustedTwilioMediaUrl(mediaUrl)) continue;
 
     const ext = contentType.includes("png") ? "png" : "jpg";
-    const filename = `${orderNumber}/${Date.now()}-${i}.${ext}`;
+    const filename = `${orderNumber}/${crypto.randomUUID()}-${i}.${ext}`;
 
     const fileResp = await fetch(mediaUrl, {
       headers: {
@@ -291,7 +346,8 @@ async function saveIncomingMedia(env, form, orderNumber) {
 
     if (!fileResp.ok) continue;
 
-    const bytes = await fileResp.arrayBuffer();
+    const bytes = await readResponseBytes(fileResp, TWILIO_MEDIA_MAX_BYTES);
+    if (!bytes) continue;
 
     const uploadResp = await fetch(
       `${env.SUPABASE_URL}/storage/v1/object/order-photos/${filename}`,
@@ -315,6 +371,50 @@ async function saveIncomingMedia(env, form, orderNumber) {
   }
 
   return savedUrls;
+}
+
+function isTrustedTwilioMediaUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && (
+      url.hostname === "api.twilio.com" ||
+      (url.hostname.startsWith("api.") && url.hostname.endsWith(".twilio.com"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function readResponseBytes(response, maxBytes) {
+  const declared = Number(response.headers.get("Content-Length") || 0);
+  if (Number.isFinite(declared) && declared > maxBytes) return null;
+  if (!response.body) return new Uint8Array();
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }
 
 function parsePhotoList(value) {

@@ -34,6 +34,15 @@ export async function onRequest(context) {
       );
     }
 
+    const body = await request.json();
+
+    /* Post-submit photo upload from the service request form. Requires the
+       order's uuid — returned only to the submitting client — so an order
+       number alone can't push photos onto someone else's order. */
+    if (body && body.action === "uploadOrderPhoto") {
+      return await handleOrderPhotoUpload(env, body, jsonHeaders);
+    }
+
     if (!env.RESEND_API_KEY) {
       return json(
         {
@@ -43,15 +52,6 @@ export async function onRequest(context) {
         500,
         jsonHeaders
       );
-    }
-
-    const body = await request.json();
-
-    /* Post-submit photo upload from the service request form. Requires the
-       order's uuid — returned only to the submitting client — so an order
-       number alone can't push photos onto someone else's order. */
-    if (body && body.action === "uploadOrderPhoto") {
-      return await handleOrderPhotoUpload(env, body, jsonHeaders);
     }
 
     const shared = buildSharedIncoming(body);
@@ -111,142 +111,100 @@ export async function onRequest(context) {
       }
     }
 
-    const nextOrderResp = await supabaseFetch(
-      env,
-      `/rest/v1/orders?select=order_number`
-    );
-
-    if (!nextOrderResp.ok) {
+    const headerIdempotencyKey = cleanIdempotencyKey(request.headers.get("Idempotency-Key"));
+    const bodyIdempotencyKey = cleanIdempotencyKey(body.idempotencyKey);
+    if (headerIdempotencyKey && bodyIdempotencyKey && headerIdempotencyKey !== bodyIdempotencyKey) {
+      return json({ ok: false, error: "Intake retry key mismatch. Refresh the form and try again." }, 200, jsonHeaders);
+    }
+    const idempotencyKey = headerIdempotencyKey || bodyIdempotencyKey;
+    if (!idempotencyKey) {
       return json(
-        {
-          ok: false,
-          error: "Failed to determine next order number.",
-          details: nextOrderResp.error
-        },
+        { ok: false, error: "Missing or invalid intake retry key. Refresh the form and try again." },
         200,
         jsonHeaders
       );
     }
 
-    const firstOrderNumber = getNextOrderNumber(nextOrderResp.data);
-    const firstOrderInt = parseInt(firstOrderNumber, 10);
+    const requestHash = await sha256Hex(JSON.stringify({ shared, gloves }));
     const submittedAt = new Date().toISOString();
-    const newOrders = gloves.map((glove, index) => buildOrderRow(
+    const newOrders = gloves.map(glove => buildOrderRow(
       shared,
       glove,
-      String(firstOrderInt + index).padStart(4, "0"),
       submittedAt
     ));
 
-    const insert = await supabaseFetch(
+    const create = await supabaseFetch(
       env,
-      `/rest/v1/orders`,
+      `/rest/v1/rpc/create_intake_orders`,
       {
         method: "POST",
-        headers: {
-          Prefer: "return=representation"
-        },
-        body: JSON.stringify(newOrders)
+        body: JSON.stringify({
+          p_idempotency_key: idempotencyKey,
+          p_request_hash: requestHash,
+          p_orders: newOrders
+        })
       }
     );
 
-    if (!insert.ok || !Array.isArray(insert.data) || insert.data.length !== newOrders.length) {
+    const createResult = unwrapRpcResult(create.data);
+    if (!create.ok || !createResult?.ok || !Array.isArray(createResult.orders) || createResult.orders.length !== newOrders.length) {
       return json(
         {
           ok: false,
-          error: "Failed to insert new order into Supabase.",
-          details: insert.error
+          error: createResult?.error || "Failed to create the intake orders.",
+          details: create.error || null,
+          retryable: createResult?.retryable === true
         },
         200,
         jsonHeaders
       );
     }
 
-    const insertedRows = insert.data;
-
-    for (const inserted of insertedRows) {
-      const customerEmailResult = await sendStatusEmail(env, inserted, "Received");
-
-      if (!customerEmailResult.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Order was created, but the Received email failed to send.",
-            details: customerEmailResult.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const customerTextResult = await sendReceivedText(env, inserted);
-
-      if (!customerTextResult.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Order was created and email sent, but the Received text failed to send.",
-            details: customerTextResult.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      const ownerEmailResult = await sendOwnerNewOrderEmail(env, inserted);
-
-      if (!ownerEmailResult.ok) {
-        return json(
-          {
-            ok: false,
-            error: "Order was created and customer email sent, but owner notification failed.",
-            details: ownerEmailResult.error
-          },
-          200,
-          jsonHeaders
-        );
-      }
-
-      await sendWebPushToAll(env, {
-        title: "New order",
-        body: `#${inserted.order_number} — ${inserted.customer_name || "Customer"} (${inserted.glove_type || "glove"})`,
-        url: "/admin/"
-      });
-      await sendPushoverNotification(env, {
-        orderNumber: inserted.order_number,
-        name: inserted.customer_name,
-        gloveType: inserted.glove_type,
-        services: inserted.services_requested
-      });
-    }
-
-    const stampedRows = [];
-    for (const inserted of insertedRows) {
-      const stamp = await supabaseFetch(
-        env,
-        `/rest/v1/orders?order_number=eq.${encodeURIComponent(inserted.order_number)}`,
-        {
-          method: "PATCH",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify({
-            last_status_emailed: "Received",
-            last_status_texted: inserted.sms_opt_in === true ? "Received" : null
-          })
-        }
+    const insertedRows = createResult.orders;
+    if (createResult.replayed === true) {
+      return json(
+        buildReplayedIntakeResponse(insertedRows, createResult.notificationResult),
+        200,
+        jsonHeaders
       );
-
-      stampedRows.push(stamp.ok && Array.isArray(stamp.data) && stamp.data[0] ? stamp.data[0] : inserted);
     }
 
-    const orders = stampedRows.map(mapOrderFromDb);
+    const delivery = await deliverIntakeNotifications(env, insertedRows);
+    const orders = delivery.rows.map(mapOrderFromDb);
+    const notificationResult = {
+      partialSuccess: delivery.failures.length > 0,
+      warning: delivery.failures.length
+        ? "Your request was received, but one or more confirmations could not be delivered. Please do not submit it again; Brett has your request."
+        : null,
+      deliveries: delivery.results,
+      failures: delivery.failures
+    };
+
+    const recorded = await supabaseFetch(
+      env,
+      `/rest/v1/intake_submissions?idempotency_key=eq.${encodeURIComponent(idempotencyKey)}`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          notification_result: notificationResult,
+          notifications_completed_at: new Date().toISOString()
+        })
+      }
+    );
+    if (!recorded.ok) {
+      notificationResult.partialSuccess = true;
+      notificationResult.warning = "Your request was received, but confirmation delivery could not be fully recorded. Please do not submit it again; Brett has your request.";
+      notificationResult.failures.push({ channel: "notification_record", error: recorded.error || "Failed to record delivery results." });
+    }
 
     return json(
       {
         ok: true,
         order: orders[0],
-        orders
+        orders,
+        replayed: false,
+        ...notificationResult
       },
       200,
       jsonHeaders
@@ -312,7 +270,7 @@ function makeTrackingToken() {
   return (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, "");
 }
 
-function buildOrderRow(shared, glove, orderNumber, submittedAt) {
+function buildOrderRow(shared, glove, submittedAt) {
   return {
     timestamp_submitted: submittedAt,
     tracking_token: makeTrackingToken(),
@@ -342,7 +300,6 @@ function buildOrderRow(shared, glove, orderNumber, submittedAt) {
     referral_source: shared.referral_source,
     glove_photos: [],
 
-    order_number: orderNumber,
     status: "Received",
     date_received: null,
     estimated_completion: null,
@@ -404,20 +361,128 @@ async function supabaseFetch(env, path, options = {}) {
   };
 }
 
-function getNextOrderNumber(rows) {
-  let maxNum = 79;
+function unwrapRpcResult(data) {
+  if (Array.isArray(data) && data.length === 1 && data[0] && typeof data[0] === "object") {
+    return data[0];
+  }
+  return data && typeof data === "object" ? data : null;
+}
 
-  if (Array.isArray(rows)) {
-    for (const row of rows) {
-      const raw = String(row.order_number || "").trim();
-      const n = parseInt(raw, 10);
-      if (!Number.isNaN(n) && n > maxNum) {
-        maxNum = n;
+function cleanIdempotencyKey(value) {
+  const key = String(value || "").trim().toLowerCase();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(key)
+    ? key
+    : "";
+}
+
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value)));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function notificationError(result) {
+  const value = result?.error;
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "Unknown delivery failure.";
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+async function attemptNotification(send) {
+  try {
+    const result = await send();
+    return result && typeof result === "object" ? result : { ok: true };
+  } catch (error) {
+    return { ok: false, error: error?.message || String(error) };
+  }
+}
+
+async function deliverIntakeNotifications(env, insertedRows) {
+  const rows = [];
+  const results = [];
+  const failures = [];
+
+  for (const inserted of insertedRows) {
+    const orderNumber = String(inserted.order_number || "").trim();
+    const customerEmail = await attemptNotification(() => sendStatusEmail(env, inserted, "Received"));
+    const customerText = await attemptNotification(() => sendReceivedText(env, inserted));
+    const ownerEmail = await attemptNotification(() => sendOwnerNewOrderEmail(env, inserted));
+
+    for (const [channel, result] of [
+      ["customer_email", customerEmail],
+      ["customer_text", customerText],
+      ["owner_email", ownerEmail]
+    ]) {
+      if (!result.ok) failures.push({ orderNumber, channel, error: notificationError(result) });
+    }
+
+    const webPush = await attemptNotification(() => sendWebPushToAll(env, {
+      title: "New order",
+      body: `#${orderNumber} — ${inserted.customer_name || "Customer"} (${inserted.glove_type || "glove"})`,
+      url: "/admin/"
+    }));
+    const pushover = await attemptNotification(() => sendPushoverNotification(env, {
+      orderNumber,
+      name: inserted.customer_name,
+      gloveType: inserted.glove_type,
+      services: inserted.services_requested
+    }));
+    for (const [channel, result] of [["web_push", webPush], ["pushover", pushover]]) {
+      if (!result.ok) failures.push({ orderNumber, channel, error: notificationError(result) });
+    }
+
+    const stampUpdates = {};
+    if (customerEmail.ok) stampUpdates.last_status_emailed = "Received";
+    if (inserted.sms_opt_in === true && customerText.ok) stampUpdates.last_status_texted = "Received";
+
+    let stampedRow = inserted;
+    let statusStamp = { ok: true, skipped: Object.keys(stampUpdates).length === 0 };
+    if (Object.keys(stampUpdates).length) {
+      statusStamp = await supabaseFetch(
+        env,
+        `/rest/v1/orders?order_number=eq.${encodeURIComponent(orderNumber)}`,
+        {
+          method: "PATCH",
+          headers: { Prefer: "return=representation" },
+          body: JSON.stringify(stampUpdates)
+        }
+      );
+      if (statusStamp.ok && Array.isArray(statusStamp.data) && statusStamp.data[0]) {
+        stampedRow = statusStamp.data[0];
+      } else if (!statusStamp.ok) {
+        failures.push({ orderNumber, channel: "delivery_stamp", error: notificationError(statusStamp) });
       }
     }
+
+    rows.push(stampedRow);
+    results.push({
+      orderNumber,
+      customerEmail,
+      customerText,
+      ownerEmail,
+      webPush,
+      pushover,
+      statusStamp: { ok: statusStamp.ok, skipped: statusStamp.skipped === true }
+    });
   }
 
-  return String(maxNum + 1).padStart(4, "0");
+  return { rows, results, failures };
+}
+
+function buildReplayedIntakeResponse(insertedRows, savedNotificationResult) {
+  const orders = insertedRows.map(mapOrderFromDb);
+  const saved = savedNotificationResult && typeof savedNotificationResult === "object"
+    ? savedNotificationResult
+    : {
+        partialSuccess: true,
+        warning: "Your request was received previously, but confirmation delivery could not be verified. Please do not submit it again; Brett has your request.",
+        deliveries: [],
+        failures: [{ channel: "notification_state", error: "No completed delivery record was available." }]
+      };
+  return { ok: true, order: orders[0], orders, replayed: true, ...saved };
 }
 
 /* =========================
@@ -551,7 +616,10 @@ ${msg}`;
 async function sendPushoverNotification(env, { orderNumber, name, gloveType, services }) {
   if (isPreviewEnvironment(env)) {
     console.log(`[preview] Suppressed Pushover alert: New Order #${orderNumber}`);
-    return;
+    return { ok: true, suppressed: true };
+  }
+  if (!env.PUSHOVER_APP_TOKEN || !env.PUSHOVER_USER_KEY) {
+    return { ok: true, skipped: true, reason: "Pushover is not configured." };
   }
   try {
     const res = await fetch("https://api.pushover.net/1/messages.json", {
@@ -571,9 +639,12 @@ async function sendPushoverNotification(env, { orderNumber, name, gloveType, ser
 
     if (!res.ok) {
       console.error("Pushover failed:", await res.text());
+      return { ok: false, error: `Pushover HTTP ${res.status}` };
     }
+    return { ok: true };
   } catch (err) {
     console.error("Pushover error:", err);
+    return { ok: false, error: err?.message || String(err) };
   }
 }
 
@@ -1122,7 +1193,7 @@ async function handleOrderPhotoUpload(env, body, jsonHeaders) {
   }
 
   const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
-  const filename = `${order.order_number}/form-${Date.now()}-${Math.floor(Math.random() * 1e6)}.${ext}`;
+  const filename = `${order.order_number}/form-${crypto.randomUUID()}.${ext}`;
 
   const uploadResp = await fetch(
     `${env.SUPABASE_URL}/storage/v1/object/order-photos/${filename}`,

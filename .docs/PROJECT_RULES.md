@@ -24,6 +24,8 @@ These rules guide future code changes for the Murph’s Mitt Maintenance reposit
 - Changes to customer email content, SMS copy, or status-triggered notifications must be documented and reviewed before deployment.
 - Preserve the current SMS reply handling for `YES`/`NO` responses on `Estimate Sent` orders.
 - Keep the `sms_opt_in` opt-in behavior intact: SMS should only be sent when the customer has opted in.
+- Preserve Twilio signature validation before inbound message lookup, status changes, alerts, or media downloads.
+- Never send Twilio account credentials to a media URL outside the trusted HTTPS Twilio API hosts.
 
 ## Deployment rules
 

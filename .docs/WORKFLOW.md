@@ -4,7 +4,9 @@ As-built baseline reviewed 2026-08-04.
 
 ## Order creation
 
-Public intake accepts one customer submission containing one or more gloves. It validates contact/delivery/acknowledgement fields and each glove's type, services, primary lace, and fielder web. It creates sequential four-digit orders with status `Received`, unpaid state, independent tracking tokens, and shared customer/delivery data. After insertion it sends customer email, an opt-in SMS, optional owner email, Web Push, and optional Pushover. The submitting browser may then upload photos using the returned order UUID.
+Public intake accepts one customer submission containing one or more gloves. It validates contact/delivery/acknowledgement fields and each glove's type, services, primary lace, and fielder web. The browser keeps one idempotency key while retrying unchanged request data. A transaction-serialized RPC assigns a consecutive number range, inserts every glove, and records the key atomically; a retry returns those orders instead of inserting duplicates.
+
+Created orders use status `Received`, unpaid state, independent tracking tokens, and shared customer/delivery data. Customer email, opt-in SMS, optional owner email, Web Push, and optional Pushover run after the order transaction. Their structured outcomes are recorded and returned. A provider failure is an explicit partial success—the order remains authoritative and the customer is told not to resubmit. The submitting browser may then upload photos using the returned order UUID.
 
 Admins can also create orders using the order editor and templates.
 
@@ -28,7 +30,7 @@ This is not a server-enforced transition graph: an authenticated admin can selec
 
 `Picked Up`, `Customer Approved`, `Pending Response`, and `In Transit to Me` are internal-only for automatic status email. Other statuses, including `On Hold` and `Waiting on Lace/Parts`, are email-eligible. Only `Estimate Sent`, `In Progress`, `Ready to Go`, and `Completed` are eligible for status SMS when the customer opted in; `Received` SMS is handled during intake. Delivery stamps prevent duplicate automatic sends, and admin actions can explicitly resend eligible email/text.
 
-Inbound Twilio messages are associated with the newest matching order among the 100 most recent orders by the sender's last 10 phone digits. Exact YES/Y while `Estimate Sent` changes the order to `Customer Approved`; NO/N changes it to `On Hold`. MMS photos are copied to `order-photos`, appended to `orders.glove_photos`, and recorded in `sms_messages`. Other messages are stored for the admin inbox.
+Inbound Twilio requests must pass `X-Twilio-Signature` HMAC validation against the exact webhook URL and all form fields before any lookup or side effect. Valid messages are associated with the newest matching order among the 100 most recent orders by the sender's last 10 phone digits. Exact YES/Y while `Estimate Sent` changes the order to `Customer Approved`; NO/N changes it to `On Hold`. MMS photos are fetched with Twilio account authentication only from trusted HTTPS Twilio API hosts, streamed with a 10 MB limit, copied to `order-photos`, appended to `orders.glove_photos`, and recorded in `sms_messages`. Other messages are stored for the admin inbox.
 
 ## Labor sessions
 

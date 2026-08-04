@@ -12,7 +12,20 @@ The repository does not contain the original schema migration for the core table
 
 Core customer/job fields used by the application include identity and timestamps; customer contact; glove type/model/web; requested services and lace colors; delivery/address; notes/photos; order number and status; received/estimated/completed dates; quote/payment/shipping; email/SMS delivery stamps; SMS opt-in and latest inbound message; approval time; lace usage; map/geocoding metadata; and `tracking_token`.
 
-`order_number` is the application-facing key used by related tables and URLs. Intake currently finds the maximum existing number and increments it. `glove_photos` holds an array of order/intake/SMS photo URLs; readers tolerate either a native array or serialized JSON text.
+`order_number` is the application-facing key used by related tables and URLs. `glove_photos` holds an array of order/intake/SMS photo URLs; readers tolerate either a native array or serialized JSON text.
+
+Public intake allocates order numbers inside `create_intake_orders`, which holds a
+transaction advisory lock while checking idempotency, choosing a consecutive
+number range, inserting every glove, and recording the submission. The entire
+multi-glove operation commits or rolls back together.
+
+### `intake_submissions`
+
+Stores one client-generated idempotency key, normalized request hash, and the
+created order UUIDs for each public intake submission. Completed notification
+delivery results are recorded after the order transaction. A retry with the same
+key and hash returns the original orders; reuse with different request data is
+rejected.
 
 ### `lace_inventory`
 
@@ -98,5 +111,6 @@ Bucket creation, public access configuration, size limits, and Storage policies 
 | `20260731120000_bench_focus.sql` | Adds Bench Focus sessions, labor linkage, constraints, RLS, and transactional lifecycle RPCs |
 | `20260803120000_resume_labor_with_new_bench_work.sql` | Atomically resumes paused labor while starting and linking new Bench Work |
 | `20260803170000_order_economics_snapshots_delete_cascade.sql` | Adds immutable completed-order economics snapshots/backfill and transactional complete-order deletion/orphan cleanup |
+| `20260804120000_reliable_intake.sql` | Adds intake idempotency state and transaction-safe multi-glove creation/order-number allocation RPC |
 
 Migrations are additive and should be reviewed/applied in timestamp order. There is no checked-in Supabase config or automated migration verification in this repository.

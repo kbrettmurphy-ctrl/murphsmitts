@@ -4,15 +4,14 @@ Reconciled against the 2026-08-04 repository state. This is a register, not auth
 
 ## Critical
 
-- **Open — Inbound SMS webhook authenticity is not verified.** `/api/sms-reply` trusts posted Twilio-shaped form fields without validating `X-Twilio-Signature`, allowing forged messages/status changes and arbitrary external media-fetch attempts.
 - **Open — The database is not reproducible from Git.** Core table DDL, constraints/foreign keys, RLS, Storage buckets, and policies predate the migration ledger and are absent.
 
 ## High
 
-- **Open — Order number allocation races.** Intake reads all order numbers, selects max+1, then inserts; concurrent submissions can choose the same number unless an external unique constraint catches it, and no retry is implemented.
-- **Partially mitigated — Side effects are non-transactional.** Bench lifecycle and complete-order deletion now use transaction-safe RPCs. Intake/update notifications, inventory adjustments, activity writes, and delivery stamps can still partially succeed across separate calls.
+- **Partially mitigated — Order number allocation races.** Public intake now allocates consecutive multi-glove ranges under a transaction advisory lock and is retry-idempotent. Manual admin order creation retains its existing unique-conflict retry loop rather than using the intake RPC.
+- **Partially mitigated — Side effects are non-transactional.** Bench lifecycle, complete-order deletion, and public intake creation now use transaction-safe RPCs. Intake notification outcomes are explicit and persisted, but external providers, update notifications, inventory adjustments, activity writes, and delivery stamps still cannot share one database transaction.
 - **Open — Admin attack surface is concentrated.** The large browser script and admin action Function combine many unrelated privileges and business rules, increasing regression and audit risk. The Action Registry makes dispatch auditable but does not reduce file size or privilege concentration.
-- **Partially mitigated — Automated tests exist, but CI does not.** Targeted self-tests cover the Action Registry, Bench Focus, pricing, durable economics, and order-photo behavior. Authentication, notification delivery, timer arithmetic breadth, inventory deltas, public-field allowlists, and migrations still lack complete regression coverage, and no workflow runs the current tests automatically.
+- **Partially mitigated — Automated tests exist, but CI does not.** Targeted self-tests cover the Action Registry, admin navigation, Bench Focus, pricing, durable economics, order-photo behavior, and Reliable Intake concurrency/retries/webhook security/failure paths. Authentication breadth, provider integration, timer arithmetic breadth, inventory deltas, public-field allowlists, and migrations still lack complete regression coverage, and no workflow runs the current tests automatically.
 
 ## Medium
 
@@ -28,6 +27,7 @@ Reconciled against the 2026-08-04 repository state. This is a register, not auth
 
 ## Fixed or superseded
 
+- **Fixed — Unauthenticated inbound SMS webhook.** MurphOS v1.4.2 validates Twilio signatures before database, status, alert, or authenticated-media side effects and restricts credentialed media fetches to trusted Twilio API hosts.
 - **Fixed — Linear action dispatch and scattered authorization policy.** MurphOS v1.2 routes registered actions through centralized authentication/demo enforcement and validates registry completeness with self-tests.
 - **Fixed — Mutable completed-order economics.** MurphOS v1.4 locks terminal snapshots in the database and backfills earlier terminal orders once.
 - **Fixed — Incomplete complete-order deletion.** MurphOS v1.4 deletes database-owned records transactionally and restores stocked lace; retaining Storage objects is intentional policy.

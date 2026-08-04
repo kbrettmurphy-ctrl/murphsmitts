@@ -5,7 +5,7 @@ As-built baseline reviewed 2026-08-04.
 | Surface | Implemented features |
 | --- | --- |
 | Public marketing | Responsive Jekyll pages, shared navigation/footer, lightboxes, FAQ/service/process content |
-| Service request | Multi-glove intake, conditional shipping address, live active lace choices, SMS consent, post-submit multi-photo upload |
+| Service request | Transaction-safe/idempotent multi-glove intake, explicit notification partial success, conditional shipping address, live active lace choices, SMS consent, post-submit multi-photo upload |
 | Public inventory | Active lace availability with in/out-of-stock display |
 | Public pricing | Published service prices/names/bullets from MurphOS with a static approved-price fallback |
 | Public gallery | Sectioned photos, order albums, covers, lightbox, descriptor/order-backed search, query deep links |
@@ -22,10 +22,10 @@ As-built baseline reviewed 2026-08-04.
 | Inventory admin | Add/edit/deactivate/restore, thresholds/alerts, low-stock banner, usage-delta adjustments |
 | Gallery admin | Upload/link/describe/cover/move/hide/restore/delete and search/filter |
 | Store admin | Listing CRUD, status/featured/order, photo upload and primary/hover roles |
-| Messaging | Twilio inbox/threading/read state, compose/reply, photo attachments, message/thread deletion, inbound MMS |
+| Messaging | Signature-validated Twilio inbound webhook, inbox/threading/read state, compose/reply, authenticated photo attachments, message/thread deletion, inbound MMS |
 | Authentication | Email/password, owner PIN fallback, owner passkey, signed 14-day sessions, admin/demo roles, invites and user administration |
 | Action Registry | Declarative authentication/demo policy, handlers, effects, required bindings, and self-test validation for every `/api/orders` action |
 | Demo | Seeded browser-only sandbox; Action Registry backstop denies demo access to real-data actions |
 | PWA/push | Installable admin manifest, no-cache service worker, Web Push subscription/test/fan-out, notification navigation, build-change reload |
 
-Not implemented as repository-managed infrastructure: a complete baseline database schema, Storage policies/bucket creation, CI workflow, dependency-managed admin build, or offline application caching. Targeted repository self-tests cover the Action Registry, Bench Focus, pricing, durable economics, and order-photo behavior but are not yet run automatically by CI.
+Not implemented as repository-managed infrastructure: a complete baseline database schema, Storage policies/bucket creation, CI workflow, dependency-managed admin build, or offline application caching. Targeted repository self-tests cover the Action Registry, admin navigation, Bench Focus, pricing, durable economics, order-photo behavior, and Reliable Intake but are not yet run automatically by CI.

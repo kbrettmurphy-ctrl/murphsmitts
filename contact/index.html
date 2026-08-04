@@ -903,6 +903,18 @@ body_class: inner
     return { total, failed };
   }
 
+  let pendingIntakeKey = "";
+  let pendingIntakeFingerprint = "";
+
+  function getIntakeRetryKey(payload) {
+    const fingerprint = JSON.stringify(payload);
+    if (!pendingIntakeKey || pendingIntakeFingerprint !== fingerprint) {
+      pendingIntakeKey = crypto.randomUUID();
+      pendingIntakeFingerprint = fingerprint;
+    }
+    return pendingIntakeKey;
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     clearMessages();
@@ -935,11 +947,15 @@ body_class: inner
       Object.assign(payload, payload.gloves[0]);
     }
 
+    const idempotencyKey = getIntakeRetryKey(payload);
+    payload.idempotencyKey = idempotencyKey;
+
     try {
       const res = await fetch("/api/intake", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey
         },
         body: JSON.stringify(payload)
       });
@@ -972,6 +988,8 @@ body_class: inner
         ? data.orders.map(order => order.orderNumber || order.order_number)
         : [data.order?.orderNumber || data.order?.order_number || ""];
       showSuccess(orderNumbers);
+      pendingIntakeKey = "";
+      pendingIntakeFingerprint = "";
 
       setTimeout(() => {
         scrollToElement(successCard);
@@ -987,9 +1005,13 @@ body_class: inner
       if (uploadResult.total) {
         if (uploadResult.failed) {
           showStatus(`Request received, but ${uploadResult.failed} photo${uploadResult.failed === 1 ? "" : "s"} failed to upload — you can text them to me instead.`, "error");
+        } else if (data.partialSuccess && data.warning) {
+          showStatus(data.warning, "error");
         } else {
           clearStatus();
         }
+      } else if (data.partialSuccess && data.warning) {
+        showStatus(data.warning, "error");
       }
     } catch (err) {
       showStatus(err.message || "Failed to submit service request.", "error");
