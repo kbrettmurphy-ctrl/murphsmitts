@@ -7733,6 +7733,14 @@ body.has-notifications .topbar-menu-btn::after{
 .gallery-manager-search::placeholder{
   font-size:inherit;
 }
+@media (max-width:899px){
+  .gallery-manager-search,
+  .gallery-manager-filter,
+  .gallery-refresh-btn{
+    font-size:16px;
+    line-height:1.15;
+  }
+}
 
 /* Gallery photo action menu: compact. Scoped to gallery-photo-menu-root so
    the orders workflow sheet keeps its own sizing. */

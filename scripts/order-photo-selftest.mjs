@@ -73,6 +73,7 @@ await test("gallery toolbar controls share one compact footprint", () => {
   ok(/\.gallery-manager-filter\{[\s\S]*?width:180px;[\s\S]*?height:34px;/.test(css));
   ok(/\.gallery-manager-search\{[\s\S]*?font-size:\.82rem;[\s\S]*?font-weight:600;[\s\S]*?line-height:1\.15;/.test(css));
   ok(/\.gallery-refresh-btn\{[\s\S]*?display:inline-flex;[\s\S]*?align-items:center;[\s\S]*?justify-content:center;/.test(css));
+  ok(/@media \(max-width:899px\)\{[\s\S]*?\.gallery-manager-search,[\s\S]*?\.gallery-manager-filter,[\s\S]*?\.gallery-refresh-btn\{[\s\S]*?font-size:16px;/.test(css));
   ok(/\.gallery-refresh-btn\{[\s\S]*?flex:1 1 0;[\s\S]*?width:auto;/.test(css));
 });
 
