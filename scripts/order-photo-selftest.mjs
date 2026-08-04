@@ -73,6 +73,7 @@ await test("gallery toolbar changes are vertical-only", () => {
   ok(/\.gallery-manager-filter\{[\s\S]*?height:34px;[\s\S]*?min-height:34px;/.test(css));
   ok(/\.gallery-manager-search\{[\s\S]*?height:34px;[\s\S]*?min-height:34px;/.test(css));
   ok(/@media \(min-width:900px\)\{[\s\S]*?\.gallery-manager-search\{[\s\S]*?font-size:\.82rem;/.test(css));
+  ok(/\.gallery-manager-filter\{[\s\S]*?font-size:\.84rem!important;/.test(css));
   equal(css.includes("grid-template-columns:repeat(2,minmax(0,1fr))"), false);
   equal(css.includes("grid-column:2"), false);
   equal(html.includes('id="galleryRefreshBtn"'), false);

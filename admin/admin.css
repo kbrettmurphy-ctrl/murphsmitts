@@ -7715,6 +7715,9 @@ body.has-notifications .topbar-menu-btn::after{
 .gallery-manager-search::placeholder{
   font-size:0.85em;
 }
+.gallery-manager-filter{
+  font-size:.84rem!important;
+}
 @media (min-width:900px){
   .gallery-manager-search{
     font-size:.82rem;
