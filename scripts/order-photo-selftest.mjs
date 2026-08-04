@@ -68,4 +68,11 @@ await test("upload menus use the anchored body-level portal", () => {
   equal(admin.includes('className = "order-gallery-bottom-sheet"'), false);
 });
 
+await test("gallery toolbar controls share one compact footprint", () => {
+  ok(/\.gallery-refresh-btn\{[\s\S]*?width:180px;[\s\S]*?height:34px;/.test(css));
+  ok(/\.gallery-manager-filter\{[\s\S]*?width:180px;[\s\S]*?height:34px;/.test(css));
+  ok(/\.gallery-manager-search\{[\s\S]*?padding:0 10px;[\s\S]*?line-height:34px;/.test(css));
+  ok(/\.gallery-refresh-btn\{[\s\S]*?flex:1 1 0;[\s\S]*?width:auto;/.test(css));
+});
+
 console.log(`\nOrder photo self-test: ${tests} tests, ${assertions} assertions passed.`);
