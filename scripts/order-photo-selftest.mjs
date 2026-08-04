@@ -71,7 +71,8 @@ await test("upload menus use the anchored body-level portal", () => {
 await test("gallery toolbar controls share one compact footprint", () => {
   ok(/\.gallery-refresh-btn\{[\s\S]*?width:180px;[\s\S]*?height:34px;/.test(css));
   ok(/\.gallery-manager-filter\{[\s\S]*?width:180px;[\s\S]*?height:34px;/.test(css));
-  ok(/\.gallery-manager-search\{[\s\S]*?padding:0 10px;[\s\S]*?line-height:34px;/.test(css));
+  ok(/\.gallery-manager-search\{[\s\S]*?font-size:\.82rem;[\s\S]*?font-weight:600;[\s\S]*?line-height:1\.15;/.test(css));
+  ok(/\.gallery-refresh-btn\{[\s\S]*?display:inline-flex;[\s\S]*?align-items:center;[\s\S]*?justify-content:center;/.test(css));
   ok(/\.gallery-refresh-btn\{[\s\S]*?flex:1 1 0;[\s\S]*?width:auto;/.test(css));
 });
 
