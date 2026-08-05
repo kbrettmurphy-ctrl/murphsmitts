@@ -8835,34 +8835,66 @@ const LACE_COLOR_MAP = {
   "black": "#111111",
   "gray": "#777777",
   "grey": "#777777",
-  "tan – camel": "#c49a6c",
-  "tan - camel": "#c49a6c",
-  "camel": "#c49a6c",
-  "tan – indian": "#b8793a",
-  "tan - indian": "#b8793a",
-  "indian tan": "#b8793a",
+  "silver": "#bfc3c7",
+  "white": "#f4eee4",
+
+  "tan – camel": "#d7cb9d",
+  "tan - camel": "#d7cb9d",
+  "camel": "#d7cb9d",
+
+  "tan – japan": "#a84d1c",
+  "tan - japan": "#a84d1c",
+  "japan tan": "#a84d1c",
+
+  "tan – cheyenne": "#d6824a",
+  "tan - cheyenne": "#d6824a",
+  "cheyenne tan": "#d6824a",
+
+  "tan – indian": "#d6824a",
+  "tan - indian": "#d6824a",
+  "indian tan": "#d6824a",
+
   "brown – chestnut": "#7a3f1d",
   "brown - chestnut": "#7a3f1d",
-  "vintage chestnut": "#6f3a1f",
+  "chestnut brown": "#7a3f1d",
+
+  "vintage – chestnut": "#7a3f1d",
+  "vintage - chestnut": "#7a3f1d",
+  "vintage chestnut": "#7a3f1d",
+  "chestnut vintage": "#7a3f1d",
+
   "brown – chocolate": "#4a2616",
   "brown - chocolate": "#4a2616",
   "chocolate": "#4a2616",
+
   "blue – royal": "#1f4fbf",
   "blue - royal": "#1f4fbf",
   "royal blue": "#1f4fbf",
+
   "blue – navy": "#092f4d",
   "blue - navy": "#092f4d",
   "navy blue": "#092f4d",
+
   "blue – carolina": "#78aeda",
   "blue - carolina": "#78aeda",
   "carolina blue": "#78aeda",
+
   "red": "#b01f2e",
+  "red – dark": "#6f111a",
   "red - dark": "#6f111a",
   "dark red": "#6f111a",
+
   "orange": "#d46a1f",
-  "pink": "#e889b9",
-  "white": "#f4eee4",
   "yellow": "#d6b21f",
+  "pink": "#e889b9",
+
+  "green": "#2e7d32",
+  "ocean mint": "#74c6a0",
+
+  "teal – dark": "#0e5a63",
+  "teal - dark": "#0e5a63",
+  "dark teal": "#0e5a63",
+
   "other (special order)": "linear"
 };
 
@@ -8873,9 +8905,21 @@ function normalizeLaceName(value) {
     .replace(/\s+/g, " ");
 }
 
+/* Fallback hue per color FAMILY (the part before the dash), so an unrecognized
+   color like "Blue - Something" shows blue instead of the old tan default. */
+const LACE_FAMILY_MAP = {
+  "black": "#111111", "gray": "#777777", "grey": "#777777", "silver": "#bfc3c7", "white": "#f4eee4",
+  "tan": "#c49a6c", "brown": "#5a3720", "vintage": "#7a3f1d",
+  "blue": "#2f5fbf", "teal": "#0e5a63", "green": "#2e7d32",
+  "red": "#b01f2e", "orange": "#d46a1f", "yellow": "#d6b21f", "purple": "#6b3fa0", "pink": "#e889b9"
+};
+
 function getLaceColor(value) {
   const key = normalizeLaceName(value);
-  return LACE_COLOR_MAP[key] || "#dacab1";
+  if (LACE_COLOR_MAP[key]) return LACE_COLOR_MAP[key];
+  // Fall back to the family hue ("tan - cheyenne" -> tan); neutral gray if unknown.
+  const family = key.split(/\s*[–-]\s*/)[0].trim();
+  return LACE_FAMILY_MAP[family] || "#c7c9cd";
 }
 
 function getInventoryQuantity(item) {
