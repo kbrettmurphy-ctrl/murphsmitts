@@ -5706,11 +5706,42 @@ async function sendCombinedBill(env, orderNumbers) {
 
   const email = billable.map(o => String(o.emailAddress || "").trim()).find(Boolean) || "";
   if (email && env.RESEND_API_KEY) {
-    // Same clean wrapper as wrapEmailHtmlSplit (container + track button + signature).
+    // Match the Ready-to-Go email format exactly: <p> paragraphs, an Amount Due
+    // table, Venmo/PayPal as hyperlinked WORDS (not raw URLs), Zelle as text, a
+    // tracker button per glove, then -Brett + the shared signature.
+    const itemsHtml = billable.map(o =>
+      `<tr><td style="padding:2px 20px 2px 0;">#${escapeHtml(String(o.orderNumber || ""))} ${escapeHtml(cleanDisplay(o.brandModel) || cleanDisplay(o.gloveType) || "Glove")}</td><td style="padding:2px 0;">${escapeHtml(formatCurrency(moneyNumber(o.priceQuoted)))}</td></tr>`
+    ).join("");
+    const shippingRow = pay.shipping > 0
+      ? `<tr><td style="padding:2px 20px 2px 0;">Shipping</td><td style="padding:2px 0;">${escapeHtml(formatCurrency(pay.shipping))}</td></tr>`
+      : "";
+    const closingLine = anyShip
+      ? "As soon as payment comes through, I'll get them boxed up and send your tracking."
+      : "Send it whenever works, or just bring cash at pickup — either's fine by me.";
     const htmlBody = `
   <div style="font-family: Arial, sans-serif; max-width: 640px; line-height: 1.5; text-align:left; color:#20313d;">
-    <div style="white-space:pre-wrap; margin:0;">${escapeHtml(core)}</div>
+    <p>Hey${firstName ? " " + escapeHtml(firstName) : ""},</p>
+
+    <p>Good news — your gloves are finished and ready! Here's one bill for all of them:</p>
+
+    <p style="margin:18px 0 8px;"><strong>Amount Due</strong></p>
+    <table style="border-collapse:collapse; margin:0 0 14px;">
+      ${itemsHtml}
+      ${shippingRow}
+      <tr><td colspan="2" style="border-top:1px solid #999; padding-top:6px;"></td></tr>
+      <tr><td style="padding:2px 20px 2px 0;"><strong>Total:</strong></td><td style="padding:2px 0;"><strong>${escapeHtml(formatCurrency(pay.total))}</strong></td></tr>
+    </table>
+
+    <p style="margin:18px 0 8px;"><strong>Payment Options</strong></p>
+    <p style="margin:0 0 6px;"><a href="${escapeHtml(pay.venmo)}" target="_blank" style="color:#0645ad; text-decoration:underline;">Venmo</a></p>
+    <p style="margin:0 0 6px;"><a href="${escapeHtml(pay.paypal)}" target="_blank" style="color:#0645ad; text-decoration:underline;">PayPal</a></p>
+    <p style="margin:0 0 18px;">Zelle: ${escapeHtml(pay.zelle)}</p>
+
+    <p style="margin:0 0 18px;">${escapeHtml(closingLine)}</p>
+
     ${trackButtons}
+
+    <p>-Brett</p>
     ${emailSignatureHtml()}
   </div>`;
     result.sent.email = await sendBrandedEmail(env, {
