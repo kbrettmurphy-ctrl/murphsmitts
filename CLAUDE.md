@@ -43,10 +43,30 @@ and the admin portal ("MurphOS").
 ## Style preferences
 
 - Compact admin controls; iOS/macOS-ish feel; laptop/iPad friendly.
-- No giant buttons. Icons for compact actions. Don't clutter Clubhouse rows.
 - No horizontal page overflow on mobile, ever (scroll inside a table wrapper is OK).
 - Match existing visual language: `.dashboard-card`, 32px-min-height buttons,
   `border-radius:10px`, `rgba(9,47,77,...)` navy palette, `#fffaf3` surfaces.
+
+### BUTTONS ARE STANDARDIZED — NO BIG BUTTONS. EVER. (read this every time)
+
+Every new button MUST match the compact size of the buttons already next to it.
+No exceptions, desktop AND mobile. A button that renders taller/fatter than its
+siblings is a bug — fix it before shipping.
+
+**The trap (I have made this mistake more than once):** the base `button.secondary`
+rule is BIG (`padding:12px 14px`) and has specificity **0,1,1**. Any compact size
+rule you write with a plain class (`.status-delivery-btn`, 0,1,0) or a
+parent-scoped selector (`.status-delivery-actions .status-delivery-btn`) is
+**silently overridden** — the button renders at the big default, and if you scope
+to one parent, a button of the same class in a *different* container (e.g.
+`.combined-bill-actions`) misses the rule entirely and blows up big.
+
+**The rule:** compact-size a button class with specificity ≥ 0,2,0 and NO parent
+scope, so it wins everywhere the class is used. The doubled-class pattern does
+this: `.status-delivery-btn.status-delivery-btn { min-height:30px; padding:4px 12px;
+font-size:.78rem; ... }`. Reuse an existing compact button class instead of
+inventing a new one whenever possible. Before shipping any button: render it next
+to its siblings (headless) and confirm identical height at desktop AND ≤899px.
 
 ## Architecture map
 
