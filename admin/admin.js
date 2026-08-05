@@ -7042,11 +7042,14 @@ function renderOrderDetail(order) {
         ${renderFieldLike("Order #", order.orderNumber || "")}
         <div class="detail-block">
           <div class="label">Customer</div>
-          <div class="field-like readonly">${escapeHtml(order.customerName || "")}</div>
+          <input id="editCustomerName" type="text" value="${escapeAttr(order.customerName || "")}" />
           <button id="detailViewCustomerBtn" class="detail-show-on-map-link customer-profile-link" type="button">View Customer Profile</button>
         </div>
         ${renderPhoneInput("Phone", "editPhoneNumber", order.phoneNumber || "")}
-        ${renderFieldLike("Email", order.emailAddress || "")}
+        <div class="detail-block">
+          <div class="label">Email</div>
+          <input id="editEmailAddress" type="email" value="${escapeAttr(order.emailAddress || "")}" />
+        </div>
         <div class="detail-block">
           <div class="label">Social Tag</div>
           <input id="editSocialTag" type="text" value="${escapeAttr(order.socialTag || "")}" />
@@ -8524,6 +8527,8 @@ async function saveCurrentOrderFromForm() {
   const updates = {
     status: newStatus,
     paid: val("editPaid"),
+    customerName: val("editCustomerName"),
+    emailAddress: val("editEmailAddress"),
     phoneNumber: formatPhoneForInput(val("editPhoneNumber")),
     priceQuoted: parsedPrice === "" ? null : parsedPrice,
     customAddonAmount: parsedCustomAddon === "" ? null : parsedCustomAddon,
