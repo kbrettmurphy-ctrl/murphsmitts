@@ -2161,14 +2161,20 @@ async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
   const gloves = [];
   const links = await supabaseFetch(
     env,
-    `/rest/v1/gallery_photo_links?select=photo_url,order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
+    `/rest/v1/gallery_photo_links?select=photo_url,order_number,is_cover,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
   );
   const linkRows = (links.ok && Array.isArray(links.data)) ? links.data : [];
   const byOrder = new Map();
+  // Cover-first URL list for an order, so the search tile uses the designated
+  // album cover, not whatever row the DB returned first.
+  const orderPhotos = (order) => (byOrder.get(order) || [])
+    .slice()
+    .sort((a, b) => (b.cover === true) - (a.cover === true))
+    .map(p => p.url);
   for (const l of linkRows) {
     if (l.order_number) {
       if (!byOrder.has(l.order_number)) byOrder.set(l.order_number, []);
-      byOrder.get(l.order_number).push(l.photo_url);
+      byOrder.get(l.order_number).push({ url: l.photo_url, cover: l.is_cover === true });
       continue;
     }
     const fields = [l.brand_model, l.glove_type, l.web_type, l.primary_lace_color, l.secondary_lace_color];
@@ -2202,7 +2208,7 @@ async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
         gloveType: row.glove_type || "",
         webType: row.web_type || "",
         laceColors: [row.primary_lace_color, row.secondary_lace_color].filter(Boolean),
-        photos: (byOrder.get(row.order_number) || []).slice(0, 4)
+        photos: orderPhotos(row.order_number).slice(0, 4)
       });
       if (gloves.length >= 24) break;
     }
