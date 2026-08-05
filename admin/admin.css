@@ -3556,6 +3556,25 @@ button.dashboard-metric:active{
   object-fit:cover;
 }
 
+/* Combined billing: one bill for a customer's multiple unpaid gloves. */
+.combined-bill-panel{
+  margin-top:10px;
+  padding:10px;
+  border-radius:10px;
+  background:rgba(9,47,77,.06);
+  border:1px solid rgba(9,47,77,.12);
+}
+.combined-bill-info{
+  font-size:.8rem;
+  line-height:1.35;
+  margin-bottom:8px;
+}
+.combined-bill-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
 .status-delivery-message{
   min-height:16px;
   margin:0;

@@ -306,6 +306,11 @@ const ACTIONS = {
     effects: ["db:orders:read", "external:sms:send", "db:orders:write", "db:sms_messages:write", "db:order_activity:write"],
     bindings: { required: ["CORE"], optional: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_MESSAGING_SERVICE_SID", "ENV-SIGNAL"] }
   },
+  sendCombinedBill: {
+    auth: "session", demo: "deny", handler: handleSendCombinedBill,
+    effects: ["db:orders:read", "external:email:send", "external:sms:send", "db:sms_messages:write"],
+    bindings: { required: ["CORE"], optional: ["RESEND_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_MESSAGING_SERVICE_SID", "ENV-SIGNAL"] }
+  },
   updateOrder: {
     auth: "session", demo: "deny", handler: handleUpdateOrder,
     effects: [
@@ -1189,6 +1194,11 @@ async function handleResendStatusText({ env, body, jsonHeaders }) {
   return json(result, 200, jsonHeaders);
 }
 
+async function handleSendCombinedBill({ env, body, jsonHeaders }) {
+  const result = await sendCombinedBill(env, body.orderNumbers);
+  return json(result, 200, jsonHeaders);
+}
+
 async function handleUpdateOrder({ env, body, jsonHeaders }) {
   const orderNumber = String(body.orderNumber || "").trim();
   const updates = body.updates || {};
@@ -1215,11 +1225,16 @@ async function handleUpdateOrder({ env, body, jsonHeaders }) {
 
   const newStatus = normalizeStatus(mergedPreview.status);
   const statusChanged = !!newStatus && newStatus !== oldStatus;
+  // Hold billing: suppress this order's auto status message so the customer can
+  // be billed once, combined with their other finished gloves. Default off.
+  const suppressNotify = body.suppressNotify === true;
   const shouldEmailForStatus =
+    !suppressNotify &&
     statusChanged &&
     !isInternalOnlyStatus(newStatus) &&
     newStatus !== lastStatusEmailed;
   const shouldTextForStatus =
+    !suppressNotify &&
     statusChanged &&
     toBoolean(mergedPreview.sms_opt_in) &&
     shouldSendTextForStatus(newStatus) &&
@@ -5593,6 +5608,128 @@ function buildPaymentLinks(order) {
     zelle:
       PAYMENT.zelle
   };
+}
+
+/* ===== Combined billing =====
+   When one customer has multiple finished-but-unpaid gloves, bill them in a
+   single message with one summed payment link instead of one message per order.
+   The payment links are the same pass-through deep links as buildPaymentLinks,
+   just with the summed amount and every order number in the note. */
+function buildCombinedPaymentLinks(orders) {
+  let service = 0, shipping = 0;
+  const nums = [];
+  for (const o of orders) {
+    service += moneyNumber(o.priceQuoted);
+    shipping += moneyNumber(o.shippingCost);
+    if (o.orderNumber) nums.push(`#${o.orderNumber}`);
+  }
+  const total = service + shipping;
+  const amount = total.toFixed(2);
+  const note = encodeURIComponent(`Murph's Mitts Orders ${nums.join(", ")}`);
+  return {
+    service, shipping, total, amount, orderNumbers: nums,
+    venmo: `venmo://paycharge?txn=pay&recipients=${PAYMENT.venmoUser}&amount=${amount}&note=${note}`,
+    paypal: `https://paypal.me/${PAYMENT.paypalMe}/${amount}`,
+    zelle: PAYMENT.zelle
+  };
+}
+
+/* Core combined-bill text (no signature) shared by the email and SMS. */
+function combinedBillBody(firstName, orders, pay, anyShip) {
+  const lines = orders.map(o =>
+    `#${o.orderNumber} ${cleanDisplay(o.brandModel) || cleanDisplay(o.gloveType) || "Glove"} — ${formatCurrency(moneyNumber(o.priceQuoted))}`
+  );
+  const shippingLine = pay.shipping > 0 ? `Shipping — ${formatCurrency(pay.shipping)}\n` : "";
+  const closer = anyShip
+    ? "As soon as payment comes through, I'll get them boxed up and send your tracking."
+    : "Send it whenever works, or just bring cash at pickup — either's fine by me.";
+
+  return `Hey${firstName ? " " + firstName : ""},
+
+Good news — your gloves are finished and ready! Here's one bill for all of them:
+
+${lines.join("\n")}
+${shippingLine}------------------------
+Total — ${formatCurrency(pay.total)}
+
+One payment covers them all:
+Venmo: ${pay.venmo}
+PayPal: ${pay.paypal}
+Zelle: ${pay.zelle}
+
+${closer}`;
+}
+
+/* Send a single combined bill for a customer's finished, unpaid orders. */
+async function sendCombinedBill(env, orderNumbers) {
+  const nums = (orderNumbers || []).map(n => String(n).trim()).filter(Boolean);
+  if (nums.length < 2) return { ok: false, error: "Need at least two orders to combine." };
+
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/orders?order_number=in.(${encodeURIComponent(nums.join(","))})&select=*`
+  );
+  if (!resp.ok || !Array.isArray(resp.data)) {
+    return { ok: false, error: "Failed to load orders.", details: resp.error };
+  }
+
+  const orders = resp.data.map(mapOrderFromDb);
+  const billable = orders.filter(orderHasBalanceDue);
+  if (billable.length < 2) {
+    return { ok: false, error: "Need at least two unpaid gloves with a balance to combine." };
+  }
+
+  // Safety: refuse to bundle across different customers.
+  const custKey = o => `${String(o.emailAddress || "").trim().toLowerCase()}|${String(o.phoneNumber || "").replace(/\D/g, "")}`;
+  const emails = new Set(billable.map(o => String(o.emailAddress || "").trim().toLowerCase()).filter(Boolean));
+  const phones = new Set(billable.map(o => String(o.phoneNumber || "").replace(/\D/g, "")).filter(p => p.length >= 10));
+  if (emails.size > 1 || phones.size > 1) {
+    return { ok: false, error: "These orders aren't all the same customer." };
+  }
+
+  const pay = buildCombinedPaymentLinks(billable);
+  const anyShip = billable.some(o => looksLikeShipMethod(o.dropOffMethod));
+  const firstName = String(billable[0].customerName || "").trim().split(/\s+/)[0] || "";
+  const core = combinedBillBody(firstName, billable, pay, anyShip);
+
+  const result = { ok: true, total: pay.total, orderNumbers: nums, sent: {} };
+
+  const email = billable.map(o => String(o.emailAddress || "").trim()).find(Boolean) || "";
+  if (email && env.RESEND_API_KEY) {
+    const htmlBody = `<div style="font-family: Arial, sans-serif; max-width:640px; line-height:1.5; color:#20313d;"><div style="white-space:pre-wrap; margin:0;">${escapeHtml(core)}</div>${emailSignatureHtml()}</div>`;
+    result.sent.email = await sendBrandedEmail(env, {
+      to: email,
+      subject: `Your gloves are ready — one combined bill (${pay.orderNumbers.join(", ")})`,
+      plainBody: `${core}\n\n-Brett`,
+      htmlBody
+    });
+  }
+
+  const phoneOrder = billable.find(o => o.smsOptIn && toE164US(o.phoneNumber));
+  if (phoneOrder) {
+    const to = toE164US(phoneOrder.phoneNumber);
+    const smsBody = `Murph's Mitts: combined bill for ${pay.orderNumbers.join(", ")}\n\n${core}\n\n-Brett`;
+    const smsResult = await sendTwilioSms(env, to, smsBody);
+    result.sent.sms = smsResult;
+    /* Mirror into the Messages inbox, best-effort. */
+    try {
+      await supabaseFetch(env, `/rest/v1/sms_messages`, {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          direction: "out",
+          phone_number: to,
+          customer_name: phoneOrder.customerName || null,
+          order_number: String(billable[0].orderNumber || ""),
+          body: smsBody,
+          twilio_sid: (smsResult && smsResult.sid) || null,
+          read: true
+        })
+      });
+    } catch { /* never block on inbox logging */ }
+  }
+
+  return result;
 }
 
 async function sendStatusEmail(env, row, statusDisplay) {

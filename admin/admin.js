@@ -3600,6 +3600,47 @@ function clientEmailResendAllowed(status) {
   ].includes(s);
 }
 
+function orderCustomerMatchKeys(o) {
+  return {
+    email: String(o?.emailAddress || "").trim().toLowerCase(),
+    phone: String(o?.phoneNumber || "").replace(/\D/g, "")
+  };
+}
+
+/* A customer's finished-or-in-progress unpaid gloves that can be billed
+   together: same email or phone, unpaid, a real balance, and past the estimate
+   stage (so a fresh quote never shows up as billable). */
+const COMBINED_BILL_PREWORK_STATUSES = new Set(["", "received", "estimate sent", "pending response"]);
+function getCustomerBillableOrders(order) {
+  const me = orderCustomerMatchKeys(order);
+  if (!me.email && me.phone.length < 10) return [];
+  return allOrders.filter(o => {
+    const k = orderCustomerMatchKeys(o);
+    const sameCustomer = (me.email && k.email === me.email) || (me.phone.length >= 10 && k.phone === me.phone);
+    if (!sameCustomer) return false;
+    if (normalizeText(o.paid) === "paid") return false;
+    if (COMBINED_BILL_PREWORK_STATUSES.has(String(o.status || "").trim().toLowerCase())) return false;
+    return (moneyNumber(o.priceQuoted) + moneyNumber(o.shippingCost)) > 0;
+  });
+}
+
+function renderCombinedBillPanel(order) {
+  const bill = getCustomerBillableOrders(order);
+  if (bill.length < 2) return "";
+  const total = bill.reduce((s, o) => s + moneyNumber(o.priceQuoted) + moneyNumber(o.shippingCost), 0);
+  const nums = bill.map(o => String(o.orderNumber));
+  const numLabels = nums.map(n => `#${n}`).join(", ");
+  return `
+    <div class="combined-bill-panel" data-order-numbers="${escapeAttr(nums.join(","))}">
+      <div class="combined-bill-info">${bill.length} unpaid gloves for this customer — <strong>${escapeHtml(formatCurrency(total))}</strong> total: ${escapeHtml(numLabels)}</div>
+      <div class="combined-bill-actions">
+        <button id="sendCombinedBillBtn" class="secondary status-delivery-btn" type="button">Send one combined bill</button>
+        <button id="markAllPaidBtn" class="secondary status-delivery-btn" type="button">Mark all paid</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderStatusDelivery(order) {
   const emailAvailable = !!String(order.emailAddress || "").trim() && clientEmailResendAllowed(order.status);
   const textAvailable =
@@ -3626,6 +3667,7 @@ function renderStatusDelivery(order) {
         <button id="resendStatusTextBtn" class="secondary status-delivery-btn" type="button" ${textAvailable ? "" : "disabled"}>Resend Text</button>
         <button id="copyTrackingLinkBtn" class="secondary status-delivery-btn" type="button" ${order.trackingToken ? "" : "disabled"}>Status Link</button>
       </div>
+      ${renderCombinedBillPanel(order)}
       <p id="statusDeliveryMessage" class="status-delivery-message" aria-live="polite"></p>
     </div>
   `;
@@ -8587,6 +8629,64 @@ function wireStatusDeliveryControls(order) {
   document.getElementById("resendStatusTextBtn")?.addEventListener("click", () => {
     resendCurrentStatus("text", order);
   });
+
+  document.getElementById("sendCombinedBillBtn")?.addEventListener("click", (e) => {
+    sendCombinedBillForCustomer(order, e.currentTarget);
+  });
+
+  document.getElementById("markAllPaidBtn")?.addEventListener("click", (e) => {
+    markCustomerOrdersPaid(order, e.currentTarget);
+  });
+}
+
+async function sendCombinedBillForCustomer(order, btn) {
+  const msgEl = document.getElementById("statusDeliveryMessage");
+  const bill = getCustomerBillableOrders(order);
+  if (bill.length < 2) {
+    if (msgEl) msgEl.textContent = "Need at least two unpaid gloves to combine.";
+    return;
+  }
+  const orderNumbers = bill.map(o => String(o.orderNumber));
+  const total = bill.reduce((s, o) => s + moneyNumber(o.priceQuoted) + moneyNumber(o.shippingCost), 0);
+  if (!window.confirm(`Send ONE combined bill for ${orderNumbers.map(n => "#" + n).join(", ")} — ${formatCurrency(total)} total?`)) return;
+
+  if (btn) btn.disabled = true;
+  if (msgEl) msgEl.textContent = "Sending combined bill…";
+  try {
+    const res = await postJson({ action: "sendCombinedBill", orderNumbers }, true);
+    if (!res || res.ok === false) throw new Error(res && res.error ? String(res.error) : "Send failed.");
+    const parts = [];
+    if (res.sent && res.sent.email) parts.push(res.sent.email.ok === false ? "email failed" : "email sent");
+    if (res.sent && res.sent.sms) parts.push(res.sent.sms.ok === false ? "text failed" : "text sent");
+    if (msgEl) msgEl.textContent = `Combined bill for ${formatCurrency(res.total)} — ${parts.join(", ") || "no email/text on file"}.`;
+  } catch (err) {
+    if (msgEl) msgEl.textContent = err.message || "Combined bill failed.";
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function markCustomerOrdersPaid(order, btn) {
+  const msgEl = document.getElementById("statusDeliveryMessage");
+  const bill = getCustomerBillableOrders(order);
+  if (!bill.length) return;
+  if (!window.confirm(`Mark ${bill.map(o => "#" + o.orderNumber).join(", ")} as Paid?`)) return;
+
+  if (btn) btn.disabled = true;
+  if (msgEl) msgEl.textContent = "Marking paid…";
+  try {
+    for (const o of bill) {
+      await saveOrderUpdate(String(o.orderNumber), { paid: "Paid" }, false);
+    }
+    if (msgEl) msgEl.textContent = "Marked all paid.";
+    if (currentOrder && String(currentOrder.orderNumber) === String(order.orderNumber)) {
+      renderOrderDetail(currentOrder);
+    }
+  } catch (err) {
+    if (msgEl) msgEl.textContent = err.message || "Failed to mark paid.";
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 function getAdminOrderFormPayload() {
