@@ -145,7 +145,11 @@ button.secondary{
   border-radius:14px;
   background:#244866;
   color:var(--cream);
-  padding:12px 14px;
+  /* Compact is the DEFAULT for every secondary button (32px, tight padding).
+     Do NOT bump this padding — a big base is what makes stray buttons fat.
+     See CLAUDE.md "BUTTONS ARE STANDARDIZED". */
+  min-height:32px;
+  padding:4px 12px;
 }
 
 .icon-btn{
@@ -3503,20 +3507,8 @@ button.dashboard-metric:active{
   gap:8px;
 }
 
-/* Compact status/combined-bill buttons. The doubled class gives 0,2,0
-   specificity so this beats button.secondary (0,1,1) — including its desktop
-   @media override — for EVERY .status-delivery-btn regardless of its container.
-   Do NOT scope this to a parent: a new container (e.g. .combined-bill-actions)
-   would then miss it and render at button.secondary's big default padding. */
-.status-delivery-btn.status-delivery-btn{
-  width:auto;
-  min-height:30px;
-  padding:4px 12px;
-  border-radius:10px;
-  font-size:.78rem;
-  font-weight:500;
-}
-
+/* No size override needed — status/combined-bill buttons inherit the compact
+   button.secondary base, so they match every other secondary button exactly. */
 .status-delivery-btn:disabled{
   opacity:.46;
   cursor:not-allowed;

@@ -49,24 +49,25 @@ and the admin portal ("MurphOS").
 
 ### BUTTONS ARE STANDARDIZED — NO BIG BUTTONS. EVER. (read this every time)
 
-Every new button MUST match the compact size of the buttons already next to it.
-No exceptions, desktop AND mobile. A button that renders taller/fatter than its
-siblings is a bug — fix it before shipping.
+Every button MUST match the compact size of its siblings. A button taller/fatter
+than the ones next to it is a bug — fix it before shipping, desktop AND mobile.
 
-**The trap (I have made this mistake more than once):** the base `button.secondary`
-rule is BIG (`padding:12px 14px`) and has specificity **0,1,1**. Any compact size
-rule you write with a plain class (`.status-delivery-btn`, 0,1,0) or a
-parent-scoped selector (`.status-delivery-actions .status-delivery-btn`) is
-**silently overridden** — the button renders at the big default, and if you scope
-to one parent, a button of the same class in a *different* container (e.g.
-`.combined-bill-actions`) misses the rule entirely and blows up big.
+`button.secondary` is THE secondary-action button and its base is now COMPACT
+(`min-height:32px; padding:4px 12px`, ~32px tall). So to add an action button:
+give it `class="secondary"` and it is automatically compact and uniform with
+every other secondary button (Resend, Status Link, combined-bill, "Use", etc.).
+Do NOT invent a new button class or add a per-button size override — you'll drift
+out of sync.
 
-**The rule:** compact-size a button class with specificity ≥ 0,2,0 and NO parent
-scope, so it wins everywhere the class is used. The doubled-class pattern does
-this: `.status-delivery-btn.status-delivery-btn { min-height:30px; padding:4px 12px;
-font-size:.78rem; ... }`. Reuse an existing compact button class instead of
-inventing a new one whenever possible. Before shipping any button: render it next
-to its siblings (headless) and confirm identical height at desktop AND ≤899px.
+**Never reintroduce big padding.** Do not bump `button.secondary` padding; do not
+add a button padding larger than ~4–6px vertical. (History, twice burned: the base
+used to be `padding:12px 14px` — fat — so every stray `.secondary` rendered big
+unless it had a higher-specificity compact override, and any override scoped to
+one parent container missed buttons of the same class elsewhere. That whole class
+of bug is gone now because the base itself is compact — keep it that way.)
+
+Before shipping any button: render it next to its siblings (headless) and confirm
+identical height at desktop AND ≤899px.
 
 ## Architecture map
 
