@@ -5694,13 +5694,29 @@ async function sendCombinedBill(env, orderNumbers) {
 
   const result = { ok: true, total: pay.total, orderNumbers: nums, sent: {} };
 
+  // Per-glove tracker links — text lines for plain/SMS, styled buttons for HTML,
+  // reusing the same emailTrackButtonHtml as every other email.
+  const trackable = billable.filter(o => o.trackingToken);
+  const trackUrlFor = o => `https://murphsmitts.com/track/?t=${o.trackingToken}`;
+  const trackerText = trackable.length
+    ? `See your finished gloves:\n${trackable.map(o => `#${o.orderNumber}: ${trackUrlFor(o)}`).join("\n")}`
+    : "";
+  const trackButtons = trackable.map(o => emailTrackButtonHtml(trackUrlFor(o), `See glove #${o.orderNumber}`)).join("");
+  const plainFull = `${core}${trackerText ? `\n\n${trackerText}` : ""}\n\n-Brett`;
+
   const email = billable.map(o => String(o.emailAddress || "").trim()).find(Boolean) || "";
   if (email && env.RESEND_API_KEY) {
-    const htmlBody = `<div style="font-family: Arial, sans-serif; max-width:640px; line-height:1.5; color:#20313d;"><div style="white-space:pre-wrap; margin:0;">${escapeHtml(core)}</div>${emailSignatureHtml()}</div>`;
+    // Same clean wrapper as wrapEmailHtmlSplit (container + track button + signature).
+    const htmlBody = `
+  <div style="font-family: Arial, sans-serif; max-width: 640px; line-height: 1.5; text-align:left; color:#20313d;">
+    <div style="white-space:pre-wrap; margin:0;">${escapeHtml(core)}</div>
+    ${trackButtons}
+    ${emailSignatureHtml()}
+  </div>`;
     result.sent.email = await sendBrandedEmail(env, {
       to: email,
       subject: `Your gloves are ready — one combined bill (${pay.orderNumbers.join(", ")})`,
-      plainBody: `${core}\n\n-Brett`,
+      plainBody: plainFull,
       htmlBody
     });
   }
@@ -5708,7 +5724,7 @@ async function sendCombinedBill(env, orderNumbers) {
   const phoneOrder = billable.find(o => o.smsOptIn && toE164US(o.phoneNumber));
   if (phoneOrder) {
     const to = toE164US(phoneOrder.phoneNumber);
-    const smsBody = `Murph's Mitts: combined bill for ${pay.orderNumbers.join(", ")}\n\n${core}\n\n-Brett`;
+    const smsBody = `Murph's Mitts: combined bill for ${pay.orderNumbers.join(", ")}\n\n${plainFull}`;
     const smsResult = await sendTwilioSms(env, to, smsBody);
     result.sent.sms = smsResult;
     /* Mirror into the Messages inbox, best-effort. */
