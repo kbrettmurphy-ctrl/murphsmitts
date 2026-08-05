@@ -3574,6 +3574,18 @@ button.dashboard-metric:active{
   flex-wrap:wrap;
   gap:8px;
 }
+.hold-billing-row{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  font-size:.8rem;
+  line-height:1.35;
+  cursor:pointer;
+}
+.hold-billing-row input{
+  margin-top:2px;
+  flex:0 0 auto;
+}
 
 .status-delivery-message{
   min-height:16px;

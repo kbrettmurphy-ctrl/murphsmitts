@@ -7079,6 +7079,13 @@ function renderOrderDetail(order) {
              </select>
           </div>
 
+          ${getCustomerBillableOrders(order).length >= 2 ? `
+          <label class="detail-block full hold-billing-row">
+            <input type="checkbox" id="editHoldBilling" />
+            <span>Hold billing — don't auto-notify on this save (bill together with their other gloves)</span>
+          </label>
+          ` : ""}
+
           <div class="detail-block">
             <div class="label">Paid?</div>
             <select id="editPaid">
@@ -8563,10 +8570,11 @@ async function saveCurrentOrderFromForm() {
     updates.zipCode = null;
   }
 
-  const updated = await saveOrderUpdate(currentOrder.orderNumber, updates, true);
+  const holdBilling = document.getElementById("editHoldBilling")?.checked === true;
+  const updated = await saveOrderUpdate(currentOrder.orderNumber, updates, true, { suppressNotify: holdBilling });
   currentOrder = updated;
   renderOrderDetail(updated);
-  saveStatusEl.textContent = "Saved.";
+  saveStatusEl.textContent = holdBilling ? "Saved — auto-message held." : "Saved.";
   resetAdminScroll(detailView);
 }
 
@@ -8794,12 +8802,16 @@ async function createNewOrderFromForm() {
   }
 }
 
-async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false) {
-  const data = await postJson({
+async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false, options = {}) {
+  const requestBody = {
     action: "updateOrder",
     orderNumber,
     updates
-  }, true);
+  };
+  // Hold billing: skip this order's auto status message so the customer can be
+  // billed once, combined with their other gloves.
+  if (options.suppressNotify === true) requestBody.suppressNotify = true;
+  const data = await postJson(requestBody, true);
 
   const updatedOrder = data.order;
   const idx = allOrders.findIndex(o => String(o.orderNumber) === String(updatedOrder.orderNumber));
