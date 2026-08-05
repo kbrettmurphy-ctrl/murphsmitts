@@ -7079,13 +7079,6 @@ function renderOrderDetail(order) {
              </select>
           </div>
 
-          ${getCustomerBillableOrders(order).length >= 2 ? `
-          <label class="detail-block full hold-billing-row">
-            <input type="checkbox" id="editHoldBilling" />
-            <span>Hold billing — don't auto-notify on this save (bill together with their other gloves)</span>
-          </label>
-          ` : ""}
-
           <div class="detail-block">
             <div class="label">Paid?</div>
             <select id="editPaid">
@@ -7093,6 +7086,13 @@ function renderOrderDetail(order) {
               <option value="Unpaid">Unpaid</option>
             </select>
           </div>
+
+          ${getCustomerBillableOrders(order).length >= 2 ? `
+          <label class="detail-block full hold-billing-row">
+            <input type="checkbox" id="editHoldBilling" />
+            <span>Hold billing — don't auto-notify on this save (bill together with their other gloves)</span>
+          </label>
+          ` : ""}
 
           <div class="detail-block">
             <div class="label">Price Quoted</div>
