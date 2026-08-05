@@ -8894,6 +8894,9 @@ const LACE_COLOR_MAP = {
   "dark purple": "#432069",
 
   "green": "#2e7d32",
+  "green – lime": "#8bc34a",
+  "green - lime": "#8bc34a",
+  "lime green": "#8bc34a",
   "ocean mint": "#74c6a0",
 
   "teal – dark": "#0e5a63",
