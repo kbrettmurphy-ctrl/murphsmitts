@@ -52,22 +52,33 @@ and the admin portal ("MurphOS").
 Every button MUST match the compact size of its siblings. A button taller/fatter
 than the ones next to it is a bug — fix it before shipping, desktop AND mobile.
 
-`button.secondary` is THE secondary-action button and its base is now COMPACT
-(`min-height:32px; padding:4px 12px`, ~32px tall). So to add an action button:
-give it `class="secondary"` and it is automatically compact and uniform with
-every other secondary button (Resend, Status Link, combined-bill, "Use", etc.).
-Do NOT invent a new button class or add a per-button size override — you'll drift
-out of sync.
+`button.secondary` is THE secondary-action button and its base is COMPACT on
+EVERY screen: `min-height:32px; padding:4px 12px; font-size:.8rem`. So to add an
+action button: give it `class="secondary"` and it is automatically compact and
+uniform with every other secondary button (Resend, Status Link, combined-bill,
+"Use", etc.). Do NOT invent a new button class or add a per-button size override
+— you'll drift out of sync.
 
-**Never reintroduce big padding.** Do not bump `button.secondary` padding; do not
-add a button padding larger than ~4–6px vertical. (History, twice burned: the base
-used to be `padding:12px 14px` — fat — so every stray `.secondary` rendered big
-unless it had a higher-specificity compact override, and any override scoped to
-one parent container missed buttons of the same class elsewhere. That whole class
-of bug is gone now because the base itself is compact — keep it that way.)
+**Size AND font-size live in the BASE rule, not only in a media query.** This is
+the exact bug that keeps recurring, so internalize it:
+- The base `button.secondary` must carry `min-height`, `padding`, AND
+  `font-size`. If font-size only lives in `@media (min-width:900px)`, then on
+  MOBILE the button inherits the big body text, grows wide, and wraps to a new
+  row. (This bit us: the Resend/Status Link row wrapped on iPhone.)
+- Never bump `button.secondary` padding or font-size; never add a button padding
+  > ~4–6px vertical.
+- Never remove a button's size/font override without first checking mobile —
+  if it was the only thing keeping the text small on mobile, removing it
+  re-breaks it.
+- (History, three times burned: base was once `padding:12px 14px` — fat; then a
+  parent-scoped compact override missed buttons of the same class in other
+  containers; then font-size lived only in the desktop media query and mobile
+  went big. All three are gone now because the base is fully compact — keep it
+  that way.)
 
-Before shipping any button: render it next to its siblings (headless) and confirm
-identical height at desktop AND ≤899px.
+Before shipping ANY button: render it next to its siblings headless and confirm
+identical height AND font-size at desktop (≥900px) AND mobile (≤899px, e.g. 390px
+wide). This applies no matter which model/agent is doing the work.
 
 ## Architecture map
 

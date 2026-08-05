@@ -145,11 +145,13 @@ button.secondary{
   border-radius:14px;
   background:#244866;
   color:var(--cream);
-  /* Compact is the DEFAULT for every secondary button (32px, tight padding).
-     Do NOT bump this padding — a big base is what makes stray buttons fat.
-     See CLAUDE.md "BUTTONS ARE STANDARDIZED". */
+  /* Compact is the DEFAULT for every secondary button, on EVERY screen (32px,
+     tight padding, .8rem text). font-size lives HERE (not only in a desktop
+     media query) or mobile inherits the big body text and buttons wrap.
+     Do NOT bump padding or font-size. See CLAUDE.md "BUTTONS ARE STANDARDIZED". */
   min-height:32px;
   padding:4px 12px;
+  font-size:.8rem;
 }
 
 .icon-btn{
