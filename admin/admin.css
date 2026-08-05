@@ -8128,12 +8128,10 @@ body.has-notifications .topbar-menu-btn::after{
   line-height:1.4;
 }
 .promise-text strong{ color:var(--navy); }
-/* Compact sizing only — visual language comes from the shared .secondary */
+/* Size + visual language come from the shared compact .secondary base; this
+   only keeps the button from shrinking next to the promise text. */
 .promise-apply-btn{
   flex-shrink:0;
-  min-height:24px;
-  padding:2px 12px;
-  font-size:.7rem;
 }
 
 /* Expenses (2.4) — compact entry row + list */
