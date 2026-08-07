@@ -114,52 +114,85 @@ body_class: inner
     return albums;
   }
 
-  function renderGallery(gallery, links, covers) {
+  const PREVIEW_COUNT = 5;
+  let galleryData = { gallery: {}, links: {}, covers: {} };
+
+  function albumsFor(key) {
+    const photos = Array.isArray(galleryData.gallery[key]) ? galleryData.gallery[key] : [];
+    return groupIntoAlbums(photos, galleryData.links, galleryData.covers);
+  }
+
+  function thumbHtml(key, label, album, index) {
+    return `
+      <button
+        class="gallery-thumb"
+        type="button"
+        data-gallery-group="${escapeHtml(key)}"
+        data-gallery-index="${index}"
+        data-photos="${escapeHtml(JSON.stringify(album.photos))}"
+        aria-label="Open image: ${escapeHtml(prettyAlt(label, album, index))}">
+        <img
+          src="${escapeHtml(album.cover)}"
+          alt="${escapeHtml(prettyAlt(label, album, index))}"
+          loading="lazy"
+          decoding="async">
+        ${album.photos.length > 1 ? `<span class="gallery-thumb-count" aria-hidden="true">${album.photos.length}</span>` : ""}
+      </button>`;
+  }
+
+  /* Overview: each category shows a few recent jobs in a fixed row (grid on
+     desktop, swipe on mobile) with a "View all N →" link into its full grid. */
+  function renderCategoryPreviews() {
     galleryRoot.innerHTML = "";
-
     let total = 0;
-
     sections.forEach(([key, label]) => {
-      const photos = Array.isArray(gallery[key]) ? gallery[key] : [];
-      if (!photos.length) return;
-
-      const albums = groupIntoAlbums(photos, links, covers);
+      const albums = albumsFor(key);
+      if (!albums.length) return;
       total += albums.length;
-
+      const featured = albums.slice(0, PREVIEW_COUNT);
       const section = document.createElement("section");
       section.className = "gallery-group";
       section.id = key;
-
       section.innerHTML = `
-        <div class="mm-section-intro">
+        <div class="gallery-category-head">
           <h2 class="mm-section-title">${escapeHtml(label)}</h2>
+          <a class="gallery-view-all" href="?category=${encodeURIComponent(key)}">View all ${albums.length} ${escapeHtml(label)} &rarr;</a>
         </div>
-        <div class="gallery-strip" data-gallery-group="${escapeHtml(key)}">
-          ${albums.map((album, index) => `
-            <button
-              class="gallery-thumb"
-              type="button"
-              data-gallery-group="${escapeHtml(key)}"
-              data-gallery-index="${index}"
-              data-photos="${escapeHtml(JSON.stringify(album.photos))}"
-              aria-label="Open image: ${escapeHtml(prettyAlt(label, album, index))}">
-              <img
-                src="${escapeHtml(album.cover)}"
-                alt="${escapeHtml(prettyAlt(label, album, index))}"
-                loading="lazy"
-                decoding="async">
-              ${album.photos.length > 1 ? `<span class="gallery-thumb-count" aria-hidden="true">${album.photos.length}</span>` : ""}
-            </button>
-          `).join("")}
-        </div>
-      `;
-
+        <div class="gallery-preview-row" data-gallery-group="${escapeHtml(key)}">
+          ${featured.map((album, index) => thumbHtml(key, label, album, index)).join("")}
+        </div>`;
       galleryRoot.appendChild(section);
     });
+    if (statusEl) statusEl.textContent = total ? "" : "No gallery photos have been uploaded yet.";
+  }
 
-    if (statusEl) {
-      statusEl.textContent = total ? "" : "No gallery photos have been uploaded yet.";
-    }
+  /* Category view (/gallery/?category=key): every glove in the category as a
+     responsive grid, with a link back to the overview. */
+  function renderCategoryFull(key) {
+    const entry = sections.find(([k]) => k === key);
+    if (!entry) { renderCategoryPreviews(); return; }
+    const label = entry[1];
+    const albums = albumsFor(key);
+    galleryRoot.innerHTML = "";
+    const section = document.createElement("section");
+    section.className = "gallery-group";
+    section.id = key;
+    section.innerHTML = `
+      <a class="gallery-back-link" href="./">&larr; Back to all categories</a>
+      <div class="gallery-category-head">
+        <h2 class="mm-section-title">${escapeHtml(label)} <span class="gallery-head-count">(${albums.length})</span></h2>
+      </div>
+      <div class="gallery-full-grid" data-gallery-group="${escapeHtml(key)}">
+        ${albums.map((album, index) => thumbHtml(key, label, album, index)).join("")}
+      </div>`;
+    galleryRoot.appendChild(section);
+    if (statusEl) statusEl.textContent = albums.length ? "" : "No photos in this category yet.";
+  }
+
+  function renderGalleryView() {
+    const cat = (new URLSearchParams(location.search).get("category") || "").trim();
+    if (cat && sections.some(([k]) => k === cat)) renderCategoryFull(cat);
+    else renderCategoryPreviews();
   }
   
   async function loadGallery() {
@@ -180,7 +213,8 @@ body_class: inner
         throw new Error(data.error || "Gallery failed to load.");
       }
 
-      renderGallery(data.gallery || {}, data.photoLinks || {}, data.photoCovers || {});
+      galleryData = { gallery: data.gallery || {}, links: data.photoLinks || {}, covers: data.photoCovers || {} };
+      renderGalleryView();
     } catch (err) {
       if (statusEl) {
         statusEl.textContent = err.message || "Gallery failed to load.";
@@ -202,7 +236,7 @@ body_class: inner
       return;
     }
     resultsEl.innerHTML = `
-      <div class="gallery-strip glove-search-grid" data-gallery-group="glove-search">
+      <div class="gallery-full-grid glove-search-grid" data-gallery-group="glove-search">
         ${gloves.flatMap((g, gi) => g.photos.slice(0, 1).map(url => `
           <figure class="glove-search-card">
             <button class="gallery-thumb" type="button"
