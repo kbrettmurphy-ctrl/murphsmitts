@@ -5463,41 +5463,53 @@ async function listGallerySection(env, section, options = {}) {
     const hidden = options.hidden === true;
     const prefix = hidden ? `_hidden/${safeSection}` : safeSection;
 
-    const resp = await fetch(
-      `${env.SUPABASE_URL}/storage/v1/object/list/gallery`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          prefix,
-          limit: 100,
-          offset: 0,
-          sortBy: {
-            column: "name",
-            order: "desc"
-          }
-        })
-      }
-    );
-
-    const text = await resp.text();
-
+    // Storage list caps at 100 items per call. Page through with offset so a
+    // section with more than 100 photos returns every object — otherwise the
+    // newest 100 (sortBy name desc) win and older photos silently drop out of
+    // the gallery (both admin manager and public site).
+    const PAGE_SIZE = 100;
     let data = [];
-    try {
-      data = text ? JSON.parse(text) : [];
-    } catch {
-      data = [];
-    }
+    for (let offset = 0; offset < 5000; offset += PAGE_SIZE) {
+      const resp = await fetch(
+        `${env.SUPABASE_URL}/storage/v1/object/list/gallery`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            prefix,
+            limit: PAGE_SIZE,
+            offset,
+            sortBy: {
+              column: "name",
+              order: "desc"
+            }
+          })
+        }
+      );
 
-    if (!resp.ok) {
-      return {
-        ok: false,
-        error: data || text || `Supabase storage list failed: ${resp.status}`
-      };
+      const text = await resp.text();
+
+      let page = [];
+      try {
+        page = text ? JSON.parse(text) : [];
+      } catch {
+        page = [];
+      }
+
+      if (!resp.ok) {
+        return {
+          ok: false,
+          error: page || text || `Supabase storage list failed: ${resp.status}`
+        };
+      }
+
+      if (!Array.isArray(page) || page.length === 0) break;
+      data = data.concat(page);
+      if (page.length < PAGE_SIZE) break;
     }
 
     const photos = (Array.isArray(data) ? data : [])
