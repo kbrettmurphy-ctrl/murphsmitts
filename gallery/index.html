@@ -156,7 +156,7 @@ body_class: inner
       section.innerHTML = `
         <div class="gallery-category-head">
           <h2 class="mm-section-title">${escapeHtml(label)}</h2>
-          <a class="gallery-view-all" href="?category=${encodeURIComponent(key)}">View all ${albums.length} ${escapeHtml(label)} &rarr;</a>
+          <a class="gallery-view-all" href="?category=${encodeURIComponent(key)}">View all ${albums.length} &rarr;</a>
         </div>
         <div class="gallery-preview-row" data-gallery-group="${escapeHtml(key)}">
           ${featured.map((album, index) => thumbHtml(key, label, album, index)).join("")}

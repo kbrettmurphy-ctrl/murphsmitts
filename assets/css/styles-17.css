@@ -2152,4 +2152,6 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
     scroll-snap-align: start;
   }
   .gallery-full-grid{ grid-template-columns: repeat(2, 1fr); }
+  /* Smaller so the full placeholder fits on a phone */
+  .glove-search-input{ font-size: 12.5px; padding: 9px 14px; }
 }
