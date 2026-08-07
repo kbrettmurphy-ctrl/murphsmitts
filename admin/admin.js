@@ -108,6 +108,11 @@ let galleryPhotoActionMenuEl = null;
 let galleryPhotos = [];
 let galleryManagerFilter = "all";
 let galleryManagerSearch = "";
+/* Shop-glove grouping: multi-select mode in the gallery manager. When active,
+   each card gets a tap-to-toggle overlay; the action bar groups/ungroups the
+   selected photos under a shared group_key. */
+let gallerySelectMode = false;
+const gallerySelectedUrls = new Set();
 let galleryPhotoPressTimer = null;
 let galleryPhotoPressStart = null;
 let orderPhotoPressTimer = null;
@@ -12943,6 +12948,9 @@ function initUploadView() {
     galleryManagerSearch = managerSearch.value.trim().toLowerCase();
     renderGalleryManagerPhotos();
   });
+  document.getElementById("galleryManagerSelectBtn")?.addEventListener("click", toggleGallerySelectMode);
+  document.getElementById("galleryManagerGroupBtn")?.addEventListener("click", groupSelectedGalleryPhotos);
+  document.getElementById("galleryManagerUngroupBtn")?.addEventListener("click", ungroupSelectedGalleryPhotos);
   setGalleryUploaderOpen(false);
   loadGalleryManagerPhotos();
 }
@@ -13049,11 +13057,14 @@ function renderGalleryManagerPhotos() {
   }
 
   list.innerHTML = `
-    <div class="gallery-manager-grid">
-      ${entries.map(({ photo, index }) => `
+    <div class="gallery-manager-grid${gallerySelectMode ? " is-selecting" : ""}">
+      ${entries.map(({ photo, index }) => {
+        const selected = gallerySelectMode && gallerySelectedUrls.has(photo.url);
+        return `
         <article
-          class="gallery-manager-item${photo.hidden ? " is-gallery-hidden" : ""}"
+          class="gallery-manager-item${photo.hidden ? " is-gallery-hidden" : ""}${selected ? " is-selected" : ""}"
           data-gallery-index="${index}"
+          data-photo-url="${escapeAttr(photo.url)}"
           tabindex="0">
           <button class="gallery-manager-thumb" type="button" data-gallery-action="view">
             <img src="${escapeAttr(photo.url)}" alt="${escapeAttr(photo.name || "Gallery photo")}" loading="lazy">
@@ -13065,20 +13076,118 @@ function renderGalleryManagerPhotos() {
               ${photo.hidden ? `<span class="gallery-manager-pill">Hidden</span>` : ""}
               ${photo.linkedOrder ? `<span class="gallery-manager-pill gallery-linked-pill">#${escapeHtml(photo.linkedOrder)}</span>` : ""}
               ${photo.gloveMeta ? `<span class="gallery-manager-pill gallery-linked-pill">Shop glove</span>` : ""}
+              ${photo.groupKey ? `<span class="gallery-manager-pill gallery-group-pill">Grouped</span>` : ""}
             </div>
           </div>
           <label class="sr-only" for="galleryActionSelect${index}">Gallery photo actions</label>
           <select id="galleryActionSelect${index}" class="gallery-manager-action-select" data-gallery-action="select" aria-label="Gallery photo actions">
             ${buildGalleryPhotoActionSelectOptions(photo)}
           </select>
+          ${gallerySelectMode ? `<button class="gallery-select-overlay" type="button" data-gallery-select-toggle aria-pressed="${selected ? "true" : "false"}" aria-label="${selected ? "Deselect photo" : "Select photo"}"><span class="gallery-select-check" aria-hidden="true">${selected ? "✓" : ""}</span></button>` : ""}
         </article>
-      `).join("")}
+      `;}).join("")}
     </div>
   `;
 
   list.querySelectorAll(".gallery-manager-item").forEach(item => {
     attachGalleryManagerItemActions(item);
   });
+}
+
+/* ---- Shop-glove grouping: multi-select in the gallery manager ---- */
+function toggleGallerySelectMode() {
+  gallerySelectMode = !gallerySelectMode;
+  gallerySelectedUrls.clear();
+  const btn = document.getElementById("galleryManagerSelectBtn");
+  if (btn) btn.textContent = gallerySelectMode ? "Cancel" : "Select";
+  updateGallerySelectBar();
+  renderGalleryManagerPhotos();
+}
+
+function exitGallerySelectMode() {
+  gallerySelectMode = false;
+  gallerySelectedUrls.clear();
+  const btn = document.getElementById("galleryManagerSelectBtn");
+  if (btn) btn.textContent = "Select";
+  updateGallerySelectBar();
+}
+
+/* Toggle one card in place — a full re-render on every tap would reset the
+   grid's scroll position, which reads as a page jump mid-selection. */
+function toggleGalleryPhotoSelected(url) {
+  if (!url) return;
+  const selected = !gallerySelectedUrls.has(url);
+  if (selected) gallerySelectedUrls.add(url);
+  else gallerySelectedUrls.delete(url);
+  const item = document.querySelector(`.gallery-manager-item[data-photo-url="${CSS.escape(url)}"]`);
+  if (item) {
+    item.classList.toggle("is-selected", selected);
+    const toggle = item.querySelector("[data-gallery-select-toggle]");
+    if (toggle) {
+      toggle.setAttribute("aria-pressed", selected ? "true" : "false");
+      toggle.setAttribute("aria-label", selected ? "Deselect photo" : "Select photo");
+      const check = toggle.querySelector(".gallery-select-check");
+      if (check) check.textContent = selected ? "✓" : "";
+    }
+  }
+  updateGallerySelectBar();
+}
+
+function updateGallerySelectBar() {
+  const bar = document.getElementById("galleryManagerSelectBar");
+  if (bar) bar.hidden = !gallerySelectMode;
+  const countEl = document.getElementById("galleryManagerSelectCount");
+  const n = gallerySelectedUrls.size;
+  if (countEl) countEl.textContent = `${n} selected`;
+  const groupBtn = document.getElementById("galleryManagerGroupBtn");
+  const ungroupBtn = document.getElementById("galleryManagerUngroupBtn");
+  // Group needs 2+ photos; Ungroup needs at least one already-grouped photo.
+  if (groupBtn) groupBtn.disabled = n < 2;
+  if (ungroupBtn) {
+    const anyGrouped = [...gallerySelectedUrls].some(u => galleryPhotos.find(p => p.url === u)?.groupKey);
+    ungroupBtn.disabled = !anyGrouped;
+  }
+}
+
+async function groupSelectedGalleryPhotos() {
+  const status = document.getElementById("galleryManagerStatus");
+  const urls = [...gallerySelectedUrls];
+  if (urls.length < 2) return;
+  const groupKey = (typeof crypto?.randomUUID === "function")
+    ? crypto.randomUUID()
+    : `sg-${Date.now()}-${Math.round(performance.now())}`;
+  const byUrl = new Map(galleryPhotos.map(p => [p.url, p]));
+  try {
+    for (const url of urls) {
+      await postJson({ action: "setGalleryPhotoGroup", url, path: byUrl.get(url)?.path, groupKey }, true);
+    }
+    // Give the group a cover if none of the selected photos already is one.
+    if (!urls.some(u => byUrl.get(u)?.isCover)) {
+      await postJson({ action: "setGalleryPhotoCover", url: urls[0] }, true);
+    }
+    if (status) status.textContent = `Grouped ${urls.length} photos into one glove.`;
+    exitGallerySelectMode();
+    await loadGalleryManagerPhotos();
+  } catch (err) {
+    if (status) status.textContent = err.message || "Could not group the photos.";
+  }
+}
+
+async function ungroupSelectedGalleryPhotos() {
+  const status = document.getElementById("galleryManagerStatus");
+  const urls = [...gallerySelectedUrls];
+  if (!urls.length) return;
+  const byUrl = new Map(galleryPhotos.map(p => [p.url, p]));
+  try {
+    for (const url of urls) {
+      await postJson({ action: "setGalleryPhotoGroup", url, path: byUrl.get(url)?.path, groupKey: "" }, true);
+    }
+    if (status) status.textContent = `Ungrouped ${urls.length} photo${urls.length === 1 ? "" : "s"}.`;
+    exitGallerySelectMode();
+    await loadGalleryManagerPhotos();
+  } catch (err) {
+    if (status) status.textContent = err.message || "Could not ungroup.";
+  }
 }
 
 function getFilteredGalleryManagerEntries() {
@@ -13107,8 +13216,19 @@ function getFilteredGalleryManagerEntries() {
 }
 
 function attachGalleryManagerItemActions(item) {
+  const selectToggle = item.querySelector("[data-gallery-select-toggle]");
+  if (selectToggle) {
+    selectToggle.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const photo = getGalleryManagerPhoto(item);
+      if (photo) toggleGalleryPhotoSelected(photo.url);
+    });
+  }
+
   item.addEventListener("contextmenu", (e) => {
     e.preventDefault();
+    if (gallerySelectMode) return;
     const photo = getGalleryManagerPhoto(item);
     if (photo) openGalleryPhotoActionMenu(photo, e);
   });
@@ -13128,11 +13248,13 @@ function attachGalleryManagerItemActions(item) {
 
   item.querySelector("[data-gallery-action='view']")?.addEventListener("click", (e) => {
     e.preventDefault();
+    if (gallerySelectMode) return;
     const photo = getGalleryManagerPhoto(item);
     if (photo?.url) window.open(photo.url, "_blank", "noopener");
   });
 
   item.addEventListener("touchstart", (e) => {
+    if (gallerySelectMode) return;
     const touch = e.touches?.[0];
     galleryPhotoPressStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
     clearTimeout(galleryPhotoPressTimer);
@@ -13444,7 +13566,7 @@ function openGalleryPhotoActionMenu(photo, source) {
       : `<button class="workflow-action-btn" type="button" data-gallery-menu-action="hide">Hide from Gallery</button>`}
     <button class="workflow-action-btn" type="button" data-gallery-menu-action="link">${photo.linkedOrder ? `Linked to #${escapeHtml(photo.linkedOrder)} — change…` : "Link to Order…"}</button>
     <button class="workflow-action-btn" type="button" data-gallery-menu-action="describe">${photo.gloveMeta ? "Shop glove details — edit…" : "Describe Glove (no order)…"}</button>
-    ${photo.linkedOrder ? `<button class="workflow-action-btn" type="button" data-gallery-menu-action="cover">${photo.isCover ? "Album Cover ✓" : "Make Album Cover"}</button>` : ""}
+    ${(photo.linkedOrder || photo.groupKey) ? `<button class="workflow-action-btn" type="button" data-gallery-menu-action="cover">${photo.isCover ? "Album Cover ✓" : "Make Album Cover"}</button>` : ""}
     <button class="workflow-action-btn" type="button" data-gallery-menu-action="move">Move to Section…</button>
     <button class="workflow-action-btn danger" type="button" data-gallery-menu-action="delete">Delete Photo</button>
   `;
@@ -13490,12 +13612,17 @@ async function runGalleryPhotoAction(photo, action) {
   if (action === "cover") {
     try {
       await postJson({ action: "setGalleryPhotoCover", url: photo.url }, true);
+      // Cover is scoped to an album: an order, or a shop-glove group.
+      const albumKey = photo.linkedOrder || photo.groupKey;
       galleryPhotos.forEach(p => {
-        if (p.linkedOrder && p.linkedOrder === photo.linkedOrder) p.isCover = false;
+        const pk = p.linkedOrder || p.groupKey;
+        if (albumKey && pk === albumKey) p.isCover = false;
       });
       const target = galleryPhotos.find(p => p.url === photo.url) || photo;
       target.isCover = true;
-      if (status) status.textContent = `Set as the album cover for #${photo.linkedOrder}.`;
+      if (status) status.textContent = photo.linkedOrder
+        ? `Set as the album cover for #${photo.linkedOrder}.`
+        : "Set as this shop glove's cover.";
       renderGalleryManagerPhotos();
     } catch (err) {
       if (status) status.textContent = err.message || "Could not set the cover.";

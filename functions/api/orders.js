@@ -2192,33 +2192,52 @@ async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
   const gloves = [];
   const links = await supabaseFetch(
     env,
-    `/rest/v1/gallery_photo_links?select=photo_url,order_number,is_cover,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
+    `/rest/v1/gallery_photo_links?select=photo_url,order_number,is_cover,group_key,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
   );
   const linkRows = (links.ok && Array.isArray(links.data)) ? links.data : [];
   const byOrder = new Map();
-  // Cover-first URL list for an order, so the search tile uses the designated
-  // album cover, not whatever row the DB returned first.
-  const orderPhotos = (order) => (byOrder.get(order) || [])
+  const byGroup = new Map();
+  // Cover-first URL list for an album, so the search tile uses the designated
+  // cover, not whatever row the DB returned first.
+  const coverFirst = (map, key) => (map.get(key) || [])
     .slice()
     .sort((a, b) => (b.cover === true) - (a.cover === true))
     .map(p => p.url);
+  const orderPhotos = (order) => coverFirst(byOrder, order);
+  const descriptorRows = [];
   for (const l of linkRows) {
     if (l.order_number) {
       if (!byOrder.has(l.order_number)) byOrder.set(l.order_number, []);
       byOrder.get(l.order_number).push({ url: l.photo_url, cover: l.is_cover === true });
       continue;
     }
+    // Collect every grouped photo (described or not) so a described shop glove
+    // can show all of its group's angles, not just the described one.
+    if (l.group_key) {
+      if (!byGroup.has(l.group_key)) byGroup.set(l.group_key, []);
+      byGroup.get(l.group_key).push({ url: l.photo_url, cover: l.is_cover === true });
+    }
     const fields = [l.brand_model, l.glove_type, l.web_type, l.primary_lace_color, l.secondary_lace_color];
-    if (!fields.some(Boolean)) continue;
+    if (fields.some(Boolean)) descriptorRows.push(l);
+  }
+  const seenGroups = new Set();
+  for (const l of descriptorRows) {
+    const fields = [l.brand_model, l.glove_type, l.web_type, l.primary_lace_color, l.secondary_lace_color];
     const hay = fields.map(v => String(v || "").toLowerCase()).join(" ");
     if (!terms.every(t => hay.includes(t))) continue;
+    // A grouped shop glove is one result with all its angles; emit it once even
+    // if several photos in the group carry descriptors.
+    if (l.group_key) {
+      if (seenGroups.has(l.group_key)) continue;
+      seenGroups.add(l.group_key);
+    }
     const brand = String(l.brand_model || "").toLowerCase();
     gloves.push({
       brandModel: l.brand_model || "",
       gloveType: l.glove_type || "",
       webType: l.web_type || "",
       laceColors: [l.primary_lace_color, l.secondary_lace_color].filter(Boolean),
-      photos: [l.photo_url],
+      photos: l.group_key ? coverFirst(byGroup, l.group_key).slice(0, 4) : [l.photo_url],
       orderNum: 0,
       brandHit: terms.every(t => brand.includes(t))
     });

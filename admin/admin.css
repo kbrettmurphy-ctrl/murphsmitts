@@ -7763,6 +7763,92 @@ body.has-notifications .topbar-menu-btn::after{
   }
 }
 
+/* ---- Shop-glove grouping: gallery manager multi-select ---- */
+.gallery-manager-select-btn{
+  flex:0 0 auto;
+}
+/* "Grouped" pill — teal, distinct from the navy order-# pill so grouped shop
+   gloves read at a glance. */
+.gallery-manager-pill.gallery-group-pill{
+  background:rgba(14,90,99,.14);
+  color:#0e5a63;
+}
+.gallery-select-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:8px 0 0;
+  padding:8px 10px;
+  border-radius:10px;
+  background:#fffaf3;
+  border:1px solid rgba(9,47,77,.14);
+}
+.gallery-select-bar[hidden]{ display:none; }
+.gallery-select-count{
+  font-size:.8rem;
+  font-weight:600;
+  color:var(--navy);
+}
+.gallery-select-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+/* Narrow screens: stack the count over the actions so the buttons never run
+   off the edge (no horizontal overflow). */
+@media (max-width:560px){
+  .gallery-select-bar{
+    flex-direction:column;
+    align-items:stretch;
+  }
+}
+/* Full-card tap target in select mode: sits above the thumb + action select
+   so the whole card toggles selection without hijacking their handlers. */
+.gallery-manager-item{ position:relative; }
+.gallery-select-overlay{
+  position:absolute;
+  inset:0;
+  z-index:6;
+  margin:0;
+  padding:0;
+  border:0;
+  background:transparent;
+  border-radius:inherit;
+  cursor:pointer;
+}
+.gallery-select-check{
+  position:absolute;
+  top:6px;
+  left:6px;
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  background:#fff;
+  border:2px solid var(--navy);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:13px;
+  font-weight:700;
+  line-height:1;
+  color:var(--navy);
+  box-shadow:0 1px 3px rgba(9,47,77,.25);
+}
+.gallery-manager-item.is-selected{
+  outline:2px solid var(--navy);
+  outline-offset:-2px;
+}
+.gallery-manager-item.is-selected .gallery-select-check{
+  background:var(--navy);
+  color:#fff;
+}
+/* While selecting, the per-card action dropdown is hidden — the card is a toggle. */
+.gallery-manager-grid.is-selecting .gallery-manager-action-select{
+  display:none;
+}
+
 /* Gallery photo action menu: compact. Scoped to gallery-photo-menu-root so
    the orders workflow sheet keeps its own sizing. */
 .gallery-photo-menu-root .workflow-sheet{
