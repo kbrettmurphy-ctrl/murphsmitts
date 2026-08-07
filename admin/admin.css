@@ -5125,7 +5125,7 @@ button.secondary:active,
 }
 
 .gallery-upload-card select,
-.gallery-manager-filter,
+select.gallery-manager-filter,
 .gallery-manager-action-select,
 .store-editor-card .detail-block select,
 .sale-photo-action-select,
