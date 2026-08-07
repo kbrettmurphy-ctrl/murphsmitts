@@ -8236,7 +8236,16 @@ async function chooseOrderGalleryUpload(order, anchor) {
 async function uploadOrderGalleryPhotos(order, files, section) {
   const addBtn = document.getElementById("orderPhotoAddBtn");
   const total = files.length;
-  const orderNumber = String(order.orderNumber || "").trim();
+  /* Resolve the order number from the passed order or the active detail order.
+     A re-rendered photo section can rebind this handler with an order that
+     lost its number, and setGalleryPhotoOrder treats an empty number as
+     "clear the link" — which silently uploads the photos to the gallery
+     unlinked. Never proceed without a real order number. */
+  const orderNumber = String(order?.orderNumber || currentOrder?.orderNumber || "").trim();
+  if (!orderNumber) {
+    setOrderPhotoStatus("Couldn't determine the order number — no photos were uploaded.");
+    return;
+  }
   let linked = 0;
   const failed = [];
 
@@ -8255,12 +8264,15 @@ async function uploadOrderGalleryPhotos(order, files, section) {
         dataUrl
       }, true);
 
-      await postJson({
+      const linkResp = await postJson({
         action: "setGalleryPhotoOrder",
         url: result.url,
         path: result.path,
         orderNumber
       }, true);
+      /* ok:true + cleared means the server unlinked instead of linking — never
+         let a photo land in the gallery unlinked without surfacing it. */
+      if (linkResp?.cleared) throw new Error("uploaded but did not link to the order");
       linked += 1;
       setOrderPhotoStatus(`Uploading to Gallery... ${linked}/${total}`);
     } catch (error) {
