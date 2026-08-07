@@ -12764,6 +12764,10 @@ function initUploadView() {
       galleryUploaderToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
       galleryUploaderToggleBtn.setAttribute("aria-label", open ? "Hide gallery uploader" : "Show gallery uploader");
     }
+    // The uploader sits at the top of the manager. When it's opened while
+    // scrolled down (hunting for orders that still need photos), bring it into
+    // view rather than making the user scroll back up to find it.
+    if (open) galleryUploaderCard?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function clearSelection() {
