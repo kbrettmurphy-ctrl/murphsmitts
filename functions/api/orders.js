@@ -5084,6 +5084,10 @@ async function uploadGalleryPhoto(env, { section, filename, contentType, dataUrl
           Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
           apikey: env.SUPABASE_SERVICE_ROLE_KEY,
           "Content-Type": contentType,
+          // Each upload gets a unique timestamped path, so the file at a URL
+          // never changes — cache it hard to cut Supabase egress on repeat
+          // views (default was no-cache = re-download every load).
+          "Cache-Control": "public, max-age=31536000, immutable",
           "x-upsert": "true"
         },
         body: bytes
@@ -5285,6 +5289,8 @@ async function uploadLacePhoto(env, { color, filename, contentType, dataUrl }) {
           Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
           apikey: env.SUPABASE_SERVICE_ROLE_KEY,
           "Content-Type": contentType,
+          // Unique timestamped path → immutable file; cache hard (was no-cache).
+          "Cache-Control": "public, max-age=31536000, immutable",
           "x-upsert": "true"
         },
         body: bytes
@@ -5347,6 +5353,8 @@ async function uploadSaleGlovePhoto(env, { slug, filename, contentType, dataUrl 
           Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
           apikey: env.SUPABASE_SERVICE_ROLE_KEY,
           "Content-Type": contentType,
+          // Unique timestamped path → immutable file; cache hard (was no-cache).
+          "Cache-Control": "public, max-age=31536000, immutable",
           "x-upsert": "true"
         },
         body: bytes
