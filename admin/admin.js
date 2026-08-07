@@ -13073,10 +13073,12 @@ function renderGalleryManagerPhotos() {
           <div class="gallery-manager-meta">
             <div class="gallery-manager-subrow">
               <span>${escapeHtml(photo.sectionLabel)}</span>
-              ${photo.hidden ? `<span class="gallery-manager-pill">Hidden</span>` : ""}
-              ${photo.linkedOrder ? `<span class="gallery-manager-pill gallery-linked-pill">#${escapeHtml(photo.linkedOrder)}</span>` : ""}
-              ${photo.gloveMeta ? `<span class="gallery-manager-pill gallery-linked-pill">Shop glove</span>` : ""}
-              ${photo.groupKey ? `<span class="gallery-manager-pill gallery-group-pill">Grouped</span>` : ""}
+              ${
+                photo.hidden ? `<span class="gallery-manager-pill">Hidden</span>`
+                : photo.linkedOrder ? `<span class="gallery-manager-pill gallery-linked-pill">#${escapeHtml(photo.linkedOrder)}</span>`
+                : photo.gloveMeta ? `<span class="gallery-manager-pill gallery-linked-pill">Shop glove</span>`
+                : ""
+              }
             </div>
           </div>
           <label class="sr-only" for="galleryActionSelect${index}">Gallery photo actions</label>
@@ -13193,7 +13195,7 @@ async function ungroupSelectedGalleryPhotos() {
 function getFilteredGalleryManagerEntries() {
   const activeFilter = galleryManagerFilter || "all";
 
-  return galleryPhotos
+  const entries = galleryPhotos
     .map((photo, index) => ({ photo, index }))
     .filter(({ photo }) => activeFilter === "all" || (activeFilter === "hidden" ? photo.hidden : photo.section === activeFilter))
     .filter(({ photo }) => {
@@ -13201,18 +13203,35 @@ function getFilteredGalleryManagerEntries() {
       const hay = [photo.linkedOrder, photo.name, photo.sectionLabel, photo.gloveMeta?.brandModel]
         .map(v => String(v || "").toLowerCase()).join(" ");
       return hay.includes(galleryManagerSearch);
-    })
-    /* Keep each glove's album together: unlinked photos first (they need
-       attention), then orders newest-first, cover photo leading its album. */
-    .sort((a, b) => {
-      const ao = a.photo.linkedOrder ? parseInt(a.photo.linkedOrder, 10) : null;
-      const bo = b.photo.linkedOrder ? parseInt(b.photo.linkedOrder, 10) : null;
-      if (ao === null && bo !== null) return -1;
-      if (bo === null && ao !== null) return 1;
-      if (ao !== null && bo !== null && ao !== bo) return bo - ao;
-      if (!!a.photo.isCover !== !!b.photo.isCover) return a.photo.isCover ? -1 : 1;
-      return a.index - b.index;
     });
+
+  /* Album identity: order # for customer work, group_key for grouped shop
+     gloves, otherwise the photo stands alone. Keeping album members adjacent
+     means a group's cover leads its own group instead of floating up with
+     every other cover. */
+  const albumIdOf = ({ photo, index }) =>
+    photo.linkedOrder ? `o:${photo.linkedOrder}`
+      : photo.groupKey ? `g:${photo.groupKey}`
+      : `s:${index}`;
+  const albumFirstIndex = new Map();
+  entries.forEach(e => {
+    const id = albumIdOf(e);
+    if (!albumFirstIndex.has(id)) albumFirstIndex.set(id, e.index);
+  });
+
+  /* Unlinked photos (shop gloves) first — they need attention — then orders
+     newest-first. Within a class, keep each album together (ordered by first
+     appearance), and inside an album the cover leads, then original order. */
+  return entries.sort((a, b) => {
+    const ao = a.photo.linkedOrder ? parseInt(a.photo.linkedOrder, 10) : null;
+    const bo = b.photo.linkedOrder ? parseInt(b.photo.linkedOrder, 10) : null;
+    if ((ao === null) !== (bo === null)) return ao === null ? -1 : 1;
+    if (ao !== null && bo !== null && ao !== bo) return bo - ao;
+    const aid = albumIdOf(a), bid = albumIdOf(b);
+    if (aid !== bid) return albumFirstIndex.get(aid) - albumFirstIndex.get(bid);
+    if (!!a.photo.isCover !== !!b.photo.isCover) return a.photo.isCover ? -1 : 1;
+    return a.index - b.index;
+  });
 }
 
 function attachGalleryManagerItemActions(item) {
