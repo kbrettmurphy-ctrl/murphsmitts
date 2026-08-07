@@ -659,6 +659,14 @@ button.secondary{
   display:none;
 }
 
+/* Opening the uploader (+) calls scrollIntoView, which parks the card top at
+   the scrollport top — right under the sticky .topbar. Offset by the topbar
+   height (the var tracks desktop 78 / mobile 68) so the whole card, starting
+   at Gallery Section, clears the bar instead of hiding behind it. */
+.gallery-upload-card{
+  scroll-margin-top:calc(var(--topbarH) + 8px);
+}
+
 .gallery-uploader-close-btn{
   min-width:34px;
   width:34px;
