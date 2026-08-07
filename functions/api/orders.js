@@ -408,6 +408,11 @@ const ACTIONS = {
     effects: ["db:orders:read", "db:gallery_photo_links:write", "db:gallery_photo_links:delete"],
     bindings: { required: ["CORE"], optional: [] }
   },
+  setGalleryPhotoGroup: {
+    auth: "session", demo: "deny", handler: handleSetGalleryPhotoGroup,
+    effects: ["db:gallery_photo_links:write"],
+    bindings: { required: ["CORE"], optional: [] }
+  },
   moveGalleryPhoto: {
     auth: "session", demo: "deny", handler: handleMoveGalleryPhoto,
     effects: ["storage:gallery:move", "db:gallery_photo_links:write"],
@@ -1769,13 +1774,19 @@ async function handleSetGalleryPhotoCover({ env, body, jsonHeaders }) {
   if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
   const link = await supabaseFetch(
     env,
-    `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}&select=order_number&limit=1`
+    `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}&select=order_number,group_key&limit=1`
   );
   const row = link.ok && Array.isArray(link.data) ? link.data[0] : null;
-  if (!row?.order_number) {
-    return json({ ok: false, error: "Photo must be linked to an order first." }, 200, jsonHeaders);
+  // Cover is scoped to an album: an order's photos, or a shop-glove group.
+  const scope = row?.order_number
+    ? `order_number=eq.${encodeURIComponent(row.order_number)}`
+    : row?.group_key
+      ? `group_key=eq.${encodeURIComponent(row.group_key)}`
+      : null;
+  if (!scope) {
+    return json({ ok: false, error: "Photo must be linked to an order or grouped first." }, 200, jsonHeaders);
   }
-  await supabaseFetch(env, `/rest/v1/gallery_photo_links?order_number=eq.${encodeURIComponent(row.order_number)}`, {
+  await supabaseFetch(env, `/rest/v1/gallery_photo_links?${scope}`, {
     method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_cover: false })
   });
   const set = await supabaseFetch(env, `/rest/v1/gallery_photo_links?photo_url=eq.${encodeURIComponent(url)}`, {
@@ -1828,6 +1839,26 @@ async function handleSetGalleryPhotoOrder({ env, body, jsonHeaders }) {
     body: JSON.stringify(row)
   });
   if (!resp.ok) return json({ ok: false, error: "Could not save the link." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+/* Group shop-glove photos (no order #) into one album by stamping a shared
+   group_key; clearing it (groupKey falsy) ungroups. merge-duplicates leaves any
+   order_number / descriptors / is_cover on an existing row untouched, and
+   creates the first link row for a photo that was previously only in storage. */
+async function handleSetGalleryPhotoGroup({ env, body, jsonHeaders }) {
+  const url = cleanText(body.url);
+  if (!url) return json({ ok: false, error: "Missing photo url." }, 200, jsonHeaders);
+  const groupKey = cleanText(body.groupKey) || null;
+  const row = { photo_url: url, group_key: groupKey };
+  const path = cleanText(body.path);
+  if (path) row.photo_path = path;
+  const resp = await supabaseFetch(env, `/rest/v1/gallery_photo_links?on_conflict=photo_url`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(row)
+  });
+  if (!resp.ok) return json({ ok: false, error: "Could not group the photo." }, 200, jsonHeaders);
   return json({ ok: true }, 200, jsonHeaders);
 }
 
@@ -2241,10 +2272,11 @@ async function handleListGalleryPhotos({ env, body, jsonHeaders }) {
   let photoLinks = {};
   let photoCovers = {};
   let photoGloveMeta = {};
+  let photoGroups = {};
   {
     const links = await supabaseFetch(
       env,
-      `/rest/v1/gallery_photo_links?select=photo_url,order_number,is_cover,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
+      `/rest/v1/gallery_photo_links?select=photo_url,order_number,is_cover,group_key,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
     );
     if (links.ok && Array.isArray(links.data)) {
       for (const l of links.data) {
@@ -2253,14 +2285,21 @@ async function handleListGalleryPhotos({ env, body, jsonHeaders }) {
           photoLinks[l.photo_url] = l.order_number;
           continue;
         }
-        if (includeHidden) {
-          photoGloveMeta[l.photo_url] = {
-            brandModel: l.brand_model || "",
-            gloveType: l.glove_type || "",
-            webType: l.web_type || "",
-            primaryLaceColor: l.primary_lace_color || "",
-            secondaryLaceColor: l.secondary_lace_color || ""
-          };
+        // No order: the row may carry a shop-glove group_key and/or descriptors.
+        // group_key is returned unconditionally so the public gallery can group
+        // shop gloves into one album.
+        if (l.group_key) photoGroups[l.photo_url] = l.group_key;
+        const descriptors = {
+          brandModel: l.brand_model || "",
+          gloveType: l.glove_type || "",
+          webType: l.web_type || "",
+          primaryLaceColor: l.primary_lace_color || "",
+          secondaryLaceColor: l.secondary_lace_color || ""
+        };
+        // Only expose gloveMeta when it actually has a descriptor — a bare
+        // group row (group_key only) must not trip the "Shop glove" pill.
+        if (includeHidden && Object.values(descriptors).some(Boolean)) {
+          photoGloveMeta[l.photo_url] = descriptors;
         }
       }
     }
@@ -2293,6 +2332,7 @@ async function handleListGalleryPhotos({ env, body, jsonHeaders }) {
     photoLinks,
     photoCovers,
     photoGloveMeta,
+    photoGroups,
     hiddenGallery
   }, 200, jsonHeaders);
 }

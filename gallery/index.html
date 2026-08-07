@@ -78,17 +78,20 @@ body_class: inner
     return `${sectionLabel} glove photo ${index + 1}`;
   }
 
-  /* Photos linked to the same order form one glove album: a single cover
-     tile with a count badge, all angles inside the lightbox. Unlinked
-     photos stay as single tiles. */
-  function groupIntoAlbums(photos, links, covers) {
+  /* Photos in the same album form one glove: a single cover tile with a count
+     badge, all angles inside the lightbox. The album key is the order # for
+     customer work, or a shop-glove group_key for gloves with no order (mine,
+     the kids', ones for sale). Order always wins. Ungrouped photos stay as
+     single tiles. */
+  function groupIntoAlbums(photos, links, covers, groups) {
     const albums = [];
-    const byOrder = new Map();
+    const byKey = new Map();
     photos.forEach(photo => {
       const isCover = !!covers[photo.url];
       const order = links[photo.url] || "";
-      if (order && byOrder.has(order)) {
-        const album = byOrder.get(order);
+      const key = order || (groups && groups[photo.url]) || "";
+      if (key && byKey.has(key)) {
+        const album = byKey.get(key);
         if (isCover) {
           album.cover = photo.url;
           album.photos.unshift(photo.url);
@@ -98,7 +101,7 @@ body_class: inner
         return;
       }
       const album = { cover: photo.url, photos: [photo.url], hasCover: isCover, order };
-      if (order) byOrder.set(order, album);
+      if (key) byKey.set(key, album);
       albums.push(album);
     });
     /* Newest work first: sort by order number descending; albums without an
@@ -115,11 +118,11 @@ body_class: inner
   }
 
   const PREVIEW_COUNT = 5;
-  let galleryData = { gallery: {}, links: {}, covers: {} };
+  let galleryData = { gallery: {}, links: {}, covers: {}, groups: {} };
 
   function albumsFor(key) {
     const photos = Array.isArray(galleryData.gallery[key]) ? galleryData.gallery[key] : [];
-    return groupIntoAlbums(photos, galleryData.links, galleryData.covers);
+    return groupIntoAlbums(photos, galleryData.links, galleryData.covers, galleryData.groups);
   }
 
   function thumbHtml(key, label, album, index) {
@@ -213,7 +216,7 @@ body_class: inner
         throw new Error(data.error || "Gallery failed to load.");
       }
 
-      galleryData = { gallery: data.gallery || {}, links: data.photoLinks || {}, covers: data.photoCovers || {} };
+      galleryData = { gallery: data.gallery || {}, links: data.photoLinks || {}, covers: data.photoCovers || {}, groups: data.photoGroups || {} };
       renderGalleryView();
     } catch (err) {
       if (statusEl) {

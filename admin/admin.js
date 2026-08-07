@@ -12854,6 +12854,12 @@ function initUploadView() {
     let linked = 0;
     let linkError = "";
     const failed = [];
+    /* Auto-group: a multi-photo upload with no order # is treated as one shop
+       glove (its angles shot together), so they all get one shared group_key
+       and collapse into a single album. Order-linked uploads group by order. */
+    const autoGroupKey = (!linkOrderNumber && files.length >= 2 && typeof crypto?.randomUUID === "function")
+      ? crypto.randomUUID()
+      : "";
 
     for (const file of files) {
       try {
@@ -12890,6 +12896,20 @@ function initUploadView() {
           } catch (err) {
             linkError = err.message || "Could not link to that order.";
           }
+        }
+
+        // autoGroupKey is only set when there's no order link, so this never
+        // collides with the order-link branch above. Best-effort; a failed
+        // group stamp must never block the uploads themselves.
+        if (autoGroupKey && result?.url) {
+          try {
+            await postJson({
+              action: "setGalleryPhotoGroup",
+              url: result.url,
+              path: result.path,
+              groupKey: autoGroupKey
+            }, true);
+          } catch (err) { /* grouping is best-effort */ }
         }
 
         status.textContent = `Uploaded ${uploaded} of ${files.length} photo${files.length === 1 ? "" : "s"} to ${section}...`;
@@ -12957,10 +12977,12 @@ async function loadGalleryManagerPhotos() {
     const glinks = data.photoLinks || {};
     const gmeta = data.photoGloveMeta || {};
     const gcovers = data.photoCovers || {};
+    const ggroups = data.photoGroups || {};
     galleryPhotos.forEach(ph => {
       ph.linkedOrder = glinks[ph.url] || "";
       ph.gloveMeta = gmeta[ph.url] || null;
       ph.isCover = !!gcovers[ph.url];
+      ph.groupKey = ggroups[ph.url] || "";
     });
     renderGalleryManagerPhotos();
   } catch (err) {

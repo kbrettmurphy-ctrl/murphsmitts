@@ -3319,6 +3319,7 @@ await test("all production actions are registry-backed with no legacy chain", as
     "createOrder",
     "resendStatusEmail",
     "resendStatusText",
+    "sendCombinedBill",
     "updateOrder",
     "geocodeAddresses",
     "geocodeMissingOrderAddresses",
@@ -3337,6 +3338,7 @@ await test("all production actions are registry-backed with no legacy chain", as
     "saveShopSettings",
     "setGalleryPhotoCover",
     "setGalleryPhotoOrder",
+    "setGalleryPhotoGroup",
     "moveGalleryPhoto",
     "hideGalleryPhoto",
     "restoreGalleryPhoto",
@@ -3404,6 +3406,7 @@ await test("all production actions are registry-backed with no legacy chain", as
     ["createOrder", "deny"],
     ["resendStatusEmail", "deny"],
     ["resendStatusText", "deny"],
+    ["sendCombinedBill", "deny"],
     ["updateOrder", "deny"],
     ["geocodeAddresses", "deny"],
     ["geocodeMissingOrderAddresses", "deny"],
@@ -3422,6 +3425,7 @@ await test("all production actions are registry-backed with no legacy chain", as
     ["saveShopSettings", "deny"],
     ["setGalleryPhotoCover", "deny"],
     ["setGalleryPhotoOrder", "deny"],
+    ["setGalleryPhotoGroup", "deny"],
     ["moveGalleryPhoto", "deny"],
     ["hideGalleryPhoto", "deny"],
     ["restoreGalleryPhoto", "deny"],
@@ -3448,7 +3452,7 @@ await test("all production actions are registry-backed with no legacy chain", as
   }
 
   deepEqual(registryActions, expectedRegistryActions);
-  equal(registryActions.length, 83);
+  equal(registryActions.length, 85);
   const registeredHandlers = [];
   for (const entry of registryEntries) {
     ok(/\bauth\s*:/.test(entry.source), `${entry.action} has auth metadata`);
@@ -3511,8 +3515,9 @@ await test("all production actions are registry-backed with no legacy chain", as
           "deleteExpense", "saveShopSettings", "createSaleGlove",
           "updateSaleGlove", "deleteSaleGlove", "deleteOrder",
           "uploadOrderPhoto", "removeOrderPhoto", "createOrder",
-          "resendStatusEmail", "resendStatusText", "updateOrder"
+          "resendStatusEmail", "resendStatusText", "sendCombinedBill", "updateOrder"
           , "uploadGalleryPhoto", "setGalleryPhotoCover", "setGalleryPhotoOrder",
+          "setGalleryPhotoGroup",
           "moveGalleryPhoto", "hideGalleryPhoto", "restoreGalleryPhoto",
           "deleteGalleryPhoto", "uploadLacePhoto", "uploadSaleGlovePhoto",
           "setSalePhotoPrimary", "setSalePhotoHover", "deleteSaleGlovePhoto",
@@ -3659,7 +3664,7 @@ await test("all production actions are registry-backed with no legacy chain", as
   deepEqual([...legacyCounts.entries()].filter(([, count]) => count !== 1), []);
   deepEqual(
     [...registryActions, ...legacyActions].sort(),
-    [...plannedActions, "getBenchFocus", "startBenchWork", "resumePausedLaborForBench", "resumeLaborWithNewBenchWork", "snoozeBenchReminder", "endBenchWork", "resolveBenchWork"].sort()
+    [...plannedActions, "getBenchFocus", "startBenchWork", "resumePausedLaborForBench", "resumeLaborWithNewBenchWork", "snoozeBenchReminder", "endBenchWork", "resolveBenchWork", "sendCombinedBill", "setGalleryPhotoGroup"].sort()
   );
 });
 
