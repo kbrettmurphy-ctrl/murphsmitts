@@ -2126,6 +2126,10 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 }
 .gallery-full-grid .gallery-thumb,
 .gallery-full-grid .glove-search-card{ width: 100%; }
+/* Let items shrink below their content (e.g. the nowrap search caption) so a
+   long caption ellipsis-truncates instead of blowing the column past the
+   viewport. */
+.gallery-full-grid > *{ min-width: 0; }
 
 /* Preview row — fixed grid on desktop (complete cards, no horizontal scroll) */
 .gallery-preview-row{
@@ -2151,7 +2155,7 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
     width: 56vw;
     scroll-snap-align: start;
   }
-  .gallery-full-grid{ grid-template-columns: repeat(2, 1fr); }
+  .gallery-full-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* Keep the input at 16px so iOS Safari doesn't auto-zoom on focus; shrink
      ONLY the placeholder so the full hint still fits. */
   .glove-search-input{ font-size: 16px; padding: 9px 14px; }
