@@ -2179,18 +2179,20 @@ async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
     }
     const fields = [l.brand_model, l.glove_type, l.web_type, l.primary_lace_color, l.secondary_lace_color];
     if (!fields.some(Boolean)) continue;
-    if (gloves.length >= 24) continue;
     const hay = fields.map(v => String(v || "").toLowerCase()).join(" ");
     if (!terms.every(t => hay.includes(t))) continue;
+    const brand = String(l.brand_model || "").toLowerCase();
     gloves.push({
       brandModel: l.brand_model || "",
       gloveType: l.glove_type || "",
       webType: l.web_type || "",
       laceColors: [l.primary_lace_color, l.secondary_lace_color].filter(Boolean),
-      photos: [l.photo_url]
+      photos: [l.photo_url],
+      orderNum: 0,
+      brandHit: terms.every(t => brand.includes(t))
     });
   }
-  if (byOrder.size && gloves.length < 24) {
+  if (byOrder.size) {
     const nums = [...byOrder.keys()].map(n => `"${String(n).replace(/"/g, "")}"`).join(",");
     const ordersResp = await supabaseFetch(
       env,
@@ -2203,17 +2205,26 @@ async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
         row.custom_color_request, row.services_requested
       ].map(v => String(v || "").toLowerCase()).join(" ");
       if (!terms.every(t => hay.includes(t))) continue;
+      const brand = String(row.brand_model || "").toLowerCase();
       gloves.push({
         brandModel: row.brand_model || "",
         gloveType: row.glove_type || "",
         webType: row.web_type || "",
         laceColors: [row.primary_lace_color, row.secondary_lace_color].filter(Boolean),
-        photos: orderPhotos(row.order_number).slice(0, 4)
+        photos: orderPhotos(row.order_number).slice(0, 4),
+        orderNum: parseInt(String(row.order_number).replace(/\D/g, ""), 10) || 0,
+        brandHit: terms.every(t => brand.includes(t))
       });
-      if (gloves.length >= 24) break;
     }
   }
-  return json({ ok: true, gloves, source: "gallery" }, 200, jsonHeaders);
+  /* Rank: exact brand/model matches first, then newest (order number desc).
+     Strip the internal sort fields before returning. */
+  gloves.sort((a, b) => {
+    if (a.brandHit !== b.brandHit) return a.brandHit ? -1 : 1;
+    return b.orderNum - a.orderNum;
+  });
+  const ranked = gloves.slice(0, 24).map(({ orderNum, brandHit, ...g }) => g);
+  return json({ ok: true, gloves: ranked, source: "gallery" }, 200, jsonHeaders);
 }
 
 async function handleListGalleryPhotos({ env, body, jsonHeaders }) {
