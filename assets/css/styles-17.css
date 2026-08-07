@@ -2085,3 +2085,71 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
   pointer-events: none;
   user-select: none;
 }
+
+/* ===== Gallery: category overview + per-category full grid =====
+   Overview shows a fixed row per category (no desktop horizontal scroll) with a
+   "View all N →" link; a category opens into a responsive grid. Mobile keeps the
+   swipe row. Appended block — scoped to gallery classes only. */
+.gallery-category-head{
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.gallery-view-all{
+  flex: 0 0 auto;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.gallery-view-all:hover{ text-decoration: underline; }
+.gallery-head-count{ color: var(--faint); font-weight: 600; }
+.gallery-back-link{
+  display: inline-block;
+  margin-bottom: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  text-decoration: none;
+}
+.gallery-back-link:hover{ text-decoration: underline; }
+
+/* Full category grid — responsive; thumbs/cards fill the cell */
+.gallery-full-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.gallery-full-grid .gallery-thumb,
+.gallery-full-grid .glove-search-card{ width: 100%; }
+
+/* Preview row — fixed grid on desktop (complete cards, no horizontal scroll) */
+.gallery-preview-row{
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+.gallery-preview-row .gallery-thumb{ width: 100%; }
+
+@media (max-width: 700px){
+  /* Preview row — horizontal swipe on mobile */
+  .gallery-preview-row{
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 8px;
+  }
+  .gallery-preview-row::-webkit-scrollbar{ display: none; }
+  .gallery-preview-row .gallery-thumb{
+    flex: 0 0 auto;
+    width: 56vw;
+    scroll-snap-align: start;
+  }
+  .gallery-full-grid{ grid-template-columns: repeat(2, 1fr); }
+}
