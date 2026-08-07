@@ -661,10 +661,12 @@ button.secondary{
 
 /* Opening the uploader (+) calls scrollIntoView, which parks the card top at
    the scrollport top — right under the sticky .topbar. Offset by the topbar
-   height (the var tracks desktop 78 / mobile 68) so the whole card, starting
-   at Gallery Section, clears the bar instead of hiding behind it. */
+   height (--topbarH tracks desktop 78 / mobile 68) PLUS the iOS safe-area inset
+   (the standalone PWA pads .topbar by env(safe-area-inset-top); --topbarH omits
+   it, and it's 0 in desktop/browser) so the whole card, starting at Gallery
+   Section, clears the bar instead of hiding behind it. */
 .gallery-upload-card{
-  scroll-margin-top:calc(var(--topbarH) + 8px);
+  scroll-margin-top:calc(var(--topbarH) + env(safe-area-inset-top, 0px) + 8px);
 }
 
 .gallery-uploader-close-btn{
