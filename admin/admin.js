@@ -9704,6 +9704,7 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
         <input id="workflowDateReceived" type="date" required value="${escapeAttr(dateReceived)}" />
         <label>Estimated completion</label>
         <input id="workflowEstimatedCompletion" type="date" value="${escapeAttr(estimatedCompletion)}" />
+        <div id="workflowPromiseProposal" class="promise-proposal" hidden></div>
       </div>
     `;
   } else if (actionKey === "onHold") {
@@ -9770,6 +9771,10 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
       </div>
     </div>
   `, { assignActionKey: true, formSize });
+
+  if (actionKey === "startWork") {
+    renderPromiseProposalForInput(order, "workflowPromiseProposal", "workflowEstimatedCompletion");
+  }
 }
 
 async function submitWorkflowAction(order, actionKey) {
@@ -16315,21 +16320,20 @@ function getPromiseProposal(order) {
   };
 }
 
-function renderPromiseProposal() {
-  const el = document.getElementById("promiseProposal");
+function renderPromiseProposalForInput(order, targetId, inputId) {
+  const el = document.getElementById(targetId);
   if (!el) return;
-  const order = detailMode === "new" ? getBlankAdminOrder() : currentOrder;
   if (!order) { el.hidden = true; return; }
 
   const fill = () => {
     const p = getPromiseProposal(order);
-    const target = document.getElementById("promiseProposal");
-    if (!target || !p) return;
+    const target = document.getElementById(targetId);
+    if (target !== el || !p) return;
     target.hidden = false;
     target.innerHTML = `
       <span class="promise-text">MurphOS proposes <strong>${escapeHtml(p.dateLabel)}</strong> —
         ${p.queueJobs ? `${p.queueHours.toFixed(1)}h queued (${p.queueJobs} job${p.queueJobs === 1 ? "" : "s"}) + ` : ""}this job ~${p.jobHours.toFixed(1)}h (${escapeHtml(p.jobBasis)}), at ${p.paceHours.toFixed(1)}h/day ${p.paceMeasured ? "measured pace" : "default pace"} + 1 buffer day</span>
-      <button type="button" class="secondary promise-apply-btn" data-promise-date="${escapeAttr(p.dateKey)}">Use</button>
+      <button type="button" class="secondary promise-apply-btn" data-promise-date="${escapeAttr(p.dateKey)}" data-promise-input="${escapeAttr(inputId)}">Use</button>
     `;
   };
 
@@ -16340,10 +16344,15 @@ function renderPromiseProposal() {
   }
 }
 
+function renderPromiseProposal() {
+  const order = detailMode === "new" ? getBlankAdminOrder() : currentOrder;
+  renderPromiseProposalForInput(order, "promiseProposal", "editEstimatedCompletion");
+}
+
 document.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-promise-date]");
   if (!btn) return;
-  const input = document.getElementById("editEstimatedCompletion");
+  const input = document.getElementById(btn.dataset.promiseInput || "editEstimatedCompletion");
   if (!input) return;
   input.value = btn.dataset.promiseDate;
   input.dispatchEvent(new Event("change", { bubbles: true }));
