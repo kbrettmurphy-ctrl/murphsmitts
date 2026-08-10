@@ -9666,7 +9666,9 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
   const existingNote = order.internalNotes || "";
   const priceQuoted = order.priceQuoted ?? "";
   const dateReceived = order.dateReceived || todayForInput();
-  const estimatedCompletion = order.estimatedCompletion || todayForInput();
+  const estimatedCompletion = actionKey === "startWork"
+    ? (getPromiseProposal(order)?.dateKey || order.estimatedCompletion || todayForInput())
+    : (order.estimatedCompletion || todayForInput());
   const dateCompleted = order.dateCompleted || todayForInput();
   const shippingCost = order.shippingCost ?? "";
   const primaryLaceUsed = order.primaryLaceUsed ?? "";
@@ -9704,7 +9706,6 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
         <input id="workflowDateReceived" type="date" required value="${escapeAttr(dateReceived)}" />
         <label>Estimated completion</label>
         <input id="workflowEstimatedCompletion" type="date" value="${escapeAttr(estimatedCompletion)}" />
-        <div id="workflowPromiseProposal" class="promise-proposal" hidden></div>
       </div>
     `;
   } else if (actionKey === "onHold") {
@@ -9772,8 +9773,16 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
     </div>
   `, { assignActionKey: true, formSize });
 
-  if (actionKey === "startWork") {
-    renderPromiseProposalForInput(order, "workflowPromiseProposal", "workflowEstimatedCompletion");
+  if (actionKey === "startWork" && !Array.isArray(moneyLaborSummaryCache)) {
+    const input = document.getElementById("workflowEstimatedCompletion");
+    let edited = false;
+    input?.addEventListener("input", () => { edited = true; }, { once: true });
+    warmLaborSummaryCache().then(() => {
+      const proposal = getPromiseProposal(order);
+      if (document.getElementById("workflowEstimatedCompletion") === input && !edited && proposal) {
+        input.value = proposal.dateKey;
+      }
+    });
   }
 }
 
@@ -16320,20 +16329,21 @@ function getPromiseProposal(order) {
   };
 }
 
-function renderPromiseProposalForInput(order, targetId, inputId) {
-  const el = document.getElementById(targetId);
+function renderPromiseProposal() {
+  const el = document.getElementById("promiseProposal");
   if (!el) return;
+  const order = detailMode === "new" ? getBlankAdminOrder() : currentOrder;
   if (!order) { el.hidden = true; return; }
 
   const fill = () => {
     const p = getPromiseProposal(order);
-    const target = document.getElementById(targetId);
-    if (target !== el || !p) return;
+    const target = document.getElementById("promiseProposal");
+    if (!target || !p) return;
     target.hidden = false;
     target.innerHTML = `
       <span class="promise-text">MurphOS proposes <strong>${escapeHtml(p.dateLabel)}</strong> —
         ${p.queueJobs ? `${p.queueHours.toFixed(1)}h queued (${p.queueJobs} job${p.queueJobs === 1 ? "" : "s"}) + ` : ""}this job ~${p.jobHours.toFixed(1)}h (${escapeHtml(p.jobBasis)}), at ${p.paceHours.toFixed(1)}h/day ${p.paceMeasured ? "measured pace" : "default pace"} + 1 buffer day</span>
-      <button type="button" class="secondary promise-apply-btn" data-promise-date="${escapeAttr(p.dateKey)}" data-promise-input="${escapeAttr(inputId)}">Use</button>
+      <button type="button" class="secondary promise-apply-btn" data-promise-date="${escapeAttr(p.dateKey)}">Use</button>
     `;
   };
 
@@ -16344,15 +16354,10 @@ function renderPromiseProposalForInput(order, targetId, inputId) {
   }
 }
 
-function renderPromiseProposal() {
-  const order = detailMode === "new" ? getBlankAdminOrder() : currentOrder;
-  renderPromiseProposalForInput(order, "promiseProposal", "editEstimatedCompletion");
-}
-
 document.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-promise-date]");
   if (!btn) return;
-  const input = document.getElementById(btn.dataset.promiseInput || "editEstimatedCompletion");
+  const input = document.getElementById("editEstimatedCompletion");
   if (!input) return;
   input.value = btn.dataset.promiseDate;
   input.dispatchEvent(new Event("change", { bubbles: true }));
