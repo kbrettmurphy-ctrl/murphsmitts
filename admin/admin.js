@@ -9666,7 +9666,9 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
   const existingNote = order.internalNotes || "";
   const priceQuoted = order.priceQuoted ?? "";
   const dateReceived = order.dateReceived || todayForInput();
-  const estimatedCompletion = order.estimatedCompletion || todayForInput();
+  const estimatedCompletion = actionKey === "startWork"
+    ? (getPromiseProposal(order)?.dateKey || order.estimatedCompletion || todayForInput())
+    : (order.estimatedCompletion || todayForInput());
   const dateCompleted = order.dateCompleted || todayForInput();
   const shippingCost = order.shippingCost ?? "";
   const primaryLaceUsed = order.primaryLaceUsed ?? "";
@@ -9770,6 +9772,18 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
       </div>
     </div>
   `, { assignActionKey: true, formSize });
+
+  if (actionKey === "startWork" && !Array.isArray(moneyLaborSummaryCache)) {
+    const input = document.getElementById("workflowEstimatedCompletion");
+    let edited = false;
+    input?.addEventListener("input", () => { edited = true; }, { once: true });
+    warmLaborSummaryCache().then(() => {
+      const proposal = getPromiseProposal(order);
+      if (document.getElementById("workflowEstimatedCompletion") === input && !edited && proposal) {
+        input.value = proposal.dateKey;
+      }
+    });
+  }
 }
 
 async function submitWorkflowAction(order, actionKey) {
