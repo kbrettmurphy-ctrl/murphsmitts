@@ -1213,6 +1213,52 @@ if (document.readyState === "loading") {
 }
 
 // =========================
+// Newsletter signup forms
+// =========================
+(() => {
+  document.querySelectorAll("[data-newsletter-form]").forEach((form) => {
+    const status = form.querySelector("[data-newsletter-status]");
+    const button = form.querySelector('button[type="submit"]');
+    const startedAt = Date.now();
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+
+      button.disabled = true;
+      status.className = "newsletter-status is-pending";
+      status.textContent = "Joining the list...";
+
+      try {
+        const response = await fetch("/api/newsletter", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: form.elements.email.value.trim(),
+            firstName: form.elements.firstName?.value.trim() || "",
+            website: form.elements.website.value,
+            source: form.dataset.newsletterSource,
+            startedAt,
+            requestKey: crypto.randomUUID()
+          })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Signup failed.");
+
+        form.reset();
+        status.className = "newsletter-status is-success";
+        status.textContent = "You’re on the list. Thanks for signing up!";
+      } catch (error) {
+        status.className = "newsletter-status is-error";
+        status.textContent = error.message || "Signup failed. Please try again.";
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+})();
+
+// =========================
 // Lace tap toggle (mobile)
 // =========================
 (() => {

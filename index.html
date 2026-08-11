@@ -212,6 +212,25 @@ body_class: home
     </div>
   </section>
 
+  <section class="container home-newsletter" aria-labelledby="home-newsletter-title">
+    <div class="home-newsletter-copy">
+      <p class="mm-eyebrow">From the Bench</p>
+      <h2 id="home-newsletter-title" class="mm-section-title">Keep your glove in the game.</h2>
+      <p class="mm-section-copy">Get practical glove-care tips, interesting glove stories, and occasional updates from the Murph’s Mitts bench.</p>
+    </div>
+    <form class="newsletter-form newsletter-form-home" data-newsletter-form data-newsletter-source="homepage">
+      <div class="newsletter-form-row">
+        <label class="sr-only" for="homeNewsletterFirstName">First name</label>
+        <input id="homeNewsletterFirstName" name="firstName" type="text" autocomplete="given-name" placeholder="First name">
+        <label class="sr-only" for="homeNewsletterEmail">Email address</label>
+        <input id="homeNewsletterEmail" name="email" type="email" autocomplete="email" placeholder="Email address" required>
+        <button class="btn btn-primary" type="submit">Join the list</button>
+      </div>
+      <input class="newsletter-honeypot" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <div class="newsletter-status" data-newsletter-status role="status" aria-live="polite"></div>
+    </form>
+  </section>
+
   <div class="lightbox" aria-hidden="true">
     <button class="lb-close" aria-label="Close">×</button>
     <button class="lb-prev" aria-label="Previous image">←</button>

@@ -1,5 +1,6 @@
 import { sendWebPushToAll } from "./_webpush.js";
 import { isPreviewEnvironment } from "./_env.js";
+import { subscribeNewsletter } from "./_newsletter.js";
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -162,6 +163,14 @@ export async function onRequest(context) {
 
     const insertedRows = createResult.orders;
     if (createResult.replayed === true) {
+      if (body.newsletterOptIn === true) {
+        await subscribeNewsletter(env, {
+          email: shared.email_address,
+          firstName: getFirstName(shared.customer_name),
+          source: "service_request",
+          requestKey: `intake:${idempotencyKey}`
+        });
+      }
       return json(
         buildReplayedIntakeResponse(insertedRows, createResult.notificationResult),
         200,
@@ -170,6 +179,15 @@ export async function onRequest(context) {
     }
 
     const delivery = await deliverIntakeNotifications(env, insertedRows);
+    if (body.newsletterOptIn === true) {
+      const newsletter = await subscribeNewsletter(env, {
+        email: shared.email_address,
+        firstName: getFirstName(shared.customer_name),
+        source: "service_request",
+        requestKey: `intake:${idempotencyKey}`
+      });
+      if (!newsletter.ok) console.error("Service request newsletter opt-in failed", newsletter.error);
+    }
     const orders = delivery.rows.map(mapOrderFromDb);
     const notificationResult = {
       partialSuccess: delivery.failures.length > 0,

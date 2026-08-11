@@ -123,6 +123,14 @@ body_class: inner
                     By checking this box, you agree to receive SMS messages from Murph's Mitts regarding your glove service request, estimates, status updates, pickup notifications, and shipping updates. Message frequency varies. Message and data rates may apply. Reply STOP to opt out.
                   </div>
                 </div>
+
+                <div class="mm-field newsletter-optin-group">
+                  <label class="mm-choice newsletter-optin-label">
+                    <input id="sr-newsletter-opt-in" name="newsletterOptIn" type="checkbox">
+                    <span>Send me occasional glove-care tips and stories.</span>
+                  </label>
+                  <div class="newsletter-optin-disclosure">Optional. You can unsubscribe at any time.</div>
+                </div>
                 
               </div>
             </div>
@@ -932,6 +940,7 @@ body_class: inner
       emailAddress: form.emailAddress.value.trim(),
       phoneNumber: form.phoneNumber.value.trim(),
       smsOptIn: !!smsOptInBox?.checked,
+      newsletterOptIn: !!form.newsletterOptIn?.checked,
       dropOffMethod: selectedValue("dropOffMethod"),
       streetAddress: streetEl.value.trim(),
       city: cityEl.value.trim(),
