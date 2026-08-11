@@ -1,0 +1,34 @@
+---
+layout: default
+title: Confirm Newsletter Signup
+description: Confirm your Murph’s Mitts glove-articles email signup.
+body_class: inner
+noindex: true
+---
+
+<main class="container page page-under-header newsletter-invite-page">
+  <section class="newsletter-invite-card" data-newsletter-invite aria-labelledby="newsletter-invite-title">
+    <p class="mm-eyebrow">Murph’s Mitts Newsletter</p>
+    <h1 class="mm-section-title" id="newsletter-invite-title">Confirm your signup.</h1>
+
+    <div data-invite-loading>
+      <p class="mm-section-copy">Checking your invitation…</p>
+    </div>
+
+    <div data-invite-ready hidden>
+      <p class="mm-section-copy" data-invite-summary></p>
+      <p class="newsletter-invite-disclosure">You’ll get occasional glove-care tips, stories, and shop updates. You can unsubscribe at any time.</p>
+      <button class="btn btn-primary" type="button" data-invite-confirm>Confirm signup</button>
+    </div>
+
+    <div data-invite-success hidden>
+      <p class="mm-section-copy">You’re on the list. Thanks for signing up!</p>
+      <a class="mm-link" href="{{ '/glove-care/' | relative_url }}">Read the latest glove articles</a>
+    </div>
+
+    <div data-invite-error hidden>
+      <p class="newsletter-status is-error" data-invite-error-message>This invitation link is invalid or has expired.</p>
+      <a class="mm-link" href="{{ '/#newsletter-signup' | relative_url }}">Use the regular signup form</a>
+    </div>
+  </section>
+</main>

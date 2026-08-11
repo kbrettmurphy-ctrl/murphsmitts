@@ -1,6 +1,6 @@
 import { isPreviewEnvironment } from "./_env.js";
 
-const SOURCES = new Set(["homepage", "footer", "service_request"]);
+const SOURCES = new Set(["homepage", "footer", "service_request", "customer_invitation"]);
 
 export async function subscribeNewsletter(env, input = {}) {
   const email = normalizeEmail(input.email);

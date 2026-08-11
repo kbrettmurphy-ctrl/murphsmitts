@@ -683,6 +683,72 @@ if (document.readyState === "loading") {
 })();
 
 // =========================
+// Past-customer newsletter invitation confirmation
+// The link only identifies the invitation. Enrollment requires this explicit click.
+// =========================
+(() => {
+  const card = document.querySelector("[data-newsletter-invite]");
+  if (!card) return;
+
+  const loading = card.querySelector("[data-invite-loading]");
+  const ready = card.querySelector("[data-invite-ready]");
+  const success = card.querySelector("[data-invite-success]");
+  const error = card.querySelector("[data-invite-error]");
+  const errorMessage = card.querySelector("[data-invite-error-message]");
+  const summary = card.querySelector("[data-invite-summary]");
+  const button = card.querySelector("[data-invite-confirm]");
+  const token = new URLSearchParams(window.location.search).get("token") || "";
+
+  const show = section => {
+    [loading, ready, success, error].forEach(item => { if (item) item.hidden = item !== section; });
+  };
+
+  const fail = message => {
+    errorMessage.textContent = message || "This invitation link is invalid or has expired.";
+    show(error);
+  };
+
+  fetch(`/api/newsletter-invite?token=${encodeURIComponent(token)}`, {
+    headers: { Accept: "application/json" },
+    cache: "no-store"
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (!data.ok) throw new Error(data.error);
+      if (data.state === "confirmed") {
+        show(success);
+        return;
+      }
+      const person = data.firstName ? `${data.firstName} (${data.maskedEmail})` : data.maskedEmail;
+      summary.textContent = `Join the Murph’s Mitts email list as ${person}.`;
+      show(ready);
+    })
+    .catch(cause => fail(cause.message));
+
+  button?.addEventListener("click", async () => {
+    button.disabled = true;
+    button.textContent = "Confirming…";
+    try {
+      const response = await fetch("/api/newsletter-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ token })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "Signup failed. Please try again.");
+      if (data.suppressed) throw new Error("Signup confirmation is disabled on this preview site.");
+      window.history.replaceState({}, "", window.location.pathname);
+      show(success);
+    } catch (cause) {
+      fail(cause.message);
+    } finally {
+      button.disabled = false;
+      button.textContent = "Confirm signup";
+    }
+  });
+})();
+
+// =========================
 // Mobile menu toggle
 // =========================
 (() => {

@@ -2277,6 +2277,36 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
   }
 }
 
+/* Past-customer newsletter invitation confirmation */
+.newsletter-invite-page{
+  min-height: 58vh;
+  display: grid;
+  place-items: start center;
+}
+.newsletter-invite-card{
+  width: min(100%, 620px);
+  margin-top: clamp(28px, 6vw, 64px);
+  padding: clamp(24px, 5vw, 42px);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-md);
+  background: var(--tint);
+}
+.newsletter-invite-card .mm-section-title{
+  margin-bottom: 14px;
+  font-size: clamp(28px, 4vw, 38px);
+}
+.newsletter-invite-card .mm-section-copy{
+  margin-bottom: 18px;
+}
+.newsletter-invite-disclosure{
+  max-width: 500px;
+  margin: 0 0 22px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.newsletter-invite-card [hidden]{ display: none; }
+
 /* Preview row — fixed grid on desktop (complete cards, no horizontal scroll) */
 .gallery-preview-row{
   display: grid;
