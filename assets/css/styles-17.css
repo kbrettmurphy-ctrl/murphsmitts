@@ -2232,7 +2232,7 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 
   .newsletter-form-home .newsletter-form-row{
     display: grid;
-    grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr);
+    grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
     gap: 8px;
   }
   .newsletter-form-home .newsletter-form-row .btn{
