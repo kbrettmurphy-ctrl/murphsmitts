@@ -2135,9 +2135,9 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
    Newsletter signup — homepage, site footer, and service-request opt-in
    -------------------------------------------------------------------------- */
 .home-newsletter{
-  margin-top: var(--section-gap);
-  padding-top: clamp(28px, 5vw, 44px);
-  padding-bottom: clamp(28px, 5vw, 44px);
+  margin-top: clamp(28px, 4vw, 44px);
+  padding-top: clamp(22px, 3vw, 30px);
+  padding-bottom: clamp(22px, 3vw, 30px);
   border-top: 1px solid var(--hairline-soft);
   border-bottom: 1px solid var(--hairline-soft);
   display: grid;
@@ -2156,20 +2156,27 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 .newsletter-form-row input{
   min-width: 0;
   width: 100%;
-  min-height: 42px;
-  padding: 10px 12px;
+  height: 34px;
+  padding: 5px 10px;
   border: 1px solid var(--hairline);
   border-radius: 10px;
   background: var(--surface);
   color: var(--navy);
   font: inherit;
+  font-size: 13px;
 }
 .newsletter-form-row input:focus{
   outline: none;
   border-color: var(--navy);
   box-shadow: 0 0 0 3px var(--focus-ring);
 }
-.newsletter-form-row .btn{ flex: 0 0 auto; white-space: nowrap; }
+.newsletter-form-row .btn{
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 5px 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
 .newsletter-status{
   min-height: 1.4em;
   margin-top: 8px;
@@ -2221,7 +2228,7 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
 @media (max-width: 560px){
   .newsletter-form-row{ flex-direction: column; }
   .newsletter-form-row input{ font-size: 16px; }
-  .newsletter-form-row .btn{ width: 100%; }
+  .newsletter-form-row .btn{ align-self: flex-start; }
 }
 
 /* Preview row — fixed grid on desktop (complete cards, no horizontal scroll) */
