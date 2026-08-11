@@ -2229,6 +2229,36 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
   .newsletter-form-row{ flex-direction: column; }
   .newsletter-form-row input{ font-size: 16px; }
   .newsletter-form-row .btn{ align-self: flex-start; }
+
+  /* Keep the sitewide signup from turning the footer into another full section. */
+  .site-footer .footer-inner{
+    padding-top: 28px;
+    padding-bottom: 22px;
+  }
+  .site-footer .footer-top{ gap: 14px; }
+  .site-footer .footer-meta{ gap: 10px; }
+  .site-footer .footer-badge img{ height: 44px; }
+  .site-footer .footer-newsletter{
+    margin-top: 18px;
+    padding-top: 16px;
+    gap: 10px;
+    text-align: left;
+  }
+  .site-footer .footer-newsletter p{ display: none; }
+  .site-footer .newsletter-form-row{
+    flex-direction: row;
+    gap: 8px;
+  }
+  .site-footer .newsletter-form-row .btn{
+    align-self: stretch;
+    padding-inline: 13px;
+  }
+  .site-footer .newsletter-status:empty{ display: none; }
+  .site-footer .footer-bottom{
+    margin-top: 18px;
+    padding-top: 14px;
+    gap: 6px;
+  }
 }
 
 /* Preview row — fixed grid on desktop (complete cards, no horizontal scroll) */
