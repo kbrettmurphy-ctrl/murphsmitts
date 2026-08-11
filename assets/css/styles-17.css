@@ -2131,6 +2131,146 @@ h1.mm-section-title{ font-size: clamp(30px, 4.4vw, 44px); }
    viewport. */
 .gallery-full-grid > *{ min-width: 0; }
 
+/* --------------------------------------------------------------------------
+   Newsletter signup — homepage, site footer, and service-request opt-in
+   -------------------------------------------------------------------------- */
+.home-newsletter{
+  margin-top: clamp(28px, 4vw, 44px);
+  padding-top: clamp(22px, 3vw, 30px);
+  padding-bottom: clamp(22px, 3vw, 30px);
+  border-top: 1px solid var(--hairline-soft);
+  border-bottom: 1px solid var(--hairline-soft);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(420px, .95fr);
+  gap: clamp(28px, 6vw, 72px);
+  align-items: center;
+}
+.home-newsletter-copy .mm-section-copy{ max-width: 600px; }
+.newsletter-form{ min-width: 0; }
+.newsletter-form-row{
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  min-width: 0;
+}
+.newsletter-form-row input{
+  min-width: 0;
+  width: 100%;
+  height: 34px;
+  padding: 5px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--navy);
+  font: inherit;
+  font-size: 13px;
+}
+.newsletter-form-row input:focus{
+  outline: none;
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+.newsletter-form-row .btn{
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 5px 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.newsletter-status{
+  min-height: 1.4em;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.newsletter-status.is-success{ color: #27633c; }
+.newsletter-status.is-error{ color: var(--red); }
+.newsletter-honeypot{
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+}
+.footer-newsletter{
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hairline-soft);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 460px);
+  gap: 28px;
+  align-items: center;
+}
+.footer-newsletter-title{
+  font-size: 14px;
+  font-weight: 620;
+  color: var(--navy);
+}
+.footer-newsletter p{
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.newsletter-optin-group{ grid-column: 1 / -1; }
+.newsletter-optin-label{ align-items: flex-start; }
+.newsletter-optin-label input{ margin-top: 3px; }
+.newsletter-optin-disclosure{
+  margin-top: 5px;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+@media (max-width: 800px){
+  .home-newsletter,
+  .footer-newsletter{ grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px){
+  .newsletter-form-row{ flex-direction: column; }
+  .newsletter-form-row input{ font-size: 16px; }
+  .newsletter-form-row .btn{ align-self: flex-start; }
+
+  .newsletter-form-home .newsletter-form-row{
+    display: grid;
+    grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+    gap: 8px;
+  }
+  .newsletter-form-home .newsletter-form-row .btn{
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  /* Keep the sitewide signup from turning the footer into another full section. */
+  .site-footer .footer-inner{
+    padding-top: 28px;
+    padding-bottom: 22px;
+  }
+  .site-footer .footer-top{ gap: 14px; }
+  .site-footer .footer-meta{ gap: 10px; }
+  .site-footer .footer-badge img{ height: 44px; }
+  .site-footer .footer-newsletter{
+    margin-top: 18px;
+    padding-top: 16px;
+    gap: 10px;
+    text-align: left;
+  }
+  .site-footer .footer-newsletter p{ display: none; }
+  .site-footer .newsletter-form-row{
+    flex-direction: row;
+    gap: 8px;
+  }
+  .site-footer .newsletter-form-row .btn{
+    align-self: stretch;
+    padding-inline: 13px;
+  }
+  .site-footer .newsletter-status:empty{ display: none; }
+  .site-footer .footer-bottom{
+    margin-top: 18px;
+    padding-top: 14px;
+    gap: 6px;
+  }
+}
+
 /* Preview row — fixed grid on desktop (complete cards, no horizontal scroll) */
 .gallery-preview-row{
   display: grid;

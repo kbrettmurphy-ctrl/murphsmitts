@@ -41,6 +41,7 @@ Pass condition: none of the responses contains the requested repository source. 
 | `ADMIN_PIN`, `ADMIN_SESSION_SECRET` | Owner fallback login and signed session/challenge tokens |
 | `WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN` | Optional explicit passkey relying-party/origin configuration |
 | `RESEND_API_KEY`, `RESEND_FROM`, `RESEND_REPLY_TO` | Customer status, owner, and invite email |
+| `RESEND_NEWSLETTER_SEGMENT_ID`, `RESEND_NEWSLETTER_TOPIC_ID` | Newsletter contact enrollment; configure the Topic as public and opt-out by default so only explicit signups receive Broadcasts |
 | `OWNER_NOTIFICATION_EMAIL` | Optional explicit new-order recipient |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_SERVICE_SID` | Outbound SMS/MMS, inbound webhook signature validation, and media download authentication |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Admin Web Push |
