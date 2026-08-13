@@ -106,6 +106,9 @@ test("Import action stays beside Remove without a redundant found header", () =>
   assert.doesNotMatch(adminSource, /review(?:s)? found/);
   assert.match(adminSource, /class="review-import-row-actions"/);
   assert.match(adminSource, /review-remove-draft[\s\S]*?data-review-import-save/);
+  assert.match(adminSource, /data-review-parse>Preview<\/button>/);
+  assert.match(adminSource, /data-review-import-save>Import<\/button>/);
+  assert.doesNotMatch(adminSource, />Preview Import<|data-review-import-save>Import \$\{/);
 });
 
 test("Every Reviews button uses the standardized secondary button class", () => {

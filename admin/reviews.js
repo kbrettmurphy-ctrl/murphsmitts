@@ -77,14 +77,14 @@ function renderReviewImport() {
             </div>
             <textarea data-review-draft-field="reviewText" rows="3" aria-label="Review text">${escapeHtml(review.reviewText)}</textarea>
             <label class="review-import-excerpt"><span>Homepage excerpt <small>Editable suggestion used only if this review is featured on the homepage.</small></span><textarea data-review-draft-field="homepageExcerpt" rows="2" aria-label="Homepage excerpt">${escapeHtml(review.homepageExcerpt || "")}</textarea></label>
-            <div class="review-import-row-actions"><button class="secondary review-remove-draft" type="button" data-review-remove-draft="${index}">Remove</button>${index === parsedReviewDrafts.length - 1 ? `<button class="secondary review-import-save" type="button" data-review-import-save>Import ${parsedReviewDrafts.length}</button><span id="reviewImportStatus" class="status" aria-live="polite"></span>` : ""}</div>
+            <div class="review-import-row-actions"><button class="secondary review-remove-draft" type="button" data-review-remove-draft="${index}">Remove</button>${index === parsedReviewDrafts.length - 1 ? `<button class="secondary review-import-save" type="button" data-review-import-save>Import</button><span id="reviewImportStatus" class="status" aria-live="polite"></span>` : ""}</div>
           </div>`).join("")}
       </div>`
     : "";
   return `<div class="dashboard-card review-import-card">
     <div class="review-card-heading"><div><h2>Paste Google Reviews</h2><p class="muted">In Google Maps, copy one or more complete review blocks. MurphOS will separate them for confirmation.</p></div><button class="secondary topbar-icon-action" type="button" data-review-import-close aria-label="Close importer">×</button></div>
     <textarea id="reviewPasteInput" rows="8" placeholder="Paste copied Google review blocks here…"></textarea>
-    <div class="review-import-actions"><button class="secondary" type="button" data-review-parse>Preview Import</button><span class="muted">Duplicate names + review text are skipped automatically.</span></div>
+    <div class="review-import-actions"><button class="secondary" type="button" data-review-parse>Preview</button><span class="muted">Duplicate names + review text are skipped automatically.</span></div>
     ${preview}
   </div>`;
 }
