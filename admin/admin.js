@@ -9386,6 +9386,11 @@ function positionAdminFilterPopover(popover, toggle) {
 
   const margin = 12;
   const popoverRect = popover.getBoundingClientRect();
+  // The topbar uses backdrop-filter, so WebKit treats it as the containing
+  // block for fixed descendants. Account for that offset while keeping the
+  // popover clamped to the actual viewport.
+  const containingBlockLeft = popoverRect.left;
+  const containingBlockTop = popoverRect.top;
   const left = Math.min(
     Math.max(margin, anchor.x - popoverRect.width),
     Math.max(margin, window.innerWidth - popoverRect.width - margin)
@@ -9395,8 +9400,8 @@ function positionAdminFilterPopover(popover, toggle) {
     Math.max(margin, window.innerHeight - popoverRect.height - margin)
   );
 
-  popover.style.left = `${left}px`;
-  popover.style.top = `${top}px`;
+  popover.style.left = `${left - containingBlockLeft}px`;
+  popover.style.top = `${top - containingBlockTop}px`;
 }
 
 function isDesktopHoverMenu() {
