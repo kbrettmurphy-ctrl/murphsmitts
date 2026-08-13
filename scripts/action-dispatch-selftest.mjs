@@ -3327,6 +3327,10 @@ await test("all production actions are registry-backed with no legacy chain", as
     "listExpenses",
     "createExpense",
     "deleteExpense",
+    "listCustomerReviews",
+    "importCustomerReviews",
+    "updateCustomerReview",
+    "deleteCustomerReview",
     "listServicePricing",
     "listServicePricingHistory",
     "saveServicePricingDraft",
@@ -3414,6 +3418,10 @@ await test("all production actions are registry-backed with no legacy chain", as
     ["listExpenses", "deny"],
     ["createExpense", "deny"],
     ["deleteExpense", "deny"],
+    ["listCustomerReviews", "deny"],
+    ["importCustomerReviews", "deny"],
+    ["updateCustomerReview", "deny"],
+    ["deleteCustomerReview", "deny"],
     ["listServicePricing", "deny"],
     ["listServicePricingHistory", "deny"],
     ["saveServicePricingDraft", "deny"],
@@ -3452,7 +3460,7 @@ await test("all production actions are registry-backed with no legacy chain", as
   }
 
   deepEqual(registryActions, expectedRegistryActions);
-  equal(registryActions.length, 85);
+  equal(registryActions.length, 89);
   const registeredHandlers = [];
   for (const entry of registryEntries) {
     ok(/\bauth\s*:/.test(entry.source), `${entry.action} has auth metadata`);
@@ -3664,7 +3672,7 @@ await test("all production actions are registry-backed with no legacy chain", as
   deepEqual([...legacyCounts.entries()].filter(([, count]) => count !== 1), []);
   deepEqual(
     [...registryActions, ...legacyActions].sort(),
-    [...plannedActions, "getBenchFocus", "startBenchWork", "resumePausedLaborForBench", "resumeLaborWithNewBenchWork", "snoozeBenchReminder", "endBenchWork", "resolveBenchWork", "sendCombinedBill", "setGalleryPhotoGroup"].sort()
+    [...plannedActions, "getBenchFocus", "startBenchWork", "resumePausedLaborForBench", "resumeLaborWithNewBenchWork", "snoozeBenchReminder", "endBenchWork", "resolveBenchWork", "sendCombinedBill", "setGalleryPhotoGroup", "listCustomerReviews", "importCustomerReviews", "updateCustomerReview", "deleteCustomerReview"].sort()
   );
 });
 

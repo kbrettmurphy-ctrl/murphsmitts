@@ -350,6 +350,22 @@ const ACTIONS = {
     auth: "session", demo: "deny", handler: handleDeleteExpense,
     effects: ["db:shop_expenses:delete"], bindings: { required: ["CORE"], optional: [] }
   },
+  listCustomerReviews: {
+    auth: "session", demo: "deny", handler: handleListCustomerReviews,
+    effects: ["db:customer_reviews:read"], bindings: { required: ["CORE"], optional: [] }
+  },
+  importCustomerReviews: {
+    auth: "session", demo: "deny", handler: handleImportCustomerReviews,
+    effects: ["db:customer_reviews:read", "db:customer_reviews:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  updateCustomerReview: {
+    auth: "session", demo: "deny", handler: handleUpdateCustomerReview,
+    effects: ["db:customer_reviews:write"], bindings: { required: ["CORE"], optional: [] }
+  },
+  deleteCustomerReview: {
+    auth: "session", demo: "deny", handler: handleDeleteCustomerReview,
+    effects: ["db:customer_reviews:delete"], bindings: { required: ["CORE"], optional: [] }
+  },
   listServicePricing: {
     auth: "session", demo: "deny", handler: handleListServicePricing,
     effects: ["db:service_pricing:read", "db:service_pricing_revisions:read", "db:service_job_types:read", "db:shop_settings:read"],
@@ -1471,6 +1487,145 @@ async function handleDeleteExpense({ env, body, jsonHeaders }) {
   });
   if (!resp.ok) return json({ ok: false, error: "Expense could not be deleted." }, 200, jsonHeaders);
   return json({ ok: true }, 200, jsonHeaders);
+}
+
+async function handleListCustomerReviews({ env, jsonHeaders }) {
+  const resp = await supabaseFetch(
+    env,
+    `/rest/v1/customer_reviews?select=*&order=hidden.asc,review_date.desc.nullslast,created_at.desc&limit=500`
+  );
+  if (!resp.ok) return json({ ok: false, error: "Reviews could not be loaded." }, 200, jsonHeaders);
+  return json({ ok: true, reviews: (resp.data || []).map(mapCustomerReviewRow) }, 200, jsonHeaders);
+}
+
+async function handleImportCustomerReviews({ env, body, jsonHeaders }) {
+  const submitted = Array.isArray(body.reviews) ? body.reviews.slice(0, 100) : [];
+  if (!submitted.length) {
+    return json({ ok: false, error: "Paste at least one review to import." }, 200, jsonHeaders);
+  }
+
+  const unique = new Map();
+  for (const item of submitted) {
+    const reviewerName = cleanText(item?.reviewerName);
+    const reviewText = cleanText(item?.reviewText);
+    if (!reviewerName || !reviewText) continue;
+    const rating = Math.max(1, Math.min(5, Math.round(Number(item?.rating) || 5)));
+    const sourceKey = cleanText(item?.sourceReviewKey) || customerReviewFingerprint(reviewerName, reviewText);
+    unique.set(sourceKey, {
+      source: "google",
+      source_review_key: sourceKey,
+      reviewer_name: reviewerName.slice(0, 160),
+      reviewer_location: cleanText(item?.reviewerLocation)?.slice(0, 160) || null,
+      rating,
+      review_text: reviewText.slice(0, 10000),
+      homepage_excerpt: cleanText(item?.homepageExcerpt)?.slice(0, 1000) || null,
+      review_date: validDateOnly(item?.reviewDate),
+      relative_date_label: cleanText(item?.dateLabel)?.slice(0, 80) || null
+    });
+  }
+  const rows = Array.from(unique.values());
+  if (!rows.length) {
+    return json({ ok: false, error: "No complete reviews were found. Each review needs a name and review text." }, 200, jsonHeaders);
+  }
+
+  const existingResp = await supabaseFetch(
+    env,
+    `/rest/v1/customer_reviews?select=source_review_key,reviewer_name,review_text&limit=1000`
+  );
+  const existing = new Set();
+  if (existingResp.ok) {
+    (existingResp.data || []).forEach(row => {
+      if (row.source_review_key) existing.add(row.source_review_key);
+      if (row.reviewer_name && row.review_text) {
+        existing.add(customerReviewFingerprint(row.reviewer_name, row.review_text));
+      }
+    });
+  }
+  const newRows = rows.filter(row => !existing.has(row.source_review_key));
+  if (newRows.length) {
+    const insert = await supabaseFetch(env, `/rest/v1/customer_reviews?on_conflict=source_review_key`, {
+      method: "POST",
+      headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+      body: JSON.stringify(newRows)
+    });
+    if (!insert.ok) return json({ ok: false, error: "Reviews could not be imported." }, 200, jsonHeaders);
+  }
+  return json({ ok: true, imported: newRows.length, skipped: rows.length - newRows.length }, 200, jsonHeaders);
+}
+
+async function handleUpdateCustomerReview({ env, body, jsonHeaders }) {
+  const id = cleanText(body.id);
+  if (!id) return json({ ok: false, error: "Missing review id." }, 200, jsonHeaders);
+  const updates = body.updates && typeof body.updates === "object" ? body.updates : {};
+  const out = {};
+  if ("reviewerName" in updates) out.reviewer_name = cleanText(updates.reviewerName)?.slice(0, 160) || "";
+  if ("reviewerLocation" in updates) out.reviewer_location = cleanText(updates.reviewerLocation)?.slice(0, 160) || null;
+  if ("rating" in updates) out.rating = Math.max(1, Math.min(5, Math.round(Number(updates.rating) || 5)));
+  if ("reviewText" in updates) out.review_text = cleanText(updates.reviewText)?.slice(0, 10000) || "";
+  if ("reviewDate" in updates) out.review_date = validDateOnly(updates.reviewDate);
+  if ("dateLabel" in updates) out.relative_date_label = cleanText(updates.dateLabel)?.slice(0, 80) || null;
+  if ("homepageFeatured" in updates) out.homepage_featured = updates.homepageFeatured === true;
+  if ("homepageExcerpt" in updates) out.homepage_excerpt = cleanText(updates.homepageExcerpt)?.slice(0, 1000) || null;
+  if ("homepageSortOrder" in updates) out.homepage_sort_order = Math.round(Number(updates.homepageSortOrder) || 0);
+  if ("servicesFeatured" in updates) out.services_featured = updates.servicesFeatured === true;
+  if ("servicesSortOrder" in updates) out.services_sort_order = Math.round(Number(updates.servicesSortOrder) || 0);
+  if ("hidden" in updates) out.hidden = updates.hidden === true;
+  if (!Object.keys(out).length) return json({ ok: false, error: "No review changes supplied." }, 200, jsonHeaders);
+  if (("reviewer_name" in out && !out.reviewer_name) || ("review_text" in out && !out.review_text)) {
+    return json({ ok: false, error: "Reviewer name and review text are required." }, 200, jsonHeaders);
+  }
+  out.updated_at = new Date().toISOString();
+  const resp = await supabaseFetch(env, `/rest/v1/customer_reviews?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(out)
+  });
+  if (!resp.ok) return json({ ok: false, error: "Review could not be saved." }, 200, jsonHeaders);
+  const row = Array.isArray(resp.data) ? resp.data[0] : null;
+  return json({ ok: true, review: row ? mapCustomerReviewRow(row) : null }, 200, jsonHeaders);
+}
+
+async function handleDeleteCustomerReview({ env, body, jsonHeaders }) {
+  const id = cleanText(body.id);
+  if (!id) return json({ ok: false, error: "Missing review id." }, 200, jsonHeaders);
+  const resp = await supabaseFetch(env, `/rest/v1/customer_reviews?id=eq.${encodeURIComponent(id)}`, {
+    method: "DELETE", headers: { Prefer: "return=minimal" }
+  });
+  if (!resp.ok) return json({ ok: false, error: "Review could not be deleted." }, 200, jsonHeaders);
+  return json({ ok: true }, 200, jsonHeaders);
+}
+
+function mapCustomerReviewRow(row) {
+  return {
+    id: row.id,
+    reviewerName: row.reviewer_name,
+    reviewerLocation: row.reviewer_location || "",
+    rating: Number(row.rating) || 5,
+    reviewText: row.review_text,
+    reviewDate: row.review_date || "",
+    dateLabel: row.relative_date_label || "",
+    homepageFeatured: row.homepage_featured === true,
+    homepageExcerpt: row.homepage_excerpt || "",
+    homepageSortOrder: Number(row.homepage_sort_order) || 0,
+    servicesFeatured: row.services_featured === true,
+    servicesSortOrder: Number(row.services_sort_order) || 0,
+    hidden: row.hidden === true,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function customerReviewFingerprint(name, text) {
+  const input = `${String(name).toLowerCase()}|${String(text).toLowerCase().replace(/\s+/g, " ").trim()}`;
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `google-${(hash >>> 0).toString(16)}`;
+}
+
+function validDateOnly(value) {
+  const date = cleanText(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : null;
 }
 
 async function handleListServicePricing({ env, jsonHeaders }) {
