@@ -97,4 +97,10 @@ test("Reviews reuses the Pricing and Money layout and card primitives", () => {
   assert.match(adminCss, /#reviewLibraryFilter\{min-height:32px/);
 });
 
+test("Import action stays beside Remove without a redundant found header", () => {
+  assert.doesNotMatch(adminSource, /review(?:s)? found/);
+  assert.match(adminSource, /class="review-import-row-actions"/);
+  assert.match(adminSource, /review-remove-draft[\s\S]*?data-review-import-save/);
+});
+
 console.log(`\nReviews self-test: ${tests} tests passed.`);

@@ -67,10 +67,6 @@ function renderReviewImport() {
   if (!reviewImportOpen) return "";
   const preview = parsedReviewDrafts.length
     ? `<div class="review-import-preview">
-        <div class="review-import-preview-heading">
-          <div><strong>${parsedReviewDrafts.length} review${parsedReviewDrafts.length === 1 ? "" : "s"} found</strong><span class="muted">Check the review and homepage excerpt before importing.</span></div>
-          <div class="review-import-preview-actions"><button class="pricing-publish review-import-save" type="button" data-review-import-save>Import ${parsedReviewDrafts.length}</button><span id="reviewImportStatus" class="status" aria-live="polite"></span></div>
-        </div>
         ${parsedReviewDrafts.map((review, index) => `
           <div class="review-import-row" data-review-draft="${index}">
             <div class="review-import-fields">
@@ -81,7 +77,7 @@ function renderReviewImport() {
             </div>
             <textarea data-review-draft-field="reviewText" rows="3" aria-label="Review text">${escapeHtml(review.reviewText)}</textarea>
             <label class="review-import-excerpt"><span>Homepage excerpt <small>Editable suggestion used only if this review is featured on the homepage.</small></span><textarea data-review-draft-field="homepageExcerpt" rows="2" aria-label="Homepage excerpt">${escapeHtml(review.homepageExcerpt || "")}</textarea></label>
-            <button class="secondary review-remove-draft" type="button" data-review-remove-draft="${index}">Remove</button>
+            <div class="review-import-row-actions"><button class="secondary review-remove-draft" type="button" data-review-remove-draft="${index}">Remove</button>${index === parsedReviewDrafts.length - 1 ? `<button class="pricing-publish review-import-save" type="button" data-review-import-save>Import ${parsedReviewDrafts.length}</button><span id="reviewImportStatus" class="status" aria-live="polite"></span>` : ""}</div>
           </div>`).join("")}
       </div>`
     : "";
