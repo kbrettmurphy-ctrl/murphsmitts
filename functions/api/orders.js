@@ -1,6 +1,7 @@
 import { sendWebPushToAll } from "./_webpush.js";
 import { formatServiceDisplayPrice } from "./_pricing.js";
 import { isPreviewEnvironment } from "./_env.js";
+import { receivedEmailMessage, receivedSmsBody } from "./_received-notifications.js";
 
 /* =========================
    ACTION REGISTRY
@@ -6120,7 +6121,7 @@ function statusMessageSmart(order, statusDisplay) {
   const s = normalizeStatus(statusDisplay);
 
   if (s === "received") {
-    return "You're all set — I've got your order in the queue. I'll be in touch as things move along!";
+    return receivedEmailMessage();
   }
 
   if (s === "estimate sent") {
@@ -6367,8 +6368,10 @@ async function sendStatusText(env, row, statusDisplay) {
   const status = normalizeStatus(statusDisplay);
   const orderNum = String(order.orderNumber || "").trim() || "(unknown)";
 
-  const body = `Murph's Mitts: Order #${orderNum} update — ${statusDisplay}\n\n${smsMessageSmart(order, status)}`
-    + (row.tracking_token ? `\n\n${(status === "completed" || status === "ready to go") ? "See your finished glove" : "Follow your glove's progress"}:\nhttps://murphsmitts.com/track/?t=${row.tracking_token}` : "");
+  const body = status === "received"
+    ? receivedSmsBody(orderNum, row.tracking_token)
+    : `Murph's Mitts: Order #${orderNum} update — ${statusDisplay}\n\n${smsMessageSmart(order, status)}`
+      + (row.tracking_token ? `\n\n${(status === "completed" || status === "ready to go") ? "See your finished glove" : "Follow your glove's progress"}:\nhttps://murphsmitts.com/track/?t=${row.tracking_token}` : "");
 
   const accountSid = env.TWILIO_ACCOUNT_SID;
   const authToken = env.TWILIO_AUTH_TOKEN;

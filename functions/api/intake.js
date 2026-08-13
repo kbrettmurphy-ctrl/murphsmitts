@@ -1,6 +1,7 @@
 import { sendWebPushToAll } from "./_webpush.js";
 import { isPreviewEnvironment } from "./_env.js";
 import { subscribeNewsletter } from "./_newsletter.js";
+import { receivedEmailMessage, receivedSmsBody } from "./_received-notifications.js";
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -774,11 +775,7 @@ function statusMessageSmart(order, statusDisplay) {
   const s = normalizeStatus(statusDisplay);
 
   if (s === "received") {
-    return `Got your request — thanks for reaching out!
-
-I'll look over the details and get an estimate to you by email shortly. If you've got photos of the glove handy, just reply and send them over — it helps me figure out exactly what it needs.
-
-`;
+    return receivedEmailMessage();
   }
 
   if (s === "estimate sent") {
@@ -996,12 +993,7 @@ async function sendReceivedText(env, row) {
   }
 
   const orderNum = String(row.order_number || "").trim() || "(unknown)";
-
-  const body =
-    `Murph's Mitts: Got your request (#${orderNum})!\n\n` +
-    `I'll look it over and send an estimate by email. ` +
-    `Feel free to reply here with photos of the glove — helps me size up the work.` +
-    (row.tracking_token ? `\n\nFollow your glove's progress:\nhttps://murphsmitts.com/track/?t=${row.tracking_token}` : "");
+  const body = receivedSmsBody(orderNum, row.tracking_token);
 
   const sent = await sendTwilioText(env, to, body);
 

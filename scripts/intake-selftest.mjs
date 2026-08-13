@@ -6,6 +6,7 @@ import fs from "node:fs";
 import { createHmac, webcrypto } from "node:crypto";
 import { onRequest as handleIntake } from "../functions/api/intake.js";
 import { onRequest as handleSmsReply } from "../functions/api/sms-reply.js";
+import { receivedEmailMessage, receivedSmsBody } from "../functions/api/_received-notifications.js";
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
@@ -72,6 +73,26 @@ let assertions = 0;
 const ok = (value, message) => { assertions += 1; assert.ok(value, message); };
 const equal = (actual, expected, message) => { assertions += 1; assert.equal(actual, expected, message); };
 const deepEqual = (actual, expected, message) => { assertions += 1; assert.deepEqual(actual, expected, message); };
+
+await test("public intake and MurphOS share canonical Received copy", () => {
+  const intakeSource = fs.readFileSync(new URL("../functions/api/intake.js", import.meta.url), "utf8");
+  const ordersSource = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
+
+  equal(receivedEmailMessage(), `Got your request — thanks for reaching out!
+
+I'll look over the details and get an estimate to you by email shortly. If you've got photos of the glove handy, just reply and send them over — it helps me figure out exactly what it needs.`);
+  equal(receivedSmsBody("0201", "track-token"), `Murph's Mitts: Got your request (#0201)!
+
+I'll look it over and send an estimate by email. Feel free to reply here with photos of the glove — helps me size up the work.
+
+Follow your glove's progress:
+https://murphsmitts.com/track/?t=track-token`);
+  ok(intakeSource.includes("return receivedEmailMessage();"));
+  ok(intakeSource.includes("receivedSmsBody(orderNum, row.tracking_token)"));
+  ok(ordersSource.includes("return receivedEmailMessage();"));
+  ok(ordersSource.includes('? receivedSmsBody(orderNum, row.tracking_token)'));
+  equal(ordersSource.includes("You're all set — I've got your order in the queue."), false);
+});
 
 async function test(name, fn) {
   tests += 1;
