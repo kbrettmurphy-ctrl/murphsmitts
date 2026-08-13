@@ -661,6 +661,9 @@ function seedDemoStore() {
     dateReceived: daysAgoIso(o.age),
     estimatedCompletion: o.est != null ? daysAgoIso(o.est) : "",
     dateCompleted: o.done != null ? daysAgoIso(o.done) : "",
+    datePaid: normalizeText(o.paid) === "paid"
+      ? (o.paidDaysAgo != null ? daysAgoIso(o.paidDaysAgo) : (o.done != null ? daysAgoIso(o.done) : daysAgoIso(o.updatedDaysAgo ?? o.age)))
+      : "",
     internalNotes: o.internalNotes || "",
     gloveNotes: o.gloveNotes || "",
     customerNotes: o.customerNotes || "",
@@ -1301,8 +1304,8 @@ function endOfDay(date) {
   return d;
 }
 
-function getOrderFinanceCompletedDate(order) {
-  return parseOrderDate(order?.dateCompleted);
+function getOrderFinancePaidDate(order) {
+  return parseOrderDate(order?.datePaid);
 }
 
 function getOrderFinanceReceivedDate(order) {
@@ -1425,15 +1428,15 @@ function computeFinanceStats(
   const range = getFinanceDateRange(filterKey, customStart, customEnd);
   const rangeReady = isFinanceRangeReady(range, filterKey);
 
-  const paidCompletedInRange = rangeReady
+  const paidInRange = rangeReady
     ? list.filter(order => {
-        if (!isCompletedOrder(order) || !isPaid(order)) return false;
-        return isDateInFinanceRange(getOrderFinanceCompletedDate(order), range);
+        if (!isPaid(order)) return false;
+        return isDateInFinanceRange(getOrderFinancePaidDate(order), range);
       })
     : [];
 
-  const revenue = paidCompletedInRange.reduce((sum, order) => sum + moneyNumber(order.priceQuoted), 0);
-  const paidOrders = paidCompletedInRange.length;
+  const revenue = paidInRange.reduce((sum, order) => sum + moneyNumber(order.priceQuoted), 0);
+  const paidOrders = paidInRange.length;
   const averagePaidOrder = paidOrders ? revenue / paidOrders : null;
 
   const outstandingOrders = rangeReady
