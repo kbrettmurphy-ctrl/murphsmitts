@@ -38,6 +38,7 @@
         <button class="nav-link nav-main" data-view="pricing">Pricing</button>
         <button class="nav-link nav-main" data-view="inventory">Lace Inventory</button>
         <button class="nav-link nav-main" data-view="upload">Gallery</button>
+        <button class="nav-link nav-main" data-view="reviews">Reviews</button>
         <button class="nav-link nav-main" data-view="gloves-sale">Gloves For Sale</button>
         <button class="nav-link nav-main" data-view="messages">Messages<span id="messagesNavBadge" class="nav-badge" hidden></span></button>
         <button class="nav-link nav-main nav-admin-only" data-view="users" hidden>Users</button>
@@ -327,6 +328,22 @@
         <div id="saleGlovesList" class="orders-list"></div>
       </section>
 
+      <section id="reviewsView" class="view">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button id="reviewsMenuBtn" class="icon-btn topbar-menu-btn" aria-label="Open menu" aria-controls="sideMenu" aria-expanded="false">☰</button>
+            <div class="topbar-heading">
+              <h1 class="topbar-title">Reviews</h1>
+              <p id="reviewsCount" class="topbar-subtitle muted">Public website selections</p>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <button id="reviewsImportToggleBtn" class="secondary topbar-icon-action" type="button" aria-label="Import Google reviews" aria-expanded="false">+</button>
+          </div>
+        </header>
+        <div id="reviewsPanel" class="reviews-admin-panel" aria-live="polite"></div>
+      </section>
+
       <section id="moneyView" class="view">
         <header class="topbar">
           <div class="topbar-left">
@@ -447,6 +464,7 @@
 
   <script src="config.js"></script>
   <script src="/assets/vendor/leaflet/1.9.4/leaflet.js"></script>
+  <script src="reviews.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>

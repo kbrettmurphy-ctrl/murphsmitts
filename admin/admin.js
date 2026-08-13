@@ -22,6 +22,7 @@ const mapView = document.getElementById("mapView");
 const moneyView = document.getElementById("moneyView");
 const moneyMenuBtn = document.getElementById("moneyMenuBtn");
 const pricingView = document.getElementById("pricingView");
+const reviewsView = document.getElementById("reviewsView");
 const detailTitle = document.getElementById("detailTitle");
 const pinInput = document.getElementById("pinInput");
 const emailInput = document.getElementById("emailInput");
@@ -277,7 +278,7 @@ document.addEventListener("focusout", (e) => {
    VIEW / MENU
 ========================= */
 function showView(view) {
-  [loginView, inviteView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, pricingView, saleGlovesView, messagesView, usersView, customersView, calendarView]
+  [loginView, inviteView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, pricingView, reviewsView, saleGlovesView, messagesView, usersView, customersView, calendarView]
     .filter(Boolean)
     .forEach(v => v.classList.remove("active"));
 
@@ -766,6 +767,10 @@ function seedDemoStore() {
       { id: "g1", brandModel: "Rawlings Pro Preferred PROS204", gloveType: "Fielders Glove", price: 220, status: "available", description: "Cleaned, conditioned, and relaced. Game ready.", photos: [] },
       { id: "g2", brandModel: "Wilson A2000 SuperSkin", gloveType: "Fielders Glove", price: 190, status: "available", description: "Restored infield glove, tight pocket.", photos: [] }
     ],
+    reviews: [
+      { id: "r1", reviewerName: "Jamie Carter", reviewerLocation: "Raleigh, NC", rating: 5, reviewText: "The glove came back looking incredible and played perfectly on day one.", reviewDate: "", dateLabel: "2 months ago", homepageFeatured: true, homepageExcerpt: "The glove came back looking incredible.", homepageSortOrder: 10, servicesFeatured: true, servicesSortOrder: 10, hidden: false },
+      { id: "r2", reviewerName: "Chris Morgan", reviewerLocation: "Richmond, VA", rating: 5, reviewText: "Fast turnaround, excellent communication, and first-class relacing work.", reviewDate: "", dateLabel: "4 months ago", homepageFeatured: true, homepageExcerpt: "Fast turnaround and first-class relacing work.", homepageSortOrder: 20, servicesFeatured: true, servicesSortOrder: 20, hidden: false }
+    ],
     sessions,
     activity,
     messages: [
@@ -924,6 +929,26 @@ function demoApi(body) {
 
     case "listSaleGloves":
       return demoResult({ gloves: store.gloves });
+    case "listCustomerReviews":
+      return demoResult({ reviews: store.reviews });
+    case "importCustomerReviews": {
+      const incoming = Array.isArray(body.reviews) ? body.reviews : [];
+      incoming.forEach(review => store.reviews.unshift({
+        id: "r" + (store.seq++), reviewerName: review.reviewerName, reviewerLocation: review.reviewerLocation || "",
+        rating: Number(review.rating) || 5, reviewText: review.reviewText, reviewDate: review.reviewDate || "",
+        dateLabel: review.dateLabel || "", homepageFeatured: false, homepageExcerpt: "", homepageSortOrder: 0,
+        servicesFeatured: false, servicesSortOrder: 0, hidden: false
+      }));
+      return demoResult({ imported: incoming.length, skipped: 0 });
+    }
+    case "updateCustomerReview": {
+      const review = store.reviews.find(item => String(item.id) === String(body.id));
+      if (review) Object.assign(review, body.updates || {});
+      return demoResult({ review });
+    }
+    case "deleteCustomerReview":
+      store.reviews = store.reviews.filter(item => String(item.id) !== String(body.id));
+      return demoResult();
     case "getSaleGlove":
       return demoResult({ glove: store.gloves.find(g => String(g.id) === String(body.id)) || null });
     case "createSaleGlove":
@@ -2932,6 +2957,7 @@ function getViewTitle(viewName) {
     case "money": return "Money";
     case "pricing": return "Pricing";
     case "upload": return "Gallery";
+    case "reviews": return "Reviews";
     case "inventory": return "Lace Inventory";
     case "gloves-sale": return "Gloves For Sale";
     case "users": return "Users";
@@ -6183,6 +6209,7 @@ function normalizeAdminView(viewName) {
   if (view === "money") return "money";
   if (view === "pricing") return "pricing";
   if (view === "upload") return "upload";
+  if (view === "reviews") return "reviews";
   if (view === "inventory") return "inventory";
   if (view === "gloves-sale") return "gloves-sale";
   if (view === "users") return "users";
@@ -6197,7 +6224,7 @@ function isKnownAdminView(viewName) {
   const view = String(viewName || "").trim().toLowerCase();
   if (!view || view === "dashboard") return true;
   if (view === "orders" || view === "current") return true;
-  return ["map", "money", "pricing", "upload", "inventory", "gloves-sale", "users", "customers", "calendar", "messages"].includes(view) || isOrderFilterView(view);
+  return ["map", "money", "pricing", "upload", "reviews", "inventory", "gloves-sale", "users", "customers", "calendar", "messages"].includes(view) || isOrderFilterView(view);
 }
 
 function syncAdminViewUrl(viewName) {
@@ -6222,6 +6249,9 @@ function syncAdminViewUrl(viewName) {
     url.searchParams.delete("order");
   } else if (view === "upload") {
     url.searchParams.set("view", "upload");
+    url.searchParams.delete("order");
+  } else if (view === "reviews") {
+    url.searchParams.set("view", "reviews");
     url.searchParams.delete("order");
   } else if (view === "inventory") {
     url.searchParams.set("view", "inventory");
@@ -6296,6 +6326,15 @@ function setActiveView(viewName) {
     loadGalleryManagerPhotos();
     closeMenu();
     resetViewScroll(uploadView, { blurActive: true });
+    return;
+  }
+
+  if (resolvedView === "reviews") {
+    syncAdminViewUrl(resolvedView);
+    showView(reviewsView);
+    renderReviewsView();
+    closeMenu();
+    resetViewScroll(reviewsView, { blurActive: true });
     return;
   }
 
@@ -14068,6 +14107,7 @@ menuBtn.addEventListener("click", openMenu);
 homeMenuBtn?.addEventListener("click", openMenu);
 document.getElementById("usersMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("pricingMenuBtn")?.addEventListener("click", openMenu);
+document.getElementById("reviewsMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("customersMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("calendarMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("messagesMenuBtn")?.addEventListener("click", openMenu);

@@ -1279,6 +1279,64 @@ if (document.readyState === "loading") {
 }
 
 // =========================
+// Curated customer reviews
+// The existing HTML reviews remain the no-network fallback. A valid, non-empty
+// placement from MurphOS replaces only the matching grid.
+// =========================
+function initPublicCustomerReviews() {
+  var homeGrid = document.querySelector(".home-reviews-grid");
+  var servicesGrid = document.querySelector(".reviews#reviews .reviews-grid");
+  if (!homeGrid && !servicesGrid) return;
+
+  function validReview(review) {
+    return !!review && typeof review.reviewerName === "string" && review.reviewerName.trim() &&
+      typeof review.text === "string" && review.text.trim() &&
+      Number(review.rating) >= 1 && Number(review.rating) <= 5;
+  }
+
+  function renderReviewGrid(grid, reviews) {
+    if (!grid || !Array.isArray(reviews) || !reviews.length || !reviews.every(validReview)) return;
+    var fragment = document.createDocumentFragment();
+    reviews.forEach(function (review) {
+      var article = document.createElement("article");
+      article.className = "review-card";
+      var stars = document.createElement("div");
+      stars.className = "review-stars";
+      stars.setAttribute("aria-label", review.rating + " out of 5 stars");
+      stars.textContent = "★".repeat(Math.round(Number(review.rating)));
+      var text = document.createElement("p");
+      text.className = "review-text";
+      text.textContent = "\u201c" + review.text + "\u201d";
+      var meta = document.createElement("div");
+      meta.className = "review-meta";
+      meta.textContent = "— " + [review.reviewerName, review.reviewerLocation, review.source].filter(Boolean).join(" · ");
+      article.appendChild(stars);
+      article.appendChild(text);
+      article.appendChild(meta);
+      fragment.appendChild(article);
+    });
+    grid.replaceChildren(fragment);
+  }
+
+  fetch("/api/public/reviews", { cache: "no-store" })
+    .then(function (response) { return response.json(); })
+    .then(function (data) {
+      if (!data || !data.ok) throw new Error("Invalid reviews response.");
+      renderReviewGrid(homeGrid, data.homepage);
+      renderReviewGrid(servicesGrid, data.services);
+    })
+    .catch(function (error) {
+      console.warn("Curated reviews unavailable; using static review fallback.", error);
+    });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initPublicCustomerReviews);
+} else {
+  initPublicCustomerReviews();
+}
+
+// =========================
 // Newsletter signup forms
 // =========================
 (() => {
