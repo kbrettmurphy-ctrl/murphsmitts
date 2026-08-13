@@ -10,7 +10,7 @@ The repository does not contain the original schema migration for the core table
 
 ### `orders`
 
-Core customer/job fields used by the application include identity and timestamps; customer contact; glove type/model/web; requested services and lace colors; delivery/address; notes/photos; order number and status; received/estimated/completed dates; quote/payment/shipping; email/SMS delivery stamps; SMS opt-in and latest inbound message; approval time; lace usage; map/geocoding metadata; and `tracking_token`.
+Core customer/job fields used by the application include identity and timestamps; customer contact; glove type/model/web; requested services and lace colors; delivery/address; notes/photos; order number and status; received/estimated/completed dates; quote/payment/shipping; automatic `date_paid` for cash-basis reporting; email/SMS delivery stamps; SMS opt-in and latest inbound message; approval time; lace usage; map/geocoding metadata; and `tracking_token`.
 
 `order_number` is the application-facing key used by related tables and URLs. In production, `glove_photos` is a text column containing a serialized JSON array of order/intake/SMS photo URLs; readers also tolerate a native array.
 

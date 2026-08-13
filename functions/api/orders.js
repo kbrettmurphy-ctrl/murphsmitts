@@ -1235,6 +1235,7 @@ async function handleUpdateOrder({ env, body, jsonHeaders }) {
     return json({ ok: false, error: "Enter the supplier's actual special-order color name." }, 200, jsonHeaders);
   }
   const oldStatus = normalizeStatus(oldRow.status);
+  const oldPaid = normalizePaidValue(oldRow.paid);
   const lastStatusEmailed = normalizeStatus(oldRow.last_status_emailed);
   const lastStatusTexted = normalizeStatus(oldRow.last_status_texted);
   const oldPrimaryColor = cleanText(oldRow.primary_lace_color);
@@ -1245,7 +1246,16 @@ async function handleUpdateOrder({ env, body, jsonHeaders }) {
   const mergedPreview = { ...oldRow, ...dbUpdates };
 
   const newStatus = normalizeStatus(mergedPreview.status);
+  const newPaid = normalizePaidValue(mergedPreview.paid);
   const statusChanged = !!newStatus && newStatus !== oldStatus;
+
+  if (newPaid === "paid" && oldPaid !== "paid") {
+    dbUpdates.date_paid = new Date().toISOString();
+    mergedPreview.date_paid = dbUpdates.date_paid;
+  } else if (newPaid !== "paid" && oldPaid === "paid") {
+    dbUpdates.date_paid = null;
+    mergedPreview.date_paid = null;
+  }
   // Hold billing: suppress this order's auto status message so the customer can
   // be billed once, combined with their other finished gloves. Default off.
   const suppressNotify = body.suppressNotify === true;
@@ -3827,6 +3837,7 @@ async function createOrderAction(env, body) {
       tracking_number: null,
       carrier: null,
       date_completed: null,
+      date_paid: normalizePaidValue(input.paid) === "paid" ? new Date().toISOString() : null,
       allow_ship_without_payment: false,
       last_status_emailed: null,
       last_status_texted: null
@@ -5044,6 +5055,7 @@ function mapOrderFromDb(row) {
     tracking: row.tracking_number,
     carrier: row.carrier,
     dateCompleted: row.date_completed,
+    datePaid: row.date_paid,
     internalNotes: row.internal_notes,
     lastStatusEmailed: row.last_status_emailed,
     smsOptIn: row.sms_opt_in === true,
