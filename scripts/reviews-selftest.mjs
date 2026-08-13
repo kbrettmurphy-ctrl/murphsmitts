@@ -103,4 +103,11 @@ test("Import action stays beside Remove without a redundant found header", () =>
   assert.match(adminSource, /review-remove-draft[\s\S]*?data-review-import-save/);
 });
 
+test("Every Reviews button uses the standardized secondary button class", () => {
+  const buttons = adminSource.match(/<button\b[^>]*>/g) || [];
+  assert.ok(buttons.length > 0);
+  buttons.forEach(button => assert.match(button, /class="[^"]*\bsecondary\b/));
+  assert.doesNotMatch(adminSource, /class="pricing-publish review-import-save"/);
+});
+
 console.log(`\nReviews self-test: ${tests} tests passed.`);

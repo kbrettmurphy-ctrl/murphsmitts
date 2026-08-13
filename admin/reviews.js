@@ -77,7 +77,7 @@ function renderReviewImport() {
             </div>
             <textarea data-review-draft-field="reviewText" rows="3" aria-label="Review text">${escapeHtml(review.reviewText)}</textarea>
             <label class="review-import-excerpt"><span>Homepage excerpt <small>Editable suggestion used only if this review is featured on the homepage.</small></span><textarea data-review-draft-field="homepageExcerpt" rows="2" aria-label="Homepage excerpt">${escapeHtml(review.homepageExcerpt || "")}</textarea></label>
-            <div class="review-import-row-actions"><button class="secondary review-remove-draft" type="button" data-review-remove-draft="${index}">Remove</button>${index === parsedReviewDrafts.length - 1 ? `<button class="pricing-publish review-import-save" type="button" data-review-import-save>Import ${parsedReviewDrafts.length}</button><span id="reviewImportStatus" class="status" aria-live="polite"></span>` : ""}</div>
+            <div class="review-import-row-actions"><button class="secondary review-remove-draft" type="button" data-review-remove-draft="${index}">Remove</button>${index === parsedReviewDrafts.length - 1 ? `<button class="secondary review-import-save" type="button" data-review-import-save>Import ${parsedReviewDrafts.length}</button><span id="reviewImportStatus" class="status" aria-live="polite"></span>` : ""}</div>
           </div>`).join("")}
       </div>`
     : "";
@@ -115,7 +115,7 @@ function renderReviewCard(review) {
       <label>Full review<textarea name="reviewText" rows="5" required>${escapeHtml(review.reviewText)}</textarea></label>
       <label>Homepage excerpt<textarea name="homepageExcerpt" rows="2" placeholder="Leave blank to use the full review">${escapeHtml(review.homepageExcerpt)}</textarea></label>
       <label class="review-hidden-control"><input name="hidden" type="checkbox" ${review.hidden ? "checked" : ""}> Hide from review library</label>
-      <div class="review-edit-actions"><button type="submit">Save</button><button class="secondary" type="button" data-review-delete>Delete</button><span class="status" data-review-status></span></div>
+      <div class="review-edit-actions"><button class="secondary" type="submit">Save</button><button class="secondary" type="button" data-review-delete>Delete</button><span class="status" data-review-status></span></div>
     </form>
   </article>`;
 }

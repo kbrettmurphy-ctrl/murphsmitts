@@ -8667,7 +8667,7 @@ details.pricing-section[open] > .pricing-section-summary{border-bottom:1px solid
 .review-import-actions,.review-edit-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .review-import-actions .muted{font-size:.7rem}
 .review-import-preview{border-top:1px solid rgba(9,47,77,.12);padding-top:12px}
-.review-import-save{min-height:34px;border-radius:10px;padding:5px 14px;font-size:.78rem;white-space:nowrap}
+.review-import-save{white-space:nowrap}
 .review-import-row{padding:12px 0;border-top:1px solid rgba(9,47,77,.09)}
 .review-import-row:first-child{padding-top:0;border-top:0}
 .review-import-row-actions{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}

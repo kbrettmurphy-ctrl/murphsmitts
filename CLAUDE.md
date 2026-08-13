@@ -22,6 +22,10 @@ and the admin portal ("MurphOS").
 - Admin header subtitles are standardized by `.topbar .topbar-subtitle`. Keep each
   unique `#...Count` ID only as a JavaScript/data hook; never style header subtitles
   with page-specific ID selectors or add another ID to a CSS allowlist.
+- Every new admin `<button>` must use an existing standardized button class; never
+  leave a button unclassified for browser-native styling. Adjacent peer actions must
+  share the same base button class unless an intentional semantic distinction is
+  documented and visually verified on desktop and mobile.
 - Preserve existing behavior unless directly told otherwise.
 - Inspect the relevant files before changing them. Line numbers drift; trust names.
 - If asked for a small fix, do not change 47 unrelated things.
