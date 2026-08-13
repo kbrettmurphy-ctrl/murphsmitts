@@ -93,8 +93,11 @@ await test("gallery manager uses cached transformed thumbnails", () => {
   ok(admin.includes('"/storage/v1/render/image/public/gallery/"'));
   ok(admin.includes('url.searchParams.set("width", "480")'));
   ok(admin.includes('url.searchParams.set("quality", "72")'));
+  ok(admin.includes('url.searchParams.set("resize", "contain")'));
+  equal(admin.includes('url.searchParams.set("resize", "cover")'), false);
   ok(admin.includes('getGalleryManagerThumbnailUrl(photo.url)'));
   ok(admin.includes('loading="lazy" decoding="async" fetchpriority="low"'));
+  ok(/\.gallery-manager-thumb img\{[\s\S]*?object-fit:contain;/.test(css));
 });
 
 console.log(`\nOrder photo self-test: ${tests} tests, ${assertions} assertions passed.`);

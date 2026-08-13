@@ -755,7 +755,8 @@ button.secondary{
   display:block;
   width:100%;
   aspect-ratio:1 / 1;
-  object-fit:cover;
+  object-fit:contain;
+  background:rgba(9,47,77,.06);
 }
 
 .gallery-manager-meta{
