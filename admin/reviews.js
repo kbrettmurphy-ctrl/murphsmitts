@@ -55,7 +55,11 @@ function parseGoogleReviewPaste(raw) {
     const ownerResponse = reviewLines.findIndex(line => /^(?:owner response|response from the owner)/i.test(line));
     const reviewText = reviewLines.slice(0, ownerResponse >= 0 ? ownerResponse : reviewLines.length).join(" ").trim();
     if (!reviewerName || !reviewText) return null;
-    return { reviewerName, reviewerLocation: "", rating, reviewText, dateLabel, reviewDate: "" };
+    const firstSentence = reviewText.match(/^.*?[.!?](?=\s|$)/)?.[0] || reviewText;
+    const homepageExcerpt = firstSentence.length > 220
+      ? `${firstSentence.slice(0, 217).replace(/\s+\S*$/, "").trim()}…`
+      : firstSentence;
+    return { reviewerName, reviewerLocation: "", rating, reviewText, homepageExcerpt, dateLabel, reviewDate: "" };
   }).filter(Boolean);
 }
 
@@ -63,7 +67,10 @@ function renderReviewImport() {
   if (!reviewImportOpen) return "";
   const preview = parsedReviewDrafts.length
     ? `<div class="review-import-preview">
-        <div class="review-import-preview-heading"><strong>${parsedReviewDrafts.length} review${parsedReviewDrafts.length === 1 ? "" : "s"} found</strong><span class="muted">Check names and text before importing.</span></div>
+        <div class="review-import-preview-heading">
+          <div><strong>${parsedReviewDrafts.length} review${parsedReviewDrafts.length === 1 ? "" : "s"} found</strong><span class="muted">Check the review and homepage excerpt before importing.</span></div>
+          <div class="review-import-preview-actions"><button class="pricing-publish review-import-save" type="button" data-review-import-save>Import ${parsedReviewDrafts.length}</button><span id="reviewImportStatus" class="status" aria-live="polite"></span></div>
+        </div>
         ${parsedReviewDrafts.map((review, index) => `
           <div class="review-import-row" data-review-draft="${index}">
             <div class="review-import-fields">
@@ -73,9 +80,9 @@ function renderReviewImport() {
               <input data-review-draft-field="dateLabel" value="${escapeAttr(review.dateLabel)}" placeholder="Date label (optional)" aria-label="Review date label">
             </div>
             <textarea data-review-draft-field="reviewText" rows="3" aria-label="Review text">${escapeHtml(review.reviewText)}</textarea>
+            <label class="review-import-excerpt"><span>Homepage excerpt <small>Editable suggestion used only if this review is featured on the homepage.</small></span><textarea data-review-draft-field="homepageExcerpt" rows="2" aria-label="Homepage excerpt">${escapeHtml(review.homepageExcerpt || "")}</textarea></label>
             <button class="secondary review-remove-draft" type="button" data-review-remove-draft="${index}">Remove</button>
           </div>`).join("")}
-        <div class="review-import-actions"><button type="button" data-review-import-save>Import ${parsedReviewDrafts.length}</button><span id="reviewImportStatus" class="status" aria-live="polite"></span></div>
       </div>`
     : "";
   return `<div class="dashboard-card review-import-card">

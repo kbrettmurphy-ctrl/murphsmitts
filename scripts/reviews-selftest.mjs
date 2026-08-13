@@ -59,6 +59,7 @@ My experience with Murph's Mitt Maixtenance was top notch! I was very impressed 
   assert.equal(parsed[0].rating, 5);
   assert.equal(parsed[0].dateLabel, "19 hours ago");
   assert.match(parsed[0].reviewText, /^My experience with Murph's Mitt Maixtenance/);
+  assert.equal(parsed[0].homepageExcerpt, "My experience with Murph's Mitt Maixtenance was top notch!");
   assert.doesNotMatch(parsed[0].reviewText, /NEW|open_in_new|2 reviews/);
 });
 
@@ -68,6 +69,7 @@ test("admin API actions are authenticated and duplicate-aware", () => {
   }
   assert.match(apiSource, /customerReviewFingerprint\(row\.reviewer_name, row\.review_text\)/);
   assert.match(apiSource, /resolution=ignore-duplicates/);
+  assert.match(apiSource, /homepage_excerpt: cleanText\(item\?\.homepageExcerpt\)/);
 });
 
 test("public endpoint exposes selected projections with fixed caps", () => {

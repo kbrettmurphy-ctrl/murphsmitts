@@ -8667,9 +8667,15 @@ details.pricing-section[open] > .pricing-section-summary{border-bottom:1px solid
 .review-import-actions,.review-edit-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .review-import-actions .muted{font-size:.7rem}
 .review-import-preview{border-top:1px solid rgba(9,47,77,.12);padding-top:12px}
-.review-import-preview-heading{margin-bottom:10px;font-size:.78rem}
+.review-import-preview-heading{align-items:center;margin-bottom:10px;font-size:.78rem}
+.review-import-preview-heading>div:first-child{display:grid;gap:2px;min-width:0}
+.review-import-preview-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.review-import-save{min-height:34px;border-radius:10px;padding:5px 14px;font-size:.78rem;white-space:nowrap}
 .review-import-row{padding:12px 0;border-top:1px solid rgba(9,47,77,.09)}
 .review-import-fields,.review-edit-grid{display:grid;grid-template-columns:2fr 2fr 1fr 1.4fr;gap:8px}
+.review-import-excerpt{display:grid;gap:5px;margin-top:10px;font-size:.7rem;font-weight:600;color:rgba(9,47,77,.68)}
+.review-import-excerpt span{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.review-import-excerpt small{font-size:.66rem;font-weight:400;color:rgba(9,47,77,.56)}
 .review-remove-draft{margin-top:8px}
 .review-summary-grid{margin:0}
 .review-summary{min-width:0}
@@ -8691,5 +8697,5 @@ details.pricing-section[open] > .pricing-section-summary{border-bottom:1px solid
 .review-edit-form{display:grid;gap:10px;margin-top:2px;padding-top:10px;border-top:1px solid rgba(9,47,77,.12)}
 .review-edit-form[hidden]{display:none}
 .review-edit-form label{display:grid;gap:5px;font-size:.7rem;font-weight:600;color:rgba(9,47,77,.68)}
-@media(max-width:700px){.review-import-fields,.review-edit-grid{grid-template-columns:1fr}.review-summary-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.review-card-heading{align-items:flex-start}.review-library-heading{align-items:center}.review-admin-text{font-size:.78rem}}
+@media(max-width:700px){.review-import-fields,.review-edit-grid{grid-template-columns:1fr}.review-summary-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.review-card-heading{align-items:flex-start}.review-library-heading{align-items:center}.review-import-preview-heading{align-items:flex-start}.review-admin-text{font-size:.78rem}}
 @media(max-width:420px){.review-summary-grid{grid-template-columns:1fr}.review-library-heading{align-items:flex-end}}

@@ -1518,6 +1518,7 @@ async function handleImportCustomerReviews({ env, body, jsonHeaders }) {
       reviewer_location: cleanText(item?.reviewerLocation)?.slice(0, 160) || null,
       rating,
       review_text: reviewText.slice(0, 10000),
+      homepage_excerpt: cleanText(item?.homepageExcerpt)?.slice(0, 1000) || null,
       review_date: validDateOnly(item?.reviewDate),
       relative_date_label: cleanText(item?.dateLabel)?.slice(0, 80) || null
     });
