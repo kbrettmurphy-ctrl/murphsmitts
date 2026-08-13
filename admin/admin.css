@@ -1654,17 +1654,7 @@ button.dashboard-metric:active{
   color:var(--cream);
 }
 
-#orderCount,
-#uploadCount,
-#saleGlovesCount,
-#mapCount,
-#moneyCount,
-#pricingCount,
-#reviewsCount,
-#clubhouseCount,
-#usersCount,
-#customersCount,
-#calendarCount{
+.topbar .topbar-subtitle{
   margin:4px 0 0;
   min-height:1.35em;
   color:rgba(218,202,177,.76);
@@ -4690,17 +4680,7 @@ button.dashboard-metric:active{
     font-size:.95rem;
   }
 
-  #orderCount,
-  #uploadCount,
-  #saleGlovesCount,
-  #mapCount,
-  #moneyCount,
-  #pricingCount,
-  #reviewsCount,
-  #clubhouseCount,
-  #usersCount,
-  #customersCount,
-  #calendarCount{
+  .topbar .topbar-subtitle{
     font-size:.7rem;
   }
 
@@ -4847,17 +4827,7 @@ body,
   color:var(--navy);
 }
 
-#orderCount,
-#uploadCount,
-#saleGlovesCount,
-#mapCount,
-#moneyCount,
-#pricingCount,
-#reviewsCount,
-#clubhouseCount,
-#usersCount,
-#customersCount,
-#calendarCount,
+.topbar .topbar-subtitle,
 .detail-topbar-actions .status{
   margin:4px 0 0;
   min-height:1.35em;
@@ -5762,17 +5732,7 @@ button.secondary,
     line-height:1.1;
   }
 
-  #orderCount,
-  #uploadCount,
-  #saleGlovesCount,
-  #mapCount,
-  #moneyCount,
-  #pricingCount,
-  #reviewsCount,
-  #clubhouseCount,
-  #usersCount,
-  #customersCount,
-  #calendarCount,
+  .topbar .topbar-subtitle,
   .detail-topbar-actions .status{
     font-size:.7rem;
   }
@@ -6361,21 +6321,9 @@ button.secondary,
     text-overflow:ellipsis;
   }
 
-  /* The earlier mobile .7rem rule for these is overridden by the later
-     base cream-theme rule (.95rem), so subtitles rendered oversized and
-     truncated on phones. This last-in-file rule wins the cascade and
-     matches the desktop compact size. */
-  #orderCount,
-  #uploadCount,
-  #saleGlovesCount,
-  #mapCount,
-  #moneyCount,
-  #pricingCount,
-  #reviewsCount,
-  #clubhouseCount,
-  #usersCount,
-  #customersCount,
-  #calendarCount{
+  /* Keep every standard view subtitle compact after the later cream-theme
+     base rule. New views inherit this through the shared class. */
+  .topbar .topbar-subtitle{
     font-size:.7rem;
   }
 
@@ -6675,12 +6623,6 @@ body.has-notifications .topbar-menu-btn::after{
 /* =========================
    MESSAGES / TWILIO INBOX
    ========================= */
-#messagesCount{
-  margin:4px 0 0;
-  min-height:1.35em;
-  font-size:.7rem;
-}
-
 .messages-shell{
   max-width:720px;
 }

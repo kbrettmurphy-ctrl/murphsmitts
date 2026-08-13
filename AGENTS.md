@@ -19,6 +19,9 @@ and the admin portal ("MurphOS").
 - Make narrow, surgical changes. Do not redesign unrelated areas. Do not "modernize" the repo.
 - Do not change the public site unless explicitly requested.
 - No global CSS changes — scoped selectors only, appended in clearly-commented blocks.
+- Admin header subtitles are standardized by `.topbar .topbar-subtitle`. Keep each
+  unique `#...Count` ID only as a JavaScript/data hook; never style header subtitles
+  with page-specific ID selectors or add another ID to a CSS allowlist.
 - Preserve existing behavior unless directly told otherwise.
 - Inspect the relevant files before changing them. Line numbers drift; trust names.
 - If asked for a small fix, do not change 47 unrelated things.

@@ -67,8 +67,9 @@ test("public pages preserve static reviews as the failure fallback", () => {
   assert.match(publicJs, /grid\.replaceChildren\(fragment\)/);
 });
 
-test("Reviews subtitle participates in every shared MurphOS header rule", () => {
-  assert.equal((adminCss.match(/#reviewsCount/g) || []).length, 5);
+test("MurphOS header subtitles use the shared class instead of page ID allowlists", () => {
+  assert.ok((adminCss.match(/\.topbar \.topbar-subtitle/g) || []).length >= 1);
+  assert.doesNotMatch(adminCss, /#[a-z][A-Za-z]*Count\s*[,\{]/);
 });
 
 console.log(`\nReviews self-test: ${tests} tests passed.`);
