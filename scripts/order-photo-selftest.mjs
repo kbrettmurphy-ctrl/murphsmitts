@@ -88,4 +88,13 @@ await test("hidden gallery photos can be isolated and restored", () => {
   ok(admin.includes('? "restoreGalleryPhoto"'));
 });
 
+await test("gallery manager uses cached transformed thumbnails", () => {
+  ok(admin.includes("function getGalleryManagerThumbnailUrl(photoUrl)"));
+  ok(admin.includes('"/storage/v1/render/image/public/gallery/"'));
+  ok(admin.includes('url.searchParams.set("width", "480")'));
+  ok(admin.includes('url.searchParams.set("quality", "72")'));
+  ok(admin.includes('getGalleryManagerThumbnailUrl(photo.url)'));
+  ok(admin.includes('loading="lazy" decoding="async" fetchpriority="low"'));
+});
+
 console.log(`\nOrder photo self-test: ${tests} tests, ${assertions} assertions passed.`);
