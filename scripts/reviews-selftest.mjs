@@ -8,6 +8,7 @@ const apiSource = fs.readFileSync(new URL("functions/api/orders.js", root), "utf
 const publicApiSource = fs.readFileSync(new URL("functions/api/public/reviews.js", root), "utf8");
 const publicJs = fs.readFileSync(new URL("assets/js/main.js", root), "utf8");
 const adminCss = fs.readFileSync(new URL("admin/admin.css", root), "utf8");
+const adminHtml = fs.readFileSync(new URL("admin/index.html", root), "utf8");
 const migration = fs.readFileSync(new URL("supabase/migrations/20260813120000_customer_reviews.sql", root), "utf8");
 
 let tests = 0;
@@ -70,6 +71,14 @@ test("public pages preserve static reviews as the failure fallback", () => {
 test("MurphOS header subtitles use the shared class instead of page ID allowlists", () => {
   assert.ok((adminCss.match(/\.topbar \.topbar-subtitle/g) || []).length >= 1);
   assert.doesNotMatch(adminCss, /#[a-z][A-Za-z]*Count\s*[,\{]/);
+});
+
+test("Reviews reuses the Pricing and Money layout and card primitives", () => {
+  assert.match(adminHtml, /class="money-view">\s*<div id="reviewsPanel" class="money-panel reviews-admin-panel"/);
+  assert.match(adminSource, /dashboard-grid money-stat-grid review-summary-grid/);
+  assert.match(adminSource, /dashboard-card dashboard-metric review-summary/);
+  assert.match(adminCss, /\.review-admin-card\{display:grid;gap:8px;padding:11px 12px/);
+  assert.match(adminCss, /#reviewLibraryFilter\{min-height:32px/);
 });
 
 console.log(`\nReviews self-test: ${tests} tests passed.`);

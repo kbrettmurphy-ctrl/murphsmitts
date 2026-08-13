@@ -120,11 +120,11 @@ function renderReviewsPanel() {
   const visible = customerReviews.filter(review => reviewFilter === "hidden" ? review.hidden : !review.hidden);
   reviewsCount.textContent = `${active.length} reviews · ${homeCount}/3 home · ${servicesCount}/6 services`;
   reviewsPanel.innerHTML = `${renderReviewImport()}
-    <div class="review-summary-grid">
-      <div class="dashboard-card review-summary"><span>Homepage</span><strong>${homeCount}/3</strong><small>lowest order values display first</small></div>
-      <div class="dashboard-card review-summary"><span>Services</span><strong>${servicesCount}/6</strong><small>lowest order values display first</small></div>
+    <div class="dashboard-grid money-stat-grid review-summary-grid">
+      <div class="dashboard-card dashboard-metric review-summary"><span class="dashboard-metric-label">Homepage</span><strong class="dashboard-metric-value">${homeCount}/3</strong><small class="dashboard-metric-sub">Lowest order displays first</small></div>
+      <div class="dashboard-card dashboard-metric review-summary"><span class="dashboard-metric-label">Services</span><strong class="dashboard-metric-value">${servicesCount}/6</strong><small class="dashboard-metric-sub">Lowest order displays first</small></div>
     </div>
-    <div class="review-library-heading"><div><h2>Review Library</h2><p class="muted">Choose the strongest reviews for each public page.</p></div><select id="reviewLibraryFilter" aria-label="Review library filter"><option value="active" ${reviewFilter === "active" ? "selected" : ""}>Active</option><option value="hidden" ${reviewFilter === "hidden" ? "selected" : ""}>Hidden</option></select></div>
+    <div class="review-library-heading"><div><h2 class="dashboard-section-title">Review Library</h2><p class="muted">Choose the strongest reviews for each public page.</p></div><select id="reviewLibraryFilter" aria-label="Review library filter"><option value="active" ${reviewFilter === "active" ? "selected" : ""}>Active</option><option value="hidden" ${reviewFilter === "hidden" ? "selected" : ""}>Hidden</option></select></div>
     <div class="review-admin-list">${visible.length ? visible.map(renderReviewCard).join("") : '<div class="dashboard-card"><p class="muted">No reviews in this view.</p></div>'}</div>`;
   reviewsImportToggleBtn?.setAttribute("aria-expanded", String(reviewImportOpen));
 }
