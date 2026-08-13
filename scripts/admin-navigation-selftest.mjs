@@ -37,4 +37,16 @@ await test("Users persists its admin URL after the role guard", () => {
   ok(branch.indexOf("syncAdminViewUrl(resolvedView);") < branch.indexOf("showView(usersView);"));
 });
 
+await test("admin filter popovers compensate for the topbar containing block", () => {
+  const start = admin.indexOf("function positionAdminFilterPopover");
+  const end = admin.indexOf("function isDesktopHoverMenu", start);
+  assert.notEqual(start, -1, "filter popover positioning function should exist");
+  assert.notEqual(end, -1, "filter popover positioning function should have a boundary");
+  const positioning = admin.slice(start, end);
+  ok(positioning.includes("const containingBlockLeft = popoverRect.left;"));
+  ok(positioning.includes("const containingBlockTop = popoverRect.top;"));
+  ok(positioning.includes("left - containingBlockLeft"));
+  ok(positioning.includes("top - containingBlockTop"));
+});
+
 console.log(`\nAdmin navigation self-test: ${tests} tests, ${assertions} assertions passed.`);
