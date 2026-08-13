@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const admin = fs.readFileSync(new URL("../admin/admin.js", import.meta.url), "utf8");
+const api = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../admin/admin.css", import.meta.url), "utf8");
 const html = fs.readFileSync(new URL("../admin/index.html", import.meta.url), "utf8");
 let tests = 0;
@@ -96,8 +97,22 @@ await test("gallery manager uses cached transformed thumbnails", () => {
   ok(admin.includes('url.searchParams.set("resize", "contain")'));
   equal(admin.includes('url.searchParams.set("resize", "cover")'), false);
   ok(admin.includes('getGalleryManagerThumbnailUrl(photo.url)'));
-  ok(admin.includes('loading="lazy" decoding="async" fetchpriority="low"'));
+  ok(admin.includes('data-gallery-thumb-src="${escapeAttr(getGalleryManagerThumbnailUrl(photo.url))}"'));
+  ok(admin.includes("function wireGalleryManagerThumbnails(root)"));
+  ok(admin.includes("const maxConcurrent = 4"));
+  ok(admin.includes("{ root: null, rootMargin"));
+  ok(admin.includes('rootMargin: "120px 0px"'));
+  ok(admin.includes("wireGalleryManagerThumbnails(list)"));
   ok(/\.gallery-manager-thumb img\{[\s\S]*?object-fit:contain;/.test(css));
+});
+
+await test("gallery storage listing retries transient rate limits", () => {
+  const start = api.indexOf("async function listGallerySection");
+  const end = api.indexOf("function galleryPhotoFromPath", start);
+  const listing = api.slice(start, end);
+  ok(listing.includes("resp.status !== 429"));
+  ok(listing.includes("attempt < 4"));
+  ok(listing.includes("250 * (2 ** attempt)"));
 });
 
 console.log(`\nOrder photo self-test: ${tests} tests, ${assertions} assertions passed.`);

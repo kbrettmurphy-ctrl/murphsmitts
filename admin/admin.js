@@ -109,6 +109,8 @@ let galleryPhotoActionMenuEl = null;
 let galleryPhotos = [];
 let galleryManagerFilter = "all";
 let galleryManagerSearch = "";
+let galleryThumbnailObserver = null;
+let galleryThumbnailGeneration = 0;
 /* Shop-glove grouping: multi-select mode in the gallery manager. When active,
    each card gets a tap-to-toggle overlay; the action bar groups/ungroups the
    selected photos under a shared group_key. */
@@ -13059,6 +13061,55 @@ function getGalleryManagerThumbnailUrl(photoUrl) {
   }
 }
 
+function wireGalleryManagerThumbnails(root) {
+  galleryThumbnailObserver?.disconnect();
+  const generation = ++galleryThumbnailGeneration;
+  const queue = [];
+  let active = 0;
+  const maxConcurrent = 4;
+
+  function pump() {
+    if (generation !== galleryThumbnailGeneration) return;
+    while (active < maxConcurrent && queue.length) {
+      const image = queue.shift();
+      const src = image?.dataset?.galleryThumbSrc;
+      if (!src || !image.isConnected) continue;
+      delete image.dataset.galleryThumbSrc;
+      active += 1;
+      const finished = () => {
+        active = Math.max(0, active - 1);
+        pump();
+      };
+      image.addEventListener("load", finished, { once: true });
+      image.addEventListener("error", finished, { once: true });
+      image.src = src;
+    }
+  }
+
+  function enqueue(image) {
+    if (!image?.dataset?.galleryThumbSrc || image.dataset.galleryThumbQueued === "true") return;
+    image.dataset.galleryThumbQueued = "true";
+    queue.push(image);
+    pump();
+  }
+
+  const images = root.querySelectorAll("img[data-gallery-thumb-src]");
+  if (!("IntersectionObserver" in window)) {
+    images.forEach(enqueue);
+    return;
+  }
+
+  galleryThumbnailObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      galleryThumbnailObserver?.unobserve(entry.target);
+      enqueue(entry.target);
+    });
+  }, { root: null, rootMargin: "120px 0px" });
+
+  images.forEach(image => galleryThumbnailObserver.observe(image));
+}
+
 async function loadGalleryManagerPhotos() {
   const list = document.getElementById("galleryManagerList");
   const status = document.getElementById("galleryManagerStatus");
@@ -13159,7 +13210,7 @@ function renderGalleryManagerPhotos() {
           data-photo-url="${escapeAttr(photo.url)}"
           tabindex="0">
           <button class="gallery-manager-thumb" type="button" data-gallery-action="view">
-            <img src="${escapeAttr(getGalleryManagerThumbnailUrl(photo.url))}" alt="${escapeAttr(photo.name || "Gallery photo")}" loading="lazy" decoding="async" fetchpriority="low">
+            <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-gallery-thumb-src="${escapeAttr(getGalleryManagerThumbnailUrl(photo.url))}" alt="${escapeAttr(photo.name || "Gallery photo")}" decoding="async" fetchpriority="low">
             ${photo.isCover ? `<span class="gallery-cover-star" aria-label="Album cover">★</span>` : ""}
           </button>
           <div class="gallery-manager-meta">
@@ -13186,6 +13237,7 @@ function renderGalleryManagerPhotos() {
   list.querySelectorAll(".gallery-manager-item").forEach(item => {
     attachGalleryManagerItemActions(item);
   });
+  wireGalleryManagerThumbnails(list);
 }
 
 /* ---- Shop-glove grouping: multi-select in the gallery manager ---- */
