@@ -8635,15 +8635,17 @@ details.pricing-section[open] > .pricing-section-summary{border-bottom:1px solid
    REVIEWS MANAGEMENT — scoped to the Reviews view. Reuses the same
    .money-view / .money-panel / .dashboard-card language as Pricing.
    ========================================================================= */
-.reviews-admin-panel{width:100%;box-sizing:border-box}
+.reviews-admin-panel{width:100%;min-width:0;box-sizing:border-box}
+.reviews-admin-panel>*{min-width:0}
 .review-import-card{display:grid;gap:10px;padding:12px}
+.review-import-card>*,.review-import-row>*{min-width:0}
 .review-card-heading,
 .review-library-heading,
 .review-import-preview-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .review-card-heading>div,.review-library-heading>div{min-width:0}
 .review-card-heading h2,.review-card-heading h3,.review-library-heading h2{margin:0;color:var(--navy)}
 .review-card-heading h2{font-size:.92rem}
-.review-card-heading h3{font-size:.9rem;font-weight:650;line-height:1.25}
+.review-card-heading h3{font-size:.9rem;font-weight:650;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .review-card-heading p,.review-library-heading p{margin:3px 0 0;font-size:.72rem;line-height:1.35}
 .review-import-card>textarea,
 .review-import-row input,
@@ -8664,14 +8666,16 @@ details.pricing-section[open] > .pricing-section-summary{border-bottom:1px solid
 }
 .review-import-card>textarea,.review-import-row textarea,.review-edit-form textarea{width:100%;resize:vertical;line-height:1.4}
 .review-import-card>textarea:focus,.review-import-row input:focus,.review-import-row select:focus,.review-import-row textarea:focus,.review-edit-form input:focus,.review-edit-form select:focus,.review-edit-form textarea:focus,#reviewLibraryFilter:focus{outline:none;border-color:rgba(9,47,77,.4);box-shadow:0 0 0 3px rgba(9,47,77,.08)}
-.review-import-actions,.review-edit-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.review-import-actions .muted{font-size:.7rem}
+.review-import-actions,.review-edit-actions{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+.review-import-actions .muted{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.7rem}
 .review-import-preview{border-top:1px solid rgba(9,47,77,.12);padding-top:12px}
 .review-import-save{white-space:nowrap}
 .review-import-row{padding:12px 0;border-top:1px solid rgba(9,47,77,.09)}
 .review-import-row:first-child{padding-top:0;border-top:0}
-.review-import-row-actions{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.review-import-row-actions{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:nowrap}
+.review-import-row-actions .review-remove-draft{margin-top:0}
 .review-import-fields,.review-edit-grid{display:grid;grid-template-columns:2fr 2fr 1fr 1.4fr;gap:8px}
+.review-import-fields>*,.review-edit-grid>*{min-width:0;width:100%;box-sizing:border-box}
 .review-import-excerpt{display:grid;gap:5px;margin-top:10px;font-size:.7rem;font-weight:600;color:rgba(9,47,77,.68)}
 .review-import-excerpt span{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
 .review-import-excerpt small{font-size:.66rem;font-weight:400;color:rgba(9,47,77,.56)}
@@ -8689,7 +8693,7 @@ details.pricing-section[open] > .pricing-section-summary{border-bottom:1px solid
 .review-admin-stars{color:#d89100;letter-spacing:.06em;margin:2px 0 0;font-size:.8rem;line-height:1}
 .review-admin-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;margin:2px 0 0;font-size:.8rem;color:var(--ink)}
 .review-admin-meta{margin:0;font-size:.68rem;line-height:1.3}
-.review-placement-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-top:8px;border-top:1px solid rgba(9,47,77,.1)}
+.review-placement-controls{display:flex;align-items:center;gap:14px;flex-wrap:nowrap;padding-top:8px;border-top:1px solid rgba(9,47,77,.1)}
 .review-placement-controls label,.review-hidden-control{display:flex;align-items:center;gap:7px;font-size:.76rem;color:var(--ink)}
 .review-placement-controls input[type="checkbox"],.review-hidden-control input[type="checkbox"]{width:16px;height:16px;margin:0;accent-color:var(--navy)}
 .review-hidden-badge{font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:999px;background:rgba(9,47,77,.09);color:var(--navy)}
@@ -8697,4 +8701,4 @@ details.pricing-section[open] > .pricing-section-summary{border-bottom:1px solid
 .review-edit-form[hidden]{display:none}
 .review-edit-form label{display:grid;gap:5px;font-size:.7rem;font-weight:600;color:rgba(9,47,77,.68)}
 @media(max-width:700px){.review-import-fields,.review-edit-grid{grid-template-columns:1fr}.review-summary-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.review-card-heading{align-items:flex-start}.review-library-heading{align-items:center}.review-admin-text{font-size:.78rem}}
-@media(max-width:420px){.review-summary-grid{grid-template-columns:1fr}.review-library-heading{align-items:flex-end}}
+@media(max-width:420px){.review-library-heading{align-items:flex-end}}

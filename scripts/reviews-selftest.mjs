@@ -115,4 +115,17 @@ test("Every Reviews button uses the standardized secondary button class", () => 
   assert.doesNotMatch(adminSource, /class="pricing-publish review-import-save"/);
 });
 
+test("Reviews mobile action rows stay compact and single-line", () => {
+  assert.match(adminCss, /\.reviews-admin-panel\{[^}]*min-width:0/);
+  assert.match(adminCss, /\.reviews-admin-panel>\*\{min-width:0\}/);
+  assert.match(adminCss, /\.review-import-card>\*,\.review-import-row>\*\{min-width:0\}/);
+  assert.match(adminCss, /\.review-import-fields>\*,\.review-edit-grid>\*\{min-width:0;width:100%;box-sizing:border-box\}/);
+  assert.match(adminCss, /\.review-import-actions,\.review-edit-actions\{[^}]*flex-wrap:nowrap/);
+  assert.match(adminCss, /\.review-import-row-actions\{[^}]*flex-wrap:nowrap/);
+  assert.match(adminCss, /\.review-import-row-actions \.review-remove-draft\{margin-top:0\}/);
+  assert.match(adminCss, /\.review-placement-controls\{[^}]*flex-wrap:nowrap/);
+  assert.match(adminCss, /\.review-import-actions \.muted\{[^}]*text-overflow:ellipsis;white-space:nowrap/);
+  assert.doesNotMatch(adminCss, /@media\(max-width:420px\)\{\.review-summary-grid\{grid-template-columns:1fr/);
+});
+
 console.log(`\nReviews self-test: ${tests} tests passed.`);
