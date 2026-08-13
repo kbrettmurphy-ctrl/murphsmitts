@@ -48,6 +48,20 @@ test("Google copy parser separates complete review blocks", () => {
   assert.match(parsed[1].reviewText, /Fast turnaround/);
 });
 
+test("Google Business clipboard markup parses without manual cleanup", () => {
+  const parse = loadParser();
+  const parsed = parse(`[**sherwood ransom**](https://www.google.com/maps/contrib/109374945789708526922/reviews?hl=en)open_in_new
+2 reviews • 0 photos
+starstarstarstarstar 19 hours ago **NEW**
+My experience with Murph's Mitt Maixtenance was top notch! I was very impressed to find someone who was equally as passionate about the restoration, preservation, and the collecting of baseball gloves.`);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].reviewerName, "sherwood ransom");
+  assert.equal(parsed[0].rating, 5);
+  assert.equal(parsed[0].dateLabel, "19 hours ago");
+  assert.match(parsed[0].reviewText, /^My experience with Murph's Mitt Maixtenance/);
+  assert.doesNotMatch(parsed[0].reviewText, /NEW|open_in_new|2 reviews/);
+});
+
 test("admin API actions are authenticated and duplicate-aware", () => {
   for (const action of ["listCustomerReviews", "importCustomerReviews", "updateCustomerReview", "deleteCustomerReview"]) {
     assert.match(apiSource, new RegExp(`${action}: \\{[\\s\\S]*?auth: "session"`));

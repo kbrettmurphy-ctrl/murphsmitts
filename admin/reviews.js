@@ -18,7 +18,7 @@ function parseGoogleReviewPaste(raw) {
   const lines = String(raw || "").replace(/\r/g, "").split("\n").map(line => line.trim());
   const starts = [];
   const metadataPattern = /(?:local guide|\b\d+\s+reviews?\b|\b\d+\s+photos?\b)/i;
-  const starsPattern = /(?:★{1,5}|\b[1-5](?:\.0)?\s*(?:out of 5|stars?)\b)/i;
+  const starsPattern = /(?:★{1,5}|(?:star\s*){1,5}|\b[1-5](?:\.0)?\s*(?:out of 5|stars?)\b)/i;
 
   for (let i = 0; i < lines.length; i += 1) {
     if (!lines[i]) continue;
@@ -39,12 +39,17 @@ function parseGoogleReviewPaste(raw) {
     const clean = group.map(line => line.trim()).filter(Boolean);
     const starIndex = clean.findIndex(line => starsPattern.test(line));
     if (!clean.length || starIndex < 0) return null;
-    const reviewerName = clean[0];
+    const markdownName = clean[0].match(/^\[(?:\*\*)?(.+?)(?:\*\*)?\]\([^)]+\)(?:open_in_new)?$/i);
+    const reviewerName = (markdownName?.[1] || clean[0])
+      .replace(/^\*\*|\*\*$/g, "")
+      .replace(/open_in_new$/i, "")
+      .trim();
     const starMatch = clean[starIndex].match(/★{1,5}/);
+    const wordStars = clean[starIndex].match(/star/gi);
     const numberMatch = clean[starIndex].match(/\b([1-5])(?:\.0)?\b/);
-    const rating = starMatch ? starMatch[0].length : Number(numberMatch?.[1] || 5);
-    const datePattern = /^(?:edited\s+)?(?:a|an|\d+)\s+(?:minute|hour|day|week|month|year)s?\s+ago$|^[A-Z][a-z]{2,8}\s+\d{1,2},\s+\d{4}$/i;
-    const dateLabel = clean.find((line, index) => index > starIndex && datePattern.test(line)) || "";
+    const rating = starMatch ? starMatch[0].length : (wordStars?.length || Number(numberMatch?.[1] || 5));
+    const datePattern = /(?:edited\s+)?(?:a|an|\d+)\s+(?:minute|hour|day|week|month|year)s?\s+ago|[A-Z][a-z]{2,8}\s+\d{1,2},\s+\d{4}/i;
+    const dateLabel = clean.slice(starIndex, starIndex + 3).map(line => line.match(datePattern)?.[0] || "").find(Boolean) || "";
     const ignored = /^(?:like|share|read more|new|helpful)$/i;
     const reviewLines = clean.slice(starIndex + 1).filter(line => line !== dateLabel && !ignored.test(line));
     const ownerResponse = reviewLines.findIndex(line => /^(?:owner response|response from the owner)/i.test(line));
