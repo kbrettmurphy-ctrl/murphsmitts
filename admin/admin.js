@@ -13052,7 +13052,7 @@ function getGalleryManagerThumbnailUrl(photoUrl) {
     );
     url.searchParams.set("width", "480");
     url.searchParams.set("quality", "72");
-    url.searchParams.set("resize", "cover");
+    url.searchParams.set("resize", "contain");
     return url.toString();
   } catch {
     return original;
