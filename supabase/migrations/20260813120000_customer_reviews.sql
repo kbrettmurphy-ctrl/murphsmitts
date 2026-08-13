@@ -37,30 +37,3 @@ alter table public.customer_reviews enable row level security;
 
 revoke all on table public.customer_reviews from anon, authenticated;
 grant select, insert, update, delete on table public.customer_reviews to service_role;
-
--- Seed the six reviews already approved on the public site. Stable source keys
--- make this safe to re-run and let later Google-copy imports recognize them.
-insert into public.customer_reviews
-  (source_review_key, reviewer_name, reviewer_location, rating, review_text,
-   homepage_featured, homepage_excerpt, homepage_sort_order,
-   services_featured, services_sort_order)
-values
-  ('site-sergio-vazquez', 'Sergio Vazquez', 'Brock, TX', 5,
-   'Huge shoutout to Murph''s Mitt Maintenance for bringing my softball catcher’s glove back to life! 🥎🔥 I sent it in for a full relace and deep clean, and we honestly couldn’t be happier. The leather looks rich and refreshed, the pocket is perfectly formed again, and the new laces are tight, strong, and game-ready. My daughter said it feels secure behind the plate and has that perfect snap when catching. You can tell they truly care about craftsmanship and detail — everything was done with precision. Daughter''s glove feels broken-in but brand new at the same time. If your mitt needs some love, don’t hesitate. Brett absolutely delivers quality work and top-notch service! 💪🏆',
-   true, 'The leather looks rich and refreshed, and the new laces are tight, strong, and game-ready.', 10, true, 10),
-  ('site-beau-bilock', 'Beau Bilock', 'Woodbridge, VA', 5,
-   'I had three gloves done by Murph''s Mitt Maintenance. Each came back better than expected. I have had relacing done in the past, but there was no difference in the structure. That was not the case after getting the gloves back from Murph. Will be doing business again.',
-   true, 'I had three gloves done by Murph''s Mitt Maintenance. Each came back better than expected.', 20, true, 20),
-  ('site-joshua-mcgirl', 'Joshua McGirl', 'Holly Ridge, NC', 5,
-   'Very timely and professional service. Made my loose glove feel brand new yet still broke in. Fantastic service and Brett was a true professional throughout the entire process. 10/10 service and customer service.',
-   true, 'Very timely and professional service. Fantastic service and customer service.', 30, true, 30),
-  ('site-robert-gilliland', 'Robert Gilliland', 'Hampstead, NC', 5,
-   'Brett did an amazing job on my son’s mitt and has relaced my daughter’s glove twice. If I or someone I know need a glove laced, Brett is the only one I will recommend for the job.',
-   false, null, 40, true, 40),
-  ('site-jason-eiseman', 'Jason Eiseman', 'Northville, MI', 5,
-   'I am honestly so impressed by the quality of work and the professionalism. Just added season to my daughter’s glove',
-   false, null, 50, true, 50),
-  ('site-corey-swinson', 'Corey Swinson', 'Hampstead, NC', 5,
-   'Had 2 gloves re-laced and restored that were in pretty awful shape. The end result was fantastic and the quick turnaround was amazing. I highly recommend Murph’s Mitt Maintenance for all your glove repair needs.',
-   false, null, 60, true, 60)
-on conflict (source_review_key) do nothing;

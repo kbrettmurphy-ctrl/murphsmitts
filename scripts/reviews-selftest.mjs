@@ -78,10 +78,15 @@ test("public endpoint exposes selected projections with fixed caps", () => {
   assert.doesNotMatch(publicApiSource, /source_review_key/);
 });
 
-test("public pages preserve static reviews as the failure fallback", () => {
-  assert.match(publicJs, /Curated reviews unavailable; using static review fallback/);
+test("public pages use MurphOS as the only review content source", () => {
+  const homeHtml = fs.readFileSync(new URL("index.html", root), "utf8");
+  const servicesHtml = fs.readFileSync(new URL("services/index.html", root), "utf8");
+  assert.match(publicJs, /MurphOS reviews unavailable/);
   assert.match(publicJs, /if \(!grid \|\| !Array\.isArray\(reviews\) \|\| !reviews\.length/);
   assert.match(publicJs, /grid\.replaceChildren\(fragment\)/);
+  assert.doesNotMatch(homeHtml, /<article class="review-card">/);
+  assert.doesNotMatch(servicesHtml, /<article class="review-card">/);
+  assert.doesNotMatch(migration, /site-(?:sergio|beau|joshua|robert|jason|corey)/);
 });
 
 test("MurphOS header subtitles use the shared class instead of page ID allowlists", () => {

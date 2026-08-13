@@ -1279,9 +1279,7 @@ if (document.readyState === "loading") {
 }
 
 // =========================
-// Curated customer reviews
-// The existing HTML reviews remain the no-network fallback. A valid, non-empty
-// placement from MurphOS replaces only the matching grid.
+// Curated customer reviews — MurphOS is the only review content source.
 // =========================
 function initPublicCustomerReviews() {
   var homeGrid = document.querySelector(".home-reviews-grid");
@@ -1326,7 +1324,7 @@ function initPublicCustomerReviews() {
       renderReviewGrid(servicesGrid, data.services);
     })
     .catch(function (error) {
-      console.warn("Curated reviews unavailable; using static review fallback.", error);
+      console.warn("MurphOS reviews unavailable.", error);
     });
 }
 
