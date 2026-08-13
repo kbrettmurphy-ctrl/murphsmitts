@@ -13037,6 +13037,28 @@ function getGallerySectionLabel(section) {
   return GALLERY_SECTION_LABELS[section] || section || "Gallery";
 }
 
+function getGalleryManagerThumbnailUrl(photoUrl) {
+  const original = String(photoUrl || "").trim();
+  if (!original) return "";
+
+  try {
+    const url = new URL(original);
+    const objectPrefix = "/storage/v1/object/public/gallery/";
+    if (!url.pathname.includes(objectPrefix)) return original;
+
+    url.pathname = url.pathname.replace(
+      objectPrefix,
+      "/storage/v1/render/image/public/gallery/"
+    );
+    url.searchParams.set("width", "480");
+    url.searchParams.set("quality", "72");
+    url.searchParams.set("resize", "cover");
+    return url.toString();
+  } catch {
+    return original;
+  }
+}
+
 async function loadGalleryManagerPhotos() {
   const list = document.getElementById("galleryManagerList");
   const status = document.getElementById("galleryManagerStatus");
@@ -13137,7 +13159,7 @@ function renderGalleryManagerPhotos() {
           data-photo-url="${escapeAttr(photo.url)}"
           tabindex="0">
           <button class="gallery-manager-thumb" type="button" data-gallery-action="view">
-            <img src="${escapeAttr(photo.url)}" alt="${escapeAttr(photo.name || "Gallery photo")}" loading="lazy">
+            <img src="${escapeAttr(getGalleryManagerThumbnailUrl(photo.url))}" alt="${escapeAttr(photo.name || "Gallery photo")}" loading="lazy" decoding="async" fetchpriority="low">
             ${photo.isCover ? `<span class="gallery-cover-star" aria-label="Album cover">★</span>` : ""}
           </button>
           <div class="gallery-manager-meta">
