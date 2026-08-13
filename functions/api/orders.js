@@ -5625,26 +5625,29 @@ async function listGallerySection(env, section, options = {}) {
     const PAGE_SIZE = 100;
     let data = [];
     for (let offset = 0; offset < 5000; offset += PAGE_SIZE) {
-      const resp = await fetch(
-        `${env.SUPABASE_URL}/storage/v1/object/list/gallery`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            prefix,
-            limit: PAGE_SIZE,
-            offset,
-            sortBy: {
-              column: "name",
-              order: "desc"
-            }
-          })
-        }
-      );
+      const request = {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          prefix,
+          limit: PAGE_SIZE,
+          offset,
+          sortBy: {
+            column: "name",
+            order: "desc"
+          }
+        })
+      };
+      let resp;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        resp = await fetch(`${env.SUPABASE_URL}/storage/v1/object/list/gallery`, request);
+        if (resp.status !== 429 || attempt === 3) break;
+        await new Promise(resolve => setTimeout(resolve, 250 * (2 ** attempt)));
+      }
 
       const text = await resp.text();
 
