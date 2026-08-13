@@ -7,6 +7,7 @@ const adminSource = fs.readFileSync(new URL("admin/reviews.js", root), "utf8");
 const apiSource = fs.readFileSync(new URL("functions/api/orders.js", root), "utf8");
 const publicApiSource = fs.readFileSync(new URL("functions/api/public/reviews.js", root), "utf8");
 const publicJs = fs.readFileSync(new URL("assets/js/main.js", root), "utf8");
+const adminCss = fs.readFileSync(new URL("admin/admin.css", root), "utf8");
 const migration = fs.readFileSync(new URL("supabase/migrations/20260813120000_customer_reviews.sql", root), "utf8");
 
 let tests = 0;
@@ -64,6 +65,10 @@ test("public pages preserve static reviews as the failure fallback", () => {
   assert.match(publicJs, /Curated reviews unavailable; using static review fallback/);
   assert.match(publicJs, /if \(!grid \|\| !Array\.isArray\(reviews\) \|\| !reviews\.length/);
   assert.match(publicJs, /grid\.replaceChildren\(fragment\)/);
+});
+
+test("Reviews subtitle participates in every shared MurphOS header rule", () => {
+  assert.equal((adminCss.match(/#reviewsCount/g) || []).length, 5);
 });
 
 console.log(`\nReviews self-test: ${tests} tests passed.`);
