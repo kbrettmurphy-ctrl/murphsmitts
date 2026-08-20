@@ -805,14 +805,32 @@ if (document.readyState === "loading") {
 })();
 
 // =========================
-// Pre-select contact tab via URL (?tab=service)
+// Pre-select contact tab and optional referral via URL
+// Example: ?tab=service&referral=Landon%20Murphy
 // =========================
 (() => {
-  const tab = new URLSearchParams(window.location.search).get("tab");
-  if (tab !== "service") return;
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get("tab");
+  const referral = (params.get("referral") || "").trim();
 
-  const serviceRadio = document.getElementById("tab-service");
-  if (serviceRadio) serviceRadio.checked = true;
+  if (tab === "service") {
+    const serviceRadio = document.getElementById("tab-service");
+    if (serviceRadio) serviceRadio.checked = true;
+  }
+
+  if (!referral) return;
+
+  const otherRadio = document.querySelector(
+    'input[name="referralSource"][value="Other"]'
+  );
+  const otherText = document.getElementById("referralOtherText");
+
+  if (otherRadio && otherText) {
+    otherRadio.checked = true;
+    otherText.value = referral.slice(0, 100);
+    otherText.dispatchEvent(new Event("input", { bubbles: true }));
+    otherText.dispatchEvent(new Event("change", { bubbles: true }));
+  }
 })();
 
 // =========================
