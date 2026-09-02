@@ -8703,3 +8703,12 @@ details.pricing-section[open] > .pricing-section-summary{border-bottom:1px solid
 .review-edit-form label{display:grid;gap:5px;font-size:.7rem;font-weight:600;color:rgba(9,47,77,.68)}
 @media(max-width:700px){.review-import-fields,.review-edit-grid{grid-template-columns:1fr}.review-summary-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.review-card-heading{align-items:flex-start}.review-library-heading{align-items:center}.review-admin-text{font-size:.78rem}}
 @media(max-width:420px){.review-library-heading{align-items:flex-end}}
+
+/* =========================================================================
+   BENCH TIMER MENU — MOBILE VISIBLE-VIEWPORT CONTAINMENT
+   Keep the anchored timer sheet scrollable inside the live iPhone viewport.
+   ========================================================================= */
+.bench-choice-sheet.is-anchored .bench-choice-panel{
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}

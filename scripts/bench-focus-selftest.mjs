@@ -313,10 +313,10 @@ await test("focused-card controls emit authoritative identifiers and reuse labor
   equal(control.includes("controlButton.disabled"), false);
 });
 
-await test("Bench end choices anchor and clamp through the existing menu utility", () => {
+await test("Bench end choices anchor and clamp through the Bench menu utility", () => {
   ok(admin.includes("anchor: choiceAnchor"));
   ok(admin.includes('endActiveBenchWork({ anchor: endBenchBtn })'));
-  ok(admin.includes("positionWorkflowMenu(panel, position)"));
+  ok(admin.includes("positionBenchChoicePanel(panel, position)"));
   ok(admin.includes('sheet.className = `bench-choice-sheet${anchorPosition ? " is-anchored" : ""}`'));
   ok(admin.includes('event.target.closest?.("[data-action]")'));
   ok(admin.includes('if (event.key === "Escape") closeBenchChoiceSheet()'));
@@ -408,6 +408,23 @@ await test("all Bench menus avoid bottom pinning and unresolved actions share th
   const resolve = admin.match(/async function resolveBenchInterval\([\s\S]*?\n\}/)?.[0] || "";
   ok(resolve.includes('chooseBenchLaborPhase("Assign Bench Work time", anchor)'));
   ok(resolve.includes("anchor\n    })") || resolve.includes("anchor\r\n    })"));
+});
+
+await test("anchored Bench menus stay inside the live mobile viewport", () => {
+  const position = admin.match(/function positionBenchChoicePanel\([\s\S]*?\n\}/)?.[0] || "";
+  const open = admin.match(/function openBenchChoiceSheet\([\s\S]*?\n\}/)?.[0] || "";
+  const close = admin.match(/function closeBenchChoiceSheet\([\s\S]*?\n\}/)?.[0] || "";
+  ok(position.includes("window.visualViewport"));
+  ok(position.includes("visualViewport?.offsetTop"));
+  ok(position.includes("visualViewport?.height"));
+  ok(position.includes("panel.style.maxHeight"));
+  ok(open.includes('sheet._visualViewport?.addEventListener("resize"'));
+  ok(open.includes('sheet._visualViewport?.addEventListener("scroll"'));
+  ok(close.includes('sheet._visualViewport?.removeEventListener("resize"'));
+  ok(close.includes('sheet._visualViewport?.removeEventListener("scroll"'));
+  ok(adminCss.includes(".bench-choice-sheet.is-anchored .bench-choice-panel{"));
+  ok(adminCss.includes("overscroll-behavior:contain"));
+  ok(adminCss.includes("-webkit-overflow-scrolling:touch"));
 });
 
 await test("Bench resolution reconciles ambiguous responses and unlocks rendered controls", () => {

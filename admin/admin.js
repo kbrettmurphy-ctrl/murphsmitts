@@ -1787,10 +1787,13 @@ function closeBenchChoiceSheet(value = null) {
   if (sheet._reposition) {
     window.removeEventListener("resize", sheet._reposition);
     window.removeEventListener("scroll", sheet._reposition, true);
+    sheet._visualViewport?.removeEventListener("resize", sheet._reposition);
+    sheet._visualViewport?.removeEventListener("scroll", sheet._reposition);
   }
   const resolve = sheet._resolve;
   sheet._resolve = null;
   sheet._reposition = null;
+  sheet._visualViewport = null;
   sheet.hidden = true;
   sheet.className = "bench-choice-sheet";
   sheet.innerHTML = "";
@@ -1819,6 +1822,33 @@ function getBenchChoiceRoot() {
   return benchChoiceRoot;
 }
 
+function positionBenchChoicePanel(panel, anchor) {
+  const visualViewport = window.visualViewport;
+  const viewport = {
+    left: visualViewport?.offsetLeft || 0,
+    top: visualViewport?.offsetTop || 0,
+    width: visualViewport?.width || window.innerWidth,
+    height: visualViewport?.height || window.innerHeight
+  };
+  const margin = 12;
+  const offsetY = window.matchMedia("(pointer: coarse)").matches ? 10 : 2;
+
+  panel.style.left = "0px";
+  panel.style.top = "0px";
+  panel.style.right = "auto";
+  panel.style.bottom = "auto";
+  panel.style.maxHeight = `${Math.max(180, viewport.height - margin * 2)}px`;
+
+  const rect = panel.getBoundingClientRect();
+  const maxLeft = Math.max(viewport.left + margin, viewport.left + viewport.width - rect.width - margin);
+  const maxTop = Math.max(viewport.top + margin, viewport.top + viewport.height - rect.height - margin);
+  const left = Math.min(Math.max(viewport.left + margin, anchor.x), maxLeft);
+  const top = Math.min(Math.max(viewport.top + margin, anchor.y + offsetY), maxTop);
+
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+}
+
 function openBenchChoiceSheet({ title, message = "", content = "", actions = [], anchor = null }) {
   closeBenchChoiceSheet();
   return new Promise(resolve => {
@@ -1842,20 +1872,27 @@ function openBenchChoiceSheet({ title, message = "", content = "", actions = [],
         let position = anchorPosition;
         if (anchorElement?.isConnected) {
           const rect = anchorElement.getBoundingClientRect();
+          const visualViewport = window.visualViewport;
+          const viewportTop = visualViewport?.offsetTop || 0;
+          const viewportBottom = viewportTop + (visualViewport?.height || window.innerHeight);
+          panel.style.maxHeight = `${Math.max(180, viewportBottom - viewportTop - 24)}px`;
           const panelHeight = panel.getBoundingClientRect().height;
           const below = rect.bottom + 6;
           position = {
             x: rect.left,
-            y: below + panelHeight <= window.innerHeight - 12
+            y: below + panelHeight <= viewportBottom - 12
               ? below
-              : Math.max(12, rect.top - panelHeight - 6)
+              : Math.max(viewportTop + 12, rect.top - panelHeight - 6)
           };
         }
-        positionWorkflowMenu(panel, position);
+        positionBenchChoicePanel(panel, position);
       };
       sheet._reposition = () => requestAnimationFrame(reposition);
+      sheet._visualViewport = window.visualViewport || null;
       window.addEventListener("resize", sheet._reposition);
       window.addEventListener("scroll", sheet._reposition, true);
+      sheet._visualViewport?.addEventListener("resize", sheet._reposition);
+      sheet._visualViewport?.addEventListener("scroll", sheet._reposition);
       reposition();
     }
   });
