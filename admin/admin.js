@@ -71,6 +71,12 @@ const calendarView = document.getElementById("calendarView");
 const usersPanel = document.getElementById("usersPanel");
 const messagesView = document.getElementById("messagesView");
 const messagesPanel = document.getElementById("messagesPanel");
+const messagesMenuBtn = document.getElementById("messagesMenuBtn");
+const messagesBackBtn = document.getElementById("messagesBackBtn");
+const messagesTitle = document.getElementById("messagesTitle");
+const messagesCount = document.getElementById("messagesCount");
+const msgComposeBtn = document.getElementById("msgComposeBtn");
+const msgThreadDeleteBtn = document.getElementById("msgThreadDeleteBtn");
 const inviteView = document.getElementById("inviteView");
 
 const saleGlovesView = document.getElementById("saleGlovesView");
@@ -11147,6 +11153,8 @@ let allMessages = [];
 let openThreadKey = null;
 let lastMessagesSig = "";
 let pendingMsgPhoto = "";
+let messageThreadPinned = true;
+let messageSending = false;
 const ORDERS_SEEN_KEY = "mm_orders_seen_ts";
 
 function msgThreadKey(m) {
@@ -11166,6 +11174,12 @@ function formatMessageTime(iso) {
   return sameDay
     ? date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+function formatConversationMessageTime(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 function groupMessageThreads(messages) {
@@ -11196,20 +11210,45 @@ function groupMessageThreads(messages) {
   return threads;
 }
 
+function setMessagesTopbar(mode, thread = null) {
+  const inThread = mode === "thread";
+  const composing = mode === "compose";
+  if (messagesMenuBtn) messagesMenuBtn.hidden = inThread || composing;
+  if (messagesBackBtn) messagesBackBtn.hidden = !inThread && !composing;
+  if (msgComposeBtn) msgComposeBtn.hidden = inThread || composing;
+  if (msgThreadDeleteBtn) {
+    msgThreadDeleteBtn.hidden = !inThread;
+    msgThreadDeleteBtn.dataset.delThread = inThread && thread ? thread.key : "";
+  }
+  if (messagesTitle) {
+    messagesTitle.textContent = inThread
+      ? (thread?.customerName || formatPhone(thread?.phoneNumber))
+      : (composing ? "New message" : "Messages");
+  }
+  if (messagesCount && (inThread || composing)) {
+    if (inThread && thread) {
+      const parts = [];
+      if (thread.customerName) parts.push(formatPhone(thread.phoneNumber));
+      if (thread.orderNumber) parts.push(`Order #${thread.orderNumber}`);
+      messagesCount.textContent = parts.join(" · ") || "Text conversation";
+    } else {
+      messagesCount.textContent = "Start a text conversation";
+    }
+  }
+}
+
 async function refreshMessages({ rerender = false } = {}) {
   try {
     const data = await postJson({ action: "listMessages" }, true);
     allMessages = data.messages || [];
     syncNotificationBadges();
-    const sig = `${allMessages.length}:${allMessages[allMessages.length - 1]?.id || ""}`;
+    const sig = `${allMessages.length}:${allMessages[0]?.id || ""}:${allMessages[allMessages.length - 1]?.id || ""}`;
     if (rerender && messagesView && messagesView.classList.contains("active")) {
-      /* Never yank the DOM out from under an active draft/keyboard. */
-      if (document.activeElement && document.activeElement.id === "msgReplyInput") return;
       /* Nothing new since the last render — don't re-render and snap the
          user's scroll position back. */
       if (sig === lastMessagesSig) return;
       lastMessagesSig = sig;
-      if (openThreadKey) openMessageThread(openThreadKey);
+      if (openThreadKey) refreshOpenMessageThread();
       else renderMessagesView();
     } else {
       lastMessagesSig = sig;
@@ -11221,6 +11260,7 @@ async function refreshMessages({ rerender = false } = {}) {
 
 async function renderMessagesView() {
   if (!messagesPanel) return;
+  pendingMsgPhoto = "";
   if (!allMessages.length) {
     messagesPanel.innerHTML = `<div class="dashboard-shell messages-shell"><div class="dashboard-card msg-empty muted">Loading messages…</div></div>`;
     await refreshMessages();
@@ -11228,9 +11268,9 @@ async function renderMessagesView() {
 
   const threads = groupMessageThreads(allMessages);
   const totalUnread = threads.reduce((n, t) => n + t.unread, 0);
-  const countEl = document.getElementById("messagesCount");
-  if (countEl) {
-    countEl.textContent = totalUnread
+  setMessagesTopbar("inbox");
+  if (messagesCount) {
+    messagesCount.textContent = totalUnread
       ? `${totalUnread} unread`
       : `${threads.length} ${threads.length === 1 ? "conversation" : "conversations"}`;
   }
@@ -11265,21 +11305,16 @@ function renderThreadRow(t) {
       </div>
       <div class="msg-thread-meta">
         <span class="msg-thread-time muted">${escapeHtml(formatMessageTime(t.last.createdAt))}</span>
-        ${t.unread ? `<span class="msg-unread-dot" aria-label="${t.unread} unread"></span>` : ""}
+        ${t.unread ? `<span class="msg-unread-badge" aria-label="${t.unread} unread">${Math.min(t.unread, 99)}</span>` : `<span class="msg-thread-chevron" aria-hidden="true">&#8250;</span>`}
       </div>
     </button>
     </div>`;
 }
 
-function openMessageThread(key) {
-  const t = groupMessageThreads(allMessages).find(x => x.key === key);
-  if (!t || !messagesPanel) return;
-  const prevDraft = (openThreadKey === key && document.getElementById("msgReplyInput")?.value) || "";
-  openThreadKey = key;
-
+function buildMessageBubbles(messages) {
   let prevDay = "";
   let bubbles = "";
-  t.messages.forEach((m, i) => {
+  messages.forEach((m, i) => {
     const dir = m.direction === "out" ? "out" : "in";
     const d = new Date(m.createdAt);
     const day = d.toDateString();
@@ -11288,39 +11323,86 @@ function openMessageThread(key) {
       const label = day === new Date().toDateString()
         ? "Today"
         : d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
-      const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-      bubbles += `<div class="msg-day"><strong>${escapeHtml(label)}</strong> ${escapeHtml(time)}</div>`;
+      bubbles += `<div class="msg-day"><strong>${escapeHtml(label)}</strong></div>`;
     }
     /* Tail only on the last bubble of a same-direction run (iMessage-style). */
-    const next = t.messages[i + 1];
+    const next = messages[i + 1];
     const tail = !next || (next.direction === "out" ? "out" : "in") !== dir ||
       new Date(next.createdAt).toDateString() !== day;
-    const media = m.mediaUrls.map(u => `<a href="${escapeAttr(u)}" target="_blank" rel="noopener"><img class="msg-media-img" src="${escapeAttr(u)}" alt="Photo" loading="lazy"></a>`).join("");
-    const mediaOnly = !m.body && m.mediaUrls.length ? " msg-media-only" : "";
+    const mediaUrls = Array.isArray(m.mediaUrls) ? m.mediaUrls : [];
+    const media = mediaUrls.map(u => `<a href="${escapeAttr(u)}" target="_blank" rel="noopener"><img class="msg-media-img" src="${escapeAttr(u)}" alt="Photo" loading="lazy"></a>`).join("");
+    const mediaOnly = !m.body && mediaUrls.length ? " msg-media-only" : "";
+    const state = m.state === "pending" ? " is-pending" : (m.state === "failed" ? " is-failed" : "");
+    const time = m.state === "pending"
+      ? "Sending…"
+      : (m.state === "failed" ? "Not sent" : formatConversationMessageTime(m.createdAt));
+    const messageId = String(m.id || "");
+    const messageIdAttr = messageId.startsWith("pending-") ? "" : ` data-mid="${escapeAttr(messageId)}"`;
     bubbles += `
-    <div class="msg-line msg-line-${dir}${tail ? " msg-tail" : ""}" data-mid="${escapeAttr(m.id)}">
+    <div class="msg-line msg-line-${dir}${tail ? " msg-tail" : ""}${state}"${messageIdAttr}>
       <div class="msg-bubble msg-${dir}${mediaOnly}">${m.body ? escapeHtml(m.body) : ""}${media}</div>
+      ${tail || state ? `<span class="msg-time">${escapeHtml(time)}</span>` : ""}
     </div>`;
   });
+  return bubbles;
+}
+
+function isMessageThreadNearBottom(convo) {
+  return !convo || convo.scrollHeight - convo.scrollTop - convo.clientHeight < 80;
+}
+
+function scrollMessageThreadToBottom() {
+  const convo = messagesPanel?.querySelector(".msg-convo");
+  if (!convo) return;
+  messageThreadPinned = true;
+  convo.scrollTop = convo.scrollHeight;
+  const latest = messagesPanel.querySelector("[data-msg-latest]");
+  if (latest) latest.hidden = true;
+}
+
+function renderOpenMessageStream(thread, { forceBottom = false, showLatest = false } = {}) {
+  const convo = messagesPanel?.querySelector(".msg-convo");
+  if (!convo) return;
+  const previousTop = convo.scrollTop;
+  convo.innerHTML = buildMessageBubbles(thread.messages);
+  convo.scrollTop = forceBottom ? convo.scrollHeight : previousTop;
+  messageThreadPinned = forceBottom || isMessageThreadNearBottom(convo);
+  const latest = messagesPanel.querySelector("[data-msg-latest]");
+  if (latest) latest.hidden = !showLatest || messageThreadPinned;
+  convo.querySelectorAll("img").forEach(img => {
+    if (!img.complete) img.addEventListener("load", () => {
+      if (messageThreadPinned) scrollMessageThreadToBottom();
+    }, { once: true });
+  });
+}
+
+function refreshOpenMessageThread() {
+  const t = groupMessageThreads(allMessages).find(x => x.key === openThreadKey);
+  if (!t) {
+    renderMessagesView();
+    return;
+  }
+  const convo = messagesPanel?.querySelector(".msg-convo");
+  const renderedIds = new Set(Array.from(convo?.querySelectorAll("[data-mid]") || [], el => el.dataset.mid));
+  const hasNewMessage = t.messages.some(message => !renderedIds.has(String(message.id)));
+  const stayAtBottom = messageThreadPinned || isMessageThreadNearBottom(convo);
+  setMessagesTopbar("thread", t);
+  renderOpenMessageStream(t, { forceBottom: stayAtBottom, showLatest: hasNewMessage && !stayAtBottom });
+  if (t.unread) markThreadRead(t.phoneNumber);
+}
+
+function openMessageThread(key) {
+  const t = groupMessageThreads(allMessages).find(x => x.key === key);
+  if (!t || !messagesPanel) return;
+  const prevDraft = (openThreadKey === key && document.getElementById("msgReplyInput")?.value) || "";
+  openThreadKey = key;
+  messageThreadPinned = true;
+  setMessagesTopbar("thread", t);
 
   messagesPanel.innerHTML = `
     <div class="dashboard-shell messages-shell msg-convo-shell">
-      <div class="msg-convo-head">
-        <button type="button" class="msg-back" data-msg-back>‹ Inbox</button>
-        <div class="msg-convo-who">
-          <div class="msg-thread-title">${escapeHtml(t.customerName || formatPhone(t.phoneNumber))}</div>
-          ${(() => {
-            const parts = [];
-            if (t.customerName) parts.push(formatPhone(t.phoneNumber));
-            if (t.orderNumber) parts.push(`Order #${t.orderNumber}`);
-            return parts.length ? `<div class="muted msg-convo-sub">${escapeHtml(parts.join(" · "))}</div>` : "";
-          })()}
-        </div>
-        <button type="button" class="msg-del-btn" data-del-thread="${escapeAttr(key)}" aria-label="Delete conversation">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14"></path><path d="M9 7V5h6v2"></path><path d="M7 7l1 13h8l1-13"></path></svg>
-        </button>
-      </div>
-      <div class="msg-convo">${bubbles}</div>
+      <div class="msg-convo">${buildMessageBubbles(t.messages)}</div>
+      <button type="button" class="msg-jump-latest" data-msg-latest hidden>New messages&nbsp;↓</button>
       ${t.phoneNumber ? `
         <div id="msgAttachPreview" class="msg-attach-preview" hidden></div>
         <div class="msg-reply msg-replybar" data-photo-drop="msgAttachInput">
@@ -11329,7 +11411,7 @@ function openMessageThread(key) {
           </button>
           <input type="file" id="msgAttachInput" accept="image/*" hidden>
           <textarea id="msgReplyInput" rows="1" placeholder="Text Message"></textarea>
-          <button type="button" id="msgReplyBtn" class="msg-send-btn" aria-label="Send"
+          <button type="button" id="msgReplyBtn" class="msg-send-btn" aria-label="Send" disabled
             data-thread="${escapeAttr(key)}" data-phone="${escapeAttr(t.phoneNumber)}"
             data-order="${escapeAttr(t.orderNumber)}" data-name="${escapeAttr(t.customerName)}">↑</button>
         </div>
@@ -11341,18 +11423,12 @@ function openMessageThread(key) {
     const input = document.getElementById("msgReplyInput");
     if (input) input.value = prevDraft;
   }
-  const convo = messagesPanel.querySelector(".msg-convo");
-  if (convo) {
-    const toBottom = () => { if (openThreadKey && convo.isConnected) convo.scrollTop = convo.scrollHeight; };
-    toBottom();
-    /* Images (MMS) load after render and grow the height — re-pin to bottom
-       when each finishes, and once more after layout settles. */
-    convo.querySelectorAll("img").forEach(img => {
-      if (!img.complete) img.addEventListener("load", toBottom, { once: true });
-    });
-    setTimeout(toBottom, 250);
-  }
-  requestAnimationFrame(fitConvoToViewport);
+  syncMessageComposer();
+  renderOpenMessageStream(t, { forceBottom: true });
+  requestAnimationFrame(() => {
+    fitConvoToViewport();
+    scrollMessageThreadToBottom();
+  });
 }
 
 async function markThreadRead(phoneNumber) {
@@ -11367,24 +11443,47 @@ async function markThreadRead(phoneNumber) {
 function renderComposeView() {
   if (!messagesPanel) return;
   showView(messagesView);
+  openThreadKey = null;
+  pendingMsgPhoto = "";
+  releaseConvoViewport();
+  setMessagesTopbar("compose");
   messagesPanel.innerHTML = `
     <div class="dashboard-shell messages-shell">
-      <div class="msg-convo-head">
-        <button type="button" class="msg-back" data-msg-back>‹ Inbox</button>
-        <div class="msg-thread-title">New message</div>
-      </div>
       <div class="msg-reply msg-compose">
         <input id="msgComposeTo" type="tel" inputmode="tel" placeholder="Phone number" autocomplete="off">
         <textarea id="msgReplyInput" rows="3" placeholder="Message…"></textarea>
-        <button type="button" id="msgReplyBtn" class="msg-reply-btn" data-compose="1">Send</button>
+        <button type="button" id="msgReplyBtn" class="msg-reply-btn" data-compose="1" disabled>Send</button>
         <p id="msgReplyStatus" class="status muted"></p>
       </div>
     </div>`;
   wireMessagesPanel();
+  syncMessageComposer();
   document.getElementById("msgComposeTo")?.focus();
 }
 
+function renderPendingMsgPhoto() {
+  const prev = document.getElementById("msgAttachPreview");
+  if (!prev) return;
+  prev.hidden = !pendingMsgPhoto;
+  prev.innerHTML = pendingMsgPhoto
+    ? `<span class="msg-attach-thumb"><img src="${escapeAttr(pendingMsgPhoto)}" alt="Attached photo"><button type="button" class="msg-attach-remove" data-attach-remove aria-label="Remove photo">&#10005;</button></span>`
+    : "";
+}
+
+function syncMessageComposer() {
+  const input = document.getElementById("msgReplyInput");
+  const btn = document.getElementById("msgReplyBtn");
+  if (input?.tagName === "TEXTAREA") {
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
+  }
+  if (btn) btn.disabled = messageSending || (!String(input?.value || "").trim() && !pendingMsgPhoto);
+  const attach = document.getElementById("msgAttachBtn");
+  if (attach) attach.classList.toggle("has-photo", !!pendingMsgPhoto);
+}
+
 async function handleMessageReply(btn) {
+  if (messageSending) return;
   const input = document.getElementById("msgReplyInput");
   const statusEl = document.getElementById("msgReplyStatus");
   const text = (input?.value || "").trim();
@@ -11393,25 +11492,74 @@ async function handleMessageReply(btn) {
   if (!text && !pendingMsgPhoto) return;
   if (!phone) { if (statusEl) statusEl.textContent = "Enter a phone number."; return; }
 
-  btn.disabled = true;
+  const mediaDataUrl = pendingMsgPhoto;
+  messageSending = true;
+  syncMessageComposer();
   if (statusEl) statusEl.textContent = "Sending…";
+  let optimisticId = "";
+  if (!isCompose) {
+    optimisticId = `pending-${Date.now()}`;
+    allMessages = allMessages.filter(message => !(
+      message.state === "failed" &&
+      msgThreadKey(message) === openThreadKey &&
+      String(message.body || "") === text
+    ));
+    allMessages.push({
+      id: optimisticId,
+      direction: "out",
+      phoneNumber: phone,
+      customerName: btn.dataset.name || "",
+      orderNumber: btn.dataset.order || "",
+      body: text,
+      mediaUrls: mediaDataUrl ? [mediaDataUrl] : [],
+      read: true,
+      createdAt: new Date().toISOString(),
+      state: "pending"
+    });
+    if (input) input.value = "";
+    pendingMsgPhoto = "";
+    renderPendingMsgPhoto();
+    const thread = groupMessageThreads(allMessages).find(item => item.key === openThreadKey);
+    if (thread) renderOpenMessageStream(thread, { forceBottom: true });
+  }
   try {
     await postJson({
       action: "sendMessageReply",
       phoneNumber: phone,
       body: text,
-      mediaDataUrl: pendingMsgPhoto || "",
+      mediaDataUrl,
       orderNumber: btn.dataset.order || "",
       customerName: btn.dataset.name || ""
     }, true);
-    clearPendingMsgPhoto();
-    if (input) input.value = "";
+    const optimistic = optimisticId
+      ? allMessages.find(message => String(message.id) === optimisticId)
+      : null;
+    if (optimistic) optimistic.state = "sent";
+    if (isCompose) {
+      pendingMsgPhoto = "";
+      if (input) input.value = "";
+    }
     await refreshMessages();
+    messageSending = false;
     if (isCompose) renderMessagesView();
-    else openMessageThread(btn.dataset.thread);
+    else {
+      refreshOpenMessageThread();
+      if (statusEl) statusEl.textContent = "";
+      syncMessageComposer();
+    }
   } catch (err) {
+    messageSending = false;
+    if (optimisticId) {
+      const pending = allMessages.find(message => String(message.id) === optimisticId);
+      if (pending) pending.state = "failed";
+      const thread = groupMessageThreads(allMessages).find(item => item.key === openThreadKey);
+      if (thread) renderOpenMessageStream(thread, { forceBottom: true });
+      if (input) input.value = text;
+      pendingMsgPhoto = mediaDataUrl;
+      renderPendingMsgPhoto();
+    }
     if (statusEl) statusEl.textContent = err.message || "Could not send the message.";
-    btn.disabled = false;
+    syncMessageComposer();
   }
 }
 
@@ -11420,6 +11568,7 @@ function wireMessagesPanel() {
   messagesPanel.dataset.wired = "true";
   messagesPanel.addEventListener("click", async (e) => {
     if (e.target.closest("[data-msg-back]")) { renderMessagesView(); return; }
+    if (e.target.closest("[data-msg-latest]")) { scrollMessageThreadToBottom(); return; }
     const del = e.target.closest("[data-del-thread]");
     if (del) { await deleteMessageThread(del.dataset.delThread); return; }
     if (e.target.closest("#msgAttachBtn")) {
@@ -11441,6 +11590,27 @@ function wireMessagesPanel() {
     }
   });
 
+  messagesPanel.addEventListener("input", (e) => {
+    if (e.target?.id === "msgReplyInput") syncMessageComposer();
+  });
+
+  messagesPanel.addEventListener("keydown", (e) => {
+    if (e.target?.id !== "msgReplyInput" || e.key !== "Enter" || e.shiftKey) return;
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    e.preventDefault();
+    const sendBtn = document.getElementById("msgReplyBtn");
+    if (sendBtn && !sendBtn.disabled) handleMessageReply(sendBtn);
+  });
+
+  messagesPanel.addEventListener("scroll", (e) => {
+    if (!e.target?.classList?.contains("msg-convo")) return;
+    messageThreadPinned = isMessageThreadNearBottom(e.target);
+    if (messageThreadPinned) {
+      const latest = messagesPanel.querySelector("[data-msg-latest]");
+      if (latest) latest.hidden = true;
+    }
+  }, true);
+
   /* Apple-style swipe-to-delete on inbox rows. */
   let swipeEl = null, swipeX = 0, swipeY = 0, swiping = false;
   armMessageDelete(messagesPanel);
@@ -11452,11 +11622,8 @@ function wireMessagesPanel() {
     const reader = new FileReader();
     reader.onload = () => {
       pendingMsgPhoto = String(reader.result || "");
-      const prev = document.getElementById("msgAttachPreview");
-      if (prev) {
-        prev.hidden = false;
-        prev.innerHTML = `<span class="msg-attach-thumb"><img src="${pendingMsgPhoto}" alt="Attached photo"><button type="button" class="msg-attach-remove" data-attach-remove aria-label="Remove photo">&#10005;</button></span>`;
-      }
+      renderPendingMsgPhoto();
+      syncMessageComposer();
       fitConvoToViewport();
     };
     reader.readAsDataURL(file);
@@ -11481,10 +11648,10 @@ function wireMessagesPanel() {
 
 function clearPendingMsgPhoto() {
   pendingMsgPhoto = "";
-  const prev = document.getElementById("msgAttachPreview");
-  if (prev) { prev.hidden = true; prev.innerHTML = ""; }
+  renderPendingMsgPhoto();
   const fileInput = document.getElementById("msgAttachInput");
   if (fileInput) fileInput.value = "";
+  syncMessageComposer();
   fitConvoToViewport();
 }
 
@@ -11584,7 +11751,7 @@ function fitConvoToViewport() {
   if (shellEl) {
     shellEl.style.height = Math.max(220, vvH - (topbar?.offsetHeight || 0) - 24) + "px";
   }
-  convo.scrollTop = convo.scrollHeight;
+  if (messageThreadPinned) convo.scrollTop = convo.scrollHeight;
 }
 
 function releaseConvoViewport() {
@@ -14229,8 +14396,13 @@ document.getElementById("pricingMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("reviewsMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("customersMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("calendarMenuBtn")?.addEventListener("click", openMenu);
-document.getElementById("messagesMenuBtn")?.addEventListener("click", openMenu);
-document.getElementById("msgComposeBtn")?.addEventListener("click", renderComposeView);
+messagesMenuBtn?.addEventListener("click", openMenu);
+messagesBackBtn?.addEventListener("click", renderMessagesView);
+msgComposeBtn?.addEventListener("click", renderComposeView);
+msgThreadDeleteBtn?.addEventListener("click", () => {
+  const key = msgThreadDeleteBtn.dataset.delThread;
+  if (key) deleteMessageThread(key);
+});
 
 /* Poll the Twilio inbox so new-text and new-order badges stay live. */
 setInterval(() => { if (getToken()) refreshMessages({ rerender: true }); }, 30000);
