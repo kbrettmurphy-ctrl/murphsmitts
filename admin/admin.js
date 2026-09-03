@@ -1828,7 +1828,29 @@ function getBenchChoiceRoot() {
   return benchChoiceRoot;
 }
 
-function positionBenchChoicePanel(panel, anchor) {
+function getBenchChoiceVerticalPlacement({
+  viewportTop,
+  viewportBottom,
+  anchorTop,
+  anchorBottom,
+  panelHeight,
+  margin = 12,
+  gap = 6
+}) {
+  const belowTop = anchorBottom + gap;
+  const aboveBottom = anchorTop - gap;
+  const belowSpace = Math.max(0, viewportBottom - margin - belowTop);
+  const aboveSpace = Math.max(0, aboveBottom - viewportTop - margin);
+  const placeBelow = panelHeight <= belowSpace || (panelHeight > aboveSpace && belowSpace >= aboveSpace);
+  const maxHeight = Math.max(1, placeBelow ? belowSpace : aboveSpace);
+  const constrainedHeight = Math.min(panelHeight, maxHeight);
+  return {
+    maxHeight,
+    top: placeBelow ? belowTop : aboveBottom - constrainedHeight
+  };
+}
+
+function positionBenchChoicePanel(panel, anchor, requestedMaxHeight = null) {
   const visualViewport = window.visualViewport;
   const viewport = {
     left: visualViewport?.offsetLeft || 0,
@@ -1837,19 +1859,22 @@ function positionBenchChoicePanel(panel, anchor) {
     height: visualViewport?.height || window.innerHeight
   };
   const margin = 12;
-  const offsetY = window.matchMedia("(pointer: coarse)").matches ? 10 : 2;
+  const viewportMaxHeight = Math.max(1, viewport.height - margin * 2);
+  const maxHeight = Number.isFinite(requestedMaxHeight)
+    ? Math.min(viewportMaxHeight, Math.max(1, requestedMaxHeight))
+    : viewportMaxHeight;
 
   panel.style.left = "0px";
   panel.style.top = "0px";
   panel.style.right = "auto";
   panel.style.bottom = "auto";
-  panel.style.maxHeight = `${Math.max(180, viewport.height - margin * 2)}px`;
+  panel.style.maxHeight = `${maxHeight}px`;
 
   const rect = panel.getBoundingClientRect();
   const maxLeft = Math.max(viewport.left + margin, viewport.left + viewport.width - rect.width - margin);
   const maxTop = Math.max(viewport.top + margin, viewport.top + viewport.height - rect.height - margin);
   const left = Math.min(Math.max(viewport.left + margin, anchor.x), maxLeft);
-  const top = Math.min(Math.max(viewport.top + margin, anchor.y + offsetY), maxTop);
+  const top = Math.min(Math.max(viewport.top + margin, anchor.y), maxTop);
 
   panel.style.left = `${left}px`;
   panel.style.top = `${top}px`;
@@ -1875,23 +1900,30 @@ function openBenchChoiceSheet({ title, message = "", content = "", actions = [],
       const panel = sheet.querySelector(".bench-choice-panel");
       const reposition = () => {
         if (!sheet.isConnected) return;
-        let position = anchorPosition;
+        const pointOffsetY = window.matchMedia("(pointer: coarse)").matches ? 10 : 2;
+        let position = { x: anchorPosition.x, y: anchorPosition.y + pointOffsetY };
+        let placementMaxHeight = null;
         if (anchorElement?.isConnected) {
           const rect = anchorElement.getBoundingClientRect();
           const visualViewport = window.visualViewport;
           const viewportTop = visualViewport?.offsetTop || 0;
           const viewportBottom = viewportTop + (visualViewport?.height || window.innerHeight);
-          panel.style.maxHeight = `${Math.max(180, viewportBottom - viewportTop - 24)}px`;
+          panel.style.maxHeight = `${Math.max(1, viewportBottom - viewportTop - 24)}px`;
           const panelHeight = panel.getBoundingClientRect().height;
-          const below = rect.bottom + 6;
+          const placement = getBenchChoiceVerticalPlacement({
+            viewportTop,
+            viewportBottom,
+            anchorTop: rect.top,
+            anchorBottom: rect.bottom,
+            panelHeight
+          });
           position = {
             x: rect.left,
-            y: below + panelHeight <= viewportBottom - 12
-              ? below
-              : Math.max(viewportTop + 12, rect.top - panelHeight - 6)
+            y: placement.top
           };
+          placementMaxHeight = placement.maxHeight;
         }
-        positionBenchChoicePanel(panel, position);
+        positionBenchChoicePanel(panel, position, placementMaxHeight);
       };
       sheet._reposition = () => requestAnimationFrame(reposition);
       sheet._visualViewport = window.visualViewport || null;

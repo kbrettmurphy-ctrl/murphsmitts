@@ -316,7 +316,7 @@ await test("focused-card controls emit authoritative identifiers and reuse labor
 await test("Bench end choices anchor and clamp through the Bench menu utility", () => {
   ok(admin.includes("anchor: choiceAnchor"));
   ok(admin.includes('endActiveBenchWork({ anchor: endBenchBtn })'));
-  ok(admin.includes("positionBenchChoicePanel(panel, position)"));
+  ok(admin.includes("positionBenchChoicePanel(panel, position, placementMaxHeight)"));
   ok(admin.includes('sheet.className = `bench-choice-sheet${anchorPosition ? " is-anchored" : ""}`'));
   ok(admin.includes('event.target.closest?.("[data-action]")'));
   ok(admin.includes('if (event.key === "Escape") closeBenchChoiceSheet()'));
@@ -331,8 +331,8 @@ await test("labor phase choices anchor to their trigger and remain portal-safe",
   ok(admin.includes("document.body.appendChild(benchChoiceRoot)"));
   ok(admin.includes('window.addEventListener("resize", sheet._reposition)'));
   ok(admin.includes('window.addEventListener("scroll", sheet._reposition, true)'));
-  ok(admin.includes("rect.bottom + 6"));
-  ok(admin.includes("rect.top - panelHeight - 6"));
+  ok(admin.includes("anchorBottom + gap"));
+  ok(admin.includes("anchorTop - gap"));
   ok(admin.includes('benchChoiceRoot.addEventListener("click"'));
   ok(admin.includes('event.target.closest?.("[data-action]")'));
   ok(admin.includes("event.stopImmediatePropagation()"));
@@ -411,18 +411,44 @@ await test("all Bench menus avoid bottom pinning and unresolved actions share th
 });
 
 await test("anchored Bench menus stay inside the live mobile viewport", () => {
+  const placementStart = admin.indexOf("function getBenchChoiceVerticalPlacement(");
+  const placementEnd = admin.indexOf("\nfunction positionBenchChoicePanel", placementStart);
+  const placementSource = admin.slice(placementStart, placementEnd).trim();
   const position = admin.match(/function positionBenchChoicePanel\([\s\S]*?\n\}/)?.[0] || "";
   const open = admin.match(/function openBenchChoiceSheet\([\s\S]*?\n\}/)?.[0] || "";
   const close = admin.match(/function closeBenchChoiceSheet\([\s\S]*?\n\}/)?.[0] || "";
+  const getPlacement = Function(`return (${placementSource})`)();
+  const middleScreen = getPlacement({
+    viewportTop: 0,
+    viewportBottom: 844,
+    anchorTop: 310,
+    anchorBottom: 344,
+    panelHeight: 520
+  });
+  equal(middleScreen.top, 350);
+  equal(middleScreen.maxHeight, 482);
+  const nearBottom = getPlacement({
+    viewportTop: 0,
+    viewportBottom: 844,
+    anchorTop: 700,
+    anchorBottom: 734,
+    panelHeight: 400
+  });
+  equal(nearBottom.top, 294);
+  equal(nearBottom.maxHeight, 682);
   ok(position.includes("window.visualViewport"));
   ok(position.includes("visualViewport?.offsetTop"));
   ok(position.includes("visualViewport?.height"));
   ok(position.includes("panel.style.maxHeight"));
+  ok(position.includes("requestedMaxHeight"));
+  ok(open.includes("getBenchChoiceVerticalPlacement"));
+  ok(open.includes("placement.maxHeight"));
   ok(open.includes('sheet._visualViewport?.addEventListener("resize"'));
   ok(open.includes('sheet._visualViewport?.addEventListener("scroll"'));
   ok(close.includes('sheet._visualViewport?.removeEventListener("resize"'));
   ok(close.includes('sheet._visualViewport?.removeEventListener("scroll"'));
   ok(adminCss.includes(".bench-choice-sheet.is-anchored .bench-choice-panel{"));
+  ok(adminCss.includes("box-sizing:border-box"));
   ok(adminCss.includes("overscroll-behavior:contain"));
   ok(adminCss.includes("-webkit-overflow-scrolling:touch"));
 });
