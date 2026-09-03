@@ -65,7 +65,7 @@ Manual expenses contain date, category, description, amount, optional quantity a
 
 ### Completed-order economics and deletion
 
-`orders.economics_snapshot` and `orders.economics_locked_at` freeze historical actual economics when an order first reaches Completed or Picked Up. A database trigger creates the snapshot transactionally, and the migration idempotently backfills terminal orders that predate the feature. Existing snapshots are immutable and remain in place if an order later leaves and re-enters a terminal state.
+`orders.economics_snapshot` and `orders.economics_locked_at` freeze historical actual economics when an order first reaches Completed or Picked Up. A database trigger creates the snapshot transactionally, and the migration idempotently backfills terminal orders that predate the feature. Existing labor and material-cost inputs remain immutable if an order later leaves and re-enters a terminal state. An admin correction to a terminal order's `price_quoted` amends only the snapshot price, net, and effective hourly rate while retaining its original lock time and historical cost basis; `price_corrected_at` records when that amendment occurred.
 
 `delete_order_completely` restores exactly matching stocked lace, deletes order-owned labor, Bench Work, activity, and legacy lace-usage rows, unlinks shared SMS/gallery references, and deletes the order in one database transaction. Storage objects are intentionally retained because Storage cannot participate in the database transaction.
 
@@ -112,5 +112,6 @@ Bucket creation, public access configuration, size limits, and Storage policies 
 | `20260803120000_resume_labor_with_new_bench_work.sql` | Atomically resumes paused labor while starting and linking new Bench Work |
 | `20260803170000_order_economics_snapshots_delete_cascade.sql` | Adds immutable completed-order economics snapshots/backfill and transactional complete-order deletion/orphan cleanup |
 | `20260804120000_reliable_intake.sql` | Adds intake idempotency state and transaction-safe multi-glove creation/order-number allocation RPC; applied to production as `20260804183247_reliable_intake` |
+| `20260902205215_correct_terminal_economics_price.sql` | Reconciles terminal service-price corrections into durable economics while preserving locked labor/material inputs |
 
 Migrations are additive and should be reviewed/applied in timestamp order. There is no checked-in Supabase config or automated migration verification in this repository.

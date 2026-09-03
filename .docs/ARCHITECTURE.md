@@ -58,7 +58,7 @@ Bench Focus is a server-authoritative operational context separate from order st
 
 ## Durable terminal economics
 
-Completed and Picked Up orders use immutable database snapshots for historical actuals. The database trigger creates the snapshot the first time an order enters a terminal state, the v1.4 migration backfills older terminal orders, and later edits do not rewrite the locked economics. Current/nonterminal estimates remain operational calculations in the admin. Full-order deletion runs through a transaction-safe RPC that restores stocked lace, removes owned database records in dependency order, and intentionally retains Storage objects.
+Completed and Picked Up orders use durable database snapshots for historical actuals. The database trigger creates the snapshot the first time an order enters a terminal state, and the v1.4 migration backfills older terminal orders. Later edits do not rewrite locked labor or material inputs; a terminal service-price correction amends only price, net, and effective rate while retaining the original lock time. Current/nonterminal estimates remain operational calculations in the admin. Full-order deletion runs through a transaction-safe RPC that restores stocked lace, removes owned database records in dependency order, and intentionally retains Storage objects.
 
 ## Generated and local-only paths
 

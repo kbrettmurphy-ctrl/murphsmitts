@@ -1,11 +1,13 @@
-/* Dependency-free characterization for weighted lace economics, immutable
-   snapshots, special-order colors, and transactional order deletion. */
+/* Dependency-free characterization for weighted lace economics, durable
+   snapshots, price corrections, special-order colors, and transactional
+   order deletion. */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const admin = fs.readFileSync(new URL("../admin/admin.js", import.meta.url), "utf8");
 const api = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
 const migration = fs.readFileSync(new URL("../supabase/migrations/20260803170000_order_economics_snapshots_delete_cascade.sql", import.meta.url), "utf8");
+const correctionMigration = fs.readFileSync(new URL("../supabase/migrations/20260902205215_correct_terminal_economics_price.sql", import.meta.url), "utf8");
 let tests = 0;
 let assertions = 0;
 const ok = (value, message) => { assertions++; assert.ok(value, message); };
@@ -75,7 +77,7 @@ await test("special-order lace values are actual text rather than sentinels", ()
   ok(api.includes("newPrimaryColor: cleanText(updated.primary_lace_color)"));
 });
 
-await test("completed economics are immutable, canonical, and backfilled once", () => {
+await test("completed economics are durable, canonical, and backfilled once", () => {
   ok(migration.includes("economics_snapshot jsonb"));
   ok(migration.includes("economics_locked_at timestamptz"));
   ok(migration.includes("build_order_economics_snapshot"));
@@ -90,6 +92,18 @@ await test("completed economics are immutable, canonical, and backfilled once", 
   ok(admin.includes("snapshot.phase_minutes?.[LABOR_CUSTOM_PHASE]"));
   ok(admin.includes("Number(snapshot.labor_minutes) || 0"));
   ok(api.includes("economicsSnapshot: row.economics_snapshot || null"));
+});
+
+await test("terminal price corrections retain locked costs and update dependent economics", () => {
+  ok(correctionMigration.includes("new.economics_snapshot := old.economics_snapshot"));
+  ok(correctionMigration.includes("new.economics_locked_at := old.economics_locked_at"));
+  ok(correctionMigration.includes("new.price_quoted is distinct from v_snapshot_price"));
+  ok(correctionMigration.includes("new.price_quoted - v_materials"));
+  ok(correctionMigration.includes("v_net / (v_labor_minutes / 60)"));
+  ok(correctionMigration.includes("'price_corrected_at', clock_timestamp()"));
+  ok(correctionMigration.includes("set economics_snapshot = economics_snapshot"));
+  ok(correctionMigration.includes("price_quoted is distinct from nullif(economics_snapshot->>'price_quoted', '')::numeric"));
+  equal(correctionMigration.includes("build_order_economics_snapshot(to_jsonb(new), 'correction')"), false);
 });
 
 await test("delete RPC restores stock then deletes/unlinks in dependency order", () => {

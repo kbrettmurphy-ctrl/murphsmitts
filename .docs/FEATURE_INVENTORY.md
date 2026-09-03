@@ -17,7 +17,7 @@ As-built baseline reviewed 2026-08-04.
 | Calendar | Received/estimated/completed scheduling with unscheduled work |
 | Map | Shipped-order markers, persisted/fallback geocoding, quality handling, unmapped errors, detail deep links |
 | Labor | Phase timers, one open session per order, pause/resume/stop, notes, history, dashboard controls, Bench-linked phases/exact backdating, summaries |
-| Money | Current job estimates plus immutable terminal actuals, effective rate, one-minute measured-job eligibility, suggested pricing, tiered rollups, labor coverage, phase hours, expenses, monthly P&L, per-service pricing intelligence, special-order/custom-add-on allocation |
+| Money | Current job estimates plus durable terminal actuals with service-price correction support, effective rate, one-minute measured-job eligibility, suggested pricing, tiered rollups, labor coverage, phase hours, expenses, monthly P&L, per-service pricing intelligence, special-order/custom-add-on allocation |
 | Pricing | GUI-managed public service prices; draft/publish workflow, price history, rollback, business settings (target rate/min charge/rounding), pricing intelligence, add/hide/deactivate services |
 | Inventory admin | Add/edit/deactivate/restore, thresholds/alerts, low-stock banner, usage-delta adjustments |
 | Gallery admin | Upload/link/describe/cover/move/hide/restore/delete and search/filter |
