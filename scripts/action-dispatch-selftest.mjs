@@ -2652,8 +2652,11 @@ await test("order, activity, and labor reads preserve validation and query seman
   deepEqual(activity.json, { ok: true, activity: [] });
   const index = await invoke({
     body: { action: "listOrdersWithActivity", _token: owner },
-    fetchMock(input) {
+    fetchMock(input, init, callNumber) {
       ok(String(input).includes("event_type=neq.order_created_manual"));
+      ok(String(input).includes("order=created_at.asc,id.asc"));
+      ok(String(input).includes(callNumber === 1 ? "offset=0" : "offset=3"));
+      if (callNumber > 1) return jsonResponse([]);
       return jsonResponse([
         { order_number: "0169" }, { order_number: "0169" }, { order_number: "0170" }
       ]);
@@ -2670,6 +2673,36 @@ await test("order, activity, and labor reads preserve validation and query seman
   deepEqual(summary.json.sessions[0], {
     orderNumber: "0169", phase: "Full Service", durationMinutes: 75, endedAt: "done"
   });
+});
+
+await test("activity index paginates beyond Supabase's default row cap", async () => {
+  const { owner } = await sessionTokens();
+  const firstPage = Array.from({ length: 500 }, () => ({ order_number: "0200" }));
+  const secondPage = Array.from({ length: 500 }, () => ({ order_number: "0201" }));
+  const result = await invoke({
+    body: { action: "listOrdersWithActivity", _token: owner },
+    fetchMock(input, init, callNumber) {
+      const url = String(input);
+      ok(url.includes("limit=500"));
+      if (callNumber === 1) {
+        ok(url.includes("offset=0"));
+        return jsonResponse(firstPage);
+      }
+      if (callNumber === 2) {
+        ok(url.includes("offset=500"));
+        return jsonResponse(secondPage);
+      }
+      if (callNumber === 3) {
+        ok(url.includes("offset=1000"));
+        return jsonResponse([{ order_number: "0214" }, { order_number: "0215" }]);
+      }
+      ok(url.includes("offset=1002"));
+      return jsonResponse([]);
+    }
+  });
+
+  equal(result.fetchCalls.length, 4);
+  deepEqual(result.json, { ok: true, orderNumbers: ["0200", "0201", "0214", "0215"] });
 });
 
 await test("pricing, history, settings defaults, and empty geocoding remain unchanged", async () => {

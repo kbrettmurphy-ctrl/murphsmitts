@@ -3036,19 +3036,30 @@ async function listOrderActivity(env, orderNumber) {
    intake, which logs nothing, or the admin form, which logs a creation
    event) counts as "new" until it picks up genuine activity. */
 async function listOrdersWithActivity(env) {
-  const resp = await supabaseFetch(
-    env,
-    `/rest/v1/order_activity?select=order_number&event_type=neq.order_created_manual`
-  );
-
-  if (!resp.ok) return resp;
-
   const seen = new Set();
-  if (Array.isArray(resp.data)) {
-    for (const row of resp.data) {
+  const pageSize = 500;
+  let offset = 0;
+
+  /* Supabase caps REST responses (1,000 rows by default). Page until an
+     empty response so newer activity never falls outside the dashboard
+     index after the table grows past that cap. */
+  while (true) {
+    const resp = await supabaseFetch(
+      env,
+      `/rest/v1/order_activity?select=order_number&event_type=neq.order_created_manual&order=created_at.asc,id.asc&limit=${pageSize}&offset=${offset}`
+    );
+
+    if (!resp.ok) return resp;
+
+    const rows = Array.isArray(resp.data) ? resp.data : [];
+    if (!rows.length) break;
+
+    for (const row of rows) {
       const orderNumber = cleanText(row?.order_number);
       if (orderNumber) seen.add(orderNumber);
     }
+
+    offset += rows.length;
   }
 
   return { ok: true, orderNumbers: Array.from(seen) };
