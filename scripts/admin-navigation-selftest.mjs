@@ -49,4 +49,22 @@ await test("admin filter popovers compensate for the topbar containing block", (
   ok(positioning.includes("top - containingBlockTop"));
 });
 
+await test("order search treats HoH as Heart of the Hide while typing", () => {
+  const start = admin.indexOf("function normalizeText");
+  const end = admin.indexOf("function val", start);
+  assert.notEqual(start, -1, "search normalization helpers should exist");
+  assert.notEqual(end, -1, "search helper boundary should exist");
+  const searchHelpers = admin.slice(start, end);
+  const orderMatchesSearch = new Function(
+    "looksLocalDropOff",
+    `${searchHelpers}\nreturn orderMatchesSearch;`
+  )(() => false);
+  const order = { brandModel: "Rawlings HoH PRO205" };
+
+  for (const query of ["heart", "heart of", "heart of the", "heart of the hide"]) {
+    ok(orderMatchesSearch(order, query), `HoH order should match ${query}`);
+  }
+  ok(orderMatchesSearch({ brandModel: "Rawlings Heart of the Hide" }, "hoh"));
+});
+
 console.log(`\nAdmin navigation self-test: ${tests} tests, ${assertions} assertions passed.`);

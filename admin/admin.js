@@ -644,7 +644,7 @@ function seedDemoStore() {
     customerName: o.customerName,
     phoneNumber: o.phone || phoneFor(o.customerName),
     emailAddress: o.email || `${nameKey(o.customerName)}@example.com`,
-    brandModel: o.brandModel || "Rawlings Heart of the Hide",
+    brandModel: o.brandModel || "Rawlings HoH",
     gloveType: o.gloveType || "Fielders Glove",
     webType: o.webType || "I-Web",
     servicesRequested: o.services,
@@ -694,7 +694,7 @@ function seedDemoStore() {
     mkOrder("9007", { customerName: "Ryan Cole", status: "Completed", paid: "Paid", price: 40, age: 120, done: 109, est: 111, brandModel: "44 Pro", services: S.LR, lace: "Black", city: "Greenville", state: "NC", lat: 35.6127, lng: -77.3664 }),
     mkOrder("9008", { customerName: "Marcus Bell", status: "Completed", paid: "Paid", price: 105, age: 110, done: 100, est: 102, brandModel: "Wilson A2K", gloveType: "Catchers Mitt", webType: "Basket (Fully Closed) Web", services: S.CCR, lace: "Red", secondaryLace: "White", city: "Wilmington", state: "NC", lat: 34.2257, lng: -77.9447 }),
     mkOrder("9009", { customerName: "Hannah Foster", status: "Completed", paid: "Paid", price: 80, age: 101, done: 90, est: 92, brandModel: "Marucci", services: S.CCR, lace: "Orange", city: "Austin", state: "TX", dropOffMethod: "Shipped", shippingCost: 14, carrier: "USPS", tracking: "9400111899223189000001", lat: 30.2672, lng: -97.7431 }),
-    mkOrder("9010", { customerName: "Trevor Hayes", status: "Completed", paid: "Paid", price: 60, age: 92, done: 82, est: 84, brandModel: "Rawlings Heart of the Hide", services: S.RL, lace: "Tan – Indian", city: "Goldsboro", state: "NC", lat: 35.3849, lng: -77.9928 }),
+    mkOrder("9010", { customerName: "Trevor Hayes", status: "Completed", paid: "Paid", price: 60, age: 92, done: 82, est: 84, brandModel: "Rawlings HoH", services: S.RL, lace: "Tan – Indian", city: "Goldsboro", state: "NC", lat: 35.3849, lng: -77.9928 }),
     mkOrder("9011", { customerName: "Caleb Turner", status: "Completed", paid: "Paid", price: 120, age: 83, done: 72, est: 74, brandModel: "All-Star", gloveType: "Catchers Mitt", webType: "Other / Not Sure", services: S.CCR + ", " + S.PAD, lace: "Black", city: "Columbus", state: "OH", dropOffMethod: "Shipped", shippingCost: 15, carrier: "UPS", tracking: "1Z999AA10123456784", lat: 39.9612, lng: -82.9988 }),
     mkOrder("9012", { customerName: "Sarah Whitfield", status: "Completed", paid: "Paid", price: 80, age: 74, done: 63, est: 65, brandModel: "Mizuno Pro", services: S.CCR, lace: "Blue – Royal", city: "Raleigh", state: "NC", lat: 35.7796, lng: -78.6382 }),
     mkOrder("9013", { customerName: "Emma Sullivan", status: "Completed", paid: "Paid", price: 50, age: 66, done: 55, est: 57, brandModel: "Wilson A2000", services: S.CC, lace: "", city: "Hampstead", state: "NC", lat: 34.3671, lng: -77.7108 }),
@@ -708,7 +708,7 @@ function seedDemoStore() {
     mkOrder("9021", { customerName: "Logan Mitchell", status: "Completed", paid: "Paid", price: 40, age: 20, done: 3, est: 5, brandModel: "Marucci", services: S.LR, lace: "Black", city: "Holly Ridge", state: "NC", lat: 34.4924, lng: -77.5550 }),
 
     /* ---- On Hold (excluded from Current) ---- */
-    mkOrder("9022", { customerName: "Kevin Doyle", status: "On Hold", price: 80, age: 24, est: -6, brandModel: "Rawlings Heart of the Hide", services: S.CCR, lace: "Blue – Carolina", internalNotes: "Waiting on customer to confirm color before starting.", city: "Wilson", state: "NC", lat: 35.7213, lng: -77.9155 }),
+    mkOrder("9022", { customerName: "Kevin Doyle", status: "On Hold", price: 80, age: 24, est: -6, brandModel: "Rawlings HoH", services: S.CCR, lace: "Blue – Carolina", internalNotes: "Waiting on customer to confirm color before starting.", city: "Wilson", state: "NC", lat: 35.7213, lng: -77.9155 }),
 
     /* ---- Current orders (9023–9036) ---- */
     mkOrder("9023", { customerName: "Jake Thompson", status: "In Progress", paid: "Paid", price: 105, age: 5, est: -2, brandModel: "Wilson A2000 1786", gloveType: "Fielders Glove", webType: "I-Web", services: S.CCR, lace: "Black", secondaryLace: "Red", primaryLaceUsed: 3, internalNotes: "Keep the pocket deep and preserve the current break-in.", customerNotes: "Would like black lace with red accents to match team colors.", city: "Hampstead", state: "NC", lat: 34.3671, lng: -77.7108 }),
@@ -716,13 +716,13 @@ function seedDemoStore() {
     mkOrder("9025", { customerName: "Priya Anand", status: "Customer Approved", price: 85, age: 3, est: -7, brandModel: "Nokona", gloveType: "Catchers Mitt", webType: "Basket (Fully Closed) Web", services: S.CCR, lace: "Blue – Navy", city: "Cary", state: "NC", lat: 35.7915, lng: -78.7811 }),
     mkOrder("9026", { customerName: "Brianna Cross", status: "In Transit to Me", age: 2, brandModel: "Wilson A2000", services: S.CCR, lace: "Red", dropOffMethod: "Shipped", shippingCost: 14, carrier: "USPS", tracking: "9400111899223189000042", city: "Nashville", state: "TN", lat: 36.1627, lng: -86.7816 }),
     mkOrder("9027", { customerName: "Anthony Russo", status: "In Transit to Me", age: 1, brandModel: "Mizuno Pro", gloveType: "Catchers Mitt", webType: "Other / Not Sure", services: S.CCR + ", " + S.PAD, lace: "Black", dropOffMethod: "Shipped", shippingCost: 15, carrier: "UPS", tracking: "1Z999AA10123456799", city: "Atlanta", state: "GA", lat: 33.7490, lng: -84.3880 }),
-    mkOrder("9028", { customerName: "Isabella Moreno", status: "Received", age: 1, brandModel: "Rawlings Heart of the Hide", services: S.CCR, lace: "Tan – Camel", city: "Sneads Ferry", state: "NC", lat: 34.5474, lng: -77.4108 }),
+    mkOrder("9028", { customerName: "Isabella Moreno", status: "Received", age: 1, brandModel: "Rawlings HoH", services: S.CCR, lace: "Tan – Camel", city: "Sneads Ferry", state: "NC", lat: 34.5474, lng: -77.4108 }),
     mkOrder("9029", { customerName: "Cole Harrison", status: "Received", age: 0, brandModel: "Wilson A2K", gloveType: "Fielders Glove", webType: "H-Web", services: S.CC, lace: "", city: "Topsail Beach", state: "NC", lat: 34.3702, lng: -77.6338 }),
     mkOrder("9030", { customerName: "Ryan Cole", status: "In Progress", paid: "Paid", price: 80, age: 6, est: -1, brandModel: "44 Pro", webType: "H-Web", services: S.CCR, lace: "Yellow", primaryLaceUsed: 3, city: "Greenville", state: "NC", lat: 35.6127, lng: -77.3664 }),
     mkOrder("9031", { customerName: "Megan Fischer", status: "Estimate Sent", price: 100, age: 4, updatedDaysAgo: 3, brandModel: "All-Star", gloveType: "Catchers Mitt", webType: "Other / Not Sure", services: S.CCR, lace: "Blue – Royal", city: "Charlotte", state: "NC", lat: 35.2271, lng: -80.8431 }),
-    mkOrder("9032", { customerName: "Derek Coleman", status: "Estimate Sent", price: 120, age: 5, updatedDaysAgo: 3, brandModel: "Rawlings Heart of the Hide", gloveType: "Fielders Glove", webType: "Trapeze Web", services: S.CCR, lace: "Red", secondaryLace: "White", city: "Richmond", state: "VA", dropOffMethod: "Shipped", shippingCost: 15, lat: 37.5407, lng: -77.4360 }),
+    mkOrder("9032", { customerName: "Derek Coleman", status: "Estimate Sent", price: 120, age: 5, updatedDaysAgo: 3, brandModel: "Rawlings HoH", gloveType: "Fielders Glove", webType: "Trapeze Web", services: S.CCR, lace: "Red", secondaryLace: "White", city: "Richmond", state: "VA", dropOffMethod: "Shipped", shippingCost: 15, lat: 37.5407, lng: -77.4360 }),
     mkOrder("9033", { customerName: "Sophia Reed", status: "Pending Response", price: 90, age: 7, updatedDaysAgo: 4, brandModel: "Mizuno MVP Prime", webType: "H-Web", services: S.CCR, lace: "Orange", city: "Wilmington", state: "NC", lat: 34.2257, lng: -77.9447 }),
-    mkOrder("9034", { customerName: "Diego Ramirez", status: "In Progress", paid: "Paid", price: 60, age: 4, est: -2, brandModel: "Rawlings Heart of the Hide", services: S.RL, lace: "Tan – Indian", primaryLaceUsed: 3, city: "Jacksonville", state: "NC", lat: 34.7541, lng: -77.4302 }),
+    mkOrder("9034", { customerName: "Diego Ramirez", status: "In Progress", paid: "Paid", price: 60, age: 4, est: -2, brandModel: "Rawlings HoH", services: S.RL, lace: "Tan – Indian", primaryLaceUsed: 3, city: "Jacksonville", state: "NC", lat: 34.7541, lng: -77.4302 }),
     mkOrder("9035", { customerName: "Austin Blake", status: "Waiting on Lace/Parts", price: 105, age: 8, brandModel: "Wilson A2000", gloveType: "Catchers Mitt", webType: "Basket (Fully Closed) Web", services: S.CCR, lace: "Blue – Carolina", internalNotes: "Waiting on Carolina Blue lace to arrive before relacing.", city: "New Bern", state: "NC", lat: 35.1085, lng: -77.0441 }),
     mkOrder("9036", { customerName: "Chloe Barrett", status: "Ready to Go", paid: "Unpaid", price: 80, age: 9, est: -1, done: 0, brandModel: "Rawlings R9", services: S.CCR, lace: "Red", city: "Wilmington", state: "NC", lat: 34.2257, lng: -77.9447 })
   ];
@@ -1111,6 +1111,17 @@ function normalizeForSearch(value) {
     .trim();
 }
 
+function expandGloveSearchAliases(value) {
+  const normalized = normalizeForSearch(value);
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  const aliases = [];
+
+  if (tokens.includes("hoh")) aliases.push("heart of the hide");
+  if (normalized.includes("heart of the hide")) aliases.push("hoh");
+
+  return [normalized, ...aliases].filter(Boolean).join(" ");
+}
+
 function digitsOnly(value) {
   return String(value || "").replace(/\D/g, "");
 }
@@ -1163,7 +1174,7 @@ function orderMatchesSearch(order, query) {
   const tokens = getSearchTokens(query);
   if (!tokens.length) return true;
 
-  const text = normalizeForSearch(getOrderSearchText(order));
+  const text = expandGloveSearchAliases(getOrderSearchText(order));
   const compactText = text.replace(/\s+/g, "");
   const digitText = [
     order.phoneNumber,

@@ -2349,6 +2349,18 @@ async function handleDeleteSaleGlovePhoto({ env, body, jsonHeaders }) {
   }, 200, jsonHeaders);
 }
 
+function expandGloveSearchAliases(value) {
+  const text = String(value || "").toLowerCase();
+  const normalized = text.replace(/[^a-z0-9]+/g, " ").trim();
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  const aliases = [];
+
+  if (tokens.includes("hoh")) aliases.push("heart of the hide");
+  if (normalized.includes("heart of the hide")) aliases.push("hoh");
+
+  return [text, ...aliases].filter(Boolean).join(" ");
+}
+
 async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
   /* Public glove search returns only glove fields and curated gallery photos,
      never customer name, contact, address, or intake photos. */
@@ -2389,7 +2401,7 @@ async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
   const seenGroups = new Set();
   for (const l of descriptorRows) {
     const fields = [l.brand_model, l.glove_type, l.web_type, l.primary_lace_color, l.secondary_lace_color];
-    const hay = fields.map(v => String(v || "").toLowerCase()).join(" ");
+    const hay = expandGloveSearchAliases(fields.join(" "));
     if (!terms.every(t => hay.includes(t))) continue;
     // A grouped shop glove is one result with all its angles; emit it once even
     // if several photos in the group carry descriptors.
@@ -2397,7 +2409,7 @@ async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
       if (seenGroups.has(l.group_key)) continue;
       seenGroups.add(l.group_key);
     }
-    const brand = String(l.brand_model || "").toLowerCase();
+    const brand = expandGloveSearchAliases(l.brand_model);
     gloves.push({
       brandModel: l.brand_model || "",
       gloveType: l.glove_type || "",
@@ -2415,13 +2427,13 @@ async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
       `/rest/v1/orders?select=order_number,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color,custom_color_request,services_requested&order_number=in.(${encodeURIComponent(nums)})`
     );
     for (const row of (ordersResp.ok && Array.isArray(ordersResp.data)) ? ordersResp.data : []) {
-      const hay = [
+      const hay = expandGloveSearchAliases([
         row.brand_model, row.glove_type, row.web_type,
         row.primary_lace_color, row.secondary_lace_color,
         row.custom_color_request, row.services_requested
-      ].map(v => String(v || "").toLowerCase()).join(" ");
+      ].join(" "));
       if (!terms.every(t => hay.includes(t))) continue;
-      const brand = String(row.brand_model || "").toLowerCase();
+      const brand = expandGloveSearchAliases(row.brand_model);
       gloves.push({
         brandModel: row.brand_model || "",
         gloveType: row.glove_type || "",
