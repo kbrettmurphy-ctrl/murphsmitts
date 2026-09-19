@@ -2769,6 +2769,58 @@ await test("public glove search preserves threshold, all-term matching, cap, and
   equal(result.json.source, "gallery");
 });
 
+await test("public glove search expands Heart of the Hide typing to HoH", async () => {
+  const descriptor = [{
+    photo_url: "https://gallery.invalid/hoh.jpg",
+    order_number: null,
+    brand_model: "Rawlings HoH PRO205",
+    glove_type: "Infield",
+    web_type: "I-web",
+    primary_lace_color: "Tan",
+    secondary_lace_color: null
+  }];
+
+  for (const q of ["heart", "heart of", "heart of the", "heart of the hide"]) {
+    const result = await invoke({
+      body: { action: "searchPublicGloves", q },
+      fetchMock: () => jsonResponse(descriptor)
+    });
+    equal(result.json.gloves.length, 1, `HoH descriptor should match ${q}`);
+    equal(result.json.gloves[0].brandModel, "Rawlings HoH PRO205");
+  }
+});
+
+await test("public glove search expands aliases for linked order descriptions", async () => {
+  const result = await invoke({
+    body: { action: "searchPublicGloves", q: "heart of the" },
+    fetchMock: input => String(input).includes("/rest/v1/orders?")
+      ? jsonResponse([{
+          order_number: "0042",
+          brand_model: "Rawlings HoH PRO205",
+          glove_type: "Infield",
+          web_type: "I-web",
+          primary_lace_color: "Tan",
+          secondary_lace_color: null,
+          custom_color_request: null,
+          services_requested: "Relace"
+        }])
+      : jsonResponse([{
+          photo_url: "https://gallery.invalid/0042.jpg",
+          order_number: "0042",
+          is_cover: true,
+          group_key: null,
+          brand_model: null,
+          glove_type: null,
+          web_type: null,
+          primary_lace_color: null,
+          secondary_lace_color: null
+        }])
+  });
+
+  equal(result.json.gloves.length, 1);
+  equal(result.json.gloves[0].brandModel, "Rawlings HoH PRO205");
+});
+
 await test("geocoding retains caps, fallback order, pacing, and no storage writes", async () => {
   const source = fs.readFileSync(new URL("../functions/api/orders.js", import.meta.url), "utf8");
   const helper = source.match(/async function geocodeAddresses\([\s\S]*?(?=\nasync function geocodeMissingOrderAddresses)/);
