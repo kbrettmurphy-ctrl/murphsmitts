@@ -8894,3 +8894,96 @@ details.pricing-section[open] > .pricing-section-summary{border-bottom:1px solid
     max-width:86%;
   }
 }
+
+/* =========================
+   ADMIN BOOT SCREEN
+   Shown only while html.admin-booting (saved token present) so the
+   login view never flashes for signed-in users during init().
+========================= */
+.admin-boot-screen{
+  display:none;
+}
+
+html.admin-booting .admin-boot-screen{
+  position:fixed;
+  inset:0;
+  z-index:100000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:var(--bg, #f4eee4);
+  opacity:1;
+  transition:opacity .24s ease;
+}
+
+html.admin-booting.admin-boot-done .admin-boot-screen{
+  opacity:0;
+  pointer-events:none;
+}
+
+.admin-boot-screen .admin-boot-inner{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:12px;
+  animation:adminBootIn .35s ease both;
+}
+
+.admin-boot-screen .admin-boot-logo{
+  width:96px;
+  height:96px;
+  object-fit:contain;
+  animation:adminBootPulse 1.6s ease-in-out infinite;
+}
+
+.admin-boot-screen .admin-boot-title{
+  font-family:"Montserrat", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight:600;
+  font-size:.85rem;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--navy, #092f4d);
+}
+
+.admin-boot-screen .admin-boot-bar{
+  position:relative;
+  width:120px;
+  height:3px;
+  border-radius:999px;
+  background:rgba(9,47,77,.12);
+  overflow:hidden;
+}
+
+.admin-boot-screen .admin-boot-bar span{
+  position:absolute;
+  top:0;
+  left:0;
+  width:40%;
+  height:100%;
+  border-radius:999px;
+  background:var(--navy, #092f4d);
+  animation:adminBootSlide 1.1s ease-in-out infinite;
+}
+
+@keyframes adminBootIn{
+  from{ opacity:0; transform:translateY(4px); }
+  to{ opacity:1; transform:none; }
+}
+
+@keyframes adminBootPulse{
+  0%, 100%{ transform:scale(1); }
+  50%{ transform:scale(1.04); }
+}
+
+@keyframes adminBootSlide{
+  0%{ transform:translateX(-100%); }
+  100%{ transform:translateX(250%); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .admin-boot-screen .admin-boot-inner,
+  .admin-boot-screen .admin-boot-logo,
+  .admin-boot-screen .admin-boot-bar span{
+    animation:none;
+  }
+}
