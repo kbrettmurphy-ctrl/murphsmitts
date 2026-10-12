@@ -6,6 +6,18 @@
   <title>MurphOS Admin</title>
   <link rel="stylesheet" href="/assets/vendor/leaflet/1.9.4/leaflet.css" />
   <link rel="stylesheet" href="admin.css" />
+  <script>
+    /* Boot screen: if a session token exists, cover the login view until init() settles. */
+    (function () {
+      try {
+        if (localStorage.getItem("mm_admin_token") && !/[?&]invite=/.test(location.search)) {
+          var root = document.documentElement;
+          root.classList.add("admin-booting");
+          setTimeout(function () { root.classList.remove("admin-booting"); }, 20000);
+        }
+      } catch (e) {}
+    })();
+  </script>
   <link rel="manifest" href="/admin/manifest.webmanifest" />
   <meta name="theme-color" content="#092f4d" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -15,6 +27,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600&display=swap" rel="stylesheet">
 </head>
 <body>
+  <div id="adminBootScreen" class="admin-boot-screen" role="status" aria-live="polite" aria-label="Loading MurphOS">
+    <div class="admin-boot-inner">
+      <img src="/assets/img/logo.png" alt="" class="admin-boot-logo" width="96" height="96">
+      <div class="admin-boot-title">MurphOS</div>
+      <div class="admin-boot-bar" aria-hidden="true"><span></span></div>
+    </div>
+  </div>
   <div class="app-shell">
     <aside id="sideMenu" class="side-menu" aria-label="MurphOS navigation">
       <div class="side-menu-header">

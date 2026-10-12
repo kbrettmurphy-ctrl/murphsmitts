@@ -14510,7 +14510,22 @@ document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
 /* =========================
    INIT
 ========================= */
+function endAdminBoot() {
+  const root = document.documentElement;
+  if (!root.classList.contains("admin-booting")) return;
+  root.classList.add("admin-boot-done");
+  setTimeout(() => root.classList.remove("admin-booting", "admin-boot-done"), 260);
+}
+
 (async function init() {
+  try {
+    await initAdminApp();
+  } finally {
+    endAdminBoot();
+  }
+})();
+
+async function initAdminApp() {
   installSwipeDeleteStyles();
   initUploadView();
   initPullToRefresh();
@@ -14545,7 +14560,7 @@ document.getElementById("uploadRefreshBtn")?.addEventListener("click", () => {
     syncAuthUI();
     showView(loginView);
   }
-})();
+}
 
 /* =========================
    WEB PUSH (PWA notifications)
