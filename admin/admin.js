@@ -5,7 +5,12 @@ const ADMIN_PHOTO_ACTION_PLACEHOLDER_LABEL = "Action";
 const ADMIN_PHOTO_ACTION_PLACEHOLDER = `<option value="" disabled hidden>${ADMIN_PHOTO_ACTION_PLACEHOLDER_LABEL}</option>`;
 const ADMIN_PHOTO_PLACEHOLDER_VALUES = new Set(["", "action", "actions"]);
 const ADMIN_STORE_PHOTO_ACTIONS = new Set(["primary", "hover", "delete"]);
-const ADMIN_GALLERY_PHOTO_ACTIONS = new Set(["view", "hide", "restore", "delete"]);
+const ADMIN_GALLERY_PHOTO_ACTIONS = new Set([
+  "view",
+  "hide",
+  "restore",
+  "delete",
+]);
 
 // Admin v2 default: keep controls compact, icon-first, and as close to native iOS/macOS behavior as practical.
 if ("scrollRestoration" in history) {
@@ -36,13 +41,21 @@ const searchClearBtn = document.getElementById("searchClearBtn");
 const searchCloseBtn = document.getElementById("searchCloseBtn");
 const orderFilterToggleBtn = document.getElementById("orderFilterToggleBtn");
 const orderFilterPopover = document.getElementById("orderFilterPopover");
-const orderFilterButtons = Array.from(document.querySelectorAll("[data-order-filter]"));
+const orderFilterButtons = Array.from(
+  document.querySelectorAll("[data-order-filter]"),
+);
 const orderNewBtn = document.getElementById("orderNewBtn");
-const inventoryFilterToggleBtn = document.getElementById("inventoryFilterToggleBtn");
+const inventoryFilterToggleBtn = document.getElementById(
+  "inventoryFilterToggleBtn",
+);
 const inventoryAddBtn = document.getElementById("inventoryAddBtn");
-const inventoryFilterPopover = document.getElementById("inventoryFilterPopover");
+const inventoryFilterPopover = document.getElementById(
+  "inventoryFilterPopover",
+);
 const inventoryAllBtn = document.getElementById("inventoryAllBtn");
-const inventoryNeedsOrderBtn = document.getElementById("inventoryNeedsOrderBtn");
+const inventoryNeedsOrderBtn = document.getElementById(
+  "inventoryNeedsOrderBtn",
+);
 const inventoryHiddenBtn = document.getElementById("inventoryHiddenBtn");
 const pullRefreshIndicator = document.getElementById("pullRefreshIndicator");
 const pullRefreshText = document.getElementById("pullRefreshText");
@@ -86,8 +99,12 @@ const saleGlovesCount = document.getElementById("saleGlovesCount");
 const saleGlovesMenuBtn = document.getElementById("saleGlovesMenuBtn");
 const saleGlovesRefreshBtn = document.getElementById("saleGlovesRefreshBtn");
 const addSaleGloveBtn = document.getElementById("addSaleGloveBtn");
-const galleryUploaderToggleBtn = document.getElementById("galleryUploaderToggleBtn");
-const galleryUploaderCloseBtn = document.getElementById("galleryUploaderCloseBtn");
+const galleryUploaderToggleBtn = document.getElementById(
+  "galleryUploaderToggleBtn",
+);
+const galleryUploaderCloseBtn = document.getElementById(
+  "galleryUploaderCloseBtn",
+);
 const galleryUploaderCard = document.getElementById("galleryUploaderCard");
 const mapMenuBtn = document.getElementById("mapMenuBtn");
 const mapRefreshBtn = document.getElementById("mapRefreshBtn");
@@ -154,7 +171,7 @@ let pullRefreshState = {
   refreshing: false,
   startX: 0,
   startY: 0,
-  distance: 0
+  distance: 0,
 };
 let loginInProgress = false;
 let listScrollY = 0;
@@ -169,14 +186,21 @@ let dashboardLaborSessions = {};
 let dashboardTimerPopoverOrder = null;
 let dashboardTimerBusy = false;
 let benchChoiceRoot = null;
-let benchFocusState = { activeBench: null, activeLabor: null, unlinkedPausedLabor: null, unresolved: [], serverNow: null };
+let benchFocusState = {
+  activeBench: null,
+  activeLabor: null,
+  unlinkedPausedLabor: null,
+  unresolved: [],
+  serverNow: null,
+};
 let benchFocusBusy = false;
 let benchFocusPollInterval = null;
 let benchFocusClockOffsetMs = 0;
 const BENCH_FOCUS_SIGNAL_KEY = "mm_bench_focus_changed";
-const benchFocusChannel = typeof BroadcastChannel === "function"
-  ? new BroadcastChannel("murphos-bench-focus")
-  : null;
+const benchFocusChannel =
+  typeof BroadcastChannel === "function"
+    ? new BroadcastChannel("murphos-bench-focus")
+    : null;
 
 /* Set of order numbers that have at least one real activity-log entry
    (the manual-creation event is excluded server-side). Drives the New
@@ -194,7 +218,9 @@ const DASHBOARD_COLLAPSE_KEY = "mm_dashboard_collapsed";
 
 function readDashboardCollapseState() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(DASHBOARD_COLLAPSE_KEY) || "null");
+    const parsed = JSON.parse(
+      localStorage.getItem(DASHBOARD_COLLAPSE_KEY) || "null",
+    );
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
@@ -210,7 +236,10 @@ function isDashboardSectionCollapsed(key) {
 function setDashboardSectionCollapsed(key, collapsed) {
   dashboardCollapseState[key] = collapsed;
   try {
-    localStorage.setItem(DASHBOARD_COLLAPSE_KEY, JSON.stringify(dashboardCollapseState));
+    localStorage.setItem(
+      DASHBOARD_COLLAPSE_KEY,
+      JSON.stringify(dashboardCollapseState),
+    );
   } catch {
     /* Non-fatal — collapse just won't persist across reloads. */
   }
@@ -233,12 +262,14 @@ document.addEventListener("contextmenu", (e) => {
 });
 
 function isEditableAdminTarget(target) {
-  return !!target?.closest?.("input, textarea, select, [contenteditable='true']");
+  return !!target?.closest?.(
+    "input, textarea, select, [contenteditable='true']",
+  );
 }
 
 function isAdminActionSurface(target) {
   return !!target?.closest?.(
-    ".order-card, .inventory-card, .workflow-sheet, .workflow-action-btn, .admin-filter-popover, .gallery-manager-item, .gallery-manager-thumb, .photo-thumb-wrap, .photo-thumb-img, .sale-photo-action-select, .gallery-manager-action-select, .topbar-icon-action"
+    ".order-card, .inventory-card, .workflow-sheet, .workflow-action-btn, .admin-filter-popover, .gallery-manager-item, .gallery-manager-thumb, .photo-thumb-wrap, .photo-thumb-img, .sale-photo-action-select, .gallery-manager-action-select, .topbar-icon-action",
   );
 }
 
@@ -253,11 +284,17 @@ function isAdminActionSurface(target) {
 function resetStrandedWindowScroll() {
   /* Mobile browser mode scrolls the document itself (so Safari's toolbar
      can collapse) — window scroll is legitimate there, never reset it. */
-  if (window.matchMedia("(max-width: 899px) and (display-mode: browser)").matches) return;
+  if (
+    window.matchMedia("(max-width: 899px) and (display-mode: browser)").matches
+  )
+    return;
   const stranded =
-    (window.scrollY || 0) ||
-    (document.documentElement.scrollTop || 0) ||
-    (document.body.scrollTop || 0);
+    window.scrollY ||
+    0 ||
+    document.documentElement.scrollTop ||
+    0 ||
+    document.body.scrollTop ||
+    0;
   if (!stranded) return;
   window.scrollTo(0, 0);
   document.documentElement.scrollTop = 0;
@@ -286,9 +323,25 @@ document.addEventListener("focusout", (e) => {
    VIEW / MENU
 ========================= */
 function showView(view) {
-  [loginView, inviteView, homeDashboardView, dashboardView, detailView, uploadView, mapView, moneyView, pricingView, reviewsView, saleGlovesView, messagesView, usersView, customersView, calendarView]
+  [
+    loginView,
+    inviteView,
+    homeDashboardView,
+    dashboardView,
+    detailView,
+    uploadView,
+    mapView,
+    moneyView,
+    pricingView,
+    reviewsView,
+    saleGlovesView,
+    messagesView,
+    usersView,
+    customersView,
+    calendarView,
+  ]
     .filter(Boolean)
-    .forEach(v => v.classList.remove("active"));
+    .forEach((v) => v.classList.remove("active"));
 
   if (view) {
     view.classList.add("active");
@@ -303,24 +356,26 @@ function resetAdminScroll(activeContainer = null) {
     activeContainer?.firstElementChild ||
     activeContainer;
 
-  const containers = new Set([
-    document.scrollingElement,
-    document.documentElement,
-    document.body,
-    mainPanel,
-    loginView,
-    homeDashboardView,
-    dashboardView,
-    detailView,
-    uploadView,
-    mapView,
-    saleGlovesView,
-    ordersList,
-    orderDetail,
-    activeContainer
-  ].filter(Boolean));
+  const containers = new Set(
+    [
+      document.scrollingElement,
+      document.documentElement,
+      document.body,
+      mainPanel,
+      loginView,
+      homeDashboardView,
+      dashboardView,
+      detailView,
+      uploadView,
+      mapView,
+      saleGlovesView,
+      ordersList,
+      orderDetail,
+      activeContainer,
+    ].filter(Boolean),
+  );
 
-  containers.forEach(container => {
+  containers.forEach((container) => {
     container.scrollTop = 0;
     container.scrollLeft = 0;
   });
@@ -337,7 +392,7 @@ function getAdminScrollTop() {
     window.scrollY || 0,
     document.documentElement.scrollTop || 0,
     document.body.scrollTop || 0,
-    mainPanel?.scrollTop || 0
+    mainPanel?.scrollTop || 0,
   );
 }
 
@@ -354,8 +409,15 @@ function setAdminScrollTop(value) {
   }
 }
 
-function resetViewScroll(viewEl, { invalidateMap = false, blurActive = false } = {}) {
-  if (blurActive && document.activeElement && typeof document.activeElement.blur === "function") {
+function resetViewScroll(
+  viewEl,
+  { invalidateMap = false, blurActive = false } = {},
+) {
+  if (
+    blurActive &&
+    document.activeElement &&
+    typeof document.activeElement.blur === "function"
+  ) {
     document.activeElement.blur();
   }
 
@@ -427,7 +489,13 @@ function clearToken() {
   laceInventory = [];
   galleryPhotos = [];
   dashboardLaborSessions = {};
-  benchFocusState = { activeBench: null, activeLabor: null, unlinkedPausedLabor: null, unresolved: [], serverNow: null };
+  benchFocusState = {
+    activeBench: null,
+    activeLabor: null,
+    unlinkedPausedLabor: null,
+    unresolved: [],
+    serverNow: null,
+  };
   stopBenchFocusPolling();
   dashboardActivityOrders = new Set();
   dashboardActivityLoaded = false;
@@ -450,7 +518,10 @@ function getCurrentRole() {
     const token = getToken();
     const payloadB64 = token.split(".")[0];
     if (!payloadB64) return "admin";
-    const json = atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((payloadB64.length + 3) % 4));
+    const json = atob(
+      payloadB64.replace(/-/g, "+").replace(/_/g, "/") +
+        "===".slice((payloadB64.length + 3) % 4),
+    );
     const payload = JSON.parse(json);
     return payload.role || "admin";
   } catch {
@@ -511,7 +582,12 @@ const DEMO_LIVE_ACTIONS = new Set(["login", "getInvite", "acceptInvite"]);
 async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
   /* Demo users run entirely in a browser-side sandbox — no real-data call
      ever leaves the page (the server also blocks demo as a backstop). */
-  if (body && body.action && !DEMO_LIVE_ACTIONS.has(body.action) && isDemoRole()) {
+  if (
+    body &&
+    body.action &&
+    !DEMO_LIVE_ACTIONS.has(body.action) &&
+    isDemoRole()
+  ) {
     return demoApi(body);
   }
 
@@ -520,9 +596,9 @@ async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
-      "Content-Type": "text/plain;charset=utf-8"
+      "Content-Type": "text/plain;charset=utf-8",
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   });
 
   const raw = await res.text();
@@ -531,7 +607,9 @@ async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
   try {
     data = JSON.parse(raw);
   } catch (err) {
-    throw new Error(`Non-JSON response: ${raw.slice(0, 300) || "[empty response]"}`);
+    throw new Error(
+      `Non-JSON response: ${raw.slice(0, 300) || "[empty response]"}`,
+    );
   }
 
   if (!data.ok) {
@@ -540,12 +618,14 @@ async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
     if (typeof data.error === "string") {
       message = data.error;
     } else if (Array.isArray(data.error)) {
-      message = data.error.map(item => {
-        if (typeof item === "string") return item;
-        if (item?.message) return item.message;
-        if (item?.details) return item.details;
-        return JSON.stringify(item);
-      }).join(" | ");
+      message = data.error
+        .map((item) => {
+          if (typeof item === "string") return item;
+          if (item?.message) return item.message;
+          if (item?.details) return item.details;
+          return JSON.stringify(item);
+        })
+        .join(" | ");
     } else if (data.error && typeof data.error === "object") {
       message =
         data.error.message ||
@@ -554,11 +634,11 @@ async function postJson(body, useAuth = false, endpoint = API_BASE_URL) {
         JSON.stringify(data.error);
 
       if (data.details) {
-         message += ` | Details: ${
+        message += ` | Details: ${
           typeof data.details === "string"
             ? data.details
             : JSON.stringify(data.details)
-         }`;
+        }`;
       }
     }
 
@@ -596,7 +676,7 @@ const DEMO_STATUS_FLOW = [
   "Customer Approved",
   "In Progress",
   "Ready to Go",
-  "Completed"
+  "Completed",
 ];
 
 /* Build the status-change activity an order would have accumulated to reach
@@ -613,14 +693,14 @@ function demoStatusActivity(status, receivedIso) {
       events.push({
         createdAt: new Date(base + i * dayMs).toISOString(),
         eventLabel: "Status changed",
-        eventDetail: DEMO_STATUS_FLOW[i]
+        eventDetail: DEMO_STATUS_FLOW[i],
       });
     }
   } else if (status && status !== "Received") {
     events.push({
       createdAt: new Date(base + dayMs).toISOString(),
       eventLabel: "Status changed",
-      eventDetail: status
+      eventDetail: status,
     });
   }
 
@@ -628,14 +708,19 @@ function demoStatusActivity(status, receivedIso) {
 }
 
 function seedDemoStore() {
-  const nameKey = s => String(s || "").toLowerCase().replace(/[^a-z]+/g, ".").replace(/^\.|\.$/g, "");
+  const nameKey = (s) =>
+    String(s || "")
+      .toLowerCase()
+      .replace(/[^a-z]+/g, ".")
+      .replace(/^\.|\.$/g, "");
   /* Unique phone per unique customer (sequential, not hashed) — a hash
      collision would merge two people in the Customers view. */
   const phoneMap = {};
   let phoneSeq = 1;
-  const phoneFor = s => {
+  const phoneFor = (s) => {
     const k = nameKey(s);
-    if (!phoneMap[k]) phoneMap[k] = `(910) 555-0${String(100 + phoneSeq++).slice(-3)}`;
+    if (!phoneMap[k])
+      phoneMap[k] = `(910) 555-0${String(100 + phoneSeq++).slice(-3)}`;
     return phoneMap[k];
   };
 
@@ -659,17 +744,27 @@ function seedDemoStore() {
        panel reads "sent" instead of a failed-looking "Not sent". */
     lastStatusEmailed: o.emailedStatus ?? o.status,
     lastStatusTexted: o.textedStatus ?? o.status,
-    lastStatusTextedAt: daysAgoIso(o.updatedDaysAgo != null ? o.updatedDaysAgo : (o.age || 0)) + "T14:02:00.000Z",
+    lastStatusTextedAt:
+      daysAgoIso(o.updatedDaysAgo != null ? o.updatedDaysAgo : o.age || 0) +
+      "T14:02:00.000Z",
     priceQuoted: o.price ?? "",
     shippingCost: o.shippingCost ?? 0,
     dropOffMethod: o.dropOffMethod || "Local Drop-Off",
-    streetAddress: "", city: o.city || "", state: o.state || "NC", zipCode: "",
+    streetAddress: "",
+    city: o.city || "",
+    state: o.state || "NC",
+    zipCode: "",
     dateReceived: daysAgoIso(o.age),
     estimatedCompletion: o.est != null ? daysAgoIso(o.est) : "",
     dateCompleted: o.done != null ? daysAgoIso(o.done) : "",
-    datePaid: normalizeText(o.paid) === "paid"
-      ? (o.paidDaysAgo != null ? daysAgoIso(o.paidDaysAgo) : (o.done != null ? daysAgoIso(o.done) : daysAgoIso(o.updatedDaysAgo ?? o.age)))
-      : "",
+    datePaid:
+      normalizeText(o.paid) === "paid"
+        ? o.paidDaysAgo != null
+          ? daysAgoIso(o.paidDaysAgo)
+          : o.done != null
+            ? daysAgoIso(o.done)
+            : daysAgoIso(o.updatedDaysAgo ?? o.age)
+        : "",
     internalNotes: o.internalNotes || "",
     gloveNotes: o.gloveNotes || "",
     customerNotes: o.customerNotes || "",
@@ -678,57 +773,637 @@ function seedDemoStore() {
     mapLat: o.lat ?? null,
     mapLng: o.lng ?? null,
     createdAt: daysAgoIso(o.age) + "T09:10:00.000Z",
-    updatedAt: o.updatedDaysAgo != null ? daysAgoIso(o.updatedDaysAgo) + "T14:00:00.000Z" : demoNow()
+    updatedAt:
+      o.updatedDaysAgo != null
+        ? daysAgoIso(o.updatedDaysAgo) + "T14:00:00.000Z"
+        : demoNow(),
   });
 
-  const S = { CCR: "Cleaning + Conditioning + Relacing", CC: "Cleaning + Conditioning", RL: "Relacing", LR: "Lace Repair", PAD: "ShockTec Air2Gel Palm Pad" };
+  const S = {
+    CCR: "Cleaning + Conditioning + Relacing",
+    CC: "Cleaning + Conditioning",
+    RL: "Relacing",
+    LR: "Lace Repair",
+    PAD: "ShockTec Air2Gel Palm Pad",
+  };
 
   const orders = [
     /* ---- Completed history (9001–9021) ---- */
-    mkOrder("9001", { customerName: "Marcus Bell", status: "Completed", paid: "Paid", price: 80, age: 188, done: 178, est: 180, brandModel: "Rawlings GG Elite", services: S.CCR, lace: "Red", city: "Wilmington", state: "NC", lat: 34.2257, lng: -77.9447 }),
-    mkOrder("9002", { customerName: "Diego Ramirez", status: "Completed", paid: "Paid", price: 105, age: 176, done: 165, est: 167, brandModel: "Wilson A2000", gloveType: "Catchers Mitt", webType: "Basket (Fully Closed) Web", services: S.CCR, lace: "Black", city: "Jacksonville", state: "NC", lat: 34.7541, lng: -77.4302 }),
-    mkOrder("9003", { customerName: "Sarah Whitfield", status: "Completed", paid: "Paid", price: 60, age: 165, done: 154, est: 156, brandModel: "Mizuno MVP Prime", services: S.RL, lace: "Tan – Camel", city: "Raleigh", state: "NC", lat: 35.7796, lng: -78.6382 }),
-    mkOrder("9004", { customerName: "Tyler Nguyen", status: "Completed", paid: "Paid", price: 50, age: 153, done: 142, est: 145, brandModel: "Rawlings R9", services: S.CC, lace: "", city: "Durham", state: "NC", lat: 35.9940, lng: -78.8986 }),
-    mkOrder("9005", { customerName: "Owen Brooks", status: "Completed", paid: "Paid", price: 100, age: 142, done: 131, est: 133, brandModel: "Rawlings Pro Preferred", gloveType: "First Base Mitt", webType: "Single Post Web", services: S.CCR, lace: "Chocolate", city: "Charlotte", state: "NC", lat: 35.2271, lng: -80.8431 }),
-    mkOrder("9006", { customerName: "Priya Anand", status: "Completed", paid: "Paid", price: 85, age: 131, done: 120, est: 122, brandModel: "Nokona", services: S.CCR, lace: "Blue – Navy", city: "Cary", state: "NC", lat: 35.7915, lng: -78.7811 }),
-    mkOrder("9007", { customerName: "Ryan Cole", status: "Completed", paid: "Paid", price: 40, age: 120, done: 109, est: 111, brandModel: "44 Pro", services: S.LR, lace: "Black", city: "Greenville", state: "NC", lat: 35.6127, lng: -77.3664 }),
-    mkOrder("9008", { customerName: "Marcus Bell", status: "Completed", paid: "Paid", price: 105, age: 110, done: 100, est: 102, brandModel: "Wilson A2K", gloveType: "Catchers Mitt", webType: "Basket (Fully Closed) Web", services: S.CCR, lace: "Red", secondaryLace: "White", city: "Wilmington", state: "NC", lat: 34.2257, lng: -77.9447 }),
-    mkOrder("9009", { customerName: "Hannah Foster", status: "Completed", paid: "Paid", price: 80, age: 101, done: 90, est: 92, brandModel: "Marucci", services: S.CCR, lace: "Orange", city: "Austin", state: "TX", dropOffMethod: "Shipped", shippingCost: 14, carrier: "USPS", tracking: "9400111899223189000001", lat: 30.2672, lng: -97.7431 }),
-    mkOrder("9010", { customerName: "Trevor Hayes", status: "Completed", paid: "Paid", price: 60, age: 92, done: 82, est: 84, brandModel: "Rawlings HoH", services: S.RL, lace: "Tan – Indian", city: "Goldsboro", state: "NC", lat: 35.3849, lng: -77.9928 }),
-    mkOrder("9011", { customerName: "Caleb Turner", status: "Completed", paid: "Paid", price: 120, age: 83, done: 72, est: 74, brandModel: "All-Star", gloveType: "Catchers Mitt", webType: "Other / Not Sure", services: S.CCR + ", " + S.PAD, lace: "Black", city: "Columbus", state: "OH", dropOffMethod: "Shipped", shippingCost: 15, carrier: "UPS", tracking: "1Z999AA10123456784", lat: 39.9612, lng: -82.9988 }),
-    mkOrder("9012", { customerName: "Sarah Whitfield", status: "Completed", paid: "Paid", price: 80, age: 74, done: 63, est: 65, brandModel: "Mizuno Pro", services: S.CCR, lace: "Blue – Royal", city: "Raleigh", state: "NC", lat: 35.7796, lng: -78.6382 }),
-    mkOrder("9013", { customerName: "Emma Sullivan", status: "Completed", paid: "Paid", price: 50, age: 66, done: 55, est: 57, brandModel: "Wilson A2000", services: S.CC, lace: "", city: "Hampstead", state: "NC", lat: 34.3671, lng: -77.7108 }),
-    mkOrder("9014", { customerName: "Ryan Cole", status: "Completed", paid: "Paid", price: 80, age: 58, done: 48, est: 50, brandModel: "44 Pro", webType: "H-Web", services: S.CCR, lace: "Yellow", city: "Greenville", state: "NC", lat: 35.6127, lng: -77.3664 }),
-    mkOrder("9015", { customerName: "Nathan Pierce", status: "Completed", paid: "Paid", price: 100, age: 50, done: 41, est: 43, brandModel: "Rawlings Pro Preferred", gloveType: "First Base Mitt", webType: "Single Post Web", services: S.CCR, lace: "Chocolate", city: "Denver", state: "CO", dropOffMethod: "Shipped", shippingCost: 16, carrier: "FedEx", tracking: "770100000010", lat: 39.7392, lng: -104.9903 }),
-    mkOrder("9016", { customerName: "Jenna Walsh", status: "Completed", paid: "Paid", price: 60, age: 42, done: 33, est: 35, brandModel: "Nokona", services: S.RL, lace: "Blue – Navy", city: "Fayetteville", state: "NC", lat: 35.0527, lng: -78.8784 }),
-    mkOrder("9017", { customerName: "Jordan Reyes", status: "Completed", paid: "Paid", price: 90, age: 30, done: 20, est: 22, brandModel: "Rawlings R9", webType: "H-Web", services: S.CCR, lace: "Red", secondaryLace: "Blue – Navy", city: "Leland", state: "NC", lat: 34.2563, lng: -78.0447 }),
-    mkOrder("9018", { customerName: "Tyler Nguyen", status: "Completed", paid: "Paid", price: 105, age: 28, done: 20, est: 21, brandModel: "Wilson A2K", services: S.CCR, lace: "Black", secondaryLace: "Gray", city: "Durham", state: "NC", lat: 35.9940, lng: -78.8986 }),
-    mkOrder("9019", { customerName: "Grace Bennett", status: "Completed", paid: "Paid", price: 50, age: 22, done: 12, est: 14, brandModel: "Mizuno MVP Prime", services: S.CC, lace: "", city: "Surf City", state: "NC", lat: 34.4277, lng: -77.5464 }),
-    mkOrder("9020", { customerName: "Marcus Bell", status: "Completed", paid: "Paid", price: 80, age: 19, done: 7, est: 9, brandModel: "Rawlings GG Elite", services: S.CCR, lace: "Tan – Camel", city: "Wilmington", state: "NC", lat: 34.2257, lng: -77.9447 }),
-    mkOrder("9021", { customerName: "Logan Mitchell", status: "Completed", paid: "Paid", price: 40, age: 20, done: 3, est: 5, brandModel: "Marucci", services: S.LR, lace: "Black", city: "Holly Ridge", state: "NC", lat: 34.4924, lng: -77.5550 }),
+    mkOrder("9001", {
+      customerName: "Marcus Bell",
+      status: "Completed",
+      paid: "Paid",
+      price: 80,
+      age: 188,
+      done: 178,
+      est: 180,
+      brandModel: "Rawlings GG Elite",
+      services: S.CCR,
+      lace: "Red",
+      city: "Wilmington",
+      state: "NC",
+      lat: 34.2257,
+      lng: -77.9447,
+    }),
+    mkOrder("9002", {
+      customerName: "Diego Ramirez",
+      status: "Completed",
+      paid: "Paid",
+      price: 105,
+      age: 176,
+      done: 165,
+      est: 167,
+      brandModel: "Wilson A2000",
+      gloveType: "Catchers Mitt",
+      webType: "Basket (Fully Closed) Web",
+      services: S.CCR,
+      lace: "Black",
+      city: "Jacksonville",
+      state: "NC",
+      lat: 34.7541,
+      lng: -77.4302,
+    }),
+    mkOrder("9003", {
+      customerName: "Sarah Whitfield",
+      status: "Completed",
+      paid: "Paid",
+      price: 60,
+      age: 165,
+      done: 154,
+      est: 156,
+      brandModel: "Mizuno MVP Prime",
+      services: S.RL,
+      lace: "Tan – Camel",
+      city: "Raleigh",
+      state: "NC",
+      lat: 35.7796,
+      lng: -78.6382,
+    }),
+    mkOrder("9004", {
+      customerName: "Tyler Nguyen",
+      status: "Completed",
+      paid: "Paid",
+      price: 50,
+      age: 153,
+      done: 142,
+      est: 145,
+      brandModel: "Rawlings R9",
+      services: S.CC,
+      lace: "",
+      city: "Durham",
+      state: "NC",
+      lat: 35.994,
+      lng: -78.8986,
+    }),
+    mkOrder("9005", {
+      customerName: "Owen Brooks",
+      status: "Completed",
+      paid: "Paid",
+      price: 100,
+      age: 142,
+      done: 131,
+      est: 133,
+      brandModel: "Rawlings Pro Preferred",
+      gloveType: "First Base Mitt",
+      webType: "Single Post Web",
+      services: S.CCR,
+      lace: "Chocolate",
+      city: "Charlotte",
+      state: "NC",
+      lat: 35.2271,
+      lng: -80.8431,
+    }),
+    mkOrder("9006", {
+      customerName: "Priya Anand",
+      status: "Completed",
+      paid: "Paid",
+      price: 85,
+      age: 131,
+      done: 120,
+      est: 122,
+      brandModel: "Nokona",
+      services: S.CCR,
+      lace: "Blue – Navy",
+      city: "Cary",
+      state: "NC",
+      lat: 35.7915,
+      lng: -78.7811,
+    }),
+    mkOrder("9007", {
+      customerName: "Ryan Cole",
+      status: "Completed",
+      paid: "Paid",
+      price: 40,
+      age: 120,
+      done: 109,
+      est: 111,
+      brandModel: "44 Pro",
+      services: S.LR,
+      lace: "Black",
+      city: "Greenville",
+      state: "NC",
+      lat: 35.6127,
+      lng: -77.3664,
+    }),
+    mkOrder("9008", {
+      customerName: "Marcus Bell",
+      status: "Completed",
+      paid: "Paid",
+      price: 105,
+      age: 110,
+      done: 100,
+      est: 102,
+      brandModel: "Wilson A2K",
+      gloveType: "Catchers Mitt",
+      webType: "Basket (Fully Closed) Web",
+      services: S.CCR,
+      lace: "Red",
+      secondaryLace: "White",
+      city: "Wilmington",
+      state: "NC",
+      lat: 34.2257,
+      lng: -77.9447,
+    }),
+    mkOrder("9009", {
+      customerName: "Hannah Foster",
+      status: "Completed",
+      paid: "Paid",
+      price: 80,
+      age: 101,
+      done: 90,
+      est: 92,
+      brandModel: "Marucci",
+      services: S.CCR,
+      lace: "Orange",
+      city: "Austin",
+      state: "TX",
+      dropOffMethod: "Shipped",
+      shippingCost: 14,
+      carrier: "USPS",
+      tracking: "9400111899223189000001",
+      lat: 30.2672,
+      lng: -97.7431,
+    }),
+    mkOrder("9010", {
+      customerName: "Trevor Hayes",
+      status: "Completed",
+      paid: "Paid",
+      price: 60,
+      age: 92,
+      done: 82,
+      est: 84,
+      brandModel: "Rawlings HoH",
+      services: S.RL,
+      lace: "Tan – Indian",
+      city: "Goldsboro",
+      state: "NC",
+      lat: 35.3849,
+      lng: -77.9928,
+    }),
+    mkOrder("9011", {
+      customerName: "Caleb Turner",
+      status: "Completed",
+      paid: "Paid",
+      price: 120,
+      age: 83,
+      done: 72,
+      est: 74,
+      brandModel: "All-Star",
+      gloveType: "Catchers Mitt",
+      webType: "Other / Not Sure",
+      services: S.CCR + ", " + S.PAD,
+      lace: "Black",
+      city: "Columbus",
+      state: "OH",
+      dropOffMethod: "Shipped",
+      shippingCost: 15,
+      carrier: "UPS",
+      tracking: "1Z999AA10123456784",
+      lat: 39.9612,
+      lng: -82.9988,
+    }),
+    mkOrder("9012", {
+      customerName: "Sarah Whitfield",
+      status: "Completed",
+      paid: "Paid",
+      price: 80,
+      age: 74,
+      done: 63,
+      est: 65,
+      brandModel: "Mizuno Pro",
+      services: S.CCR,
+      lace: "Blue – Royal",
+      city: "Raleigh",
+      state: "NC",
+      lat: 35.7796,
+      lng: -78.6382,
+    }),
+    mkOrder("9013", {
+      customerName: "Emma Sullivan",
+      status: "Completed",
+      paid: "Paid",
+      price: 50,
+      age: 66,
+      done: 55,
+      est: 57,
+      brandModel: "Wilson A2000",
+      services: S.CC,
+      lace: "",
+      city: "Hampstead",
+      state: "NC",
+      lat: 34.3671,
+      lng: -77.7108,
+    }),
+    mkOrder("9014", {
+      customerName: "Ryan Cole",
+      status: "Completed",
+      paid: "Paid",
+      price: 80,
+      age: 58,
+      done: 48,
+      est: 50,
+      brandModel: "44 Pro",
+      webType: "H-Web",
+      services: S.CCR,
+      lace: "Yellow",
+      city: "Greenville",
+      state: "NC",
+      lat: 35.6127,
+      lng: -77.3664,
+    }),
+    mkOrder("9015", {
+      customerName: "Nathan Pierce",
+      status: "Completed",
+      paid: "Paid",
+      price: 100,
+      age: 50,
+      done: 41,
+      est: 43,
+      brandModel: "Rawlings Pro Preferred",
+      gloveType: "First Base Mitt",
+      webType: "Single Post Web",
+      services: S.CCR,
+      lace: "Chocolate",
+      city: "Denver",
+      state: "CO",
+      dropOffMethod: "Shipped",
+      shippingCost: 16,
+      carrier: "FedEx",
+      tracking: "770100000010",
+      lat: 39.7392,
+      lng: -104.9903,
+    }),
+    mkOrder("9016", {
+      customerName: "Jenna Walsh",
+      status: "Completed",
+      paid: "Paid",
+      price: 60,
+      age: 42,
+      done: 33,
+      est: 35,
+      brandModel: "Nokona",
+      services: S.RL,
+      lace: "Blue – Navy",
+      city: "Fayetteville",
+      state: "NC",
+      lat: 35.0527,
+      lng: -78.8784,
+    }),
+    mkOrder("9017", {
+      customerName: "Jordan Reyes",
+      status: "Completed",
+      paid: "Paid",
+      price: 90,
+      age: 30,
+      done: 20,
+      est: 22,
+      brandModel: "Rawlings R9",
+      webType: "H-Web",
+      services: S.CCR,
+      lace: "Red",
+      secondaryLace: "Blue – Navy",
+      city: "Leland",
+      state: "NC",
+      lat: 34.2563,
+      lng: -78.0447,
+    }),
+    mkOrder("9018", {
+      customerName: "Tyler Nguyen",
+      status: "Completed",
+      paid: "Paid",
+      price: 105,
+      age: 28,
+      done: 20,
+      est: 21,
+      brandModel: "Wilson A2K",
+      services: S.CCR,
+      lace: "Black",
+      secondaryLace: "Gray",
+      city: "Durham",
+      state: "NC",
+      lat: 35.994,
+      lng: -78.8986,
+    }),
+    mkOrder("9019", {
+      customerName: "Grace Bennett",
+      status: "Completed",
+      paid: "Paid",
+      price: 50,
+      age: 22,
+      done: 12,
+      est: 14,
+      brandModel: "Mizuno MVP Prime",
+      services: S.CC,
+      lace: "",
+      city: "Surf City",
+      state: "NC",
+      lat: 34.4277,
+      lng: -77.5464,
+    }),
+    mkOrder("9020", {
+      customerName: "Marcus Bell",
+      status: "Completed",
+      paid: "Paid",
+      price: 80,
+      age: 19,
+      done: 7,
+      est: 9,
+      brandModel: "Rawlings GG Elite",
+      services: S.CCR,
+      lace: "Tan – Camel",
+      city: "Wilmington",
+      state: "NC",
+      lat: 34.2257,
+      lng: -77.9447,
+    }),
+    mkOrder("9021", {
+      customerName: "Logan Mitchell",
+      status: "Completed",
+      paid: "Paid",
+      price: 40,
+      age: 20,
+      done: 3,
+      est: 5,
+      brandModel: "Marucci",
+      services: S.LR,
+      lace: "Black",
+      city: "Holly Ridge",
+      state: "NC",
+      lat: 34.4924,
+      lng: -77.555,
+    }),
 
     /* ---- On Hold (excluded from Current) ---- */
-    mkOrder("9022", { customerName: "Kevin Doyle", status: "On Hold", price: 80, age: 24, est: -6, brandModel: "Rawlings HoH", services: S.CCR, lace: "Blue – Carolina", internalNotes: "Waiting on customer to confirm color before starting.", city: "Wilson", state: "NC", lat: 35.7213, lng: -77.9155 }),
+    mkOrder("9022", {
+      customerName: "Kevin Doyle",
+      status: "On Hold",
+      price: 80,
+      age: 24,
+      est: -6,
+      brandModel: "Rawlings HoH",
+      services: S.CCR,
+      lace: "Blue – Carolina",
+      internalNotes: "Waiting on customer to confirm color before starting.",
+      city: "Wilson",
+      state: "NC",
+      lat: 35.7213,
+      lng: -77.9155,
+    }),
 
     /* ---- Current orders (9023–9036) ---- */
-    mkOrder("9023", { customerName: "Jake Thompson", status: "In Progress", paid: "Paid", price: 105, age: 5, est: -2, brandModel: "Wilson A2000 1786", gloveType: "Fielders Glove", webType: "I-Web", services: S.CCR, lace: "Black", secondaryLace: "Red", primaryLaceUsed: 3, internalNotes: "Keep the pocket deep and preserve the current break-in.", customerNotes: "Would like black lace with red accents to match team colors.", city: "Hampstead", state: "NC", lat: 34.3671, lng: -77.7108 }),
-    mkOrder("9024", { customerName: "Ethan Ward", status: "Customer Approved", price: 100, age: 4, est: -6, brandModel: "Rawlings Pro Preferred", gloveType: "First Base Mitt", webType: "Single Post Web", services: S.CCR, lace: "Chocolate", city: "Wrightsville Beach", state: "NC", lat: 34.2085, lng: -77.7964 }),
-    mkOrder("9025", { customerName: "Priya Anand", status: "Customer Approved", price: 85, age: 3, est: -7, brandModel: "Nokona", gloveType: "Catchers Mitt", webType: "Basket (Fully Closed) Web", services: S.CCR, lace: "Blue – Navy", city: "Cary", state: "NC", lat: 35.7915, lng: -78.7811 }),
-    mkOrder("9026", { customerName: "Brianna Cross", status: "In Transit to Me", age: 2, brandModel: "Wilson A2000", services: S.CCR, lace: "Red", dropOffMethod: "Shipped", shippingCost: 14, carrier: "USPS", tracking: "9400111899223189000042", city: "Nashville", state: "TN", lat: 36.1627, lng: -86.7816 }),
-    mkOrder("9027", { customerName: "Anthony Russo", status: "In Transit to Me", age: 1, brandModel: "Mizuno Pro", gloveType: "Catchers Mitt", webType: "Other / Not Sure", services: S.CCR + ", " + S.PAD, lace: "Black", dropOffMethod: "Shipped", shippingCost: 15, carrier: "UPS", tracking: "1Z999AA10123456799", city: "Atlanta", state: "GA", lat: 33.7490, lng: -84.3880 }),
-    mkOrder("9028", { customerName: "Isabella Moreno", status: "Received", age: 1, brandModel: "Rawlings HoH", services: S.CCR, lace: "Tan – Camel", city: "Sneads Ferry", state: "NC", lat: 34.5474, lng: -77.4108 }),
-    mkOrder("9029", { customerName: "Cole Harrison", status: "Received", age: 0, brandModel: "Wilson A2K", gloveType: "Fielders Glove", webType: "H-Web", services: S.CC, lace: "", city: "Topsail Beach", state: "NC", lat: 34.3702, lng: -77.6338 }),
-    mkOrder("9030", { customerName: "Ryan Cole", status: "In Progress", paid: "Paid", price: 80, age: 6, est: -1, brandModel: "44 Pro", webType: "H-Web", services: S.CCR, lace: "Yellow", primaryLaceUsed: 3, city: "Greenville", state: "NC", lat: 35.6127, lng: -77.3664 }),
-    mkOrder("9031", { customerName: "Megan Fischer", status: "Estimate Sent", price: 100, age: 4, updatedDaysAgo: 3, brandModel: "All-Star", gloveType: "Catchers Mitt", webType: "Other / Not Sure", services: S.CCR, lace: "Blue – Royal", city: "Charlotte", state: "NC", lat: 35.2271, lng: -80.8431 }),
-    mkOrder("9032", { customerName: "Derek Coleman", status: "Estimate Sent", price: 120, age: 5, updatedDaysAgo: 3, brandModel: "Rawlings HoH", gloveType: "Fielders Glove", webType: "Trapeze Web", services: S.CCR, lace: "Red", secondaryLace: "White", city: "Richmond", state: "VA", dropOffMethod: "Shipped", shippingCost: 15, lat: 37.5407, lng: -77.4360 }),
-    mkOrder("9033", { customerName: "Sophia Reed", status: "Pending Response", price: 90, age: 7, updatedDaysAgo: 4, brandModel: "Mizuno MVP Prime", webType: "H-Web", services: S.CCR, lace: "Orange", city: "Wilmington", state: "NC", lat: 34.2257, lng: -77.9447 }),
-    mkOrder("9034", { customerName: "Diego Ramirez", status: "In Progress", paid: "Paid", price: 60, age: 4, est: -2, brandModel: "Rawlings HoH", services: S.RL, lace: "Tan – Indian", primaryLaceUsed: 3, city: "Jacksonville", state: "NC", lat: 34.7541, lng: -77.4302 }),
-    mkOrder("9035", { customerName: "Austin Blake", status: "Waiting on Lace/Parts", price: 105, age: 8, brandModel: "Wilson A2000", gloveType: "Catchers Mitt", webType: "Basket (Fully Closed) Web", services: S.CCR, lace: "Blue – Carolina", internalNotes: "Waiting on Carolina Blue lace to arrive before relacing.", city: "New Bern", state: "NC", lat: 35.1085, lng: -77.0441 }),
-    mkOrder("9036", { customerName: "Chloe Barrett", status: "Ready to Go", paid: "Unpaid", price: 80, age: 9, est: -1, done: 0, brandModel: "Rawlings R9", services: S.CCR, lace: "Red", city: "Wilmington", state: "NC", lat: 34.2257, lng: -77.9447 })
+    mkOrder("9023", {
+      customerName: "Jake Thompson",
+      status: "In Progress",
+      paid: "Paid",
+      price: 105,
+      age: 5,
+      est: -2,
+      brandModel: "Wilson A2000 1786",
+      gloveType: "Fielders Glove",
+      webType: "I-Web",
+      services: S.CCR,
+      lace: "Black",
+      secondaryLace: "Red",
+      primaryLaceUsed: 3,
+      internalNotes: "Keep the pocket deep and preserve the current break-in.",
+      customerNotes:
+        "Would like black lace with red accents to match team colors.",
+      city: "Hampstead",
+      state: "NC",
+      lat: 34.3671,
+      lng: -77.7108,
+    }),
+    mkOrder("9024", {
+      customerName: "Ethan Ward",
+      status: "Customer Approved",
+      price: 100,
+      age: 4,
+      est: -6,
+      brandModel: "Rawlings Pro Preferred",
+      gloveType: "First Base Mitt",
+      webType: "Single Post Web",
+      services: S.CCR,
+      lace: "Chocolate",
+      city: "Wrightsville Beach",
+      state: "NC",
+      lat: 34.2085,
+      lng: -77.7964,
+    }),
+    mkOrder("9025", {
+      customerName: "Priya Anand",
+      status: "Customer Approved",
+      price: 85,
+      age: 3,
+      est: -7,
+      brandModel: "Nokona",
+      gloveType: "Catchers Mitt",
+      webType: "Basket (Fully Closed) Web",
+      services: S.CCR,
+      lace: "Blue – Navy",
+      city: "Cary",
+      state: "NC",
+      lat: 35.7915,
+      lng: -78.7811,
+    }),
+    mkOrder("9026", {
+      customerName: "Brianna Cross",
+      status: "In Transit to Me",
+      age: 2,
+      brandModel: "Wilson A2000",
+      services: S.CCR,
+      lace: "Red",
+      dropOffMethod: "Shipped",
+      shippingCost: 14,
+      carrier: "USPS",
+      tracking: "9400111899223189000042",
+      city: "Nashville",
+      state: "TN",
+      lat: 36.1627,
+      lng: -86.7816,
+    }),
+    mkOrder("9027", {
+      customerName: "Anthony Russo",
+      status: "In Transit to Me",
+      age: 1,
+      brandModel: "Mizuno Pro",
+      gloveType: "Catchers Mitt",
+      webType: "Other / Not Sure",
+      services: S.CCR + ", " + S.PAD,
+      lace: "Black",
+      dropOffMethod: "Shipped",
+      shippingCost: 15,
+      carrier: "UPS",
+      tracking: "1Z999AA10123456799",
+      city: "Atlanta",
+      state: "GA",
+      lat: 33.749,
+      lng: -84.388,
+    }),
+    mkOrder("9028", {
+      customerName: "Isabella Moreno",
+      status: "Received",
+      age: 1,
+      brandModel: "Rawlings HoH",
+      services: S.CCR,
+      lace: "Tan – Camel",
+      city: "Sneads Ferry",
+      state: "NC",
+      lat: 34.5474,
+      lng: -77.4108,
+    }),
+    mkOrder("9029", {
+      customerName: "Cole Harrison",
+      status: "Received",
+      age: 0,
+      brandModel: "Wilson A2K",
+      gloveType: "Fielders Glove",
+      webType: "H-Web",
+      services: S.CC,
+      lace: "",
+      city: "Topsail Beach",
+      state: "NC",
+      lat: 34.3702,
+      lng: -77.6338,
+    }),
+    mkOrder("9030", {
+      customerName: "Ryan Cole",
+      status: "In Progress",
+      paid: "Paid",
+      price: 80,
+      age: 6,
+      est: -1,
+      brandModel: "44 Pro",
+      webType: "H-Web",
+      services: S.CCR,
+      lace: "Yellow",
+      primaryLaceUsed: 3,
+      city: "Greenville",
+      state: "NC",
+      lat: 35.6127,
+      lng: -77.3664,
+    }),
+    mkOrder("9031", {
+      customerName: "Megan Fischer",
+      status: "Estimate Sent",
+      price: 100,
+      age: 4,
+      updatedDaysAgo: 3,
+      brandModel: "All-Star",
+      gloveType: "Catchers Mitt",
+      webType: "Other / Not Sure",
+      services: S.CCR,
+      lace: "Blue – Royal",
+      city: "Charlotte",
+      state: "NC",
+      lat: 35.2271,
+      lng: -80.8431,
+    }),
+    mkOrder("9032", {
+      customerName: "Derek Coleman",
+      status: "Estimate Sent",
+      price: 120,
+      age: 5,
+      updatedDaysAgo: 3,
+      brandModel: "Rawlings HoH",
+      gloveType: "Fielders Glove",
+      webType: "Trapeze Web",
+      services: S.CCR,
+      lace: "Red",
+      secondaryLace: "White",
+      city: "Richmond",
+      state: "VA",
+      dropOffMethod: "Shipped",
+      shippingCost: 15,
+      lat: 37.5407,
+      lng: -77.436,
+    }),
+    mkOrder("9033", {
+      customerName: "Sophia Reed",
+      status: "Pending Response",
+      price: 90,
+      age: 7,
+      updatedDaysAgo: 4,
+      brandModel: "Mizuno MVP Prime",
+      webType: "H-Web",
+      services: S.CCR,
+      lace: "Orange",
+      city: "Wilmington",
+      state: "NC",
+      lat: 34.2257,
+      lng: -77.9447,
+    }),
+    mkOrder("9034", {
+      customerName: "Diego Ramirez",
+      status: "In Progress",
+      paid: "Paid",
+      price: 60,
+      age: 4,
+      est: -2,
+      brandModel: "Rawlings HoH",
+      services: S.RL,
+      lace: "Tan – Indian",
+      primaryLaceUsed: 3,
+      city: "Jacksonville",
+      state: "NC",
+      lat: 34.7541,
+      lng: -77.4302,
+    }),
+    mkOrder("9035", {
+      customerName: "Austin Blake",
+      status: "Waiting on Lace/Parts",
+      price: 105,
+      age: 8,
+      brandModel: "Wilson A2000",
+      gloveType: "Catchers Mitt",
+      webType: "Basket (Fully Closed) Web",
+      services: S.CCR,
+      lace: "Blue – Carolina",
+      internalNotes: "Waiting on Carolina Blue lace to arrive before relacing.",
+      city: "New Bern",
+      state: "NC",
+      lat: 35.1085,
+      lng: -77.0441,
+    }),
+    mkOrder("9036", {
+      customerName: "Chloe Barrett",
+      status: "Ready to Go",
+      paid: "Unpaid",
+      price: 80,
+      age: 9,
+      est: -1,
+      done: 0,
+      brandModel: "Rawlings R9",
+      services: S.CCR,
+      lace: "Red",
+      city: "Wilmington",
+      state: "NC",
+      lat: 34.2257,
+      lng: -77.9447,
+    }),
   ];
 
   const activity = {};
-  orders.forEach(o => {
+  orders.forEach((o) => {
     const events = demoStatusActivity(o.status, o.dateReceived);
     if (events.length) activity[o.orderNumber] = events;
   });
@@ -736,63 +1411,241 @@ function seedDemoStore() {
   /* Completed labor sessions — Jake's three phases plus history on 10 jobs. */
   let sid = 1;
   const sess = (orderNumber, phase, mins, recAge) => ({
-    id: "s" + (sid++),
+    id: "s" + sid++,
     orderNumber,
     phase,
     status: "stopped",
     startedAt: daysAgoIso(recAge) + "T13:00:00.000Z",
     pausedAt: null,
-    endedAt: daysAgoIso(recAge) + `T13:${String(mins).padStart(2, "0")}:00.000Z`,
+    endedAt:
+      daysAgoIso(recAge) + `T13:${String(mins).padStart(2, "0")}:00.000Z`,
     pauseAccumulatedSeconds: 0,
-    durationMinutes: mins
+    durationMinutes: mins,
   });
   const sessions = [
-    sess("9023", "Tear down", 24, 4), sess("9023", "Cleaning", 43, 3), sess("9023", "Relacing", 51, 2),
-    sess("9001", "Cleaning", 38, 185), sess("9001", "Relacing", 62, 182),
-    sess("9005", "Tear down", 19, 140), sess("9005", "Relacing", 74, 137), sess("9005", "Palm Pad", 22, 135),
-    sess("9008", "Cleaning", 41, 108), sess("9008", "Relacing", 88, 104),
-    sess("9011", "Relacing", 96, 80), sess("9011", "Palm Pad", 26, 78),
-    sess("9012", "Cleaning", 34, 72), sess("9012", "Relacing", 58, 69),
+    sess("9023", "Tear down", 24, 4),
+    sess("9023", "Cleaning", 43, 3),
+    sess("9023", "Relacing", 51, 2),
+    sess("9001", "Cleaning", 38, 185),
+    sess("9001", "Relacing", 62, 182),
+    sess("9005", "Tear down", 19, 140),
+    sess("9005", "Relacing", 74, 137),
+    sess("9005", "Palm Pad", 22, 135),
+    sess("9008", "Cleaning", 41, 108),
+    sess("9008", "Relacing", 88, 104),
+    sess("9011", "Relacing", 96, 80),
+    sess("9011", "Palm Pad", 26, 78),
+    sess("9012", "Cleaning", 34, 72),
+    sess("9012", "Relacing", 58, 69),
     sess("9014", "Relacing", 57, 55),
-    sess("9017", "Tear down", 21, 28), sess("9017", "Relacing", 63, 25),
-    sess("9018", "Cleaning", 44, 26), sess("9018", "Relacing", 69, 23),
+    sess("9017", "Tear down", 21, 28),
+    sess("9017", "Relacing", 63, 25),
+    sess("9018", "Cleaning", 44, 26),
+    sess("9018", "Relacing", 69, 23),
     sess("9020", "Relacing", 61, 17),
-    sess("9030", "Tear down", 18, 6), sess("9030", "Relacing", 47, 5)
+    sess("9030", "Tear down", 18, 6),
+    sess("9030", "Relacing", 47, 5),
   ];
 
   return {
     orders,
     inventory: [
-      { id: "d1", color: "Black", quantity_on_hand: 14, reorder_at: 4, active: true, reorder_alert_enabled: true },
-      { id: "d2", color: "Tan – Camel", quantity_on_hand: 11, reorder_at: 4, active: true, reorder_alert_enabled: true },
-      { id: "d3", color: "Tan – Indian", quantity_on_hand: 8, reorder_at: 4, active: true, reorder_alert_enabled: true },
-      { id: "d4", color: "Red", quantity_on_hand: 9, reorder_at: 4, active: true, reorder_alert_enabled: true },
-      { id: "d5", color: "Chocolate", quantity_on_hand: 6, reorder_at: 4, active: true, reorder_alert_enabled: true },
-      { id: "d6", color: "Blue – Navy", quantity_on_hand: 7, reorder_at: 4, active: true, reorder_alert_enabled: true },
-      { id: "d7", color: "Blue – Royal", quantity_on_hand: 3, reorder_at: 4, active: true, reorder_alert_enabled: true },
-      { id: "d8", color: "Yellow", quantity_on_hand: 2, reorder_at: 4, active: true, reorder_alert_enabled: true },
-      { id: "d9", color: "Blue – Carolina", quantity_on_hand: 0, reorder_at: 4, active: true, reorder_alert_enabled: true },
-      { id: "d10", color: "Orange", quantity_on_hand: 6, reorder_at: 4, active: true, reorder_alert_enabled: true }
+      {
+        id: "d1",
+        color: "Black",
+        quantity_on_hand: 14,
+        reorder_at: 4,
+        active: true,
+        reorder_alert_enabled: true,
+      },
+      {
+        id: "d2",
+        color: "Tan – Camel",
+        quantity_on_hand: 11,
+        reorder_at: 4,
+        active: true,
+        reorder_alert_enabled: true,
+      },
+      {
+        id: "d3",
+        color: "Tan – Indian",
+        quantity_on_hand: 8,
+        reorder_at: 4,
+        active: true,
+        reorder_alert_enabled: true,
+      },
+      {
+        id: "d4",
+        color: "Red",
+        quantity_on_hand: 9,
+        reorder_at: 4,
+        active: true,
+        reorder_alert_enabled: true,
+      },
+      {
+        id: "d5",
+        color: "Chocolate",
+        quantity_on_hand: 6,
+        reorder_at: 4,
+        active: true,
+        reorder_alert_enabled: true,
+      },
+      {
+        id: "d6",
+        color: "Blue – Navy",
+        quantity_on_hand: 7,
+        reorder_at: 4,
+        active: true,
+        reorder_alert_enabled: true,
+      },
+      {
+        id: "d7",
+        color: "Blue – Royal",
+        quantity_on_hand: 3,
+        reorder_at: 4,
+        active: true,
+        reorder_alert_enabled: true,
+      },
+      {
+        id: "d8",
+        color: "Yellow",
+        quantity_on_hand: 2,
+        reorder_at: 4,
+        active: true,
+        reorder_alert_enabled: true,
+      },
+      {
+        id: "d9",
+        color: "Blue – Carolina",
+        quantity_on_hand: 0,
+        reorder_at: 4,
+        active: true,
+        reorder_alert_enabled: true,
+      },
+      {
+        id: "d10",
+        color: "Orange",
+        quantity_on_hand: 6,
+        reorder_at: 4,
+        active: true,
+        reorder_alert_enabled: true,
+      },
     ],
     gloves: [
-      { id: "g1", brandModel: "Rawlings Pro Preferred PROS204", gloveType: "Fielders Glove", price: 220, status: "available", description: "Cleaned, conditioned, and relaced. Game ready.", photos: [] },
-      { id: "g2", brandModel: "Wilson A2000 SuperSkin", gloveType: "Fielders Glove", price: 190, status: "available", description: "Restored infield glove, tight pocket.", photos: [] }
+      {
+        id: "g1",
+        brandModel: "Rawlings Pro Preferred PROS204",
+        gloveType: "Fielders Glove",
+        price: 220,
+        status: "available",
+        description: "Cleaned, conditioned, and relaced. Game ready.",
+        photos: [],
+      },
+      {
+        id: "g2",
+        brandModel: "Wilson A2000 SuperSkin",
+        gloveType: "Fielders Glove",
+        price: 190,
+        status: "available",
+        description: "Restored infield glove, tight pocket.",
+        photos: [],
+      },
     ],
     reviews: [
-      { id: "r1", reviewerName: "Jamie Carter", reviewerLocation: "Raleigh, NC", rating: 5, reviewText: "The glove came back looking incredible and played perfectly on day one.", reviewDate: "", dateLabel: "2 months ago", homepageFeatured: true, homepageExcerpt: "The glove came back looking incredible.", homepageSortOrder: 10, servicesFeatured: true, servicesSortOrder: 10, hidden: false },
-      { id: "r2", reviewerName: "Chris Morgan", reviewerLocation: "Richmond, VA", rating: 5, reviewText: "Fast turnaround, excellent communication, and first-class relacing work.", reviewDate: "", dateLabel: "4 months ago", homepageFeatured: true, homepageExcerpt: "Fast turnaround and first-class relacing work.", homepageSortOrder: 20, servicesFeatured: true, servicesSortOrder: 20, hidden: false }
+      {
+        id: "r1",
+        reviewerName: "Jamie Carter",
+        reviewerLocation: "Raleigh, NC",
+        rating: 5,
+        reviewText:
+          "The glove came back looking incredible and played perfectly on day one.",
+        reviewDate: "",
+        dateLabel: "2 months ago",
+        homepageFeatured: true,
+        homepageExcerpt: "The glove came back looking incredible.",
+        homepageSortOrder: 10,
+        servicesFeatured: true,
+        servicesSortOrder: 10,
+        hidden: false,
+      },
+      {
+        id: "r2",
+        reviewerName: "Chris Morgan",
+        reviewerLocation: "Richmond, VA",
+        rating: 5,
+        reviewText:
+          "Fast turnaround, excellent communication, and first-class relacing work.",
+        reviewDate: "",
+        dateLabel: "4 months ago",
+        homepageFeatured: true,
+        homepageExcerpt: "Fast turnaround and first-class relacing work.",
+        homepageSortOrder: 20,
+        servicesFeatured: true,
+        servicesSortOrder: 20,
+        hidden: false,
+      },
     ],
     sessions,
     activity,
     messages: [
-      { id: "m1", direction: "in", phoneNumber: phoneFor("Sophia Reed"), customerName: "Sophia Reed", orderNumber: "9033", body: "Hey, just checking on the estimate you sent — is the H-web repair included?", mediaUrls: [], read: false, createdAt: new Date(Date.now() - 5400000).toISOString() },
-      { id: "m2", direction: "in", phoneNumber: phoneFor("Jake Thompson"), customerName: "Jake Thompson", orderNumber: "9023", body: "Thanks for the update! Excited to see it.", mediaUrls: [], read: false, createdAt: new Date(Date.now() - 3600000).toISOString() },
-      { id: "m3", direction: "out", phoneNumber: phoneFor("Jake Thompson"), customerName: "Jake Thompson", orderNumber: "9023", body: "Relacing it now with the black and red — should be ready in a couple days!", mediaUrls: [], read: true, createdAt: new Date(Date.now() - 3000000).toISOString() },
-      { id: "m4", direction: "in", phoneNumber: phoneFor("Chloe Barrett"), customerName: "Chloe Barrett", orderNumber: "9036", body: "Awesome, I'll swing by to grab it and pay this week.", mediaUrls: [], read: true, createdAt: new Date(Date.now() - 86400000).toISOString() },
-      { id: "m5", direction: "out", phoneNumber: phoneFor("Austin Blake"), customerName: "Austin Blake", orderNumber: "9035", body: "Your Carolina blue lace is on order — I'll start the relace as soon as it lands.", mediaUrls: [], read: true, createdAt: new Date(Date.now() - 172800000).toISOString() }
+      {
+        id: "m1",
+        direction: "in",
+        phoneNumber: phoneFor("Sophia Reed"),
+        customerName: "Sophia Reed",
+        orderNumber: "9033",
+        body: "Hey, just checking on the estimate you sent — is the H-web repair included?",
+        mediaUrls: [],
+        read: false,
+        createdAt: new Date(Date.now() - 5400000).toISOString(),
+      },
+      {
+        id: "m2",
+        direction: "in",
+        phoneNumber: phoneFor("Jake Thompson"),
+        customerName: "Jake Thompson",
+        orderNumber: "9023",
+        body: "Thanks for the update! Excited to see it.",
+        mediaUrls: [],
+        read: false,
+        createdAt: new Date(Date.now() - 3600000).toISOString(),
+      },
+      {
+        id: "m3",
+        direction: "out",
+        phoneNumber: phoneFor("Jake Thompson"),
+        customerName: "Jake Thompson",
+        orderNumber: "9023",
+        body: "Relacing it now with the black and red — should be ready in a couple days!",
+        mediaUrls: [],
+        read: true,
+        createdAt: new Date(Date.now() - 3000000).toISOString(),
+      },
+      {
+        id: "m4",
+        direction: "in",
+        phoneNumber: phoneFor("Chloe Barrett"),
+        customerName: "Chloe Barrett",
+        orderNumber: "9036",
+        body: "Awesome, I'll swing by to grab it and pay this week.",
+        mediaUrls: [],
+        read: true,
+        createdAt: new Date(Date.now() - 86400000).toISOString(),
+      },
+      {
+        id: "m5",
+        direction: "out",
+        phoneNumber: phoneFor("Austin Blake"),
+        customerName: "Austin Blake",
+        orderNumber: "9035",
+        body: "Your Carolina blue lace is on order — I'll start the relace as soon as it lands.",
+        mediaUrls: [],
+        read: true,
+        createdAt: new Date(Date.now() - 172800000).toISOString(),
+      },
     ],
     nextOrderNum: 9037,
-    seq: 40
+    seq: 40,
   };
 }
 
@@ -805,7 +1658,7 @@ function demoAdjustLaceInventory(store, color, delta) {
   const c = String(color || "").trim();
   const d = Number(delta || 0);
   if (!c || !d) return;
-  const item = store.inventory.find(i => i.color === c);
+  const item = store.inventory.find((i) => i.color === c);
   if (item) item.quantity_on_hand = Number(item.quantity_on_hand || 0) + d;
 }
 
@@ -816,7 +1669,8 @@ function demoResult(extra) {
 function demoApi(body) {
   const store = getDemoStore();
   const action = body.action;
-  const findOrder = (n) => store.orders.find(o => String(o.orderNumber) === String(n));
+  const findOrder = (n) =>
+    store.orders.find((o) => String(o.orderNumber) === String(n));
 
   switch (action) {
     case "listOrders":
@@ -839,75 +1693,124 @@ function demoApi(body) {
 
         demoAdjustLaceInventory(store, oldPrimaryColor, oldPrimaryUsed);
         demoAdjustLaceInventory(store, oldSecondaryColor, oldSecondaryUsed);
-        demoAdjustLaceInventory(store, order.primaryLaceColor, -Number(order.primaryLaceUsed || 0));
-        demoAdjustLaceInventory(store, order.secondaryLaceColor, -Number(order.secondaryLaceUsed || 0));
+        demoAdjustLaceInventory(
+          store,
+          order.primaryLaceColor,
+          -Number(order.primaryLaceUsed || 0),
+        );
+        demoAdjustLaceInventory(
+          store,
+          order.secondaryLaceColor,
+          -Number(order.secondaryLaceUsed || 0),
+        );
       }
       return demoResult({ order });
     }
     case "createOrder": {
       const n = String(store.nextOrderNum++);
-      const order = Object.assign({
-        orderNumber: n,
-        customerName: body.customerName || "New Sample",
-        phoneNumber: "", emailAddress: "",
-        brandModel: "", gloveType: "Fielders", webType: "",
-        servicesRequested: "", primaryLaceColor: "", secondaryLaceColor: "",
-        primaryLaceUsed: "", secondaryLaceUsed: "",
-        status: "Received", paid: "Unpaid", priceQuoted: "", shippingCost: 0,
-        dropOffMethod: "Local drop-off", streetAddress: "", city: "", state: "", zipCode: "",
-        dateReceived: daysAgoIso(0), estimatedCompletion: "", dateCompleted: "",
-        internalNotes: "", gloveNotes: "", createdAt: demoNow(), updatedAt: demoNow()
-      }, body.order || {});
+      const order = Object.assign(
+        {
+          orderNumber: n,
+          customerName: body.customerName || "New Sample",
+          phoneNumber: "",
+          emailAddress: "",
+          brandModel: "",
+          gloveType: "Fielders",
+          webType: "",
+          servicesRequested: "",
+          primaryLaceColor: "",
+          secondaryLaceColor: "",
+          primaryLaceUsed: "",
+          secondaryLaceUsed: "",
+          status: "Received",
+          paid: "Unpaid",
+          priceQuoted: "",
+          shippingCost: 0,
+          dropOffMethod: "Local drop-off",
+          streetAddress: "",
+          city: "",
+          state: "",
+          zipCode: "",
+          dateReceived: daysAgoIso(0),
+          estimatedCompletion: "",
+          dateCompleted: "",
+          internalNotes: "",
+          gloveNotes: "",
+          createdAt: demoNow(),
+          updatedAt: demoNow(),
+        },
+        body.order || {},
+      );
       store.orders.unshift(order);
       return demoResult({ order });
     }
     case "deleteOrder":
-      store.orders = store.orders.filter(o => String(o.orderNumber) !== String(body.orderNumber));
+      store.orders = store.orders.filter(
+        (o) => String(o.orderNumber) !== String(body.orderNumber),
+      );
       return demoResult();
 
     case "listOpenLaborSessions":
-      return demoResult({ sessions: store.sessions.filter(s => !s.endedAt) });
+      return demoResult({ sessions: store.sessions.filter((s) => !s.endedAt) });
     case "listLaborSessions":
-      return demoResult({ sessions: store.sessions.filter(s => String(s.orderNumber) === String(body.orderNumber)) });
+      return demoResult({
+        sessions: store.sessions.filter(
+          (s) => String(s.orderNumber) === String(body.orderNumber),
+        ),
+      });
     case "listLaborSummary":
-      return demoResult({ sessions: store.sessions.filter(s => s.endedAt) });
+      return demoResult({ sessions: store.sessions.filter((s) => s.endedAt) });
     case "startLaborSession": {
       const session = {
-        id: "s" + (store.seq++),
+        id: "s" + store.seq++,
         orderNumber: String(body.orderNumber),
         phase: body.phase || "Work",
         status: "running",
         startedAt: demoNow(),
         pausedAt: null,
         endedAt: null,
-        pauseAccumulatedSeconds: 0
+        pauseAccumulatedSeconds: 0,
       };
       store.sessions.push(session);
       return demoResult({ session });
     }
     case "pauseLaborSession": {
-      const s = store.sessions.find(x => x.id === body.sessionId);
-      if (s) { s.status = "paused"; s.pausedAt = demoNow(); }
+      const s = store.sessions.find((x) => x.id === body.sessionId);
+      if (s) {
+        s.status = "paused";
+        s.pausedAt = demoNow();
+      }
       return demoResult();
     }
     case "resumeLaborSession": {
-      const s = store.sessions.find(x => x.id === body.sessionId);
+      const s = store.sessions.find((x) => x.id === body.sessionId);
       if (s && s.pausedAt) {
-        s.pauseAccumulatedSeconds += Math.max(0, Math.round((Date.now() - new Date(s.pausedAt).getTime()) / 1000));
-        s.status = "running"; s.pausedAt = null;
+        s.pauseAccumulatedSeconds += Math.max(
+          0,
+          Math.round((Date.now() - new Date(s.pausedAt).getTime()) / 1000),
+        );
+        s.status = "running";
+        s.pausedAt = null;
       }
       return demoResult();
     }
     case "stopLaborSession": {
-      const s = store.sessions.find(x => x.id === body.sessionId);
-      if (s) { s.status = "stopped"; s.endedAt = demoNow(); }
+      const s = store.sessions.find((x) => x.id === body.sessionId);
+      if (s) {
+        s.status = "stopped";
+        s.endedAt = demoNow();
+      }
       return demoResult();
     }
     case "updateLaborSessionNotes":
       return demoResult();
 
     case "listOrdersWithActivity":
-      return demoResult({ orderNumbers: store.orders.filter(o => normalizeStatus(o.status) !== "received").map(o => o.orderNumber) });
+      return demoResult({
+        orderNumbers: store.orders
+          .filter((o) => normalizeStatus(o.status) !== "received")
+          .map((o) => o.orderNumber),
+      });
     case "listOrderActivity":
       return demoResult({ activity: store.activity[body.orderNumber] || [] });
 
@@ -915,22 +1818,26 @@ function demoApi(body) {
       return demoResult({ inventory: store.inventory });
     case "createInventoryItem":
       store.inventory.push({
-        id: "d" + (store.seq++),
+        id: "d" + store.seq++,
         color: body.color || "New Color",
         quantity_on_hand: Number(body.quantityOnHand) || 0,
         reorder_at: Number(body.reorderAt) || 4,
         active: body.active !== false,
         reorder_alert_enabled: body.reorderAlertEnabled !== false,
-        photo_url: body.photoUrl || null
+        photo_url: body.photoUrl || null,
       });
       return demoResult();
     case "updateInventoryItem": {
-      const item = store.inventory.find(i => i.color === body.color || String(i.id) === String(body.id));
+      const item = store.inventory.find(
+        (i) => i.color === body.color || String(i.id) === String(body.id),
+      );
       const u = body.updates || {};
       if (item) {
-        if ("quantityOnHand" in u) item.quantity_on_hand = Number(u.quantityOnHand) || 0;
+        if ("quantityOnHand" in u)
+          item.quantity_on_hand = Number(u.quantityOnHand) || 0;
         if ("reorderAt" in u) item.reorder_at = Number(u.reorderAt) || 0;
-        if ("reorderAlertEnabled" in u) item.reorder_alert_enabled = !!u.reorderAlertEnabled;
+        if ("reorderAlertEnabled" in u)
+          item.reorder_alert_enabled = !!u.reorderAlertEnabled;
         if ("color" in u) item.color = u.color;
         if ("active" in u) item.active = !!u.active;
         if ("photoUrl" in u) item.photo_url = u.photoUrl;
@@ -944,34 +1851,62 @@ function demoApi(body) {
       return demoResult({ reviews: store.reviews });
     case "importCustomerReviews": {
       const incoming = Array.isArray(body.reviews) ? body.reviews : [];
-      incoming.forEach(review => store.reviews.unshift({
-        id: "r" + (store.seq++), reviewerName: review.reviewerName, reviewerLocation: review.reviewerLocation || "",
-        rating: Number(review.rating) || 5, reviewText: review.reviewText, reviewDate: review.reviewDate || "",
-        dateLabel: review.dateLabel || "", homepageFeatured: false, homepageExcerpt: "", homepageSortOrder: 0,
-        servicesFeatured: false, servicesSortOrder: 0, hidden: false
-      }));
+      incoming.forEach((review) =>
+        store.reviews.unshift({
+          id: "r" + store.seq++,
+          reviewerName: review.reviewerName,
+          reviewerLocation: review.reviewerLocation || "",
+          rating: Number(review.rating) || 5,
+          reviewText: review.reviewText,
+          reviewDate: review.reviewDate || "",
+          dateLabel: review.dateLabel || "",
+          homepageFeatured: false,
+          homepageExcerpt: "",
+          homepageSortOrder: 0,
+          servicesFeatured: false,
+          servicesSortOrder: 0,
+          hidden: false,
+        }),
+      );
       return demoResult({ imported: incoming.length, skipped: 0 });
     }
     case "updateCustomerReview": {
-      const review = store.reviews.find(item => String(item.id) === String(body.id));
+      const review = store.reviews.find(
+        (item) => String(item.id) === String(body.id),
+      );
       if (review) Object.assign(review, body.updates || {});
       return demoResult({ review });
     }
     case "deleteCustomerReview":
-      store.reviews = store.reviews.filter(item => String(item.id) !== String(body.id));
+      store.reviews = store.reviews.filter(
+        (item) => String(item.id) !== String(body.id),
+      );
       return demoResult();
     case "getSaleGlove":
-      return demoResult({ glove: store.gloves.find(g => String(g.id) === String(body.id)) || null });
+      return demoResult({
+        glove:
+          store.gloves.find((g) => String(g.id) === String(body.id)) || null,
+      });
     case "createSaleGlove":
-      store.gloves.push({ id: "g" + (store.seq++), brandModel: body.brandModel || "New Glove", gloveType: body.gloveType || "Fielders", price: Number(body.price) || 0, status: "available", description: body.description || "", photos: [] });
+      store.gloves.push({
+        id: "g" + store.seq++,
+        brandModel: body.brandModel || "New Glove",
+        gloveType: body.gloveType || "Fielders",
+        price: Number(body.price) || 0,
+        status: "available",
+        description: body.description || "",
+        photos: [],
+      });
       return demoResult();
     case "updateSaleGlove": {
-      const g = store.gloves.find(x => String(x.id) === String(body.id));
+      const g = store.gloves.find((x) => String(x.id) === String(body.id));
       if (g) Object.assign(g, body.updates || body);
       return demoResult();
     }
     case "deleteSaleGlove":
-      store.gloves = store.gloves.filter(g => String(g.id) !== String(body.id));
+      store.gloves = store.gloves.filter(
+        (g) => String(g.id) !== String(body.id),
+      );
       return demoResult();
     case "listSaleGlovePhotos":
       return demoResult({ photos: [] });
@@ -981,29 +1916,50 @@ function demoApi(body) {
     case "listMessages":
       return demoResult({ messages: store.messages });
     case "markMessagesRead":
-      store.messages.forEach(m => {
-        if (m.direction === "in" && (!body.phoneNumber || m.phoneNumber === body.phoneNumber)) m.read = true;
+      store.messages.forEach((m) => {
+        if (
+          m.direction === "in" &&
+          (!body.phoneNumber || m.phoneNumber === body.phoneNumber)
+        )
+          m.read = true;
       });
       return demoResult();
     case "deleteMessage":
-      store.messages = store.messages.filter(m => String(m.id) !== String(body.id));
+      store.messages = store.messages.filter(
+        (m) => String(m.id) !== String(body.id),
+      );
       return demoResult();
     case "deleteMessageThread": {
-      const keys = new Set((body.phoneNumbers || []).map(pn => String(pn).replace(/\D/g, "").slice(-10)));
-      store.messages = store.messages.filter(m => !keys.has(String(m.phoneNumber).replace(/\D/g, "").slice(-10)));
+      const keys = new Set(
+        (body.phoneNumbers || []).map((pn) =>
+          String(pn).replace(/\D/g, "").slice(-10),
+        ),
+      );
+      store.messages = store.messages.filter(
+        (m) => !keys.has(String(m.phoneNumber).replace(/\D/g, "").slice(-10)),
+      );
       return demoResult();
     }
     case "sendMessageReply":
       store.messages.push({
-        id: "m" + (store.seq++), direction: "out", phoneNumber: body.phoneNumber,
-        customerName: body.customerName || "", orderNumber: body.orderNumber || "",
-        body: body.body, mediaUrls: [], read: true, createdAt: demoNow()
+        id: "m" + store.seq++,
+        direction: "out",
+        phoneNumber: body.phoneNumber,
+        customerName: body.customerName || "",
+        orderNumber: body.orderNumber || "",
+        body: body.body,
+        mediaUrls: [],
+        read: true,
+        createdAt: demoNow(),
       });
       return demoResult();
 
     case "resendStatusEmail":
     case "resendStatusText":
-      return Promise.resolve({ ok: false, error: "Demo mode: emails and texts are disabled." });
+      return Promise.resolve({
+        ok: false,
+        error: "Demo mode: emails and texts are disabled.",
+      });
 
     case "geocodeAddresses":
     case "geocodeMissingOrderAddresses":
@@ -1069,9 +2025,7 @@ function parseMoneyInput(value) {
 }
 
 function moneyNumber(value) {
-  const n = Number(
-    String(value ?? "").replace(/[^\d.-]/g, "")
-  );
+  const n = Number(String(value ?? "").replace(/[^\d.-]/g, ""));
 
   return Number.isNaN(n) ? 0 : n;
 }
@@ -1097,11 +2051,15 @@ function escapeAttr(str) {
 }
 
 function normalizeStatus(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function normalizeText(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function normalizeForSearch(value) {
@@ -1129,12 +2087,13 @@ function digitsOnly(value) {
 function getSearchTokens(value) {
   return normalizeForSearch(value)
     .split(/\s+/)
-    .map(token => token.trim())
+    .map((token) => token.trim())
     .filter(Boolean);
 }
 
 function getOrderSearchText(order) {
-  const paidState = normalizeText(order.paid) === "paid" ? "paid" : "unpaid needs payment";
+  const paidState =
+    normalizeText(order.paid) === "paid" ? "paid" : "unpaid needs payment";
   const fulfillmentState = looksLocalDropOff(order)
     ? "local pickup drop off drop-off"
     : "shipping shipped mail mail-in";
@@ -1142,7 +2101,10 @@ function getOrderSearchText(order) {
   return [
     order.orderNumber,
     order.customerName,
-    String(order.customerName || "").split(/\s+/).filter(Boolean).join(" "),
+    String(order.customerName || "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .join(" "),
     order.emailAddress,
     order.phoneNumber,
     order.status,
@@ -1166,7 +2128,7 @@ function getOrderSearchText(order) {
     order.zip,
     order.internalNotes,
     order.customerNotes,
-    order.gloveNotes
+    order.gloveNotes,
   ].join(" ");
 }
 
@@ -1180,10 +2142,12 @@ function orderMatchesSearch(order, query) {
     order.phoneNumber,
     order.orderNumber,
     order.zipCode,
-    order.zip
-  ].map(digitsOnly).join(" ");
+    order.zip,
+  ]
+    .map(digitsOnly)
+    .join(" ");
 
-  return tokens.every(token => {
+  return tokens.every((token) => {
     if (text.includes(token) || compactText.includes(token)) return true;
 
     const tokenDigits = digitsOnly(token);
@@ -1213,7 +2177,11 @@ function isOnHoldOrder(order) {
 }
 
 function isCurrentOrder(order) {
-  return !isCompletedOrder(order) && !isCancelledOrder(order) && !isOnHoldOrder(order);
+  return (
+    !isCompletedOrder(order) &&
+    !isCancelledOrder(order) &&
+    !isOnHoldOrder(order)
+  );
 }
 
 function isWaitingOnCustomer(order) {
@@ -1249,7 +2217,10 @@ function parseOrderDate(value) {
 function isThisMonth(date) {
   if (!date) return false;
   const now = new Date();
-  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+  return (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth()
+  );
 }
 
 function isCompletedThisMonth(order) {
@@ -1271,14 +2242,14 @@ function formatCurrency(value) {
 
 const ON_DECK_STATUS_PRIORITY = {
   "in transit to me": 1,
-  "customer approved": 2
+  "customer approved": 2,
 };
 
 const OUTSTANDING_UNPAID_STATUSES = new Set([
   "in progress",
   "ready to go",
   "completed",
-  "picked up"
+  "picked up",
 ]);
 
 function isOutstandingUnpaidOrder(order) {
@@ -1290,7 +2261,7 @@ function isOnDeckOrder(order) {
   if (!isCurrentOrder(order)) return false;
   return Object.prototype.hasOwnProperty.call(
     ON_DECK_STATUS_PRIORITY,
-    normalizeStatus(order?.status)
+    normalizeStatus(order?.status),
   );
 }
 
@@ -1336,7 +2307,7 @@ function getOrderFinanceReceivedDate(order) {
 function getFinanceDateRange(
   filterKey = financeFilterKey,
   customStart = financeFilterCustomStart,
-  customEnd = financeFilterCustomEnd
+  customEnd = financeFilterCustomEnd,
 ) {
   const now = new Date();
   const today = startOfDay(now);
@@ -1346,46 +2317,47 @@ function getFinanceDateRange(
       return {
         start: startOfDay(new Date(today.getFullYear(), today.getMonth(), 1)),
         end: endOfDay(now),
-        label: "This month"
+        label: "This month",
       };
     case "last-30-days":
       return {
         start: startOfDay(new Date(today.getTime() - 29 * 86400000)),
         end: endOfDay(now),
-        label: "Last 30 days"
+        label: "Last 30 days",
       };
     case "last-60-days":
       return {
         start: startOfDay(new Date(today.getTime() - 59 * 86400000)),
         end: endOfDay(now),
-        label: "Last 60 days"
+        label: "Last 60 days",
       };
     case "ytd":
       return {
         start: startOfDay(new Date(today.getFullYear(), 0, 1)),
         end: endOfDay(now),
-        label: "Year to date"
+        label: "Year to date",
       };
     case "last-365-days":
       return {
         start: startOfDay(new Date(today.getTime() - 364 * 86400000)),
         end: endOfDay(now),
-        label: "Last 365 days"
+        label: "Last 365 days",
       };
     case "all-time":
       return {
         start: null,
         end: null,
-        label: "All time"
+        label: "All time",
       };
     case "custom": {
       const start = parseOrderDate(customStart);
       const end = parseOrderDate(customEnd);
       if (start) start.setHours(0, 0, 0, 0);
       if (end) end.setHours(23, 59, 59, 999);
-      const label = start && end
-        ? `${formatDateForInput(start)} – ${formatDateForInput(end)}`
-        : "Custom range";
+      const label =
+        start && end
+          ? `${formatDateForInput(start)} – ${formatDateForInput(end)}`
+          : "Custom range";
       return { start, end, label };
     }
     case "ytd":
@@ -1393,7 +2365,7 @@ function getFinanceDateRange(
       return {
         start: startOfDay(new Date(today.getFullYear(), 0, 1)),
         end: endOfDay(now),
-        label: "Year to date"
+        label: "Year to date",
       };
   }
 }
@@ -1417,11 +2389,17 @@ function computeDashboardStats(orders = allOrders) {
   const completedThisMonth = list.filter(isCompletedThisMonth);
   const turnaroundDays = list
     .filter(isCompletedOrder)
-    .map(order => daysBetween(parseOrderDate(order.dateReceived), parseOrderDate(order.dateCompleted)))
-    .filter(days => days !== null);
+    .map((order) =>
+      daysBetween(
+        parseOrderDate(order.dateReceived),
+        parseOrderDate(order.dateCompleted),
+      ),
+    )
+    .filter((days) => days !== null);
 
   const averageTurnaround = turnaroundDays.length
-    ? turnaroundDays.reduce((sum, days) => sum + days, 0) / turnaroundDays.length
+    ? turnaroundDays.reduce((sum, days) => sum + days, 0) /
+      turnaroundDays.length
     : null;
 
   return {
@@ -1431,7 +2409,7 @@ function computeDashboardStats(orders = allOrders) {
     readyToGo: currentOrders.filter(isReadyToGo).length,
     inProgress: currentOrders.filter(isInProgressOrder).length,
     completedThisMonth: completedThisMonth.length,
-    averageTurnaround
+    averageTurnaround,
   };
 }
 
@@ -1439,31 +2417,37 @@ function computeFinanceStats(
   orders = allOrders,
   filterKey = financeFilterKey,
   customStart = financeFilterCustomStart,
-  customEnd = financeFilterCustomEnd
+  customEnd = financeFilterCustomEnd,
 ) {
   const list = Array.isArray(orders) ? orders : [];
   const range = getFinanceDateRange(filterKey, customStart, customEnd);
   const rangeReady = isFinanceRangeReady(range, filterKey);
 
   const paidInRange = rangeReady
-    ? list.filter(order => {
+    ? list.filter((order) => {
         if (!isPaid(order)) return false;
         return isDateInFinanceRange(getOrderFinancePaidDate(order), range);
       })
     : [];
 
-  const revenue = paidInRange.reduce((sum, order) => sum + moneyNumber(order.priceQuoted), 0);
+  const revenue = paidInRange.reduce(
+    (sum, order) => sum + moneyNumber(order.priceQuoted),
+    0,
+  );
   const paidOrders = paidInRange.length;
   const averagePaidOrder = paidOrders ? revenue / paidOrders : null;
 
   const outstandingOrders = rangeReady
-    ? list.filter(order => {
+    ? list.filter((order) => {
         if (!isOutstandingUnpaidOrder(order)) return false;
         return isDateInFinanceRange(getOrderFinanceReceivedDate(order), range);
       })
     : [];
 
-  const outstandingUnpaid = outstandingOrders.reduce((sum, order) => sum + moneyNumber(order.priceQuoted), 0);
+  const outstandingUnpaid = outstandingOrders.reduce(
+    (sum, order) => sum + moneyNumber(order.priceQuoted),
+    0,
+  );
 
   return {
     range,
@@ -1472,7 +2456,7 @@ function computeFinanceStats(
     paidOrders,
     averagePaidOrder,
     outstandingUnpaid,
-    outstandingUnpaidCount: outstandingOrders.length
+    outstandingUnpaidCount: outstandingOrders.length,
   };
 }
 
@@ -1496,7 +2480,10 @@ function getBenchPreviewOrders(orders = allOrders, limit = 5) {
 
 function getOnDeckOrders(orders = allOrders, limit = 5) {
   const list = Array.isArray(orders) ? orders : [];
-  return sortDashboardOrders(list.filter(isOnDeckOrder), getOnDeckPriority).slice(0, limit);
+  return sortDashboardOrders(
+    list.filter(isOnDeckOrder),
+    getOnDeckPriority,
+  ).slice(0, limit);
 }
 
 function getNewOrders(orders = allOrders, limit = 5) {
@@ -1512,12 +2499,14 @@ function getDashboardAttentionItems(orders = allOrders) {
   const followUpMs = 3 * 24 * 60 * 60 * 1000;
   const eligible = list.filter(isCurrentOrder);
 
-  const readyUnpaid = eligible.filter(order => isReadyToGo(order) && !isPaid(order));
+  const readyUnpaid = eligible.filter(
+    (order) => isReadyToGo(order) && !isPaid(order),
+  );
   if (readyUnpaid.length) {
     items.push({
       key: "ready-unpaid",
       label: `${readyUnpaid.length} ready to go but unpaid`,
-      view: "ready"
+      view: "ready",
     });
   }
 
@@ -1526,11 +2515,11 @@ function getDashboardAttentionItems(orders = allOrders) {
     items.push({
       key: "waiting-parts",
       label: `${waitingParts.length} waiting on lace/parts`,
-      view: "waiting"
+      view: "waiting",
     });
   }
 
-  const staleCustomer = eligible.filter(order => {
+  const staleCustomer = eligible.filter((order) => {
     /* Pending-response orders get their own follow-up reminder below,
        so this line stays scoped to estimate-sent to avoid double-counting. */
     if (normalizeStatus(order?.status) !== "estimate sent") return false;
@@ -1543,13 +2532,13 @@ function getDashboardAttentionItems(orders = allOrders) {
     items.push({
       key: "stale-customer",
       label: `${staleCustomer.length} estimates pending over 48 hours`,
-      view: "estimate"
+      view: "estimate",
     });
   }
 
   /* Follow up on orders sitting in "Pending Response" — nudge Brett to
      chase customers who've gone quiet after the estimate conversation. */
-  const followUpResponse = eligible.filter(order => {
+  const followUpResponse = eligible.filter((order) => {
     if (!isWaitingForCustomerResponse(order)) return false;
     const updated = parseOrderDate(order.updatedAt);
     if (!updated) return false;
@@ -1560,7 +2549,7 @@ function getDashboardAttentionItems(orders = allOrders) {
     items.push({
       key: "pending-response",
       label: `${followUpResponse.length} pending response — follow up`,
-      view: "customer-response"
+      view: "customer-response",
     });
   }
 
@@ -1570,11 +2559,12 @@ function getDashboardAttentionItems(orders = allOrders) {
 const DASHBOARD_TIMER_ICONS = {
   start: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="14" r="7"></circle><path d="M12 14v-4"></path><path d="M9 3h6"></path><path d="M12 3v4"></path></svg>`,
   pause: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 7v10"></path><path d="M15 7v10"></path></svg>`,
-  resume: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 7l8 5-8 5z"></path></svg>`
+  resume: `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 7l8 5-8 5z"></path></svg>`,
 };
 
 function getDashboardTimerStateLabel(session) {
-  const stateLabel = getLaborSessionStatus(session) === "paused" ? "Paused" : "Running";
+  const stateLabel =
+    getLaborSessionStatus(session) === "paused" ? "Paused" : "Running";
   const elapsed = formatLaborDuration(getLaborActiveSeconds(session) / 60);
   return `${stateLabel} · ${session.phase || "Work"} · ${elapsed}`;
 }
@@ -1586,13 +2576,20 @@ function renderDashboardTimerButton(order, session) {
      timer exists, the same icon opens a small menu with Pause/Resume and
      Stop. The icon still reflects state (pause = running, play = paused). */
   const action = !session ? "start" : "menu";
-  const icon = !session ? "start" : (sessionStatus === "paused" ? "resume" : "pause");
+  const icon = !session
+    ? "start"
+    : sessionStatus === "paused"
+      ? "resume"
+      : "pause";
   const ariaLabel = !session
     ? `Start timer for ${order.customerName || "customer"}`
     : "Timer options";
-  const modifier = sessionStatus === "running"
-    ? " dashboard-timer-btn--running"
-    : (sessionStatus === "paused" ? " dashboard-timer-btn--paused" : "");
+  const modifier =
+    sessionStatus === "running"
+      ? " dashboard-timer-btn--running"
+      : sessionStatus === "paused"
+        ? " dashboard-timer-btn--paused"
+        : "";
 
   return `
     <button
@@ -1610,9 +2607,10 @@ function renderDashboardTimerButton(order, session) {
 function renderBenchFocusTimerControls(order, session, bench) {
   const orderKey = String(order.orderNumber || bench.orderNumber || "");
   const status = getLaborSessionStatus(session);
-  const primary = status === "paused"
-    ? { control: "resume", label: "Resume", icon: "resume" }
-    : { control: "pause", label: "Pause", icon: "pause" };
+  const primary =
+    status === "paused"
+      ? { control: "resume", label: "Resume", icon: "resume" }
+      : { control: "pause", label: "Pause", icon: "pause" };
   const common = `data-timer-order="${escapeAttr(orderKey)}" data-session-id="${escapeAttr(session.id)}" data-bench-session-id="${escapeAttr(bench.id)}"`;
   return `
     <button type="button" class="bench-focus-timer-control" data-timer-control="${primary.control}" ${common} ${dashboardTimerBusy ? "disabled" : ""}>
@@ -1625,13 +2623,18 @@ function renderBenchFocusTimerControls(order, session, bench) {
 }
 
 function renderDashboardOrderRow(order, { timerControls = false } = {}) {
-  const laceRaw = String(order.primaryLaceColor || order.lacePrimary || "").trim();
+  const laceRaw = String(
+    order.primaryLaceColor || order.lacePrimary || "",
+  ).trim();
   const lace = laceRaw ? adminOrderLaceLabel(laceRaw) : "";
   const brand = String(order.brandModel || "").trim();
   const meta = [brand, lace].filter(Boolean).join(" · ");
   const orderKey = String(order.orderNumber || "");
-  const isFocusedOrder = String(benchFocusState.activeBench?.orderNumber || "") === orderKey;
-  const session = timerControls ? (dashboardLaborSessions[orderKey] || null) : null;
+  const isFocusedOrder =
+    String(benchFocusState.activeBench?.orderNumber || "") === orderKey;
+  const session = timerControls
+    ? dashboardLaborSessions[orderKey] || null
+    : null;
   const timerStateHtml = session
     ? `<span class="dashboard-bench-timer-state" data-bench-timer="${escapeAttr(orderKey)}">${escapeHtml(getDashboardTimerStateLabel(session))}</span>`
     : "";
@@ -1654,7 +2657,9 @@ function renderDashboardOrderRow(order, { timerControls = false } = {}) {
           ${timerStateHtml}
         </div>
       </div>
-      ${timerControls ? `
+      ${
+        timerControls
+          ? `
         <div class="dashboard-bench-actions">
           <button
             type="button"
@@ -1664,7 +2669,9 @@ function renderDashboardOrderRow(order, { timerControls = false } = {}) {
           >${isFocusedOrder ? "On Bench" : "Start Bench Work"}</button>
           ${isFocusedOrder ? "" : renderDashboardTimerButton(order, session)}
         </div>
-      ` : ""}
+      `
+          : ""
+      }
     </div>
   `;
 }
@@ -1684,14 +2691,20 @@ function formatBenchElapsed(startedAt, endedAt = null) {
 
 function isBenchLaborReminderDue(bench, labor = benchFocusState.activeLabor) {
   if (!bench || labor || benchFocusState.unlinkedPausedLabor) return false;
-  return getBenchFocusNow() >= Date.parse(bench.startedAt) + 90000 &&
-    (!bench.reminderSnoozedUntil || getBenchFocusNow() >= Date.parse(bench.reminderSnoozedUntil));
+  return (
+    getBenchFocusNow() >= Date.parse(bench.startedAt) + 90000 &&
+    (!bench.reminderSnoozedUntil ||
+      getBenchFocusNow() >= Date.parse(bench.reminderSnoozedUntil))
+  );
 }
 
 function renderBenchFocusCard() {
   const bench = benchFocusState.activeBench;
   if (!bench) return "";
-  const order = allOrders.find(item => String(item.orderNumber) === String(bench.orderNumber)) || {};
+  const order =
+    allOrders.find(
+      (item) => String(item.orderNumber) === String(bench.orderNumber),
+    ) || {};
   const labor = benchFocusState.activeLabor;
   const unlinkedPausedLabor = benchFocusState.unlinkedPausedLabor;
   const laborStatus = labor ? getLaborSessionStatus(labor) : "";
@@ -1709,16 +2722,21 @@ function renderBenchFocusCard() {
       </div>
       <div class="bench-focus-labor${labor ? " has-labor" : ""}">
         <div class="bench-focus-labor-heading">${escapeHtml(labor?.phase || "No labor timer")}</div>
-        ${labor ? `
+        ${
+          labor
+            ? `
           <div class="bench-focus-labor-status">${escapeHtml(laborStatus === "paused" ? "Paused" : "Running")} · Labor <strong data-bench-labor-elapsed>${escapeHtml(formatLaborDuration(getLaborActiveSeconds(labor) / 60))}</strong></div>
           <div class="bench-focus-card-actions"><div class="bench-focus-labor-controls">${renderBenchFocusTimerControls(order, labor, bench)}</div><button type="button" class="bench-focus-end-btn" data-bench-end>End Bench Work</button></div>
-        ` : unlinkedPausedLabor ? `
+        `
+            : unlinkedPausedLabor
+              ? `
           <p class="bench-focus-paused-warning">A paused labor session is still open for this order.</p>
           <div class="bench-focus-card-actions"><div class="bench-focus-reminder-actions">
             <button type="button" data-bench-paused-resume>Resume Existing Timer</button>
             <button type="button" data-bench-paused-stop>Stop Existing Timer</button>
           </div><button type="button" class="bench-focus-end-btn" data-bench-end>End Bench Work</button></div>
-        ` : `
+        `
+              : `
           <div class="bench-focus-card-actions"><div class="bench-focus-reminder-actions">
             ${!bench.backdateConsumedAt ? `<button type="button" data-bench-labor-start="bench">Start from Bench Work</button>` : ""}
             <button type="button" data-bench-labor-start="now">Start Now</button>
@@ -1727,7 +2745,8 @@ function renderBenchFocusCard() {
             <span>No labor timer is running.</span>
             <button type="button" data-bench-remind-later>Remind Later</button>
           </div>
-        `}
+        `
+        }
       </div>
     </section>
   `;
@@ -1739,13 +2758,19 @@ async function resumeExistingPausedLaborForBench() {
   if (!bench || !labor || benchFocusBusy) return;
   benchFocusBusy = true;
   try {
-    await postJson({
-      action: "resumePausedLaborForBench",
-      benchSessionId: bench.id,
-      laborSessionId: labor.id
-    }, true);
+    await postJson(
+      {
+        action: "resumePausedLaborForBench",
+        benchSessionId: bench.id,
+        laborSessionId: labor.id,
+      },
+      true,
+    );
     broadcastBenchFocusChange();
-    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+    await Promise.all([
+      refreshBenchFocusState(),
+      refreshDashboardLaborSessions(),
+    ]);
   } catch (error) {
     alert(error.message || "The paused labor timer could not be resumed.");
     await refreshBenchFocusState();
@@ -1762,7 +2787,10 @@ async function stopExistingPausedLaborForBench() {
   try {
     await postJson({ action: "stopLaborSession", sessionId: labor.id }, true);
     broadcastBenchFocusChange();
-    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+    await Promise.all([
+      refreshBenchFocusState(),
+      refreshDashboardLaborSessions(),
+    ]);
   } catch (error) {
     alert(error.message || "The paused labor timer could not be stopped.");
     await refreshBenchFocusState();
@@ -1779,18 +2807,24 @@ async function resumePausedLaborWithNewBenchWork(session, anchor = null) {
     anchor,
     actions: [
       { label: "Resume and Start Bench Work", value: "resume" },
-      { label: "Cancel", value: "" }
-    ]
+      { label: "Cancel", value: "" },
+    ],
   });
   if (choice !== "resume") return;
 
   dashboardTimerBusy = true;
   if (activeView === "dashboard") renderHomeDashboard();
   try {
-    await postJson({ action: "resumeLaborWithNewBenchWork", laborSessionId: session.id }, true);
+    await postJson(
+      { action: "resumeLaborWithNewBenchWork", laborSessionId: session.id },
+      true,
+    );
     broadcastBenchFocusChange();
   } catch (error) {
-    alert(error.message || "The paused labor timer could not be resumed on the bench.");
+    alert(
+      error.message ||
+        "The paused labor timer could not be resumed on the bench.",
+    );
   } finally {
     dashboardTimerBusy = false;
     await refreshBenchFocusSurfaces();
@@ -1826,7 +2860,7 @@ function getBenchChoiceRoot() {
   benchChoiceRoot = document.createElement("div");
   benchChoiceRoot.className = "bench-choice-sheet";
   benchChoiceRoot.hidden = true;
-  benchChoiceRoot.addEventListener("click", event => {
+  benchChoiceRoot.addEventListener("click", (event) => {
     const action = event.target.closest?.("[data-action]");
     const dismiss = event.target.closest?.("[data-overlay-dismiss]");
     if (!action && !dismiss) return;
@@ -1846,18 +2880,20 @@ function getBenchChoiceVerticalPlacement({
   anchorBottom,
   panelHeight,
   margin = 12,
-  gap = 6
+  gap = 6,
 }) {
   const belowTop = anchorBottom + gap;
   const aboveBottom = anchorTop - gap;
   const belowSpace = Math.max(0, viewportBottom - margin - belowTop);
   const aboveSpace = Math.max(0, aboveBottom - viewportTop - margin);
-  const placeBelow = panelHeight <= belowSpace || (panelHeight > aboveSpace && belowSpace >= aboveSpace);
+  const placeBelow =
+    panelHeight <= belowSpace ||
+    (panelHeight > aboveSpace && belowSpace >= aboveSpace);
   const maxHeight = Math.max(1, placeBelow ? belowSpace : aboveSpace);
   const constrainedHeight = Math.min(panelHeight, maxHeight);
   return {
     maxHeight,
-    top: placeBelow ? belowTop : aboveBottom - constrainedHeight
+    top: placeBelow ? belowTop : aboveBottom - constrainedHeight,
   };
 }
 
@@ -1867,7 +2903,7 @@ function positionBenchChoicePanel(panel, anchor, requestedMaxHeight = null) {
     left: visualViewport?.offsetLeft || 0,
     top: visualViewport?.offsetTop || 0,
     width: visualViewport?.width || window.innerWidth,
-    height: visualViewport?.height || window.innerHeight
+    height: visualViewport?.height || window.innerHeight,
   };
   const margin = 12;
   const viewportMaxHeight = Math.max(1, viewport.height - margin * 2);
@@ -1882,8 +2918,14 @@ function positionBenchChoicePanel(panel, anchor, requestedMaxHeight = null) {
   panel.style.maxHeight = `${maxHeight}px`;
 
   const rect = panel.getBoundingClientRect();
-  const maxLeft = Math.max(viewport.left + margin, viewport.left + viewport.width - rect.width - margin);
-  const maxTop = Math.max(viewport.top + margin, viewport.top + viewport.height - rect.height - margin);
+  const maxLeft = Math.max(
+    viewport.left + margin,
+    viewport.left + viewport.width - rect.width - margin,
+  );
+  const maxTop = Math.max(
+    viewport.top + margin,
+    viewport.top + viewport.height - rect.height - margin,
+  );
   const left = Math.min(Math.max(viewport.left + margin, anchor.x), maxLeft);
   const top = Math.min(Math.max(viewport.top + margin, anchor.y), maxTop);
 
@@ -1891,12 +2933,24 @@ function positionBenchChoicePanel(panel, anchor, requestedMaxHeight = null) {
   panel.style.top = `${top}px`;
 }
 
-function openBenchChoiceSheet({ title, message = "", content = "", actions = [], anchor = null }) {
+function openBenchChoiceSheet({
+  title,
+  message = "",
+  content = "",
+  actions = [],
+  anchor = null,
+}) {
   closeBenchChoiceSheet();
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const sheet = getBenchChoiceRoot();
-    const anchorElement = anchor?.x == null && anchor?.getBoundingClientRect ? anchor : null;
-    const anchorPosition = anchor?.x != null ? anchor : (anchor ? getAdminAnchorPosition(null, anchor) : null);
+    const anchorElement =
+      anchor?.x == null && anchor?.getBoundingClientRect ? anchor : null;
+    const anchorPosition =
+      anchor?.x != null
+        ? anchor
+        : anchor
+          ? getAdminAnchorPosition(null, anchor)
+          : null;
     sheet.className = `bench-choice-sheet${anchorPosition ? " is-anchored" : ""}`;
     sheet.hidden = false;
     sheet._resolve = resolve;
@@ -1904,21 +2958,27 @@ function openBenchChoiceSheet({ title, message = "", content = "", actions = [],
       <div id="benchChoiceTitle" class="bench-choice-title">${escapeHtml(title)}</div>
       ${message ? `<p>${escapeHtml(message)}</p>` : ""}
       ${content}
-      <div class="bench-choice-actions">${actions.map(action => `<button type="button" data-action="${escapeAttr(action.value)}" class="${action.danger ? "is-danger" : ""}"><span>${escapeHtml(action.label)}</span></button>`).join("")}</div>
+      <div class="bench-choice-actions">${actions.map((action) => `<button type="button" data-action="${escapeAttr(action.value)}" class="${action.danger ? "is-danger" : ""}"><span>${escapeHtml(action.label)}</span></button>`).join("")}</div>
     </div>`;
     document.addEventListener("keydown", handleBenchChoiceKeydown);
     if (anchorPosition) {
       const panel = sheet.querySelector(".bench-choice-panel");
       const reposition = () => {
         if (!sheet.isConnected) return;
-        const pointOffsetY = window.matchMedia("(pointer: coarse)").matches ? 10 : 2;
-        let position = { x: anchorPosition.x, y: anchorPosition.y + pointOffsetY };
+        const pointOffsetY = window.matchMedia("(pointer: coarse)").matches
+          ? 10
+          : 2;
+        let position = {
+          x: anchorPosition.x,
+          y: anchorPosition.y + pointOffsetY,
+        };
         let placementMaxHeight = null;
         if (anchorElement?.isConnected) {
           const rect = anchorElement.getBoundingClientRect();
           const visualViewport = window.visualViewport;
           const viewportTop = visualViewport?.offsetTop || 0;
-          const viewportBottom = viewportTop + (visualViewport?.height || window.innerHeight);
+          const viewportBottom =
+            viewportTop + (visualViewport?.height || window.innerHeight);
           panel.style.maxHeight = `${Math.max(1, viewportBottom - viewportTop - 24)}px`;
           const panelHeight = panel.getBoundingClientRect().height;
           const placement = getBenchChoiceVerticalPlacement({
@@ -1926,11 +2986,11 @@ function openBenchChoiceSheet({ title, message = "", content = "", actions = [],
             viewportBottom,
             anchorTop: rect.top,
             anchorBottom: rect.bottom,
-            panelHeight
+            panelHeight,
           });
           position = {
             x: rect.left,
-            y: placement.top
+            y: placement.top,
           };
           placementMaxHeight = placement.maxHeight;
         }
@@ -1951,26 +3011,38 @@ async function chooseBenchLaborPhase(title, anchor = null) {
   return openBenchChoiceSheet({
     title,
     anchor,
-    actions: [...LABOR_TIMER_PHASES.map(phase => ({ label: phase, value: phase })), { label: "Cancel", value: "" }]
+    actions: [
+      ...LABOR_TIMER_PHASES.map((phase) => ({ label: phase, value: phase })),
+      { label: "Cancel", value: "" },
+    ],
   });
 }
 
 async function startLaborForActiveBench(mode, anchor = null) {
   const bench = benchFocusState.activeBench;
   if (!bench || benchFocusBusy) return;
-  const phase = await chooseBenchLaborPhase(mode === "bench" ? "Start from Bench Work" : "Start labor now", anchor);
+  const phase = await chooseBenchLaborPhase(
+    mode === "bench" ? "Start from Bench Work" : "Start labor now",
+    anchor,
+  );
   if (!phase) return;
   benchFocusBusy = true;
   try {
-    await postJson({
-      action: "startLaborSession",
-      orderNumber: bench.orderNumber,
-      phase,
-      benchSessionId: bench.id,
-      benchStartMode: mode
-    }, true);
+    await postJson(
+      {
+        action: "startLaborSession",
+        orderNumber: bench.orderNumber,
+        phase,
+        benchSessionId: bench.id,
+        benchStartMode: mode,
+      },
+      true,
+    );
     broadcastBenchFocusChange();
-    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+    await Promise.all([
+      refreshBenchFocusState(),
+      refreshDashboardLaborSessions(),
+    ]);
   } catch (error) {
     alert(error.message || "Labor timer could not be started.");
     await refreshBenchFocusState();
@@ -1985,7 +3057,10 @@ async function snoozeBenchReminder() {
   if (!bench || benchFocusBusy) return;
   benchFocusBusy = true;
   try {
-    await postJson({ action: "snoozeBenchReminder", benchSessionId: bench.id }, true);
+    await postJson(
+      { action: "snoozeBenchReminder", benchSessionId: bench.id },
+      true,
+    );
     broadcastBenchFocusChange();
     await refreshBenchFocusState();
   } catch (error) {
@@ -1999,11 +3074,15 @@ async function snoozeBenchReminder() {
 async function refreshBenchFocusSurfaces({ refreshViewedLabor = false } = {}) {
   await Promise.all([
     refreshBenchFocusState({ rerender: false }),
-    refreshDashboardLaborSessions({ rerender: false })
+    refreshDashboardLaborSessions({ rerender: false }),
   ]);
   if (dashboardPanel) renderHomeDashboard();
   refreshOrderDetailBenchBanner();
-  if (refreshViewedLabor && detailView?.classList.contains("active") && currentOrder?.orderNumber) {
+  if (
+    refreshViewedLabor &&
+    detailView?.classList.contains("active") &&
+    currentOrder?.orderNumber
+  ) {
     await loadLaborSessions(currentOrder.orderNumber);
   }
 }
@@ -2011,28 +3090,52 @@ async function refreshBenchFocusSurfaces({ refreshViewedLabor = false } = {}) {
 async function endActiveBenchWork({ switchToOrder = "", anchor = null } = {}) {
   const bench = benchFocusState.activeBench;
   if (!bench || benchFocusBusy) return false;
-  const choiceAnchor = anchor?.x != null ? anchor : (anchor ? getAdminAnchorPosition(null, anchor) : null);
+  const choiceAnchor =
+    anchor?.x != null
+      ? anchor
+      : anchor
+        ? getAdminAnchorPosition(null, anchor)
+        : null;
   let runningAction = "none";
   if (getLaborSessionStatus(benchFocusState.activeLabor) === "running") {
     runningAction = await openBenchChoiceSheet({
-      title: switchToOrder ? "End current Bench Work and switch?" : "End Bench Work",
+      title: switchToOrder
+        ? "End current Bench Work and switch?"
+        : "End Bench Work",
       message: "A linked labor timer is running. Choose how to resolve it.",
       actions: [
-        { label: switchToOrder ? "Pause Timer and Switch" : "Pause Timer and End Bench Work", value: "pause" },
-        { label: switchToOrder ? "Stop Timer and Switch" : "Stop Timer and End Bench Work", value: "stop", danger: true },
-        { label: "Cancel", value: "" }
+        {
+          label: switchToOrder
+            ? "Pause Timer and Switch"
+            : "Pause Timer and End Bench Work",
+          value: "pause",
+        },
+        {
+          label: switchToOrder
+            ? "Stop Timer and Switch"
+            : "Stop Timer and End Bench Work",
+          value: "stop",
+          danger: true,
+        },
+        { label: "Cancel", value: "" },
       ],
-      anchor: choiceAnchor
+      anchor: choiceAnchor,
     });
     if (!runningAction) return false;
   }
   benchFocusBusy = true;
   try {
-    const result = await postJson({ action: "endBenchWork", benchSessionId: bench.id, runningAction }, true);
+    const result = await postJson(
+      { action: "endBenchWork", benchSessionId: bench.id, runningAction },
+      true,
+    );
     broadcastBenchFocusChange();
     await refreshBenchFocusSurfaces({ refreshViewedLabor: true });
     if (result.bench?.resolution === "pending") {
-      const unresolvedBench = benchFocusState.unresolved.find(item => item.id === result.bench.id) || result.bench;
+      const unresolvedBench =
+        benchFocusState.unresolved.find(
+          (item) => item.id === result.bench.id,
+        ) || result.bench;
       openImmediateBenchResolution(unresolvedBench, choiceAnchor);
     }
     if (switchToOrder) {
@@ -2041,7 +3144,8 @@ async function endActiveBenchWork({ switchToOrder = "", anchor = null } = {}) {
     }
     return true;
   } catch (error) {
-    if (error.runningLaborChoice) return endActiveBenchWork({ switchToOrder, anchor: choiceAnchor });
+    if (error.runningLaborChoice)
+      return endActiveBenchWork({ switchToOrder, anchor: choiceAnchor });
     alert(error.message || "Bench Work could not be ended.");
     await refreshBenchFocusState();
     return false;
@@ -2055,7 +3159,9 @@ async function endActiveBenchWork({ switchToOrder = "", anchor = null } = {}) {
 async function resolveBenchInterval(bench, resolution, anchor = null) {
   if (!bench || benchFocusBusy) return;
   if (resolution === "labor_recorded" && bench.hasOpenLabor) {
-    alert("Stop or resolve the open labor session before assigning this Bench Work interval.");
+    alert(
+      "Stop or resolve the open labor session before assigning this Bench Work interval.",
+    );
     return;
   }
   let phase = "";
@@ -2065,29 +3171,48 @@ async function resolveBenchInterval(bench, resolution, anchor = null) {
   } else {
     const confirmed = await openBenchChoiceSheet({
       title: "Discard Bench Work time?",
-      message: "This interval will remain in history but will not count as labor.",
-      actions: [{ label: "Discard", value: "discard", danger: true }, { label: "Cancel", value: "" }],
-      anchor
+      message:
+        "This interval will remain in history but will not count as labor.",
+      actions: [
+        { label: "Discard", value: "discard", danger: true },
+        { label: "Cancel", value: "" },
+      ],
+      anchor,
     });
     if (confirmed !== "discard") return;
   }
   benchFocusBusy = true;
   try {
-    await postJson({ action: "resolveBenchWork", benchSessionId: bench.id, resolution, phase }, true);
+    await postJson(
+      {
+        action: "resolveBenchWork",
+        benchSessionId: bench.id,
+        resolution,
+        phase,
+      },
+      true,
+    );
     broadcastBenchFocusChange();
-    await Promise.all([refreshBenchFocusState(), refreshDashboardLaborSessions()]);
+    await Promise.all([
+      refreshBenchFocusState(),
+      refreshDashboardLaborSessions(),
+    ]);
     if (activeView === "dashboard") renderHomeDashboard();
   } catch (error) {
     await refreshBenchFocusState({ rerender: false });
-    const stillUnresolved = benchFocusState.unresolved.some(item => String(item.id) === String(bench.id));
+    const stillUnresolved = benchFocusState.unresolved.some(
+      (item) => String(item.id) === String(bench.id),
+    );
     if (!stillUnresolved) {
       broadcastBenchFocusChange();
       await refreshDashboardLaborSessions({ rerender: false });
       return;
     }
-    alert(String(error.message || "").startsWith("Non-JSON response:")
-      ? "The server response was interrupted. Bench Work was rechecked and is still unresolved. Try again."
-      : (error.message || "Bench Work could not be resolved."));
+    alert(
+      String(error.message || "").startsWith("Non-JSON response:")
+        ? "The server response was interrupted. Bench Work was rechecked and is still unresolved. Try again."
+        : error.message || "Bench Work could not be resolved.",
+    );
   } finally {
     benchFocusBusy = false;
     if (activeView === "dashboard") renderHomeDashboard();
@@ -2101,19 +3226,30 @@ async function openImmediateBenchResolution(bench, anchor = null) {
       ? `#${bench.orderNumber} · A separate paused labor session remains open. Stop or resolve it before assigning the entire Bench interval.`
       : `#${bench.orderNumber} · ${formatBenchElapsed(bench.startedAt, bench.endedAt)}`,
     actions: [
-      ...(!bench.hasOpenLabor ? [{ label: "Assign Time", value: "labor_recorded" }] : []),
+      ...(!bench.hasOpenLabor
+        ? [{ label: "Assign Time", value: "labor_recorded" }]
+        : []),
       { label: "Discard", value: "discarded", danger: true },
-      { label: "Resolve Later", value: "" }
+      { label: "Resolve Later", value: "" },
     ],
-    anchor
+    anchor,
   });
   if (choice) resolveBenchInterval(bench, choice, anchor);
 }
 
 async function openUnresolvedBenchList(anchor = null) {
-  const choiceAnchor = anchor?.x != null ? anchor : (anchor ? getAdminAnchorPosition(null, anchor) : null);
-  const content = `<div class="bench-unresolved-list">${benchFocusState.unresolved.map(bench => {
-      const order = allOrders.find(item => String(item.orderNumber) === String(bench.orderNumber)) || {};
+  const choiceAnchor =
+    anchor?.x != null
+      ? anchor
+      : anchor
+        ? getAdminAnchorPosition(null, anchor)
+        : null;
+  const content = `<div class="bench-unresolved-list">${benchFocusState.unresolved
+    .map((bench) => {
+      const order =
+        allOrders.find(
+          (item) => String(item.orderNumber) === String(bench.orderNumber),
+        ) || {};
       return `<article class="bench-unresolved-row">
         <div><strong>#${escapeHtml(bench.orderNumber)} · ${escapeHtml(order.customerName || "Customer")}</strong>
         <span>${escapeHtml(formatLaborDateTime(bench.startedAt))} – ${escapeHtml(formatLaborDateTime(bench.endedAt))}</span>
@@ -2124,22 +3260,39 @@ async function openUnresolvedBenchList(anchor = null) {
           <button type="button" class="is-danger" data-action="discard:${escapeAttr(bench.id)}">Discard</button>
         </div>
       </article>`;
-    }).join("")}</div>`;
+    })
+    .join("")}</div>`;
   const choice = await openBenchChoiceSheet({
     title: "Bench Work time to review",
     content,
     actions: [{ label: "Close", value: "" }],
-    anchor: choiceAnchor
+    anchor: choiceAnchor,
   });
   const [resolution, id] = String(choice || "").split(":");
   if (!id) return;
-  const bench = benchFocusState.unresolved.find(item => String(item.id) === id);
-  if (bench) resolveBenchInterval(bench, resolution === "assign" ? "labor_recorded" : "discarded", choiceAnchor);
+  const bench = benchFocusState.unresolved.find(
+    (item) => String(item.id) === id,
+  );
+  if (bench)
+    resolveBenchInterval(
+      bench,
+      resolution === "assign" ? "labor_recorded" : "discarded",
+      choiceAnchor,
+    );
 }
 
-async function startBenchWorkFromDashboard(orderNumber, options = {}, anchor = null) {
+async function startBenchWorkFromDashboard(
+  orderNumber,
+  options = {},
+  anchor = null,
+) {
   if (benchFocusBusy) return;
-  const choiceAnchor = anchor?.x != null ? anchor : (anchor ? getAdminAnchorPosition(null, anchor) : null);
+  const choiceAnchor =
+    anchor?.x != null
+      ? anchor
+      : anchor
+        ? getAdminAnchorPosition(null, anchor)
+        : null;
   benchFocusBusy = true;
   renderHomeDashboard();
   try {
@@ -2149,32 +3302,53 @@ async function startBenchWorkFromDashboard(orderNumber, options = {}, anchor = n
     await refreshDashboardLaborSessions();
   } catch (error) {
     if (error.requiresConfirmation) {
-      const physical = error.receivedPhysicalPresence ? "\n\nContinue only if the glove is physically present." : "";
-      if (confirm(`This order is currently ${error.status}. Start Bench Work without changing its status?${physical}`)) {
+      const physical = error.receivedPhysicalPresence
+        ? "\n\nContinue only if the glove is physically present."
+        : "";
+      if (
+        confirm(
+          `This order is currently ${error.status}. Start Bench Work without changing its status?${physical}`,
+        )
+      ) {
         benchFocusBusy = false;
-        return startBenchWorkFromDashboard(orderNumber, { ...options, confirmStatusOverride: true }, choiceAnchor);
+        return startBenchWorkFromDashboard(
+          orderNumber,
+          { ...options, confirmStatusOverride: true },
+          choiceAnchor,
+        );
       }
     } else if (error.pausedLaborChoice) {
       const choice = await openBenchChoiceSheet({
         title: `Paused timer for #${orderNumber}`,
-        message: "Resume this order’s timer and start Bench Work for the same glove?",
+        message:
+          "Resume this order’s timer and start Bench Work for the same glove?",
         actions: [
-          { label: "Resume Timer and Start Bench Work", value: "resume_attach" },
+          {
+            label: "Resume Timer and Start Bench Work",
+            value: "resume_attach",
+          },
           { label: "Start Bench Work and Leave Timer Paused", value: "leave" },
-          { label: "Cancel", value: "cancel" }
+          { label: "Cancel", value: "cancel" },
         ],
-        anchor: choiceAnchor
+        anchor: choiceAnchor,
       });
       if (choice && choice !== "cancel") {
         benchFocusBusy = false;
-        return startBenchWorkFromDashboard(orderNumber, { ...options, pausedAction: choice }, choiceAnchor);
+        return startBenchWorkFromDashboard(
+          orderNumber,
+          { ...options, pausedAction: choice },
+          choiceAnchor,
+        );
       }
     } else if (error.conflict === "active_bench") {
       const choice = await openBenchChoiceSheet({
         title: "Another glove is on the bench.",
         message: `End Bench Work for #${error.activeOrderNumber || "current order"} before switching.`,
-        actions: [{ label: "End Current and Switch", value: "switch" }, { label: "Stay on Current Glove", value: "" }],
-        anchor: choiceAnchor
+        actions: [
+          { label: "End Current and Switch", value: "switch" },
+          { label: "Stay on Current Glove", value: "" },
+        ],
+        anchor: choiceAnchor,
       });
       if (choice === "switch") {
         benchFocusBusy = false;
@@ -2188,13 +3362,17 @@ async function startBenchWorkFromDashboard(orderNumber, options = {}, anchor = n
           { label: "Pause Timer and Switch", value: "pause" },
           { label: "Stop Timer and Switch", value: "stop", danger: true },
           { label: "Stay on Current Glove", value: "" },
-          { label: "Cancel", value: "" }
+          { label: "Cancel", value: "" },
         ],
-        anchor: choiceAnchor
+        anchor: choiceAnchor,
       });
       if (choice) {
         benchFocusBusy = false;
-        return startBenchWorkFromDashboard(orderNumber, { ...options, otherRunningAction: choice }, choiceAnchor);
+        return startBenchWorkFromDashboard(
+          orderNumber,
+          { ...options, otherRunningAction: choice },
+          choiceAnchor,
+        );
       }
     } else {
       alert(error.message || "Bench Work could not be started.");
@@ -2207,7 +3385,7 @@ async function startBenchWorkFromDashboard(orderNumber, options = {}, anchor = n
 
 function renderDashboardOrderList(orders, emptyMessage, options = {}) {
   return orders.length
-    ? orders.map(order => renderDashboardOrderRow(order, options)).join("")
+    ? orders.map((order) => renderDashboardOrderRow(order, options)).join("")
     : `<p class="dashboard-empty muted">${escapeHtml(emptyMessage)}</p>`;
 }
 
@@ -2215,12 +3393,13 @@ async function refreshDashboardLaborSessions({ rerender = true } = {}) {
   try {
     const data = await postJson({ action: "listOpenLaborSessions" }, true);
     const nextMap = {};
-    (data.sessions || []).forEach(session => {
+    (data.sessions || []).forEach((session) => {
       if (!session?.orderNumber) return;
       nextMap[String(session.orderNumber)] = session;
     });
 
-    const changed = JSON.stringify(nextMap) !== JSON.stringify(dashboardLaborSessions);
+    const changed =
+      JSON.stringify(nextMap) !== JSON.stringify(dashboardLaborSessions);
     dashboardLaborSessions = nextMap;
 
     if (changed && rerender && activeView === "dashboard") {
@@ -2251,7 +3430,9 @@ function syncBenchFocusPolling() {
 
 function broadcastBenchFocusChange() {
   benchFocusChannel?.postMessage({ type: "changed" });
-  try { localStorage.setItem(BENCH_FOCUS_SIGNAL_KEY, String(Date.now())); } catch {}
+  try {
+    localStorage.setItem(BENCH_FOCUS_SIGNAL_KEY, String(Date.now()));
+  } catch {}
 }
 
 async function refreshBenchFocusState({ rerender = true } = {}) {
@@ -2263,24 +3444,27 @@ async function refreshBenchFocusState({ rerender = true } = {}) {
       activeLabor: data.activeLabor || null,
       unlinkedPausedLabor: data.unlinkedPausedLabor || null,
       unresolved: data.unresolved || [],
-      serverNow: data.serverNow || null
+      serverNow: data.serverNow || null,
     };
-    const changed = JSON.stringify({ ...next, serverNow: null }) !==
+    const changed =
+      JSON.stringify({ ...next, serverNow: null }) !==
       JSON.stringify({ ...benchFocusState, serverNow: null });
     const parsedServerNow = Date.parse(next.serverNow);
-    if (Number.isFinite(parsedServerNow)) benchFocusClockOffsetMs = parsedServerNow - Date.now();
+    if (Number.isFinite(parsedServerNow))
+      benchFocusClockOffsetMs = parsedServerNow - Date.now();
     benchFocusState = next;
     syncBenchFocusPolling();
-    if (changed && rerender && activeView === "dashboard") renderHomeDashboard();
+    if (changed && rerender && activeView === "dashboard")
+      renderHomeDashboard();
   } catch {
     /* Preserve the last confirmed state during transient network loss. */
   }
 }
 
-benchFocusChannel?.addEventListener("message", event => {
+benchFocusChannel?.addEventListener("message", (event) => {
   if (event.data?.type === "changed") refreshBenchFocusState();
 });
-window.addEventListener("storage", event => {
+window.addEventListener("storage", (event) => {
   if (event.key === BENCH_FOCUS_SIGNAL_KEY) refreshBenchFocusState();
 });
 window.addEventListener("focus", () => refreshBenchFocusState());
@@ -2288,11 +3472,11 @@ window.addEventListener("focus", () => refreshBenchFocusState());
 async function refreshDashboardActivityIndex({ rerender = true } = {}) {
   try {
     const data = await postJson({ action: "listOrdersWithActivity" }, true);
-    const nextSet = new Set((data.orderNumbers || []).map(n => String(n)));
+    const nextSet = new Set((data.orderNumbers || []).map((n) => String(n)));
     const changed =
       !dashboardActivityLoaded ||
       nextSet.size !== dashboardActivityOrders.size ||
-      [...nextSet].some(n => !dashboardActivityOrders.has(n));
+      [...nextSet].some((n) => !dashboardActivityOrders.has(n));
 
     dashboardActivityOrders = nextSet;
     dashboardActivityLoaded = true;
@@ -2316,7 +3500,7 @@ async function openDashboardTimerPopover(button, orderKey) {
   const phase = await openBenchChoiceSheet({
     title: "Start labor",
     anchor: button,
-    actions: LABOR_TIMER_PHASES.map(value => ({ label: value, value }))
+    actions: LABOR_TIMER_PHASES.map((value) => ({ label: value, value })),
   });
   dashboardTimerPopoverOrder = null;
   if (phase) await handleDashboardTimerPhaseSelect(orderKey, phase);
@@ -2326,25 +3510,30 @@ async function openDashboardTimerPopover(button, orderKey) {
    plus Stop. Reuses the phase popover styling. */
 async function openDashboardTimerControlsPopover(button, orderKey, session) {
   closeDashboardTimerPopover();
-  const primary = getLaborSessionStatus(session) === "paused"
-    ? { control: "resume", label: "Resume" }
-    : { control: "pause", label: "Pause" };
+  const primary =
+    getLaborSessionStatus(session) === "paused"
+      ? { control: "resume", label: "Resume" }
+      : { control: "pause", label: "Pause" };
 
   dashboardTimerPopoverOrder = orderKey;
   const control = await openBenchChoiceSheet({
     title: "Labor timer",
     anchor: button,
-    actions: [primary, { control: "stop", label: "Stop" }]
-      .map(item => ({ label: item.label, value: item.control, danger: item.control === "stop" }))
+    actions: [primary, { control: "stop", label: "Stop" }].map((item) => ({
+      label: item.label,
+      value: item.control,
+      danger: item.control === "stop",
+    })),
   });
   dashboardTimerPopoverOrder = null;
   if (control) await handleDashboardTimerControl(orderKey, control, button);
 }
 
 function hasRunningDashboardSessionOtherThan(orderKey) {
-  return Object.values(dashboardLaborSessions).some(session =>
-    String(session.orderNumber) !== String(orderKey) &&
-    getLaborSessionStatus(session) === "running"
+  return Object.values(dashboardLaborSessions).some(
+    (session) =>
+      String(session.orderNumber) !== String(orderKey) &&
+      getLaborSessionStatus(session) === "running",
   );
 }
 
@@ -2354,16 +3543,22 @@ async function handleDashboardTimerPhaseSelect(orderKey, phase) {
   closeDashboardTimerPopover();
 
   try {
-    const activeBench = benchFocusState.activeBench &&
+    const activeBench =
+      benchFocusState.activeBench &&
       String(benchFocusState.activeBench.orderNumber) === String(orderKey)
-      ? benchFocusState.activeBench
-      : null;
-    await postJson({
-      action: "startLaborSession",
-      orderNumber: orderKey,
-      phase,
-      ...(activeBench ? { benchSessionId: activeBench.id, benchStartMode: "now" } : {})
-    }, true);
+        ? benchFocusState.activeBench
+        : null;
+    await postJson(
+      {
+        action: "startLaborSession",
+        orderNumber: orderKey,
+        phase,
+        ...(activeBench
+          ? { benchSessionId: activeBench.id, benchStartMode: "now" }
+          : {}),
+      },
+      true,
+    );
 
     broadcastBenchFocusChange();
     await refreshBenchFocusState({ rerender: false });
@@ -2381,11 +3576,11 @@ async function handleDashboardTimerAction(button) {
 
   const orderKey = String(button.dataset.timerOrder || "");
   const action = button.dataset.timerAction;
-  const session = dashboardLaborSessions[orderKey] || (
-    String(benchFocusState.activeBench?.orderNumber) === orderKey
+  const session =
+    dashboardLaborSessions[orderKey] ||
+    (String(benchFocusState.activeBench?.orderNumber) === orderKey
       ? benchFocusState.activeLabor
-      : null
-  );
+      : null);
 
   if (dashboardTimerPopoverOrder === orderKey) {
     closeDashboardTimerPopover();
@@ -2407,12 +3602,17 @@ async function handleDashboardTimerAction(button) {
   }
 }
 
-async function handleDashboardTimerControl(orderKey, control, controlButton = null) {
+async function handleDashboardTimerControl(
+  orderKey,
+  control,
+  controlButton = null,
+) {
   if (dashboardTimerBusy) return;
 
-  const focusedSession = String(benchFocusState.activeBench?.orderNumber) === String(orderKey)
-    ? benchFocusState.activeLabor
-    : null;
+  const focusedSession =
+    String(benchFocusState.activeBench?.orderNumber) === String(orderKey)
+      ? benchFocusState.activeLabor
+      : null;
   const session = dashboardLaborSessions[orderKey] || focusedSession || null;
   if (!session?.id) return;
   const emittedSessionId = String(controlButton?.dataset.sessionId || "");
@@ -2420,7 +3620,8 @@ async function handleDashboardTimerControl(orderKey, control, controlButton = nu
 
   if (control === "resume" && getLaborSessionStatus(session) === "paused") {
     const activeBench = benchFocusState.activeBench;
-    const linkedToActiveBench = activeBench &&
+    const linkedToActiveBench =
+      activeBench &&
       String(activeBench.orderNumber) === String(orderKey) &&
       String(session.benchWorkSessionId || "") === String(activeBench.id);
     const choiceAnchor = getAdminAnchorPosition(null, controlButton);
@@ -2439,8 +3640,8 @@ async function handleDashboardTimerControl(orderKey, control, controlButton = nu
         anchor: choiceAnchor,
         actions: [
           { label: "End Current Bench Work and Resume", value: "end" },
-          { label: "Cancel", value: "" }
-        ]
+          { label: "Cancel", value: "" },
+        ],
       });
       if (choice !== "end") return;
       const ended = await endActiveBenchWork({ anchor: choiceAnchor });
@@ -2461,11 +3662,20 @@ async function handleDashboardTimerControl(orderKey, control, controlButton = nu
   if (activeView === "dashboard") renderHomeDashboard();
   try {
     if (control === "pause") {
-      await postJson({ action: "pauseLaborSession", sessionId: session.id }, true);
+      await postJson(
+        { action: "pauseLaborSession", sessionId: session.id },
+        true,
+      );
     } else if (control === "resume") {
-      await postJson({ action: "resumeLaborSession", sessionId: session.id }, true);
+      await postJson(
+        { action: "resumeLaborSession", sessionId: session.id },
+        true,
+      );
     } else if (control === "stop") {
-      await postJson({ action: "stopLaborSession", sessionId: session.id }, true);
+      await postJson(
+        { action: "stopLaborSession", sessionId: session.id },
+        true,
+      );
     }
     broadcastBenchFocusChange();
   } catch (err) {
@@ -2498,7 +3708,7 @@ const FINANCE_FILTER_OPTIONS = [
   ["ytd", "Year to Date", "YTD"],
   ["last-365-days", "Last 365 Days", "365 Days"],
   ["all-time", "All Time", "All Time"],
-  ["custom", "Custom", "Custom"]
+  ["custom", "Custom", "Custom"],
 ];
 
 function getFinanceFilterShortLabel(key) {
@@ -2507,7 +3717,8 @@ function getFinanceFilterShortLabel(key) {
 }
 
 function renderFinanceFilterOptions(selectedKey) {
-  return FINANCE_FILTER_OPTIONS.map(([value, label]) => `
+  return FINANCE_FILTER_OPTIONS.map(
+    ([value, label]) => `
     <button
       type="button"
       class="dashboard-finance-filter-option${value === selectedKey ? " active" : ""}"
@@ -2515,13 +3726,15 @@ function renderFinanceFilterOptions(selectedKey) {
       aria-checked="${value === selectedKey ? "true" : "false"}"
       data-finance-filter="${escapeAttr(value)}"
     >${escapeHtml(label)}</button>
-  `).join("");
+  `,
+  ).join("");
 }
 
 function renderFinanceMetricCards(financeStats) {
-  const avgPaidOrderDisplay = !financeStats.rangeReady || financeStats.averagePaidOrder === null
-    ? "—"
-    : formatCurrency(financeStats.averagePaidOrder);
+  const avgPaidOrderDisplay =
+    !financeStats.rangeReady || financeStats.averagePaidOrder === null
+      ? "—"
+      : formatCurrency(financeStats.averagePaidOrder);
   const revenueDisplay = financeStats.rangeReady
     ? formatCurrency(financeStats.revenue)
     : "—";
@@ -2536,7 +3749,7 @@ function renderFinanceMetricCards(financeStats) {
     renderDashboardMetricCard("Revenue", revenueDisplay),
     renderDashboardMetricCard("Outstanding Unpaid", outstandingDisplay),
     renderDashboardMetricCard("Average Paid Order", avgPaidOrderDisplay),
-    renderDashboardMetricCard("Paid Orders", paidOrdersDisplay)
+    renderDashboardMetricCard("Paid Orders", paidOrdersDisplay),
   ].join("");
 }
 
@@ -2545,7 +3758,9 @@ function renderFinanceMetricCards(financeStats) {
    date input closes the native iOS picker and commits today. */
 function updateFinanceSnapshotSummary() {
   if (!dashboardPanel) return;
-  const financeSection = dashboardPanel.querySelector(".dashboard-section-finance");
+  const financeSection = dashboardPanel.querySelector(
+    ".dashboard-section-finance",
+  );
   if (!financeSection) return;
 
   const financeStats = computeFinanceStats();
@@ -2598,7 +3813,7 @@ function getClubhouseGreetingDateLabel() {
   return new Date().toLocaleDateString([], {
     weekday: "long",
     month: "short",
-    day: "numeric"
+    day: "numeric",
   });
 }
 
@@ -2627,29 +3842,55 @@ function renderHomeDashboard() {
   const attentionItems = getDashboardAttentionItems();
   const metricsCollapsed = isDashboardSectionCollapsed("metrics");
   const financeCollapsed = isDashboardSectionCollapsed("finance");
-  const avgTurnaroundDisplay = stats.averageTurnaround === null
-    ? "—"
-    : `${Math.round(stats.averageTurnaround)}d`;
+  const avgTurnaroundDisplay =
+    stats.averageTurnaround === null
+      ? "—"
+      : `${Math.round(stats.averageTurnaround)}d`;
   const financeRangeLabel = financeStats.range.label;
 
   const metricsHtml = [
-    renderDashboardMetricCard("Current Orders", stats.currentOrders, { view: "current" }),
+    renderDashboardMetricCard("Current Orders", stats.currentOrders, {
+      view: "current",
+    }),
     ...(stats.waitingOnCustomer > 0
-      ? [renderDashboardMetricCard("Waiting on Customer", stats.waitingOnCustomer, { view: "estimate" })]
+      ? [
+          renderDashboardMetricCard(
+            "Waiting on Customer",
+            stats.waitingOnCustomer,
+            { view: "estimate" },
+          ),
+        ]
       : []),
     ...(stats.waitingOnParts > 0
-      ? [renderDashboardMetricCard("Waiting on Lace/Parts", stats.waitingOnParts, { view: "waiting" })]
+      ? [
+          renderDashboardMetricCard(
+            "Waiting on Lace/Parts",
+            stats.waitingOnParts,
+            { view: "waiting" },
+          ),
+        ]
       : []),
-    renderDashboardMetricCard("Ready to Go", stats.readyToGo, { view: "ready" }),
-    renderDashboardMetricCard("In Progress", stats.inProgress, { view: "progress" }),
-    renderDashboardMetricCard("Completed This Month", stats.completedThisMonth, { view: "completed" }),
-    renderDashboardMetricCard("Average Turnaround", avgTurnaroundDisplay, { sub: "All completed orders" })
+    renderDashboardMetricCard("Ready to Go", stats.readyToGo, {
+      view: "ready",
+    }),
+    renderDashboardMetricCard("In Progress", stats.inProgress, {
+      view: "progress",
+    }),
+    renderDashboardMetricCard(
+      "Completed This Month",
+      stats.completedThisMonth,
+      { view: "completed" },
+    ),
+    renderDashboardMetricCard("Average Turnaround", avgTurnaroundDisplay, {
+      sub: "All completed orders",
+    }),
   ].join("");
 
   const financeHtml = renderFinanceMetricCards(financeStats);
 
-  const financeCustomHtml = financeFilterKey === "custom"
-    ? `
+  const financeCustomHtml =
+    financeFilterKey === "custom"
+      ? `
       <div class="dashboard-finance-custom">
         <label>
           Start Date
@@ -2671,35 +3912,50 @@ function renderHomeDashboard() {
         </label>
       </div>
     `
-    : "";
+      : "";
 
   /* Any dynamically-attached bench timer popover is about to be wiped
      by the innerHTML rebuild — clear its state too. */
   closeDashboardTimerPopover();
 
-  const benchHtml = renderDashboardOrderList(benchOrders, "No bench work queued.", { timerControls: true });
-  const onDeckHtml = renderDashboardOrderList(onDeckOrders, "No orders on deck.");
+  const benchHtml = renderDashboardOrderList(
+    benchOrders,
+    "No bench work queued.",
+    { timerControls: true },
+  );
+  const onDeckHtml = renderDashboardOrderList(
+    onDeckOrders,
+    "No orders on deck.",
+  );
   const newHtml = renderDashboardOrderList(newOrders, "No new orders.");
 
   const attentionHtml = attentionItems.length
-    ? attentionItems.map(item => `
+    ? attentionItems
+        .map(
+          (item) => `
         <button
           class="dashboard-attention-item"
           type="button"
           data-dashboard-view="${escapeAttr(item.view)}"
         >${escapeHtml(item.label)}</button>
-      `).join("")
+      `,
+        )
+        .join("")
     : `<p class="dashboard-empty muted">Nothing needs attention right now.</p>`;
 
   dashboardPanel.innerHTML = `
     <div class="dashboard-shell">
       ${renderClubhouseGreeting()}
       ${renderBenchFocusCard()}
-      ${benchFocusState.unresolved.length ? `
-        <button type="button" class="bench-unresolved-indicator bench-unresolved-indicator--${benchFocusState.unresolved.length >= 5 ? "high" : (benchFocusState.unresolved.length >= 3 ? "medium" : "low")}" data-bench-unresolved-open>
+      ${
+        benchFocusState.unresolved.length
+          ? `
+        <button type="button" class="bench-unresolved-indicator bench-unresolved-indicator--${benchFocusState.unresolved.length >= 5 ? "high" : benchFocusState.unresolved.length >= 3 ? "medium" : "low"}" data-bench-unresolved-open>
           ${benchFocusState.unresolved.length} Bench Work ${benchFocusState.unresolved.length === 1 ? "interval needs" : "intervals need"} review
         </button>
-      ` : ""}
+      `
+          : ""
+      }
       <section class="dashboard-section dashboard-section-bench">
         <div class="dashboard-section-heading-row">
           <h2 class="dashboard-section-title">Today's Bench</h2>
@@ -2816,7 +4072,10 @@ function wireHomeDashboardActions() {
            inputs are safe. */
         const collapsed = section.classList.toggle("is-collapsed");
         setDashboardSectionCollapsed(key, collapsed);
-        collapseToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        collapseToggle.setAttribute(
+          "aria-expanded",
+          collapsed ? "false" : "true",
+        );
       }
       return;
     }
@@ -2839,7 +4098,11 @@ function wireHomeDashboardActions() {
     if (benchStartBtn) {
       e.preventDefault();
       e.stopPropagation();
-      startBenchWorkFromDashboard(benchStartBtn.dataset.benchStart, {}, benchStartBtn);
+      startBenchWorkFromDashboard(
+        benchStartBtn.dataset.benchStart,
+        {},
+        benchStartBtn,
+      );
       return;
     }
 
@@ -2847,7 +4110,10 @@ function wireHomeDashboardActions() {
     if (benchLaborStartBtn) {
       e.preventDefault();
       e.stopPropagation();
-      startLaborForActiveBench(benchLaborStartBtn.dataset.benchLaborStart, benchLaborStartBtn);
+      startLaborForActiveBench(
+        benchLaborStartBtn.dataset.benchLaborStart,
+        benchLaborStartBtn,
+      );
       return;
     }
 
@@ -2887,7 +4153,7 @@ function wireHomeDashboardActions() {
       handleDashboardTimerControl(
         timerControlBtn.dataset.timerOrder,
         timerControlBtn.dataset.timerControl,
-        timerControlBtn
+        timerControlBtn,
       );
       return;
     }
@@ -2918,7 +4184,9 @@ function wireHomeDashboardActions() {
   /* Rows replaced their Open button — keep them keyboard-operable. */
   dashboardPanel.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
-    const row = e.target.closest?.(".dashboard-bench-row[data-dashboard-order]");
+    const row = e.target.closest?.(
+      ".dashboard-bench-row[data-dashboard-order]",
+    );
     if (!row || e.target !== row) return;
     e.preventDefault();
     openOrder(row.dataset.dashboardOrder, { returnView: "dashboard" });
@@ -2937,7 +4205,11 @@ function wireHomeDashboardActions() {
     }
     const rowEl = e.target.closest?.(".dashboard-bench-row");
     if (!rowEl) return null;
-    return allOrders.find(o => String(o.orderNumber) === String(rowEl.dataset.orderNumber)) || null;
+    return (
+      allOrders.find(
+        (o) => String(o.orderNumber) === String(rowEl.dataset.orderNumber),
+      ) || null
+    );
   };
 
   dashboardPanel.addEventListener("contextmenu", (e) => {
@@ -2947,20 +4219,26 @@ function wireHomeDashboardActions() {
     openWorkflowSheet(order, e);
   });
 
-  dashboardPanel.addEventListener("touchstart", (e) => {
-    const order = resolveDashboardRowOrder(e);
-    if (!order) return;
-    startWorkflowPress(e, order);
-  }, { passive: true });
+  dashboardPanel.addEventListener(
+    "touchstart",
+    (e) => {
+      const order = resolveDashboardRowOrder(e);
+      if (!order) return;
+      startWorkflowPress(e, order);
+    },
+    { passive: true },
+  );
 
-  dashboardPanel.addEventListener("touchmove", cancelWorkflowPress, { passive: true });
+  dashboardPanel.addEventListener("touchmove", cancelWorkflowPress, {
+    passive: true,
+  });
   dashboardPanel.addEventListener("touchend", cancelWorkflowPress);
   dashboardPanel.addEventListener("touchcancel", cancelWorkflowPress);
 
   /* Keep bench timer elapsed text from going stale without re-rendering. */
   setInterval(() => {
     if (activeView !== "dashboard") return;
-    dashboardPanel.querySelectorAll("[data-bench-timer]").forEach(el => {
+    dashboardPanel.querySelectorAll("[data-bench-timer]").forEach((el) => {
       const session = dashboardLaborSessions[el.dataset.benchTimer];
       if (session) el.textContent = getDashboardTimerStateLabel(session);
     });
@@ -2969,13 +4247,23 @@ function wireHomeDashboardActions() {
   setInterval(() => {
     if (activeView !== "dashboard" || !benchFocusState.activeBench) return;
     const benchElapsed = dashboardPanel.querySelector("[data-bench-elapsed]");
-    if (benchElapsed) benchElapsed.textContent = formatBenchElapsed(benchFocusState.activeBench.startedAt);
-    const laborElapsed = dashboardPanel.querySelector("[data-bench-labor-elapsed]");
+    if (benchElapsed)
+      benchElapsed.textContent = formatBenchElapsed(
+        benchFocusState.activeBench.startedAt,
+      );
+    const laborElapsed = dashboardPanel.querySelector(
+      "[data-bench-labor-elapsed]",
+    );
     if (laborElapsed && benchFocusState.activeLabor) {
-      laborElapsed.textContent = formatLaborDuration(getLaborActiveSeconds(benchFocusState.activeLabor) / 60);
+      laborElapsed.textContent = formatLaborDuration(
+        getLaborActiveSeconds(benchFocusState.activeLabor) / 60,
+      );
     }
-    const reminder = dashboardPanel.querySelector("[data-bench-labor-reminder]");
-    if (reminder) reminder.hidden = !isBenchLaborReminderDue(benchFocusState.activeBench);
+    const reminder = dashboardPanel.querySelector(
+      "[data-bench-labor-reminder]",
+    );
+    if (reminder)
+      reminder.hidden = !isBenchLaborReminderDue(benchFocusState.activeBench);
   }, 1000);
 
   /* Close the popover without re-rendering the dashboard — a full
@@ -2989,8 +4277,10 @@ function wireHomeDashboardActions() {
 
   dashboardPanel.addEventListener("change", (e) => {
     if (e.target.matches("[data-finance-custom-date]")) {
-      financeFilterCustomStart = document.getElementById("financeCustomStart")?.value || "";
-      financeFilterCustomEnd = document.getElementById("financeCustomEnd")?.value || "";
+      financeFilterCustomStart =
+        document.getElementById("financeCustomStart")?.value || "";
+      financeFilterCustomEnd =
+        document.getElementById("financeCustomEnd")?.value || "";
       updateFinanceSnapshotSummary();
     }
   });
@@ -3019,7 +4309,7 @@ const ORDER_FILTER_LABELS = {
   waiting: "Waiting Parts",
   ready: "Ready to Go",
   hold: "On Hold",
-  completed: "Completed"
+  completed: "Completed",
 };
 
 function isOrderFilterView(viewName) {
@@ -3034,7 +4324,10 @@ function getOrderStatusDisplay(status) {
   const raw = String(status || "").trim();
   const normalized = normalizeStatus(raw);
 
-  if (normalized === "waiting on lace/parts" || normalized === "waiting on parts") {
+  if (
+    normalized === "waiting on lace/parts" ||
+    normalized === "waiting on parts"
+  ) {
     return "Waiting Parts";
   }
 
@@ -3043,19 +4336,32 @@ function getOrderStatusDisplay(status) {
 
 function getViewTitle(viewName) {
   switch (viewName) {
-    case "dashboard": return "Clubhouse";
-    case "map": return "Map";
-    case "money": return "Money";
-    case "pricing": return "Pricing";
-    case "upload": return "Gallery";
-    case "reviews": return "Reviews";
-    case "inventory": return "Lace Inventory";
-    case "gloves-sale": return "Gloves For Sale";
-    case "users": return "Users";
-    case "customers": return "Customers";
-    case "calendar": return "Calendar";
-    case "messages": return "Messages";
-    default: return "Orders";
+    case "dashboard":
+      return "Clubhouse";
+    case "map":
+      return "Map";
+    case "money":
+      return "Money";
+    case "pricing":
+      return "Pricing";
+    case "upload":
+      return "Gallery";
+    case "reviews":
+      return "Reviews";
+    case "inventory":
+      return "Lace Inventory";
+    case "gloves-sale":
+      return "Gloves For Sale";
+    case "users":
+      return "Users";
+    case "customers":
+      return "Customers";
+    case "calendar":
+      return "Calendar";
+    case "messages":
+      return "Messages";
+    default:
+      return "Orders";
   }
 }
 
@@ -3063,21 +4369,27 @@ function getViewOrders() {
   switch (activeView) {
     case "all":
       return allOrders;
-      
+
     case "completed":
       return allOrders.filter(isCompletedOrder);
 
     case "waiting":
-      return allOrders.filter(order => {
+      return allOrders.filter((order) => {
         const status = normalizeStatus(order.status);
-        return status === "waiting on lace/parts" || status === "waiting on parts";
+        return (
+          status === "waiting on lace/parts" || status === "waiting on parts"
+        );
       });
 
     case "estimate":
-      return allOrders.filter(order => normalizeStatus(order.status) === "estimate sent");
-      
+      return allOrders.filter(
+        (order) => normalizeStatus(order.status) === "estimate sent",
+      );
+
     case "approved":
-      return allOrders.filter(order => normalizeStatus(order.status) === "customer approved");
+      return allOrders.filter(
+        (order) => normalizeStatus(order.status) === "customer approved",
+      );
 
     case "customer-response":
       return allOrders.filter(isWaitingForCustomerResponse);
@@ -3086,16 +4398,20 @@ function getViewOrders() {
       return allOrders.filter(isInTransitToMe);
 
     case "progress":
-      return allOrders.filter(order => normalizeStatus(order.status) === "in progress");
+      return allOrders.filter(
+        (order) => normalizeStatus(order.status) === "in progress",
+      );
 
     case "ready":
-      return allOrders.filter(order => normalizeStatus(order.status) === "ready to go");
+      return allOrders.filter(
+        (order) => normalizeStatus(order.status) === "ready to go",
+      );
 
     case "hold":
       return allOrders.filter(isOnHold);
 
     default:
-      return allOrders.filter(order => {
+      return allOrders.filter((order) => {
         const status = normalizeStatus(order.status);
         return (
           status !== "completed" &&
@@ -3111,18 +4427,21 @@ function looksLocalDropOff(order) {
     order.dropOffMethod,
     order.deliveryMethod,
     order.shippingMethod,
-    order.dropoffMethod
-  ].map(normalizeText).join(" ");
+    order.dropoffMethod,
+  ]
+    .map(normalizeText)
+    .join(" ");
 
   return (
-    text.includes("local") ||
-    text.includes("drop off") ||
-    text.includes("drop-off") ||
-    text.includes("pickup") ||
-    text.includes("pick up") ||
-    text.includes("meet up") ||
-    text.includes("meet-up")
-  ) && !text.includes("ship");
+    (text.includes("local") ||
+      text.includes("drop off") ||
+      text.includes("drop-off") ||
+      text.includes("pickup") ||
+      text.includes("pick up") ||
+      text.includes("meet up") ||
+      text.includes("meet-up")) &&
+    !text.includes("ship")
+  );
 }
 
 function buildPirateShipClipboardText(order) {
@@ -3132,9 +4451,9 @@ function buildPirateShipClipboardText(order) {
     order.address2 || order.aptUnit || order.apartment || "",
     `${order.city || ""}, ${order.state || ""} ${order.zipCode || order.zip || ""}`,
     "United States",
-    order.emailAddress
+    order.emailAddress,
   ]
-    .map(v => String(v || "").trim())
+    .map((v) => String(v || "").trim())
     .filter(Boolean)
     .join("\n");
 }
@@ -3170,7 +4489,9 @@ async function copyPirateShipInfo(order) {
 }
 
 function textOrderCustomer(order) {
-  const phone = String(order.phoneNumber || "").replace(/[^\d+]/g, "").trim();
+  const phone = String(order.phoneNumber || "")
+    .replace(/[^\d+]/g, "")
+    .trim();
   if (phone) window.location.href = `sms:${phone}`;
 }
 
@@ -3207,7 +4528,7 @@ const SWIPE_ICONS = {
       <path d="M10 11v5.5" />
       <path d="M14 11v5.5" />
     </svg>
-  `
+  `,
 };
 
 function hasMeaningfulValue(value) {
@@ -3215,11 +4536,17 @@ function hasMeaningfulValue(value) {
 }
 
 function shouldShowPrimaryLace(order) {
-  return hasMeaningfulValue(order.primaryLaceColor) || hasMeaningfulValue(order.lacePrimary);
+  return (
+    hasMeaningfulValue(order.primaryLaceColor) ||
+    hasMeaningfulValue(order.lacePrimary)
+  );
 }
 
 function shouldShowSecondaryLace(order) {
-  return hasMeaningfulValue(order.secondaryLaceColor) || hasMeaningfulValue(order.laceAccent);
+  return (
+    hasMeaningfulValue(order.secondaryLaceColor) ||
+    hasMeaningfulValue(order.laceAccent)
+  );
 }
 
 function shouldShowCustomLaceNotes(order) {
@@ -3242,7 +4569,7 @@ function renderFieldLike(label, value) {
 function captureOrderDetailCollapseState() {
   if (!orderDetail) return;
 
-  orderDetail.querySelectorAll("[data-section-key]").forEach(section => {
+  orderDetail.querySelectorAll("[data-section-key]").forEach((section) => {
     const key = section.dataset.sectionKey;
     if (!key || section.classList.contains("is-empty")) return;
     orderDetailCollapseState[key] = !section.classList.contains("is-collapsed");
@@ -3260,7 +4587,9 @@ function getDefaultSectionExpanded(sectionKey) {
 }
 
 function getSectionExpanded(sectionKey, defaultExpanded) {
-  if (Object.prototype.hasOwnProperty.call(orderDetailCollapseState, sectionKey)) {
+  if (
+    Object.prototype.hasOwnProperty.call(orderDetailCollapseState, sectionKey)
+  ) {
     return orderDetailCollapseState[sectionKey];
   }
   return defaultExpanded;
@@ -3302,9 +4631,15 @@ function summarizeGloveDetails(order) {
 
 function summarizeLace(order) {
   const parts = [];
-  const primary = String(order.primaryLaceColor || order.lacePrimary || "").trim();
-  const secondary = String(order.secondaryLaceColor || order.laceAccent || "").trim();
-  const custom = String(order.customColorRequest || order.customLaceNotes || "").trim();
+  const primary = String(
+    order.primaryLaceColor || order.lacePrimary || "",
+  ).trim();
+  const secondary = String(
+    order.secondaryLaceColor || order.laceAccent || "",
+  ).trim();
+  const custom = String(
+    order.customColorRequest || order.customLaceNotes || "",
+  ).trim();
   const primaryUsed = order.primaryLaceUsed;
   const secondaryUsed = order.secondaryLaceUsed;
 
@@ -3314,7 +4649,11 @@ function summarizeLace(order) {
   if (primaryUsed !== null && primaryUsed !== undefined && primaryUsed !== "") {
     parts.push(`${primaryUsed} primary used`);
   }
-  if (secondaryUsed !== null && secondaryUsed !== undefined && secondaryUsed !== "") {
+  if (
+    secondaryUsed !== null &&
+    secondaryUsed !== undefined &&
+    secondaryUsed !== ""
+  ) {
     parts.push(`${secondaryUsed} secondary used`);
   }
 
@@ -3352,11 +4691,15 @@ function summarizeServices(order) {
 
 function summarizeServicesFromForm() {
   const checked = Array.from(
-    document.querySelectorAll('input[name="editServicesRequested"]:checked')
-  ).map(el => el.value);
+    document.querySelectorAll('input[name="editServicesRequested"]:checked'),
+  ).map((el) => el.value);
 
-  const otherChecked = document.getElementById("editServiceOtherCheck")?.checked;
-  const otherText = String(document.getElementById("editServiceOtherText")?.value || "").trim();
+  const otherChecked = document.getElementById(
+    "editServiceOtherCheck",
+  )?.checked;
+  const otherText = String(
+    document.getElementById("editServiceOtherText")?.value || "",
+  ).trim();
 
   if (otherChecked && otherText) checked.push(otherText);
   else if (otherChecked) checked.push("Other");
@@ -3366,7 +4709,9 @@ function summarizeServicesFromForm() {
 
 function buildCompactShippingAddress(street, city, state, zip) {
   const streetLine = String(street || "").trim();
-  const cityLine = [String(city || "").trim(), String(state || "").trim()].filter(Boolean).join(", ");
+  const cityLine = [String(city || "").trim(), String(state || "").trim()]
+    .filter(Boolean)
+    .join(", ");
   const zipLine = String(zip || "").trim();
   const cityStateZip = [cityLine, zipLine].filter(Boolean).join(" ");
 
@@ -3402,16 +4747,30 @@ function summarizeShipping(order) {
 }
 
 function summarizeShippingFromForm() {
-  const dropOff = document.getElementById("editDropOffMethod")?.value || currentOrder?.dropOffMethod || "";
+  const dropOff =
+    document.getElementById("editDropOffMethod")?.value ||
+    currentOrder?.dropOffMethod ||
+    "";
   if (looksLocalDropOff({ dropOffMethod: dropOff })) return "Local Drop-Off";
 
-  const tracking = String(document.getElementById("editTrackingNumber")?.value || "").trim();
-  const carrier = String(document.getElementById("editCarrier")?.value || "").trim();
-  const street = String(document.getElementById("editStreetAddress")?.value || "").trim();
+  const tracking = String(
+    document.getElementById("editTrackingNumber")?.value || "",
+  ).trim();
+  const carrier = String(
+    document.getElementById("editCarrier")?.value || "",
+  ).trim();
+  const street = String(
+    document.getElementById("editStreetAddress")?.value || "",
+  ).trim();
   const city = String(document.getElementById("editCity")?.value || "").trim();
-  const state = String(document.getElementById("editState")?.value || "").trim();
-  const zip = String(document.getElementById("editZipCode")?.value || "").trim();
-  const allowShip = document.getElementById("editAllowShipWithoutPayment")?.value === "true";
+  const state = String(
+    document.getElementById("editState")?.value || "",
+  ).trim();
+  const zip = String(
+    document.getElementById("editZipCode")?.value || "",
+  ).trim();
+  const allowShip =
+    document.getElementById("editAllowShipWithoutPayment")?.value === "true";
   const address = buildCompactShippingAddress(street, city, state, zip);
   const hasShippingData = !!(tracking || carrier || address || allowShip);
 
@@ -3429,7 +4788,9 @@ function summarizeShippingFromForm() {
 
 function summarizeCustomerFromForm() {
   const order = currentOrder || {};
-  const phone = formatPhoneForInput(document.getElementById("editPhoneNumber")?.value || "").trim();
+  const phone = formatPhoneForInput(
+    document.getElementById("editPhoneNumber")?.value || "",
+  ).trim();
   const email = String(order.emailAddress || "").trim();
   const parts = [];
 
@@ -3445,7 +4806,9 @@ function summarizeOrderStatusFromForm() {
   const parts = [];
   const status = document.getElementById("editStatus")?.value;
   const paid = document.getElementById("editPaid")?.value;
-  const price = String(document.getElementById("editPriceQuoted")?.value || "").trim();
+  const price = String(
+    document.getElementById("editPriceQuoted")?.value || "",
+  ).trim();
 
   if (status) parts.push(status);
   if (paid) parts.push(paid);
@@ -3456,9 +4819,15 @@ function summarizeOrderStatusFromForm() {
 
 function summarizeGloveDetailsFromForm() {
   const parts = [];
-  const brand = String(document.getElementById("editBrandModel")?.value || "").trim();
-  const gloveType = String(document.getElementById("editGloveType")?.value || "").trim();
-  const dropOff = String(document.getElementById("editDropOffMethod")?.value || "").trim();
+  const brand = String(
+    document.getElementById("editBrandModel")?.value || "",
+  ).trim();
+  const gloveType = String(
+    document.getElementById("editGloveType")?.value || "",
+  ).trim();
+  const dropOff = String(
+    document.getElementById("editDropOffMethod")?.value || "",
+  ).trim();
 
   if (brand) parts.push(brand);
   if (gloveType) parts.push(gloveType);
@@ -3469,11 +4838,21 @@ function summarizeGloveDetailsFromForm() {
 
 function summarizeLaceFromForm() {
   const parts = [];
-  const primary = String(document.getElementById("editPrimaryLaceColor")?.value || "").trim();
-  const secondary = String(document.getElementById("editSecondaryLaceColor")?.value || "").trim();
-  const custom = String(document.getElementById("editCustomColorRequest")?.value || "").trim();
-  const primaryUsed = String(document.getElementById("editPrimaryLaceUsed")?.value || "").trim();
-  const secondaryUsed = String(document.getElementById("editSecondaryLaceUsed")?.value || "").trim();
+  const primary = String(
+    document.getElementById("editPrimaryLaceColor")?.value || "",
+  ).trim();
+  const secondary = String(
+    document.getElementById("editSecondaryLaceColor")?.value || "",
+  ).trim();
+  const custom = String(
+    document.getElementById("editCustomColorRequest")?.value || "",
+  ).trim();
+  const primaryUsed = String(
+    document.getElementById("editPrimaryLaceUsed")?.value || "",
+  ).trim();
+  const secondaryUsed = String(
+    document.getElementById("editSecondaryLaceUsed")?.value || "",
+  ).trim();
 
   if (primary) parts.push(adminOrderLaceLabel(primary));
   if (secondary) parts.push(adminOrderLaceLabel(secondary));
@@ -3485,8 +4864,12 @@ function summarizeLaceFromForm() {
 }
 
 function summarizeNotesFromForm() {
-  const customer = String(document.getElementById("editGloveNotes")?.value || "").trim();
-  const internal = String(document.getElementById("editInternalNotes")?.value || "").trim();
+  const customer = String(
+    document.getElementById("editGloveNotes")?.value || "",
+  ).trim();
+  const internal = String(
+    document.getElementById("editInternalNotes")?.value || "",
+  ).trim();
 
   if (customer && internal) return "Customer + internal notes";
   if (customer) return "Customer note";
@@ -3534,21 +4917,29 @@ function getDetailSectionSummary(sectionKey, order = currentOrder) {
 }
 
 function updateDetailSectionSummary(sectionKey, order = currentOrder) {
-  const summaryEl = orderDetail?.querySelector(`[data-section-summary="${sectionKey}"]`);
+  const summaryEl = orderDetail?.querySelector(
+    `[data-section-summary="${sectionKey}"]`,
+  );
   if (!summaryEl) return;
 
   const summary = getDetailSectionSummary(sectionKey, order);
   summaryEl.textContent = summary ? `· ${summary}` : "";
 }
 
-function renderCollapsibleDetailSection(sectionKey, title, summary, bodyHtml, {
-  defaultExpanded = true,
-  isEmpty = false,
-  sectionId = `${sectionKey}Section`,
-  bodyId = `${sectionKey}SectionBody`,
-  headerActionsHtml = "",
-  extraClass = ""
-} = {}) {
+function renderCollapsibleDetailSection(
+  sectionKey,
+  title,
+  summary,
+  bodyHtml,
+  {
+    defaultExpanded = true,
+    isEmpty = false,
+    sectionId = `${sectionKey}Section`,
+    bodyId = `${sectionKey}SectionBody`,
+    headerActionsHtml = "",
+    extraClass = "",
+  } = {},
+) {
   const expanded = getSectionExpanded(sectionKey, defaultExpanded);
   const collapsed = !isEmpty && !expanded;
   const ariaExpanded = isEmpty || expanded;
@@ -3611,9 +5002,29 @@ function ensureDetailCollapseDelegation() {
 function wireDetailSectionSummaries() {
   const summaryBindings = [
     { ids: ["editPhoneNumber"], key: "customer" },
-    { ids: ["editStatus", "editPaid", "editPriceQuoted", "editShippingCost"], key: "orderStatus" },
-    { ids: ["editBrandModel", "editGloveType", "editDropOffMethod", "editWebType"], key: "gloveDetails" },
-    { ids: ["editPrimaryLaceColor", "editSecondaryLaceColor", "editPrimaryLaceUsed", "editSecondaryLaceUsed", "editCustomColorRequest"], key: "lace" },
+    {
+      ids: ["editStatus", "editPaid", "editPriceQuoted", "editShippingCost"],
+      key: "orderStatus",
+    },
+    {
+      ids: [
+        "editBrandModel",
+        "editGloveType",
+        "editDropOffMethod",
+        "editWebType",
+      ],
+      key: "gloveDetails",
+    },
+    {
+      ids: [
+        "editPrimaryLaceColor",
+        "editSecondaryLaceColor",
+        "editPrimaryLaceUsed",
+        "editSecondaryLaceUsed",
+        "editCustomColorRequest",
+      ],
+      key: "lace",
+    },
     { ids: ["editGloveNotes", "editInternalNotes"], key: "notes" },
     {
       ids: [
@@ -3623,14 +5034,14 @@ function wireDetailSectionSummaries() {
         "editStreetAddress",
         "editCity",
         "editState",
-        "editZipCode"
+        "editZipCode",
       ],
-      key: "shipping"
-    }
+      key: "shipping",
+    },
   ];
 
   summaryBindings.forEach(({ ids, key }) => {
-    ids.forEach(id => {
+    ids.forEach((id) => {
       const el = document.getElementById(id);
       if (!el || el.dataset.summaryBound === "1") return;
       el.dataset.summaryBound = "1";
@@ -3642,10 +5053,14 @@ function wireDetailSectionSummaries() {
   const servicesWrap = document.getElementById("editServicesRequestedWrap");
   if (servicesWrap && servicesWrap.dataset.summaryBound !== "1") {
     servicesWrap.dataset.summaryBound = "1";
-    servicesWrap.addEventListener("change", () => updateDetailSectionSummary("services"));
-    document.getElementById("editServiceOtherText")?.addEventListener("input", () => {
-      updateDetailSectionSummary("services");
-    });
+    servicesWrap.addEventListener("change", () =>
+      updateDetailSectionSummary("services"),
+    );
+    document
+      .getElementById("editServiceOtherText")
+      ?.addEventListener("input", () => {
+        updateDetailSectionSummary("services");
+      });
   }
 }
 
@@ -3655,9 +5070,13 @@ function renderPhotoGallery(order) {
     <div data-photo-drop="orderPhotoInput" class="order-photo-drop">
     <input id="orderPhotoInput" class="order-photo-input" type="file" accept="image/*" multiple>
     <p id="orderPhotoStatus" class="upload-status order-photo-status" aria-live="polite"></p>
-    ${photos.length ? `
+    ${
+      photos.length
+        ? `
       <div class="photo-grid">
-        ${photos.map((url, index) => `
+        ${photos
+          .map(
+            (url, index) => `
           <div class="photo-thumb-wrap">
             <img
               class="photo-thumb-img"
@@ -3667,11 +5086,15 @@ function renderPhotoGallery(order) {
               loading="lazy"
             >
           </div>
-        `).join("")}
+        `,
+          )
+          .join("")}
       </div>
-    ` : `
+    `
+        : `
       <p class="muted order-photo-empty">No order photos yet.</p>
-    `}
+    `
+    }
     <div class="detail-photo-actions">
       <button id="orderPhotoAddBtn" class="detail-show-on-map-link detail-photo-add-link" type="button">Add Photo</button>
     </div>
@@ -3686,8 +5109,8 @@ function renderPhotoGallery(order) {
     {
       defaultExpanded: getDefaultSectionExpanded("photos"),
       sectionId: "detailPhotoSection",
-      bodyId: "photosSectionBody"
-    }
+      bodyId: "photosSectionBody",
+    },
   );
 
   return `
@@ -3714,44 +5137,66 @@ function clientTextResendAllowed(status) {
 
 function clientEmailResendAllowed(status) {
   const s = normalizeStatus(status);
-  return !!s && ![
-    "picked up",
-    "pending response",
-    "in transit to me",
-    "customer approved"
-  ].includes(s);
+  return (
+    !!s &&
+    ![
+      "picked up",
+      "pending response",
+      "in transit to me",
+      "customer approved",
+    ].includes(s)
+  );
 }
 
 function orderCustomerMatchKeys(o) {
   return {
-    email: String(o?.emailAddress || "").trim().toLowerCase(),
-    phone: String(o?.phoneNumber || "").replace(/\D/g, "")
+    email: String(o?.emailAddress || "")
+      .trim()
+      .toLowerCase(),
+    phone: String(o?.phoneNumber || "").replace(/\D/g, ""),
   };
 }
 
 /* A customer's finished-or-in-progress unpaid gloves that can be billed
    together: same email or phone, unpaid, a real balance, and past the estimate
    stage (so a fresh quote never shows up as billable). */
-const COMBINED_BILL_PREWORK_STATUSES = new Set(["", "received", "estimate sent", "pending response"]);
+const COMBINED_BILL_PREWORK_STATUSES = new Set([
+  "",
+  "received",
+  "estimate sent",
+  "pending response",
+]);
 function getCustomerBillableOrders(order) {
   const me = orderCustomerMatchKeys(order);
   if (!me.email && me.phone.length < 10) return [];
-  return allOrders.filter(o => {
+  return allOrders.filter((o) => {
     const k = orderCustomerMatchKeys(o);
-    const sameCustomer = (me.email && k.email === me.email) || (me.phone.length >= 10 && k.phone === me.phone);
+    const sameCustomer =
+      (me.email && k.email === me.email) ||
+      (me.phone.length >= 10 && k.phone === me.phone);
     if (!sameCustomer) return false;
     if (normalizeText(o.paid) === "paid") return false;
-    if (COMBINED_BILL_PREWORK_STATUSES.has(String(o.status || "").trim().toLowerCase())) return false;
-    return (moneyNumber(o.priceQuoted) + moneyNumber(o.shippingCost)) > 0;
+    if (
+      COMBINED_BILL_PREWORK_STATUSES.has(
+        String(o.status || "")
+          .trim()
+          .toLowerCase(),
+      )
+    )
+      return false;
+    return moneyNumber(o.priceQuoted) + moneyNumber(o.shippingCost) > 0;
   });
 }
 
 function renderCombinedBillPanel(order) {
   const bill = getCustomerBillableOrders(order);
   if (bill.length < 2) return "";
-  const total = bill.reduce((s, o) => s + moneyNumber(o.priceQuoted) + moneyNumber(o.shippingCost), 0);
-  const nums = bill.map(o => String(o.orderNumber));
-  const numLabels = nums.map(n => `#${n}`).join(", ");
+  const total = bill.reduce(
+    (s, o) => s + moneyNumber(o.priceQuoted) + moneyNumber(o.shippingCost),
+    0,
+  );
+  const nums = bill.map((o) => String(o.orderNumber));
+  const numLabels = nums.map((n) => `#${n}`).join(", ");
   return `
     <div class="combined-bill-panel" data-order-numbers="${escapeAttr(nums.join(","))}">
       <div class="combined-bill-info">${bill.length} unpaid gloves for this customer — <strong>${escapeHtml(formatCurrency(total))}</strong> total: ${escapeHtml(numLabels)}</div>
@@ -3764,12 +5209,16 @@ function renderCombinedBillPanel(order) {
 }
 
 function renderStatusDelivery(order) {
-  const emailAvailable = !!String(order.emailAddress || "").trim() && clientEmailResendAllowed(order.status);
+  const emailAvailable =
+    !!String(order.emailAddress || "").trim() &&
+    clientEmailResendAllowed(order.status);
   const textAvailable =
     !!String(order.phoneNumber || "").trim() &&
     order.smsOptIn === true &&
     clientTextResendAllowed(order.status);
-  const textSuffix = order.lastStatusTextedAt ? ` · ${escapeHtml(formatDeliveryDateTime(order.lastStatusTextedAt))}` : "";
+  const textSuffix = order.lastStatusTextedAt
+    ? ` · ${escapeHtml(formatDeliveryDateTime(order.lastStatusTextedAt))}`
+    : "";
 
   return `
     <div id="statusDeliveryBlock" class="status-delivery-block detail-block full">
@@ -3811,8 +5260,8 @@ function renderOrderActivity(order) {
       defaultExpanded: false,
       isEmpty: true,
       sectionId: "orderActivitySection",
-      bodyId: "activitySectionBody"
-    }
+      bodyId: "activitySectionBody",
+    },
   );
 }
 
@@ -3858,13 +5307,20 @@ async function loadOrderActivity(orderNumber) {
   orderActivityLoadToken = token;
 
   try {
-    const data = await postJson({
-      action: "listOrderActivity",
-      orderNumber
-    }, true);
+    const data = await postJson(
+      {
+        action: "listOrderActivity",
+        orderNumber,
+      },
+      true,
+    );
 
     if (token !== orderActivityLoadToken) return;
-    if (!currentOrder || String(currentOrder.orderNumber) !== String(orderNumber)) return;
+    if (
+      !currentOrder ||
+      String(currentOrder.orderNumber) !== String(orderNumber)
+    )
+      return;
 
     const activity = data.activity || [];
     activityList.innerHTML = renderOrderActivityRows(activity);
@@ -3884,7 +5340,7 @@ function renderOrderActivityRows(activity) {
   let currentGroup = "";
   let html = "";
 
-  activity.forEach(item => {
+  activity.forEach((item) => {
     const date = parseActivityDate(item.createdAt || item.created_at);
     const group = formatActivityDateGroup(date);
     if (group !== currentGroup) {
@@ -3929,7 +5385,7 @@ function formatActivityDateGroup(date) {
   return date.toLocaleDateString([], {
     month: "short",
     day: "numeric",
-    year: date.getFullYear() === today.getFullYear() ? undefined : "numeric"
+    year: date.getFullYear() === today.getFullYear() ? undefined : "numeric",
   });
 }
 
@@ -3945,7 +5401,7 @@ function formatActivityTime(date) {
   if (!date) return "";
   return date.toLocaleTimeString([], {
     hour: "numeric",
-    minute: "2-digit"
+    minute: "2-digit",
   });
 }
 
@@ -3959,7 +5415,7 @@ const LABOR_TIMER_PHASES = [
   "Photos",
   "Packing/Shipping",
   "Admin/Messaging",
-  "Other"
+  "Other",
 ];
 
 /* =========================
@@ -3971,18 +5427,22 @@ const LABOR_TIMER_PHASES = [
    It is pure pass-through — neither revenue nor expense.
 ========================= */
 const SHOP_ECONOMICS = {
-  laceCostPerPiece: 3.60,
-  lacePieceDefaults: { "Fielders Glove": 3, "Catchers Mitt": 4, "First Base Mitt": 5 },
+  laceCostPerPiece: 3.6,
+  lacePieceDefaults: {
+    "Fielders Glove": 3,
+    "Catchers Mitt": 4,
+    "First Base Mitt": 5,
+  },
   lacePiecesTrapezeBonus: 1,
   palmPadUnitCost: 1.25, // $25 ShockTec 5 sq ft sheet ÷ twenty 6"x6" pads
-  consumablesPerCleaning: 1.00,
+  consumablesPerCleaning: 1.0,
   /* Measured pricing (2.1): suggested = median measured hours x target
      rate + materials. Tune the target rate here. */
   targetHourlyRate: 45,
   /* Every finished glove goes out with 1 business card + 1 sticker.
      Priced at replacement cost (cards $40.22/100, stickers $41.63/100) —
      the free replacement cards are a windfall, not a cost basis. */
-  packagingPerOrder: 0.82
+  packagingPerOrder: 0.82,
 };
 
 function getHistoricalOrderBasis(order) {
@@ -3998,7 +5458,7 @@ function getHistoricalOrderBasis(order) {
     customAddonLabel: inputs.custom_addon_label ?? order?.customAddonLabel,
     referralSource: inputs.referral_source ?? order?.referralSource,
     dateCompleted: snapshot.date_completed ?? order?.dateCompleted,
-    priceQuoted: snapshot.price_quoted ?? order?.priceQuoted
+    priceQuoted: snapshot.price_quoted ?? order?.priceQuoted,
   };
 }
 
@@ -4009,12 +5469,18 @@ function getOrderSelectedServices(order) {
 
 function orderHasRelacingService(order) {
   const services = getOrderSelectedServices(order);
-  return services.includes("Relacing") || services.includes("Cleaning + Conditioning + Relacing");
+  return (
+    services.includes("Relacing") ||
+    services.includes("Cleaning + Conditioning + Relacing")
+  );
 }
 
 function orderHasCleaningService(order) {
   const services = getOrderSelectedServices(order);
-  return services.includes("Cleaning + Conditioning") || services.includes("Cleaning + Conditioning + Relacing");
+  return (
+    services.includes("Cleaning + Conditioning") ||
+    services.includes("Cleaning + Conditioning + Relacing")
+  );
 }
 
 function orderHasPalmPadService(order) {
@@ -4031,7 +5497,9 @@ function orderLoopCount(order) {
   if (selected.includes("Thumb Loop Replacement")) count += 1;
   if (selected.includes("Pinky Loop Replacement")) count += 1;
   if (count === 0) {
-    const other = String(parseServicesValue(basis?.servicesRequested || "").otherText || "").toLowerCase();
+    const other = String(
+      parseServicesValue(basis?.servicesRequested || "").otherText || "",
+    ).toLowerCase();
     if (/\b(loop|thumb|pinky)\b/.test(other)) count = 1;
   }
   return count;
@@ -4040,7 +5508,9 @@ function orderLoopCount(order) {
 function orderHasWebReplacement(order) {
   const basis = getHistoricalOrderBasis(order);
   if (getOrderSelectedServices(order).includes("Web Replacement")) return true;
-  const other = String(parseServicesValue(basis?.servicesRequested || "").otherText || "").toLowerCase();
+  const other = String(
+    parseServicesValue(basis?.servicesRequested || "").otherText || "",
+  ).toLowerCase();
   return /\bweb\b/.test(other);
 }
 
@@ -4054,15 +5524,20 @@ function orderCustomAddonAmount(order) {
 }
 
 function orderHasTrapezeWeb(order) {
-  return String(getHistoricalOrderBasis(order)?.webType || "").toLowerCase().includes("trapeze");
+  return String(getHistoricalOrderBasis(order)?.webType || "")
+    .toLowerCase()
+    .includes("trapeze");
 }
 
 function getDefaultLacePieces(order) {
   const basis = getHistoricalOrderBasis(order);
-  const base = SHOP_ECONOMICS.lacePieceDefaults[String(basis?.gloveType || "")] ?? 4;
-  const trapezeBonus = String(basis?.gloveType || "") === "Fielders Glove" && orderHasTrapezeWeb(order)
-    ? SHOP_ECONOMICS.lacePiecesTrapezeBonus
-    : 0;
+  const base =
+    SHOP_ECONOMICS.lacePieceDefaults[String(basis?.gloveType || "")] ?? 4;
+  const trapezeBonus =
+    String(basis?.gloveType || "") === "Fielders Glove" &&
+    orderHasTrapezeWeb(order)
+      ? SHOP_ECONOMICS.lacePiecesTrapezeBonus
+      : 0;
   return base + trapezeBonus;
 }
 
@@ -4071,14 +5546,17 @@ function getDefaultLacePieces(order) {
 function getOrderActualLacePieces(order) {
   const primary = Number(order?.primaryLaceUsed);
   const secondary = Number(order?.secondaryLaceUsed);
-  const total = (Number.isFinite(primary) ? primary : 0)
-    + (Number.isFinite(secondary) ? secondary : 0);
+  const total =
+    (Number.isFinite(primary) ? primary : 0) +
+    (Number.isFinite(secondary) ? secondary : 0);
   return total > 0 ? total : null;
 }
 
 function getOrderEconomicsSnapshot(order) {
   const snapshot = order?.economicsSnapshot;
-  return snapshot && typeof snapshot === "object" && Number(snapshot.version) >= 1
+  return snapshot &&
+    typeof snapshot === "object" &&
+    Number(snapshot.version) >= 1
     ? snapshot
     : null;
 }
@@ -4093,7 +5571,7 @@ function materialsFromEconomicsSnapshot(snapshot) {
     palmPadCost: Number(snapshot.palm_pad_material_cost) || 0,
     consumables: Number(snapshot.consumables_cost) || 0,
     packaging: Number(snapshot.packaging_cost) || 0,
-    total: Number(snapshot.total_materials) || 0
+    total: Number(snapshot.total_materials) || 0,
   };
 }
 
@@ -4103,9 +5581,11 @@ function getOrderMaterialsCost(order) {
   const snapshot = getOrderEconomicsSnapshot(order);
   if (snapshot) return materialsFromEconomicsSnapshot(snapshot);
 
-  const override = order?.lacePiecesUsed != null && Number.isFinite(Number(order.lacePiecesUsed))
-    ? Number(order.lacePiecesUsed)
-    : null;
+  const override =
+    order?.lacePiecesUsed != null &&
+    Number.isFinite(Number(order.lacePiecesUsed))
+      ? Number(order.lacePiecesUsed)
+      : null;
   const actual = getOrderActualLacePieces(order);
 
   let lacePieces;
@@ -4114,7 +5594,9 @@ function getOrderMaterialsCost(order) {
   } else if (actual !== null) {
     lacePieces = actual;
   } else {
-    lacePieces = orderHasRelacingService(order) ? getDefaultLacePieces(order) : 0;
+    lacePieces = orderHasRelacingService(order)
+      ? getDefaultLacePieces(order)
+      : 0;
   }
 
   const laceUnitCost = getResolvedLaceUnitCost();
@@ -4128,13 +5610,18 @@ function getOrderMaterialsCost(order) {
       palmPadCost: null,
       consumables: null,
       packaging: null,
-      total: null
+      total: null,
     };
   }
   const laceCost = lacePieces * laceUnitCost;
-  const palmPadCost = orderHasPalmPadService(order) ? SHOP_ECONOMICS.palmPadUnitCost : 0;
-  const consumables = orderHasCleaningService(order) ? getConsumablesPerGlove() : 0;
-  const packaging = getUnitCost("business_card", 0.41) + getUnitCost("sticker", 0.41);
+  const palmPadCost = orderHasPalmPadService(order)
+    ? SHOP_ECONOMICS.palmPadUnitCost
+    : 0;
+  const consumables = orderHasCleaningService(order)
+    ? getConsumablesPerGlove()
+    : 0;
+  const packaging =
+    getUnitCost("business_card", 0.41) + getUnitCost("sticker", 0.41);
 
   return {
     available: true,
@@ -4145,7 +5632,7 @@ function getOrderMaterialsCost(order) {
     palmPadCost,
     consumables,
     packaging,
-    total: laceCost + palmPadCost + consumables + packaging
+    total: laceCost + palmPadCost + consumables + packaging,
   };
 }
 
@@ -4154,25 +5641,45 @@ function getOrderEconomics(order, laborMinutes) {
   if (snapshot) {
     const materials = materialsFromEconomicsSnapshot(snapshot);
     const net = snapshot.net == null ? null : Number(snapshot.net);
-    const hourlyRate = snapshot.effective_hourly_rate == null ? null : Number(snapshot.effective_hourly_rate);
+    const hourlyRate =
+      snapshot.effective_hourly_rate == null
+        ? null
+        : Number(snapshot.effective_hourly_rate);
     return {
       materials,
-      price: snapshot.price_quoted == null ? null : Number(snapshot.price_quoted),
+      price:
+        snapshot.price_quoted == null ? null : Number(snapshot.price_quoted),
       net,
       laborMinutes: Number(snapshot.labor_minutes) || 0,
       hourlyRate,
-      reason: net === null ? "No price set" : (hourlyRate === null ? "No labor logged" : ""),
-      locked: true
+      reason:
+        net === null
+          ? "No price set"
+          : hourlyRate === null
+            ? "No labor logged"
+            : "",
+      locked: true,
     };
   }
   const materials = getOrderMaterialsCost(order);
   const minutes = Number(laborMinutes);
   const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
   const price = Number(order?.priceQuoted);
-  const hasPrice = order?.priceQuoted != null && order?.priceQuoted !== "" && Number.isFinite(price);
+  const hasPrice =
+    order?.priceQuoted != null &&
+    order?.priceQuoted !== "" &&
+    Number.isFinite(price);
 
   if (!materials.available) {
-    return { materials, price: hasPrice ? price : null, net: null, laborMinutes: safeMinutes, hourlyRate: null, reason: "Material costs unavailable", locked: false };
+    return {
+      materials,
+      price: hasPrice ? price : null,
+      net: null,
+      laborMinutes: safeMinutes,
+      hourlyRate: null,
+      reason: "Material costs unavailable",
+      locked: false,
+    };
   }
   const net = hasPrice ? price - materials.total : null;
 
@@ -4186,18 +5693,33 @@ function getOrderEconomics(order, laborMinutes) {
     hourlyRate = net / (safeMinutes / 60);
   }
 
-  return { materials, price: hasPrice ? price : null, net, laborMinutes: safeMinutes, hourlyRate, reason, locked: false };
+  return {
+    materials,
+    price: hasPrice ? price : null,
+    net,
+    laborMinutes: safeMinutes,
+    hourlyRate,
+    reason,
+    locked: false,
+  };
 }
 
 function getOrderEconomicsSummaryText(order) {
-  if (orderDetailLaborMinutes === null && !getOrderEconomicsSnapshot(order)) return "";
+  if (orderDetailLaborMinutes === null && !getOrderEconomicsSnapshot(order))
+    return "";
   const econ = getOrderEconomics(order, orderDetailLaborMinutes);
-  return econ.hourlyRate !== null ? `${formatCurrency(econ.hourlyRate)}/hr` : "";
+  return econ.hourlyRate !== null
+    ? `${formatCurrency(econ.hourlyRate)}/hr`
+    : "";
 }
 
 function renderOrderEconomicsBody(order) {
-  const laborLoaded = orderDetailLaborMinutes !== null || !!getOrderEconomicsSnapshot(order);
-  const econ = getOrderEconomics(order, laborLoaded ? orderDetailLaborMinutes : 0);
+  const laborLoaded =
+    orderDetailLaborMinutes !== null || !!getOrderEconomicsSnapshot(order);
+  const econ = getOrderEconomics(
+    order,
+    laborLoaded ? orderDetailLaborMinutes : 0,
+  );
   const m = econ.materials;
   const hasPrice = econ.net !== null;
   const suggestion = m.available ? getSuggestedPrice(order) : null;
@@ -4208,14 +5730,18 @@ function renderOrderEconomicsBody(order) {
   const piecesSourceLabel = snapshot
     ? `(locked ${String(snapshot.lace_pieces_source || "historical")})`
     : isOverride
-    ? `(override${actualPieces !== null ? ` — actual used ${actualPieces}` : ` — estimate ${defaultPieces}`})`
-    : (actualPieces !== null
+      ? `(override${actualPieces !== null ? ` — actual used ${actualPieces}` : ` — estimate ${defaultPieces}`})`
+      : actualPieces !== null
         ? "(actual lace used)"
-        : `(estimate for glove type: ${defaultPieces})`);
+        : `(estimate for glove type: ${defaultPieces})`;
 
   let suggestionHtml = "";
   const measured = m.available ? getMeasuredSuggestion(order) : null;
-  const suggestedPrice = measured ? measured.price : (suggestion ? suggestion.price : null);
+  const suggestedPrice = measured
+    ? measured.price
+    : suggestion
+      ? suggestion.price
+      : null;
   if (suggestedPrice !== null) {
     let deltaText = "";
     if (hasPrice) {
@@ -4229,9 +5755,10 @@ function renderOrderEconomicsBody(order) {
       ? `median ${formatLaborDuration(measured.medianMinutes)} × ${formatCurrency(SHOP_ECONOMICS.targetHourlyRate)}/hr + materials, from ${measured.n} measured jobs`
       : `rule-based — under ${MEASURED_MIN_BUCKET_JOBS} measured jobs of this type so far`;
     if (orderHasCustomWork(order)) {
-      basis += orderCustomPhaseMinutes(order.orderNumber) > 0
-        ? ` · custom work timed under its own phase — the standard time feeds the medians`
-        : ` · custom work on this order — time the bespoke part under the "Custom Work" phase so the standard time can feed the medians`;
+      basis +=
+        orderCustomPhaseMinutes(order.orderNumber) > 0
+          ? ` · custom work timed under its own phase — the standard time feeds the medians`
+          : ` · custom work on this order — time the bespoke part under the "Custom Work" phase so the standard time can feed the medians`;
     }
     suggestionHtml = `
       <div class="order-economics-suggestion muted">Suggested price: ${escapeHtml(formatCurrency(suggestedPrice))}${escapeHtml(deltaText)}</div>
@@ -4241,9 +5768,10 @@ function renderOrderEconomicsBody(order) {
     suggestionHtml = `<div class="order-economics-suggestion muted">Pricing unavailable.</div>`;
   }
 
-  const rateDisplay = econ.hourlyRate !== null
-    ? escapeHtml(`${formatCurrency(econ.hourlyRate)}/hr`)
-    : `— <span class="order-economics-reason muted">${escapeHtml(!m.available ? "Loading material costs…" : (laborLoaded ? econ.reason : "Loading labor…"))}</span>`;
+  const rateDisplay =
+    econ.hourlyRate !== null
+      ? escapeHtml(`${formatCurrency(econ.hourlyRate)}/hr`)
+      : `— <span class="order-economics-reason muted">${escapeHtml(!m.available ? "Loading material costs…" : laborLoaded ? econ.reason : "Loading labor…")}</span>`;
 
   return `
     <div class="order-economics">
@@ -4263,7 +5791,9 @@ function renderOrderEconomicsBody(order) {
         <div class="order-economics-line"><span>Labor</span><span>${econ.locked || laborLoaded ? escapeHtml(formatLaborDuration(econ.laborMinutes)) : "—"}</span></div>
         ${econ.locked ? `<div class="order-economics-line"><span>Historical actuals</span><span>Locked ${escapeHtml(formatDeliveryDateTime(order.economicsLockedAt || getOrderEconomicsSnapshot(order)?.locked_at || ""))}</span></div>` : ""}
       </div>
-      ${orderHasRelacingService(order) ? `
+      ${
+        orderHasRelacingService(order)
+          ? `
         <div class="order-economics-pieces">
           <label class="order-economics-pieces-label" for="economicsLacePieces">
             Lace pieces <span class="muted">${escapeHtml(piecesSourceLabel)}</span>
@@ -4279,7 +5809,9 @@ function renderOrderEconomicsBody(order) {
             ${snapshot ? "disabled" : ""}
           >
         </div>
-      ` : ""}
+      `
+          : ""
+      }
     </div>
   `;
 }
@@ -4293,8 +5825,8 @@ function renderOrderEconomicsSection(order) {
     {
       defaultExpanded: getDefaultSectionExpanded("economics"),
       sectionId: "economicsSection",
-      bodyId: "economicsSectionBody"
-    }
+      bodyId: "economicsSectionBody",
+    },
   );
 }
 
@@ -4304,7 +5836,9 @@ function updateOrderEconomicsSection(order = currentOrder) {
   const body = document.getElementById("economicsSectionBody");
   if (body) body.innerHTML = renderOrderEconomicsBody(order);
 
-  const summaryEl = orderDetail?.querySelector(`[data-section-summary="economics"]`);
+  const summaryEl = orderDetail?.querySelector(
+    `[data-section-summary="economics"]`,
+  );
   if (summaryEl) {
     const summary = getOrderEconomicsSummaryText(order);
     summaryEl.textContent = summary ? `· ${summary}` : "";
@@ -4335,7 +5869,11 @@ function ensureOrderEconomicsDelegation() {
 
     e.target.disabled = true;
     try {
-      await saveOrderUpdate(order.orderNumber, { lacePiecesUsed: nextValue }, true);
+      await saveOrderUpdate(
+        order.orderNumber,
+        { lacePiecesUsed: nextValue },
+        true,
+      );
     } catch (err) {
       alert(err?.message || "Lace pieces could not be saved.");
     }
@@ -4344,19 +5882,26 @@ function ensureOrderEconomicsDelegation() {
 }
 
 function getPublishedService(serviceKey) {
-  const services = pricingStateCache && Array.isArray(pricingStateCache.services)
-    ? pricingStateCache.services
-    : null;
+  const services =
+    pricingStateCache && Array.isArray(pricingStateCache.services)
+      ? pricingStateCache.services
+      : null;
   if (!services) return null;
-  return services.find(service => (
-    service.serviceKey === serviceKey && service.isActive && service.publishedAt
-  )) || null;
+  return (
+    services.find(
+      (service) =>
+        service.serviceKey === serviceKey &&
+        service.isActive &&
+        service.publishedAt,
+    ) || null
+  );
 }
 
 function getPublishedServiceUnitPrice(serviceKey, order) {
   const service = getPublishedService(serviceKey);
   if (!service || service.pricingType === "variable") return null;
-  const usePremium = service.pricingType === "tiered" && orderPricingTier(order) === "premium";
+  const usePremium =
+    service.pricingType === "tiered" && orderPricingTier(order) === "premium";
   const value = usePremium ? service.premiumPrice : service.basePrice;
   if (value === null || value === undefined || value === "") return null;
   const price = Number(value);
@@ -4382,21 +5927,26 @@ function getSuggestedPrice(order) {
     const serviceKey = fullService ? "standard_full_service" : "full_relace";
     const base = getPublishedServiceUnitPrice(serviceKey, order);
     if (base === null) return null;
-    price += base; priced = true;
-    parts.push(`${fullService ? "Full service" : "Full relace"}: ${formatCurrency(base)}`);
+    price += base;
+    priced = true;
+    parts.push(
+      `${fullService ? "Full service" : "Full relace"}: ${formatCurrency(base)}`,
+    );
   } else {
     /* Non-relace primaries are independent services — sum whatever's selected
        (e.g. Clean & Condition + Lace Repair), not one-or-the-other. */
     if (hasClean) {
       const amount = getPublishedServiceUnitPrice("clean_condition", order);
       if (amount === null) return null;
-      price += amount; priced = true;
+      price += amount;
+      priced = true;
       parts.push(`Clean & condition: ${formatCurrency(amount)}`);
     }
     if (hasLaceRepair) {
       const amount = getPublishedServiceUnitPrice("lace_repair", order);
       if (amount === null) return null;
-      price += amount; priced = true;
+      price += amount;
+      priced = true;
       parts.push(`Lace repair: ${formatCurrency(amount)}`);
     }
   }
@@ -4405,14 +5955,16 @@ function getSuggestedPrice(order) {
   if (orderHasPalmPadService(order)) {
     const amount = getPublishedServiceUnitPrice("palm_padding", order);
     if (amount === null) return null;
-    price += amount; priced = true;
+    price += amount;
+    priced = true;
     parts.push(`Palm pad: +${formatCurrency(amount)}`);
   }
   if (loopCount > 0) {
     const unit = getPublishedServiceUnitPrice("loop_replacement", order);
     if (unit === null) return null;
     const loop = loopCount * unit;
-    price += loop; priced = true;
+    price += loop;
+    priced = true;
     parts.push(`Loop replacement ×${loopCount}: +${formatCurrency(loop)}`);
   }
   if (hasWeb) {
@@ -4441,7 +5993,10 @@ async function renderMoneyView() {
   let sessions = [];
   let loadError = "";
   const expensesReady = await warmExpensesCache();
-  if (!expensesReady) loadError = expensesCacheError || "Material costs could not be loaded. Retry the Money view.";
+  if (!expensesReady)
+    loadError =
+      expensesCacheError ||
+      "Material costs could not be loaded. Retry the Money view.";
   await warmPricingCache();
   try {
     const data = await postJson({ action: "listLaborSummary" }, true);
@@ -4474,7 +6029,7 @@ function ensureMoneyViewDelegation() {
 
 function buildMoneyRollup(items, keyFn, { sortByLabelDesc = false } = {}) {
   const groups = new Map();
-  items.forEach(item => {
+  items.forEach((item) => {
     const label = keyFn(item) || "Other";
     if (!groups.has(label)) groups.set(label, []);
     groups.get(label).push(item);
@@ -4482,22 +6037,37 @@ function buildMoneyRollup(items, keyFn, { sortByLabelDesc = false } = {}) {
 
   const rows = Array.from(groups.entries()).map(([label, groupItems]) => {
     const jobs = groupItems.length;
-    const priced = groupItems.filter(i => i.econ.net !== null);
+    const priced = groupItems.filter((i) => i.econ.net !== null);
     const avgPrice = priced.length
       ? priced.reduce((s, i) => s + Number(i.econ.price), 0) / priced.length
       : null;
-    const avgMaterials = groupItems.reduce((s, i) => s + i.econ.materials.total, 0) / jobs;
-    const avgMinutes = groupItems.reduce((s, i) => s + i.econ.laborMinutes, 0) / jobs;
+    const avgMaterials =
+      groupItems.reduce((s, i) => s + i.econ.materials.total, 0) / jobs;
+    const avgMinutes =
+      groupItems.reduce((s, i) => s + i.econ.laborMinutes, 0) / jobs;
     const netSum = priced.reduce((s, i) => s + i.econ.net, 0);
-    const pricedHours = priced.reduce((s, i) => s + i.econ.laborMinutes, 0) / 60;
+    const pricedHours =
+      priced.reduce((s, i) => s + i.econ.laborMinutes, 0) / 60;
     const rate = pricedHours > 0 ? netSum / pricedHours : null;
-    const orderNumbers = groupItems.map(i => String(i.order.orderNumber || "")).filter(Boolean);
-    return { label, jobs, avgPrice, avgMaterials, avgMinutes, rate, orderNumbers };
+    const orderNumbers = groupItems
+      .map((i) => String(i.order.orderNumber || ""))
+      .filter(Boolean);
+    return {
+      label,
+      jobs,
+      avgPrice,
+      avgMaterials,
+      avgMinutes,
+      rate,
+      orderNumbers,
+    };
   });
 
-  rows.sort(sortByLabelDesc
-    ? (a, b) => String(b.label).localeCompare(String(a.label))
-    : (a, b) => b.jobs - a.jobs);
+  rows.sort(
+    sortByLabelDesc
+      ? (a, b) => String(b.label).localeCompare(String(a.label))
+      : (a, b) => b.jobs - a.jobs,
+  );
   return rows;
 }
 
@@ -4512,18 +6082,24 @@ function renderMoneyRollupTable(title, firstColumn, rows) {
             <tr><th>${escapeHtml(firstColumn)}</th><th>Jobs</th><th>Avg price</th><th>Avg materials</th><th>Avg hours</th><th>$/hr</th></tr>
           </thead>
           <tbody>
-            ${rows.map(row => `
+            ${rows
+              .map(
+                (row) => `
               <tr>
                 <td>${escapeHtml(row.label)}</td>
-                <td>${row.orderNumbers && row.orderNumbers.length
-                  ? `<button type="button" class="pricing-jobs-link" data-jobs="${escapeAttr(row.orderNumbers.join(","))}" data-context="${escapeAttr(row.label)}" data-chip-label="${escapeAttr(title)}">${row.jobs}</button>`
-                  : row.jobs}</td>
+                <td>${
+                  row.orderNumbers && row.orderNumbers.length
+                    ? `<button type="button" class="pricing-jobs-link" data-jobs="${escapeAttr(row.orderNumbers.join(","))}" data-context="${escapeAttr(row.label)}" data-chip-label="${escapeAttr(title)}">${row.jobs}</button>`
+                    : row.jobs
+                }</td>
                 <td>${row.avgPrice !== null ? escapeHtml(formatCurrency(row.avgPrice)) : "—"}</td>
                 <td>${escapeHtml(formatCurrency(row.avgMaterials))}</td>
                 <td>${escapeHtml(formatLaborDuration(row.avgMinutes))}</td>
                 <td>${row.rate !== null ? escapeHtml(`${formatCurrency(row.rate)}/hr`) : "—"}</td>
               </tr>
-            `).join("")}
+            `,
+              )
+              .join("")}
           </tbody>
         </table>
       </div>
@@ -4542,9 +6118,11 @@ function renderMoneyJobsTable(title, items) {
             <tr><th>Customer</th><th>Order</th><th>Service</th><th>Price</th><th>Hours</th><th>$/hr</th></tr>
           </thead>
           <tbody>
-            ${items.map(item => {
-              const unpaid = String(item.order.paid || "").toLowerCase() !== "paid";
-              return `
+            ${items
+              .map((item) => {
+                const unpaid =
+                  String(item.order.paid || "").toLowerCase() !== "paid";
+                return `
                 <tr class="money-job-row" data-money-order="${escapeAttr(String(item.order.orderNumber || ""))}">
                   <td>${escapeHtml(item.order.customerName || "Customer")}</td>
                   <td>#${escapeHtml(String(item.order.orderNumber || ""))}</td>
@@ -4554,7 +6132,8 @@ function renderMoneyJobsTable(title, items) {
                   <td>${escapeHtml(`${formatCurrency(item.econ.hourlyRate)}/hr`)}</td>
                 </tr>
               `;
-            }).join("")}
+              })
+              .join("")}
           </tbody>
         </table>
       </div>
@@ -4568,11 +6147,15 @@ function renderMoneyJobsTable(title, items) {
    friendly. Only appears once the pricing cache has loaded. */
 function renderMoneyPricingCard(laborByOrder) {
   const state = pricingStateCache;
-  if (!state || !Array.isArray(state.services) || !state.services.length) return "";
+  if (!state || !Array.isArray(state.services) || !state.services.length)
+    return "";
   const services = state.services;
   const rows = services
     .filter((s) => (s.analyticsMappings || []).length)
-    .map((s) => ({ s, intel: computeServicePricingIntel(s, services, laborByOrder) }));
+    .map((s) => ({
+      s,
+      intel: computeServicePricingIntel(s, services, laborByOrder),
+    }));
   if (!rows.length) return "";
 
   return `
@@ -4580,13 +6163,19 @@ function renderMoneyPricingCard(laborByOrder) {
       <h3 class="money-card-title">Service Pricing Intelligence</h3>
       <p class="muted pricing-money-note">Published price vs measured labor and materials. Prices are managed in the Pricing view — this is analysis only.</p>
       <div class="pricing-money-list">
-        ${rows.map(({ s, intel }) => {
-          /* Summarize with the best-populated tier so the collapsed row shows a
+        ${rows
+          .map(({ s, intel }) => {
+            /* Summarize with the best-populated tier so the collapsed row shows a
              meaningful rate; the expanded block breaks tiers out in full. */
-          const primary = intel.tiers.slice().sort((a, b) => b.n - a.n)[0] || intel.tiers[0];
-          const interp = pricingTierInterpretation(primary, intel.settings);
-          const rateText = primary && primary.effectiveRate != null ? `${formatCurrency(primary.effectiveRate)}/hr` : "—";
-          return `
+            const primary =
+              intel.tiers.slice().sort((a, b) => b.n - a.n)[0] ||
+              intel.tiers[0];
+            const interp = pricingTierInterpretation(primary, intel.settings);
+            const rateText =
+              primary && primary.effectiveRate != null
+                ? `${formatCurrency(primary.effectiveRate)}/hr`
+                : "—";
+            return `
             <details class="pricing-money-item">
               <summary class="pricing-money-summary">
                 <span class="pricing-money-name">${escapeHtml(s.serviceName)}</span>
@@ -4599,7 +6188,8 @@ function renderMoneyPricingCard(laborByOrder) {
               ${renderServicePricingIntelBlock(s, intel)}
             </details>
           `;
-        }).join("")}
+          })
+          .join("")}
       </div>
     </div>
   `;
@@ -4611,7 +6201,9 @@ function renderMoneyPricingCard(laborByOrder) {
    ever appears.) */
 function isArchivedOrder(order) {
   const status = normalizeStatus(order?.status);
-  return order?.archived === true || status === "archived" || status === "cancelled";
+  return (
+    order?.archived === true || status === "archived" || status === "cancelled"
+  );
 }
 
 /* The estimated/charged price for analytics, or null when there is none. Blank
@@ -4630,7 +6222,9 @@ function orderChargedPrice(order) {
    are excluded entirely. */
 function isMoneyEligibleOrder(order) {
   if (isArchivedOrder(order)) return false;
-  return normalizeStatus(order?.status) === "ready to go" || isCompletedOrder(order);
+  return (
+    normalizeStatus(order?.status) === "ready to go" || isCompletedOrder(order)
+  );
 }
 
 /* Global Pricing Intelligence cutoff. Orders 0001–0080 stay fully visible
@@ -4654,13 +6248,14 @@ function renderMoneyViewContent(sessions, loadError) {
     return `<div class="money-error">${escapeHtml(loadError || "Material costs are unavailable. Retry before reviewing job economics.")}</div>`;
   }
   const laborByOrder = {};
-  (Array.isArray(sessions) ? sessions : []).forEach(session => {
+  (Array.isArray(sessions) ? sessions : []).forEach((session) => {
     const key = String(session.orderNumber || "");
     if (!key) return;
-    laborByOrder[key] = (laborByOrder[key] || 0) + (Number(session.durationMinutes) || 0);
+    laborByOrder[key] =
+      (laborByOrder[key] || 0) + (Number(session.durationMinutes) || 0);
   });
 
-  const rows = allOrders.filter(isMoneyEligibleOrder).map(order => {
+  const rows = allOrders.filter(isMoneyEligibleOrder).map((order) => {
     const laborMinutes = laborByOrder[String(order.orderNumber)] || 0;
     return { order, econ: getOrderEconomics(order, laborMinutes) };
   });
@@ -4670,16 +6265,25 @@ function renderMoneyViewContent(sessions, loadError) {
      rollups and best/worst too — a sub-minute fat-finger start/stop
      otherwise prints a wild $/hr artifact. Real short jobs still count. */
   const MIN_ROLLUP_LABOR_MINUTES = 1;
-  const logged = rows.filter(r => r.econ.laborMinutes > 0);
-  const withLabor = logged.filter(r => r.econ.laborMinutes >= MIN_ROLLUP_LABOR_MINUTES);
+  const logged = rows.filter((r) => r.econ.laborMinutes > 0);
+  const withLabor = logged.filter(
+    (r) => r.econ.laborMinutes >= MIN_ROLLUP_LABOR_MINUTES,
+  );
   const excludedCount = logged.length - withLabor.length;
-  const rated = withLabor.filter(r => r.econ.hourlyRate !== null);
+  const rated = withLabor.filter((r) => r.econ.hourlyRate !== null);
 
   const totalNet = rated.reduce((sum, r) => sum + r.econ.net, 0);
-  const ratedHours = rated.reduce((sum, r) => sum + r.econ.laborMinutes, 0) / 60;
+  const ratedHours =
+    rated.reduce((sum, r) => sum + r.econ.laborMinutes, 0) / 60;
   const overallRate = ratedHours > 0 ? totalNet / ratedHours : null;
-  const totalLaborMinutes = withLabor.reduce((sum, r) => sum + r.econ.laborMinutes, 0);
-  const totalMaterials = withLabor.reduce((sum, r) => sum + r.econ.materials.total, 0);
+  const totalLaborMinutes = withLabor.reduce(
+    (sum, r) => sum + r.econ.laborMinutes,
+    0,
+  );
+  const totalMaterials = withLabor.reduce(
+    (sum, r) => sum + r.econ.materials.total,
+    0,
+  );
 
   const errorHtml = loadError
     ? `<div class="money-error">${escapeHtml(loadError)}</div>`
@@ -4702,23 +6306,38 @@ function renderMoneyViewContent(sessions, loadError) {
     `;
   }
 
-  const byService = buildMoneyRollup(withLabor, r => getOrderSelectedServices(r.order).join(" + ") || "Other");
-  const byGlove = buildMoneyRollup(withLabor, r => String(getHistoricalOrderBasis(r.order).gloveType || "Unknown"));
+  const byService = buildMoneyRollup(
+    withLabor,
+    (r) => getOrderSelectedServices(r.order).join(" + ") || "Other",
+  );
+  const byGlove = buildMoneyRollup(withLabor, (r) =>
+    String(getHistoricalOrderBasis(r.order).gloveType || "Unknown"),
+  );
   /* Referral ROI uses ALL money-eligible orders — revenue per source
      doesn't require labor logs; $/hr fills in as timers cover more jobs. */
-  const byReferral = buildMoneyRollup(rows, r => {
-    const src = String(getHistoricalOrderBasis(r.order).referralSource || "").trim();
+  const byReferral = buildMoneyRollup(rows, (r) => {
+    const src = String(
+      getHistoricalOrderBasis(r.order).referralSource || "",
+    ).trim();
     if (!src) return "Unknown";
     return src.toLowerCase().startsWith("other") ? "Other" : src;
   });
 
   const byMonth = buildMoneyRollup(
     withLabor,
-    r => String(getHistoricalOrderBasis(r.order).dateCompleted || r.order.createdAt || r.order.timestampSubmitted || "").slice(0, 7) || "Unknown",
-    { sortByLabelDesc: true }
+    (r) =>
+      String(
+        getHistoricalOrderBasis(r.order).dateCompleted ||
+          r.order.createdAt ||
+          r.order.timestampSubmitted ||
+          "",
+      ).slice(0, 7) || "Unknown",
+    { sortByLabelDesc: true },
   );
 
-  const sortedByRate = rated.slice().sort((a, b) => b.econ.hourlyRate - a.econ.hourlyRate);
+  const sortedByRate = rated
+    .slice()
+    .sort((a, b) => b.econ.hourlyRate - a.econ.hourlyRate);
   const best = sortedByRate.slice(0, 5);
   const worst = sortedByRate.length > 5 ? sortedByRate.slice(-5).reverse() : [];
 
@@ -4800,21 +6419,22 @@ function formatLaborDateTime(value) {
     month: "short",
     day: "numeric",
     hour: "numeric",
-    minute: "2-digit"
+    minute: "2-digit",
   });
 }
 
 function getLaborSessionsSummary(sessions) {
   if (!Array.isArray(sessions) || !sessions.length) return "";
 
-  const active = sessions.find(session => !session.endedAt);
+  const active = sessions.find((session) => !session.endedAt);
   if (active) {
-    const stateLabel = getLaborSessionStatus(active) === "paused" ? "Paused" : "Running";
+    const stateLabel =
+      getLaborSessionStatus(active) === "paused" ? "Paused" : "Running";
     return `${stateLabel} · ${active.phase}`;
   }
 
   const totalMinutes = sessions
-    .filter(session => session.endedAt)
+    .filter((session) => session.endedAt)
     .reduce((sum, session) => sum + Number(session.durationMinutes || 0), 0);
 
   if (totalMinutes > 0) return `${formatLaborDuration(totalMinutes)} logged`;
@@ -4825,9 +6445,11 @@ function renderLaborPhaseOptions(selectedPhase = "") {
   const selected = String(selectedPhase || "");
   return `
     <option value="">Select phase</option>
-    ${LABOR_TIMER_PHASES.map(phase => `
+    ${LABOR_TIMER_PHASES.map(
+      (phase) => `
       <option value="${escapeAttr(phase)}"${phase === selected ? " selected" : ""}>${escapeHtml(phase)}</option>
-    `).join("")}
+    `,
+    ).join("")}
   `;
 }
 
@@ -4838,23 +6460,20 @@ function renderLaborTimerSection(order) {
     </div>
   `;
 
-  return renderCollapsibleDetailSection(
-    "laborTimer",
-    "Labor Timer",
-    "",
-    body,
-    {
-      defaultExpanded: getDefaultSectionExpanded("laborTimer"),
-      sectionId: "laborTimerSection",
-      bodyId: "laborTimerSectionBody"
-    }
-  );
+  return renderCollapsibleDetailSection("laborTimer", "Labor Timer", "", body, {
+    defaultExpanded: getDefaultSectionExpanded("laborTimer"),
+    sectionId: "laborTimerSection",
+    bodyId: "laborTimerSectionBody",
+  });
 }
 
 function renderLaborSessionRows(sessions) {
   const completed = (Array.isArray(sessions) ? sessions : [])
-    .filter(session => session.endedAt)
-    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+    .filter((session) => session.endedAt)
+    .sort(
+      (a, b) =>
+        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+    );
 
   if (!completed.length) {
     return `<p class="muted labor-timer-empty">No labor logged yet.</p>`;
@@ -4862,7 +6481,9 @@ function renderLaborSessionRows(sessions) {
 
   return `
     <div class="labor-session-list">
-      ${completed.map(session => `
+      ${completed
+        .map(
+          (session) => `
         <div class="labor-session-row">
           <div class="labor-session-main">
             <strong>${escapeHtml(session.phase || "Work")}</strong>
@@ -4873,15 +6494,20 @@ function renderLaborSessionRows(sessions) {
             ${session.notes ? `<span class="labor-session-notes">${escapeHtml(session.notes)}</span>` : ""}
           </div>
         </div>
-      `).join("")}
+      `,
+        )
+        .join("")}
     </div>
   `;
 }
 
 function renderLaborTimerPanel(sessions, { error = "" } = {}) {
-  const active = (Array.isArray(sessions) ? sessions : []).find(session => !session.endedAt) || null;
+  const active =
+    (Array.isArray(sessions) ? sessions : []).find(
+      (session) => !session.endedAt,
+    ) || null;
   const totalMinutes = (Array.isArray(sessions) ? sessions : [])
-    .filter(session => session.endedAt)
+    .filter((session) => session.endedAt)
     .reduce((sum, session) => sum + Number(session.durationMinutes || 0), 0);
   const notesValue = active?.notes || "";
   const selectedPhase = active?.phase || "";
@@ -4889,7 +6515,9 @@ function renderLaborTimerPanel(sessions, { error = "" } = {}) {
   return `
     ${error ? `<p class="labor-timer-error" role="alert">${escapeHtml(error)}</p>` : ""}
 
-    ${active ? `
+    ${
+      active
+        ? `
       <div class="labor-timer-card labor-timer-card--active">
         <div class="labor-timer-active-label">
           Active timer
@@ -4903,7 +6531,9 @@ function renderLaborTimerPanel(sessions, { error = "" } = {}) {
           Started ${escapeHtml(formatLaborDateTime(active.startedAt))}
         </div>
       </div>
-    ` : ""}
+    `
+        : ""
+    }
 
     <div class="labor-timer-card labor-timer-controls">
       <div class="labor-timer-field">
@@ -4931,7 +6561,9 @@ function renderLaborTimerPanel(sessions, { error = "" } = {}) {
           data-labor-start
           ${active ? "disabled" : ""}
         >Start Timer</button>
-        ${active && getLaborSessionStatus(active) === "running" ? `
+        ${
+          active && getLaborSessionStatus(active) === "running"
+            ? `
           <button
             id="laborTimerPauseBtn"
             class="labor-timer-btn"
@@ -4939,8 +6571,12 @@ function renderLaborTimerPanel(sessions, { error = "" } = {}) {
             data-labor-pause
             data-session-id="${escapeAttr(active.id)}"
           >Pause</button>
-        ` : ""}
-        ${active && getLaborSessionStatus(active) === "paused" ? `
+        `
+            : ""
+        }
+        ${
+          active && getLaborSessionStatus(active) === "paused"
+            ? `
           <button
             id="laborTimerResumeBtn"
             class="labor-timer-btn"
@@ -4948,8 +6584,12 @@ function renderLaborTimerPanel(sessions, { error = "" } = {}) {
             data-labor-resume
             data-session-id="${escapeAttr(active.id)}"
           >Resume</button>
-        ` : ""}
-        ${active ? `
+        `
+            : ""
+        }
+        ${
+          active
+            ? `
           <button
             id="laborTimerStopBtn"
             class="labor-timer-btn labor-timer-btn--stop"
@@ -4957,7 +6597,9 @@ function renderLaborTimerPanel(sessions, { error = "" } = {}) {
             data-labor-stop
             data-session-id="${escapeAttr(active.id)}"
           >Stop Timer</button>
-        ` : ""}
+        `
+            : ""
+        }
       </div>
     </div>
 
@@ -4975,7 +6617,9 @@ function renderLaborTimerPanel(sessions, { error = "" } = {}) {
 
 function updateLaborTimerSummary(sessions) {
   const summary = getLaborSessionsSummary(sessions);
-  const summaryEl = orderDetail?.querySelector(`[data-section-summary="laborTimer"]`);
+  const summaryEl = orderDetail?.querySelector(
+    `[data-section-summary="laborTimer"]`,
+  );
   if (summaryEl) {
     summaryEl.textContent = summary ? `· ${summary}` : "";
   }
@@ -5015,13 +6659,20 @@ async function loadLaborSessions(orderNumber, { preserveError = "" } = {}) {
 
   try {
     refreshBenchFocusState({ rerender: false });
-    const data = await postJson({
-      action: "listLaborSessions",
-      orderNumber
-    }, true);
+    const data = await postJson(
+      {
+        action: "listLaborSessions",
+        orderNumber,
+      },
+      true,
+    );
 
     if (token !== laborTimerLoadToken) return;
-    if (!currentOrder || String(currentOrder.orderNumber) !== String(orderNumber)) return;
+    if (
+      !currentOrder ||
+      String(currentOrder.orderNumber) !== String(orderNumber)
+    )
+      return;
 
     const sessions = data.sessions || [];
     panel.innerHTML = renderLaborTimerPanel(sessions, { error: preserveError });
@@ -5030,16 +6681,16 @@ async function loadLaborSessions(orderNumber, { preserveError = "" } = {}) {
     /* Economics counts stopped sessions only — open/paused sessions
        don't contribute labor minutes until stopped. */
     orderDetailLaborMinutes = sessions
-      .filter(session => session.endedAt)
+      .filter((session) => session.endedAt)
       .reduce((sum, session) => sum + Number(session.durationMinutes || 0), 0);
     updateOrderEconomicsSection();
 
-    const active = sessions.find(session => !session.endedAt);
+    const active = sessions.find((session) => !session.endedAt);
     if (active) startLaborTimerTick(active);
   } catch (err) {
     if (token !== laborTimerLoadToken) return;
     panel.innerHTML = renderLaborTimerPanel([], {
-      error: err?.message || "Labor timer could not be loaded."
+      error: err?.message || "Labor timer could not be loaded.",
     });
     updateLaborTimerSummary([]);
     orderDetailLaborMinutes = null;
@@ -5053,7 +6704,7 @@ async function handleLaborTimerStart(orderNumber) {
 
   if (!phase) {
     await loadLaborSessions(orderNumber, {
-      preserveError: "Select a phase before starting the timer."
+      preserveError: "Select a phase before starting the timer.",
     });
     return;
   }
@@ -5062,23 +6713,29 @@ async function handleLaborTimerStart(orderNumber) {
   if (startBtn) startBtn.disabled = true;
 
   try {
-    const activeBench = benchFocusState.activeBench &&
+    const activeBench =
+      benchFocusState.activeBench &&
       String(benchFocusState.activeBench.orderNumber) === String(orderNumber)
-      ? benchFocusState.activeBench
-      : null;
-    await postJson({
-      action: "startLaborSession",
-      orderNumber,
-      phase,
-      notes,
-      ...(activeBench ? { benchSessionId: activeBench.id, benchStartMode: "now" } : {})
-    }, true);
+        ? benchFocusState.activeBench
+        : null;
+    await postJson(
+      {
+        action: "startLaborSession",
+        orderNumber,
+        phase,
+        notes,
+        ...(activeBench
+          ? { benchSessionId: activeBench.id, benchStartMode: "now" }
+          : {}),
+      },
+      true,
+    );
 
     await loadLaborSessions(orderNumber);
     loadOrderActivity(orderNumber);
   } catch (err) {
     await loadLaborSessions(orderNumber, {
-      preserveError: err?.message || "Labor timer could not be started."
+      preserveError: err?.message || "Labor timer could not be started.",
     });
   }
 }
@@ -5089,11 +6746,14 @@ async function handleLaborTimerPause(orderNumber, sessionId) {
   if (pauseBtn) pauseBtn.disabled = true;
 
   try {
-    await postJson({
-      action: "pauseLaborSession",
-      sessionId,
-      notes
-    }, true);
+    await postJson(
+      {
+        action: "pauseLaborSession",
+        sessionId,
+        notes,
+      },
+      true,
+    );
 
     broadcastBenchFocusChange();
     await refreshBenchFocusState({ rerender: false });
@@ -5102,7 +6762,7 @@ async function handleLaborTimerPause(orderNumber, sessionId) {
     await loadLaborSessions(orderNumber);
   } catch (err) {
     await loadLaborSessions(orderNumber, {
-      preserveError: err?.message || "Labor timer could not be paused."
+      preserveError: err?.message || "Labor timer could not be paused.",
     });
   }
 }
@@ -5113,11 +6773,14 @@ async function handleLaborTimerResume(orderNumber, sessionId) {
   if (resumeBtn) resumeBtn.disabled = true;
 
   try {
-    await postJson({
-      action: "resumeLaborSession",
-      sessionId,
-      notes
-    }, true);
+    await postJson(
+      {
+        action: "resumeLaborSession",
+        sessionId,
+        notes,
+      },
+      true,
+    );
 
     broadcastBenchFocusChange();
     await refreshBenchFocusState({ rerender: false });
@@ -5125,7 +6788,7 @@ async function handleLaborTimerResume(orderNumber, sessionId) {
     await loadLaborSessions(orderNumber);
   } catch (err) {
     await loadLaborSessions(orderNumber, {
-      preserveError: err?.message || "Labor timer could not be resumed."
+      preserveError: err?.message || "Labor timer could not be resumed.",
     });
   }
 }
@@ -5136,11 +6799,14 @@ async function handleLaborTimerStop(orderNumber, sessionId) {
   if (stopBtn) stopBtn.disabled = true;
 
   try {
-    await postJson({
-      action: "stopLaborSession",
-      sessionId,
-      notes
-    }, true);
+    await postJson(
+      {
+        action: "stopLaborSession",
+        sessionId,
+        notes,
+      },
+      true,
+    );
 
     broadcastBenchFocusChange();
     await refreshBenchFocusState({ rerender: false });
@@ -5150,7 +6816,7 @@ async function handleLaborTimerStop(orderNumber, sessionId) {
     loadOrderActivity(orderNumber);
   } catch (err) {
     await loadLaborSessions(orderNumber, {
-      preserveError: err?.message || "Labor timer could not be stopped."
+      preserveError: err?.message || "Labor timer could not be stopped.",
     });
   }
 }
@@ -5166,9 +6832,11 @@ function ensureLaborTimerDelegation() {
       e.stopPropagation();
       if (!benchFocusBusy) {
         endBenchBtn.disabled = true;
-        Promise.resolve(endActiveBenchWork({ anchor: endBenchBtn })).finally(() => {
-          if (endBenchBtn.isConnected) endBenchBtn.disabled = false;
-        });
+        Promise.resolve(endActiveBenchWork({ anchor: endBenchBtn })).finally(
+          () => {
+            if (endBenchBtn.isConnected) endBenchBtn.disabled = false;
+          },
+        );
       }
       return;
     }
@@ -5176,7 +6844,9 @@ function ensureLaborTimerDelegation() {
     const startBtn = e.target.closest("[data-labor-start]");
     if (startBtn) {
       e.preventDefault();
-      const orderNumber = document.getElementById("laborTimerPanel")?.dataset.orderNumber || currentOrder?.orderNumber;
+      const orderNumber =
+        document.getElementById("laborTimerPanel")?.dataset.orderNumber ||
+        currentOrder?.orderNumber;
       if (!orderNumber) return;
       handleLaborTimerStart(orderNumber);
       return;
@@ -5185,7 +6855,9 @@ function ensureLaborTimerDelegation() {
     const pauseBtn = e.target.closest("[data-labor-pause]");
     if (pauseBtn) {
       e.preventDefault();
-      const orderNumber = document.getElementById("laborTimerPanel")?.dataset.orderNumber || currentOrder?.orderNumber;
+      const orderNumber =
+        document.getElementById("laborTimerPanel")?.dataset.orderNumber ||
+        currentOrder?.orderNumber;
       const sessionId = pauseBtn.dataset.sessionId;
       if (!orderNumber || !sessionId) return;
       handleLaborTimerPause(orderNumber, sessionId);
@@ -5195,7 +6867,9 @@ function ensureLaborTimerDelegation() {
     const resumeBtn = e.target.closest("[data-labor-resume]");
     if (resumeBtn) {
       e.preventDefault();
-      const orderNumber = document.getElementById("laborTimerPanel")?.dataset.orderNumber || currentOrder?.orderNumber;
+      const orderNumber =
+        document.getElementById("laborTimerPanel")?.dataset.orderNumber ||
+        currentOrder?.orderNumber;
       const sessionId = resumeBtn.dataset.sessionId;
       if (!orderNumber || !sessionId) return;
       handleLaborTimerResume(orderNumber, sessionId);
@@ -5205,7 +6879,9 @@ function ensureLaborTimerDelegation() {
     const stopBtn = e.target.closest("[data-labor-stop]");
     if (stopBtn) {
       e.preventDefault();
-      const orderNumber = document.getElementById("laborTimerPanel")?.dataset.orderNumber || currentOrder?.orderNumber;
+      const orderNumber =
+        document.getElementById("laborTimerPanel")?.dataset.orderNumber ||
+        currentOrder?.orderNumber;
       const sessionId = stopBtn.dataset.sessionId;
       if (!orderNumber || !sessionId) return;
       handleLaborTimerStop(orderNumber, sessionId);
@@ -5221,7 +6897,7 @@ function formatDeliveryDateTime(value) {
     month: "short",
     day: "numeric",
     hour: "numeric",
-    minute: "2-digit"
+    minute: "2-digit",
   });
 }
 
@@ -5233,7 +6909,7 @@ function emptyToNull(value) {
 const GLOVE_TYPE_OPTIONS = [
   "Fielders Glove",
   "Catchers Mitt",
-  "First Base Mitt"
+  "First Base Mitt",
 ];
 
 const WEB_TYPE_OPTIONS = [
@@ -5244,12 +6920,12 @@ const WEB_TYPE_OPTIONS = [
   "Trapeze Web",
   "Single Post Web",
   "Two-Piece Web",
-  "Other / Not Sure"
+  "Other / Not Sure",
 ];
 
 const DROP_OFF_METHOD_OPTIONS = [
   "Local Drop-Off",
-  "Shipped to Murph’s Mitt Maintenance"
+  "Shipped to Murph’s Mitt Maintenance",
 ];
 
 const SERVICE_OPTIONS = [
@@ -5260,7 +6936,7 @@ const SERVICE_OPTIONS = [
   "ShockTec Air2Gel Palm Pad",
   "Thumb Loop Replacement",
   "Pinky Loop Replacement",
-  "Web Replacement"
+  "Web Replacement",
 ];
 
 /* Lace color options come from the live lace inventory — same source, labels,
@@ -5274,21 +6950,31 @@ const ADMIN_LACE_LABEL_OVERRIDES = new Map([
   ["red - dark", "Dark Red"],
   ["tan - camel", "Camel"],
   ["tan - indian", "Indian Tan"],
-  ["tan - japan", "Japan Tan"]
+  ["tan - japan", "Japan Tan"],
 ]);
 /* Lace colors are grouped by family (the part before "-" in "Tan - Cheyenne"),
    families ordered by this list, plain colors before their variants, then A→Z.
    This replaces a hard-coded per-color rank so a NEW color slots into its family
    with no code change — just name it "Family - Specific" in the inventory. */
 const ADMIN_LACE_CATEGORY_ORDER = [
-  "black", "gray", "grey", "white",
-  "tan", "brown",
-  "blue", "green",
-  "red", "orange", "yellow", "purple"
+  "black",
+  "gray",
+  "grey",
+  "white",
+  "tan",
+  "brown",
+  "blue",
+  "green",
+  "red",
+  "orange",
+  "yellow",
+  "purple",
 ];
 
 function adminLaceCategoryRank(normalized) {
-  const cat = String(normalized || "").split(" - ")[0].trim();
+  const cat = String(normalized || "")
+    .split(" - ")[0]
+    .trim();
   const idx = ADMIN_LACE_CATEGORY_ORDER.indexOf(cat);
   return { idx: idx === -1 ? ADMIN_LACE_CATEGORY_ORDER.length : idx, cat };
 }
@@ -5296,12 +6982,12 @@ function adminLaceCategoryRank(normalized) {
 function compareAdminLaceColors(a, b) {
   const ra = adminLaceCategoryRank(a.normalized);
   const rb = adminLaceCategoryRank(b.normalized);
-  if (ra.idx !== rb.idx) return ra.idx - rb.idx;          // known families in list order
+  if (ra.idx !== rb.idx) return ra.idx - rb.idx; // known families in list order
   if (ra.cat !== rb.cat) return ra.cat.localeCompare(rb.cat); // unknown families A→Z
   const aVariant = a.normalized.includes(" - ");
   const bVariant = b.normalized.includes(" - ");
-  if (aVariant !== bVariant) return aVariant ? 1 : -1;    // plain color before its variants
-  return a.label.localeCompare(b.label);                  // then A→Z within the family
+  if (aVariant !== bVariant) return aVariant ? 1 : -1; // plain color before its variants
+  return a.label.localeCompare(b.label); // then A→Z within the family
 }
 
 let adminLaceOptionsCache = null;
@@ -5318,9 +7004,13 @@ function normalizeAdminLaceColor(value) {
 
 function adminLaceLabel(color) {
   const normalized = normalizeAdminLaceColor(color);
-  if (ADMIN_LACE_LABEL_OVERRIDES.has(normalized)) return ADMIN_LACE_LABEL_OVERRIDES.get(normalized);
-  const titled = normalized.split(/\s+/).filter(Boolean)
-    .map(word => `${word.charAt(0).toUpperCase()}${word.slice(1)}`).join(" ");
+  if (ADMIN_LACE_LABEL_OVERRIDES.has(normalized))
+    return ADMIN_LACE_LABEL_OVERRIDES.get(normalized);
+  const titled = normalized
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+    .join(" ");
   const parts = titled.split(" - ");
   if (parts.length === 2) return `${parts[1]} ${parts[0]}`;
   return titled;
@@ -5328,24 +7018,30 @@ function adminLaceLabel(color) {
 
 function adminOrderLaceLabel(color) {
   const raw = String(color || "").trim();
-  const stocked = adminLaceOptionsCache?.find(item => item.normalized === normalizeAdminLaceColor(raw));
+  const stocked = adminLaceOptionsCache?.find(
+    (item) => item.normalized === normalizeAdminLaceColor(raw),
+  );
   return stocked ? stocked.label : raw;
 }
 
 function loadAdminLaceOptions() {
   if (adminLaceOptionsCache) return Promise.resolve(adminLaceOptionsCache);
   if (!adminLaceOptionsPromise) {
-    adminLaceOptionsPromise = fetch("/api/lace-inventory", { cache: "no-store" })
-      .then(res => res.json())
-      .then(data => {
-        if (!data?.ok || !Array.isArray(data.inventory)) throw new Error("Lace inventory unavailable.");
+    adminLaceOptionsPromise = fetch("/api/lace-inventory", {
+      cache: "no-store",
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data?.ok || !Array.isArray(data.inventory))
+          throw new Error("Lace inventory unavailable.");
         const seen = new Set();
         const items = [];
         for (const item of data.inventory) {
           const value = String(item.color || "").trim();
           const normalized = normalizeAdminLaceColor(value);
           if (!value || seen.has(normalized) || item.active === false) continue;
-          if (normalized.includes("pink") || normalized.includes("vintage")) continue;
+          if (normalized.includes("pink") || normalized.includes("vintage"))
+            continue;
           seen.add(normalized);
           items.push({ value, normalized, label: adminLaceLabel(value) });
         }
@@ -5366,38 +7062,67 @@ function adminLaceOptionMarkup(current, placeholder = "Choose") {
   const items = adminLaceOptionsCache || [];
   const cur = String(current || "").trim();
   const curNormalized = normalizeAdminLaceColor(cur);
-  const inList = !cur || items.some(i => i.normalized === curNormalized);
-  return `<option value=""${!cur ? " selected" : ""}>${escapeHtml(placeholder)}</option>`
-    + (inList ? "" : `<option value="${escapeAttr(cur)}" selected>${escapeHtml(cur)}</option>`)
-    + items.map(i =>
-        `<option value="${escapeAttr(i.value)}"${i.normalized === curNormalized ? " selected" : ""}>${escapeHtml(i.label)}</option>`
-      ).join("");
+  const inList = !cur || items.some((i) => i.normalized === curNormalized);
+  return (
+    `<option value=""${!cur ? " selected" : ""}>${escapeHtml(placeholder)}</option>` +
+    (inList
+      ? ""
+      : `<option value="${escapeAttr(cur)}" selected>${escapeHtml(cur)}</option>`) +
+    items
+      .map(
+        (i) =>
+          `<option value="${escapeAttr(i.value)}"${i.normalized === curNormalized ? " selected" : ""}>${escapeHtml(i.label)}</option>`,
+      )
+      .join("")
+  );
 }
 
 /* Re-populate any rendered lace selects once the inventory arrives — options
    only; never re-renders the surrounding detail form. */
 function refreshAdminLaceSelects() {
-  document.querySelectorAll("select[data-lace-color-select]").forEach(select => {
-    const current = select.value || select.dataset.current || "";
-    const isSpecialOrder = !!current && !adminLaceOptionsCache?.some(item => item.normalized === normalizeAdminLaceColor(current));
-    if (isSpecialOrder && select.dataset.allowSpecialOrder === "true") {
-      replaceLaceSelectWithSpecialOrderInput(select, current, { focus: false });
-      return;
-    }
-    select.innerHTML = adminLaceOptionMarkup(current, select.dataset.placeholder || "Choose");
-    if (select.dataset.allowSpecialOrder === "true" || "allowCustom" in select.dataset) {
-      select.insertAdjacentHTML("beforeend", `<option value="__custom__">Special-order color…</option>`);
-    }
-  });
+  document
+    .querySelectorAll("select[data-lace-color-select]")
+    .forEach((select) => {
+      const current = select.value || select.dataset.current || "";
+      const isSpecialOrder =
+        !!current &&
+        !adminLaceOptionsCache?.some(
+          (item) => item.normalized === normalizeAdminLaceColor(current),
+        );
+      if (isSpecialOrder && select.dataset.allowSpecialOrder === "true") {
+        replaceLaceSelectWithSpecialOrderInput(select, current, {
+          focus: false,
+        });
+        return;
+      }
+      select.innerHTML = adminLaceOptionMarkup(
+        current,
+        select.dataset.placeholder || "Choose",
+      );
+      if (
+        select.dataset.allowSpecialOrder === "true" ||
+        "allowCustom" in select.dataset
+      ) {
+        select.insertAdjacentHTML(
+          "beforeend",
+          `<option value="__custom__">Special-order color…</option>`,
+        );
+      }
+    });
 }
 
-function replaceLaceSelectWithSpecialOrderInput(select, value = "", { focus = true } = {}) {
+function replaceLaceSelectWithSpecialOrderInput(
+  select,
+  value = "",
+  { focus = true } = {},
+) {
   const input = document.createElement("input");
   input.type = "text";
   input.id = select.id;
   input.value = String(value || "").trim();
   input.placeholder = "Supplier color name";
-  if (select.dataset.describeField) input.dataset.describeField = select.dataset.describeField;
+  if (select.dataset.describeField)
+    input.dataset.describeField = select.dataset.describeField;
   input.dataset.specialOrderLaceColor = "true";
   select.replaceWith(input);
   if (focus) input.focus();
@@ -5461,7 +7186,7 @@ const STATE_OPTIONS = [
   { value: "WV", label: "West Virginia" },
   { value: "WI", label: "Wisconsin" },
   { value: "WY", label: "Wyoming" },
-  { value: "DC", label: "District of Columbia" }
+  { value: "DC", label: "District of Columbia" },
 ];
 
 const REFERRAL_SOURCE_OPTIONS = [
@@ -5471,15 +7196,17 @@ const REFERRAL_SOURCE_OPTIONS = [
   "Referral",
   "The Craftsman",
   "Google",
-  "Other"
+  "Other",
 ];
 
 function renderSelectOptions(current, options, placeholder = "") {
   const values = placeholder ? ["", ...options] : options;
-  return values.map(v => {
-    const label = v || placeholder;
-    return `<option value="${escapeAttr(v)}" ${String(v) === String(current || "") ? "selected" : ""}>${escapeHtml(label)}</option>`;
-  }).join("");
+  return values
+    .map((v) => {
+      const label = v || placeholder;
+      return `<option value="${escapeAttr(v)}" ${String(v) === String(current || "") ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
 }
 
 function renderSelectInput(label, id, current, options, placeholder = "") {
@@ -5536,7 +7263,11 @@ function renderPhoneInput(label, id, value) {
 function renderLaceInput(label, id, value, placeholder = "Choose") {
   loadAdminLaceOptions();
   const current = String(value || "").trim();
-  const known = !current || adminLaceOptionsCache?.some(item => item.normalized === normalizeAdminLaceColor(current));
+  const known =
+    !current ||
+    adminLaceOptionsCache?.some(
+      (item) => item.normalized === normalizeAdminLaceColor(current),
+    );
   if (adminLaceOptionsCache && !known) {
     return `
       <div class="detail-block">
@@ -5565,14 +7296,18 @@ function webTypeOptions(current) {
 }
 
 function dropOffMethodOptions(current) {
-  return renderSelectOptions(current, DROP_OFF_METHOD_OPTIONS, "Select drop-off method");
+  return renderSelectOptions(
+    current,
+    DROP_OFF_METHOD_OPTIONS,
+    "Select drop-off method",
+  );
 }
 
 function carrierOptions(current) {
   return renderSelectOptions(
     current,
     ["USPS", "UPS", "FedEx"],
-    "Select carrier"
+    "Select carrier",
   );
 }
 
@@ -5582,35 +7317,35 @@ function stateOptions(current) {
 
   return [
     `<option value="">Select state</option>`,
-    ...STATE_OPTIONS.map(opt => {
+    ...STATE_OPTIONS.map((opt) => {
       const selected =
-        upper === opt.value ||
-        raw.toLowerCase() === opt.label.toLowerCase();
+        upper === opt.value || raw.toLowerCase() === opt.label.toLowerCase();
 
       return `<option value="${escapeAttr(opt.value)}" ${selected ? "selected" : ""}>${escapeHtml(opt.label)}</option>`;
-    })
+    }),
   ].join("");
 }
 
 function parseServicesValue(value) {
   const parts = String(value || "")
     .split(",")
-    .map(v => v.trim())
+    .map((v) => v.trim())
     .filter(Boolean);
 
-  const selected = SERVICE_OPTIONS.filter(opt => parts.includes(opt));
+  const selected = SERVICE_OPTIONS.filter((opt) => parts.includes(opt));
 
   const otherParts = parts
-    .filter(v => !SERVICE_OPTIONS.includes(v))
-    .map(v => v.replace(/^Other:\s*/i, "").trim())
+    .filter((v) => !SERVICE_OPTIONS.includes(v))
+    .map((v) => v.replace(/^Other:\s*/i, "").trim())
     .filter(Boolean);
 
-  const otherChecked = parts.some(v => /^other$/i.test(v)) || otherParts.length > 0;
+  const otherChecked =
+    parts.some((v) => /^other$/i.test(v)) || otherParts.length > 0;
 
   return {
     selected,
     otherChecked,
-    otherText: otherParts.join(", ")
+    otherText: otherParts.join(", "),
   };
 }
 
@@ -5621,7 +7356,8 @@ function renderServicesEditor(currentValue) {
     <div class="detail-block full">
       <div class="label">Services Requested</div>
       <div class="checkbox-group" id="editServicesRequestedWrap">
-        ${SERVICE_OPTIONS.map(opt => `
+        ${SERVICE_OPTIONS.map(
+          (opt) => `
           <label class="checkbox-item">
             <input
               type="checkbox"
@@ -5631,7 +7367,8 @@ function renderServicesEditor(currentValue) {
             />
             <span>${escapeHtml(opt)}</span>
           </label>
-        `).join("")}
+        `,
+        ).join("")}
 
         <label class="checkbox-item">
           <input
@@ -5655,10 +7392,12 @@ function renderServicesEditor(currentValue) {
 
 function getSelectedServices() {
   const checked = Array.from(
-    document.querySelectorAll('input[name="editServicesRequested"]:checked')
-  ).map(el => el.value);
+    document.querySelectorAll('input[name="editServicesRequested"]:checked'),
+  ).map((el) => el.value);
 
-  const otherChecked = document.getElementById("editServiceOtherCheck")?.checked;
+  const otherChecked = document.getElementById(
+    "editServiceOtherCheck",
+  )?.checked;
   const otherText = val("editServiceOtherText").trim();
 
   if (otherChecked && otherText) {
@@ -5671,7 +7410,9 @@ function getSelectedServices() {
 }
 
 function formatPhoneForInput(value) {
-  const digits = String(value || "").replace(/\D/g, "").slice(0, 10);
+  const digits = String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 10);
 
   if (digits.length <= 3) return digits;
   if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
@@ -6015,20 +7756,22 @@ function installSwipeDeleteStyles() {
 function suppressNextOrderCardClick(duration = 450) {
   suppressOrderCardClickUntil = Math.max(
     suppressOrderCardClickUntil,
-    performance.now() + duration
+    performance.now() + duration,
   );
 }
 
 function suppressRowClick(row, duration = 450) {
   row._suppressClickUntil = Math.max(
     row._suppressClickUntil || 0,
-    performance.now() + duration
+    performance.now() + duration,
   );
 }
 
 function shouldSuppressOrderCardClick(row) {
   const now = performance.now();
-  return now < suppressOrderCardClickUntil || now < (row._suppressClickUntil || 0);
+  return (
+    now < suppressOrderCardClickUntil || now < (row._suppressClickUntil || 0)
+  );
 }
 
 function enableOrderSwipeActions(row, order) {
@@ -6038,10 +7781,12 @@ function enableOrderSwipeActions(row, order) {
   const ACTION_SIZE = 50;
   const ACTION_GAP = 9;
   const ACTION_PAD = 10;
-  const DELETE_WIDTH = ACTION_SIZE + (ACTION_PAD * 2);
+  const DELETE_WIDTH = ACTION_SIZE + ACTION_PAD * 2;
   const quickActions = row.querySelectorAll(".swipe-action-btn").length;
   const QUICK_WIDTH = quickActions
-    ? (quickActions * ACTION_SIZE) + ((quickActions - 1) * ACTION_GAP) + (ACTION_PAD * 2)
+    ? quickActions * ACTION_SIZE +
+      (quickActions - 1) * ACTION_GAP +
+      ACTION_PAD * 2
     : 0;
   const HORIZONTAL_THRESHOLD = 12;
   const VERTICAL_THRESHOLD = 10;
@@ -6078,7 +7823,10 @@ function enableOrderSwipeActions(row, order) {
     card.style.transform = `translateX(${currentOffset}px)`;
     row.classList.toggle("revealing-right", currentOffset > 8);
     row.classList.toggle("revealing-left", currentOffset < -8);
-    row.classList.toggle("swiped-right", currentOffset >= QUICK_WIDTH - 2 && QUICK_WIDTH > 0);
+    row.classList.toggle(
+      "swiped-right",
+      currentOffset >= QUICK_WIDTH - 2 && QUICK_WIDTH > 0,
+    );
     row.classList.toggle("swiped-left", currentOffset <= -DELETE_WIDTH + 2);
     row.classList.toggle("is-swiping", Math.abs(currentOffset) > 1);
   }
@@ -6102,63 +7850,80 @@ function enableOrderSwipeActions(row, order) {
     setOffset(QUICK_WIDTH, withTransition);
   }
 
-  card.addEventListener("touchstart", (e) => {
-    if (!window.matchMedia("(pointer: coarse)").matches) return;
-    if (e.touches.length !== 1) return;
-    if (e.target.closest(".swipe-action-btn") || e.target.closest(".swipe-delete-btn")) return;
+  card.addEventListener(
+    "touchstart",
+    (e) => {
+      if (!window.matchMedia("(pointer: coarse)").matches) return;
+      if (e.touches.length !== 1) return;
+      if (
+        e.target.closest(".swipe-action-btn") ||
+        e.target.closest(".swipe-delete-btn")
+      )
+        return;
 
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    startOffset = currentOffset;
-    tracking = true;
-    dragging = true;
-    lockedVertical = false;
-    row._swipeDirection = "";
-    card.style.transition = "none";
-  }, { passive: true });
-
-  card.addEventListener("touchmove", (e) => {
-    if (!tracking || !dragging || !window.matchMedia("(pointer: coarse)").matches) return;
-
-    if (e.touches.length !== 1) {
-      tracking = false;
-      dragging = false;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startOffset = currentOffset;
+      tracking = true;
+      dragging = true;
       lockedVertical = false;
-      closeSwipe(true);
-      return;
-    }
+      row._swipeDirection = "";
+      card.style.transition = "none";
+    },
+    { passive: true },
+  );
 
-    const currentX = e.touches[0].clientX;
-    const currentY = e.touches[0].clientY;
-    const dx = currentX - startX;
-    const dy = currentY - startY;
-    const absX = Math.abs(dx);
-    const absY = Math.abs(dy);
+  card.addEventListener(
+    "touchmove",
+    (e) => {
+      if (
+        !tracking ||
+        !dragging ||
+        !window.matchMedia("(pointer: coarse)").matches
+      )
+        return;
 
-    if (!lockedVertical && !row._swipeDirection) {
-      if (absY > VERTICAL_THRESHOLD && absY > absX * DIRECTION_RATIO) {
-        lockedVertical = true;
+      if (e.touches.length !== 1) {
         tracking = false;
         dragging = false;
+        lockedVertical = false;
         closeSwipe(true);
         return;
       }
 
-      if (absX < HORIZONTAL_THRESHOLD || absX < absY * DIRECTION_RATIO) {
-        return;
+      const currentX = e.touches[0].clientX;
+      const currentY = e.touches[0].clientY;
+      const dx = currentX - startX;
+      const dy = currentY - startY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+
+      if (!lockedVertical && !row._swipeDirection) {
+        if (absY > VERTICAL_THRESHOLD && absY > absX * DIRECTION_RATIO) {
+          lockedVertical = true;
+          tracking = false;
+          dragging = false;
+          closeSwipe(true);
+          return;
+        }
+
+        if (absX < HORIZONTAL_THRESHOLD || absX < absY * DIRECTION_RATIO) {
+          return;
+        }
+
+        row._swipeDirection = "horizontal";
+        closeOtherSwipes(row);
+        cancelWorkflowPress();
       }
 
-      row._swipeDirection = "horizontal";
-      closeOtherSwipes(row);
-      cancelWorkflowPress();
-    }
-
-    if (row._swipeDirection === "horizontal") {
-      e.preventDefault();
-      cancelWorkflowPress();
-      setOffset(startOffset + dx, false);
-    }
-  }, { passive: false });
+      if (row._swipeDirection === "horizontal") {
+        e.preventDefault();
+        cancelWorkflowPress();
+        setOffset(startOffset + dx, false);
+      }
+    },
+    { passive: false },
+  );
 
   function finishSwipe() {
     if (!tracking && !dragging && !row._swipeDirection) {
@@ -6188,18 +7953,22 @@ function enableOrderSwipeActions(row, order) {
   card.addEventListener("touchend", finishSwipe);
   card.addEventListener("touchcancel", finishSwipe);
 
-  document.addEventListener("touchstart", (e) => {
-    if (!row.contains(e.target)) {
-      closeSwipe(true);
-    }
-  }, { passive: true });
+  document.addEventListener(
+    "touchstart",
+    (e) => {
+      if (!row.contains(e.target)) {
+        closeSwipe(true);
+      }
+    },
+    { passive: true },
+  );
 
   row._closeSwipe = closeSwipe;
   row._isSwipeOpen = () => Math.abs(currentOffset) > 1;
 }
 
 function closeOtherSwipes(activeRow) {
-  document.querySelectorAll(".swipe-row").forEach(row => {
+  document.querySelectorAll(".swipe-row").forEach((row) => {
     if (row !== activeRow && typeof row._closeSwipe === "function") {
       row._closeSwipe(true);
     }
@@ -6261,11 +8030,11 @@ function positionDesktopOrderActionMenu(button, menu) {
   const margin = 10;
   const left = Math.min(
     window.innerWidth - menuRect.width - margin,
-    Math.max(margin, rect.left + (rect.width / 2) - (menuRect.width / 2))
+    Math.max(margin, rect.left + rect.width / 2 - menuRect.width / 2),
   );
   const top = Math.min(
     window.innerHeight - menuRect.height - margin,
-    rect.bottom + gap
+    rect.bottom + gap,
   );
 
   menu.style.left = `${left}px`;
@@ -6273,7 +8042,9 @@ function positionDesktopOrderActionMenu(button, menu) {
 }
 
 function toggleDesktopOrderActionMenu(row, button, order) {
-  const isOpen = desktopOrderActionState?.button === button && !desktopOrderActionMenu?.hidden;
+  const isOpen =
+    desktopOrderActionState?.button === button &&
+    !desktopOrderActionMenu?.hidden;
 
   if (isOpen) {
     closeDesktopOrderActionMenus();
@@ -6293,7 +8064,9 @@ function toggleDesktopOrderActionMenu(row, button, order) {
 }
 
 function normalizeAdminView(viewName) {
-  const view = String(viewName || "").trim().toLowerCase();
+  const view = String(viewName || "")
+    .trim()
+    .toLowerCase();
   if (!view || view === "dashboard") return "dashboard";
   if (view === "orders" || view === "current") return "current";
   if (view === "map") return "map";
@@ -6312,10 +8085,26 @@ function normalizeAdminView(viewName) {
 }
 
 function isKnownAdminView(viewName) {
-  const view = String(viewName || "").trim().toLowerCase();
+  const view = String(viewName || "")
+    .trim()
+    .toLowerCase();
   if (!view || view === "dashboard") return true;
   if (view === "orders" || view === "current") return true;
-  return ["map", "money", "pricing", "upload", "reviews", "inventory", "gloves-sale", "users", "customers", "calendar", "messages"].includes(view) || isOrderFilterView(view);
+  return (
+    [
+      "map",
+      "money",
+      "pricing",
+      "upload",
+      "reviews",
+      "inventory",
+      "gloves-sale",
+      "users",
+      "customers",
+      "calendar",
+      "messages",
+    ].includes(view) || isOrderFilterView(view)
+  );
 }
 
 function syncAdminViewUrl(viewName) {
@@ -6386,10 +8175,15 @@ function setActiveView(viewName) {
   orderFiltersExpanded = false;
   inventoryFiltersExpanded = false;
   activeView = resolvedView;
-  navLinks.forEach(link => {
-    const isDashboardLink = link.dataset.view === "dashboard" && resolvedView === "dashboard";
-    const isOrdersLink = link.dataset.view === "current" && isOrderFilterView(resolvedView);
-    link.classList.toggle("active", isDashboardLink || isOrdersLink || link.dataset.view === resolvedView);
+  navLinks.forEach((link) => {
+    const isDashboardLink =
+      link.dataset.view === "dashboard" && resolvedView === "dashboard";
+    const isOrdersLink =
+      link.dataset.view === "current" && isOrderFilterView(resolvedView);
+    link.classList.toggle(
+      "active",
+      isDashboardLink || isOrdersLink || link.dataset.view === resolvedView,
+    );
   });
 
   if (viewTitle) {
@@ -6508,7 +8302,9 @@ function setActiveView(viewName) {
     showView(mapView);
     closeMenu();
     resetViewScroll(mapView, { invalidateMap: true, blurActive: true });
-    renderMapView().finally(() => resetViewScroll(mapView, { invalidateMap: true }));
+    renderMapView().finally(() =>
+      resetViewScroll(mapView, { invalidateMap: true }),
+    );
     return;
   }
 
@@ -6516,7 +8312,7 @@ function setActiveView(viewName) {
   if (resolvedView === "inventory") {
     searchInput.value = "";
     syncSearchUI();
-    renderPromise = loadInventory().catch(err => {
+    renderPromise = loadInventory().catch((err) => {
       ordersList.innerHTML = `<div class="no-results">${escapeHtml(err.message || "Failed to load inventory.")}</div>`;
     });
   } else {
@@ -6571,7 +8367,9 @@ function applyFilters() {
   if (isSearching) pricingIntelFilter = null;
   if (pricingIntelFilter && !isSearching && isOrderFilterView(activeView)) {
     const wanted = new Set(pricingIntelFilter.orderNumbers.map(String));
-    const list = allOrders.filter(order => wanted.has(String(order.orderNumber)));
+    const list = allOrders.filter((order) =>
+      wanted.has(String(order.orderNumber)),
+    );
     sortOrders(list);
     renderOrders(list);
     viewTitle.textContent = "Orders";
@@ -6586,7 +8384,7 @@ function applyFilters() {
   let list = (isSearching ? allOrders : getViewOrders()).slice();
 
   if (isSearching) {
-    list = list.filter(order => orderMatchesSearch(order, q));
+    list = list.filter((order) => orderMatchesSearch(order, q));
   }
 
   sortOrders(list);
@@ -6608,9 +8406,15 @@ function applyFilters() {
 
 /* Open the Orders view filtered to a pricing-intelligence tier's exact jobs. */
 function openPricingIntelOrders(orderNumbers, context, chipLabel) {
-  const nums = (orderNumbers || []).map(n => String(n).trim()).filter(Boolean);
+  const nums = (orderNumbers || [])
+    .map((n) => String(n).trim())
+    .filter(Boolean);
   if (!nums.length) return;
-  pricingIntelFilter = { orderNumbers: nums, context: context || "", chipLabel: chipLabel || "" };
+  pricingIntelFilter = {
+    orderNumbers: nums,
+    context: context || "",
+    chipLabel: chipLabel || "",
+  };
   if (searchInput) searchInput.value = "";
   searchExpanded = false;
   setActiveView("current");
@@ -6627,7 +8431,9 @@ function renderPricingIntelChip(count) {
   const bar = document.getElementById("pricingIntelChip");
   if (!bar || !pricingIntelFilter) return;
   const prefix = pricingIntelFilter.chipLabel || "Pricing Intelligence";
-  const ctx = pricingIntelFilter.context ? ` · ${escapeHtml(pricingIntelFilter.context)}` : "";
+  const ctx = pricingIntelFilter.context
+    ? ` · ${escapeHtml(pricingIntelFilter.context)}`
+    : "";
   bar.innerHTML = `
     <span class="pricing-chip">
       <span class="pricing-chip-label">${escapeHtml(prefix)}${ctx} · ${count} job${count === 1 ? "" : "s"}</span>
@@ -6639,7 +8445,10 @@ function renderPricingIntelChip(count) {
 
 function hidePricingIntelChip() {
   const bar = document.getElementById("pricingIntelChip");
-  if (bar) { bar.hidden = true; bar.innerHTML = ""; }
+  if (bar) {
+    bar.hidden = true;
+    bar.innerHTML = "";
+  }
 }
 
 /* Delegated: a Measured-jobs count (Pricing view or Money view) opens the
@@ -6647,8 +8456,15 @@ function hidePricingIntelChip() {
 document.addEventListener("click", (e) => {
   const jobsLink = e.target.closest(".pricing-jobs-link");
   if (jobsLink) {
-    const nums = (jobsLink.dataset.jobs || "").split(",").map(s => s.trim()).filter(Boolean);
-    openPricingIntelOrders(nums, jobsLink.dataset.context || "", jobsLink.dataset.chipLabel || "");
+    const nums = (jobsLink.dataset.jobs || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    openPricingIntelOrders(
+      nums,
+      jobsLink.dataset.context || "",
+      jobsLink.dataset.chipLabel || "",
+    );
     return;
   }
   if (e.target.closest("[data-pricing-chip-remove]")) {
@@ -6692,19 +8508,27 @@ function syncOrderFilterUI() {
 
   if (orderFilterToggleBtn) {
     orderFilterToggleBtn.hidden = !showOrderFilter;
-    orderFilterToggleBtn.setAttribute("aria-expanded", showPopover ? "true" : "false");
+    orderFilterToggleBtn.setAttribute(
+      "aria-expanded",
+      showPopover ? "true" : "false",
+    );
     orderFilterToggleBtn.classList.toggle("is-active", showPopover);
-    orderFilterToggleBtn.classList.toggle("has-active-filter", showOrderFilter && activeView !== "current");
+    orderFilterToggleBtn.classList.toggle(
+      "has-active-filter",
+      showOrderFilter && activeView !== "current",
+    );
   }
 
   if (orderFilterPopover) {
     orderFilterPopover.hidden = !showPopover;
     if (showPopover) {
-      requestAnimationFrame(() => positionAdminFilterPopover(orderFilterPopover, orderFilterToggleBtn));
+      requestAnimationFrame(() =>
+        positionAdminFilterPopover(orderFilterPopover, orderFilterToggleBtn),
+      );
     }
   }
 
-  orderFilterButtons.forEach(btn => {
+  orderFilterButtons.forEach((btn) => {
     const active = btn.dataset.orderFilter === activeView;
     btn.classList.toggle("active", active);
     btn.setAttribute("aria-checked", active ? "true" : "false");
@@ -6767,7 +8591,11 @@ function canStartPullRefresh(e) {
   if (!window.matchMedia("(pointer: coarse)").matches) return false;
   if (!isAuthenticated()) return false;
   if (pullRefreshState.refreshing) return false;
-  if (loginView?.classList.contains("active") || detailView?.classList.contains("active")) return false;
+  if (
+    loginView?.classList.contains("active") ||
+    detailView?.classList.contains("active")
+  )
+    return false;
   if (document.body.classList.contains("workflow-open")) return false;
   if (sideMenu?.classList.contains("open")) return false;
   if (orderFiltersExpanded || inventoryFiltersExpanded) return false;
@@ -6785,7 +8613,7 @@ function canStartPullRefresh(e) {
   if (!e.touches || e.touches.length !== 1) return false;
   if (
     e.target.closest(
-      "button, input, textarea, select, .swipe-action-panel, .side-menu, .admin-filter-popover, .leaflet-container, .leaflet-popup, .order-map, .upload-drop"
+      "button, input, textarea, select, .swipe-action-panel, .side-menu, .admin-filter-popover, .leaflet-container, .leaflet-popup, .order-map, .upload-drop",
     )
   ) {
     return false;
@@ -6860,62 +8688,71 @@ function initPullToRefresh() {
   const threshold = 74;
   const directionThreshold = 10;
 
-  document.addEventListener("touchstart", (e) => {
-    if (!canStartPullRefresh(e)) return;
+  document.addEventListener(
+    "touchstart",
+    (e) => {
+      if (!canStartPullRefresh(e)) return;
 
-    const touch = e.touches[0];
-    pullRefreshState.tracking = true;
-    pullRefreshState.pulling = false;
-    pullRefreshState.startX = touch.clientX;
-    pullRefreshState.startY = touch.clientY;
-    pullRefreshState.distance = 0;
-  }, { passive: true });
+      const touch = e.touches[0];
+      pullRefreshState.tracking = true;
+      pullRefreshState.pulling = false;
+      pullRefreshState.startX = touch.clientX;
+      pullRefreshState.startY = touch.clientY;
+      pullRefreshState.distance = 0;
+    },
+    { passive: true },
+  );
 
-  document.addEventListener("touchmove", (e) => {
-    if (!pullRefreshState.tracking || pullRefreshState.refreshing) return;
-    if (!e.touches || e.touches.length !== 1) {
-      resetPullRefreshIndicator();
-      return;
-    }
-
-    const touch = e.touches[0];
-    const dx = touch.clientX - pullRefreshState.startX;
-    const dy = touch.clientY - pullRefreshState.startY;
-    const absX = Math.abs(dx);
-    const absY = Math.abs(dy);
-
-    if (!pullRefreshState.pulling) {
-      if (dy < 0 || (absX > directionThreshold && absX > absY)) {
+  document.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!pullRefreshState.tracking || pullRefreshState.refreshing) return;
+      if (!e.touches || e.touches.length !== 1) {
         resetPullRefreshIndicator();
         return;
       }
 
-      if (dy < directionThreshold || absY < absX * 1.2) {
-        return;
+      const touch = e.touches[0];
+      const dx = touch.clientX - pullRefreshState.startX;
+      const dy = touch.clientY - pullRefreshState.startY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+
+      if (!pullRefreshState.pulling) {
+        if (dy < 0 || (absX > directionThreshold && absX > absY)) {
+          resetPullRefreshIndicator();
+          return;
+        }
+
+        if (dy < directionThreshold || absY < absX * 1.2) {
+          return;
+        }
+
+        pullRefreshState.pulling = true;
+        closeOtherSwipes(null);
+        cancelWorkflowPress();
       }
 
-      pullRefreshState.pulling = true;
-      closeOtherSwipes(null);
+      if (!pullRefreshState.pulling) return;
+
+      e.preventDefault();
       cancelWorkflowPress();
-    }
 
-    if (!pullRefreshState.pulling) return;
-
-    e.preventDefault();
-    cancelWorkflowPress();
-
-    const distance = Math.min(92, (dy - directionThreshold) * 0.55);
-    pullRefreshState.distance = Math.max(0, distance);
-    setPullRefreshIndicator(
-      pullRefreshState.distance,
-      pullRefreshState.distance >= threshold ? "ready" : "pull"
-    );
-  }, { passive: false });
+      const distance = Math.min(92, (dy - directionThreshold) * 0.55);
+      pullRefreshState.distance = Math.max(0, distance);
+      setPullRefreshIndicator(
+        pullRefreshState.distance,
+        pullRefreshState.distance >= threshold ? "ready" : "pull",
+      );
+    },
+    { passive: false },
+  );
 
   document.addEventListener("touchend", () => {
     if (!pullRefreshState.tracking) return;
 
-    const shouldRefresh = pullRefreshState.pulling && pullRefreshState.distance >= threshold;
+    const shouldRefresh =
+      pullRefreshState.pulling && pullRefreshState.distance >= threshold;
     pullRefreshState.tracking = false;
     pullRefreshState.pulling = false;
 
@@ -6930,19 +8767,29 @@ function initPullToRefresh() {
 }
 
 async function deleteOrder(orderNumber) {
-  const data = await postJson({
-    action: "deleteOrder",
-    orderNumber
-  }, true);
+  const data = await postJson(
+    {
+      action: "deleteOrder",
+      orderNumber,
+    },
+    true,
+  );
 
-  allOrders = allOrders.filter(o => String(o.orderNumber) !== String(orderNumber));
+  allOrders = allOrders.filter(
+    (o) => String(o.orderNumber) !== String(orderNumber),
+  );
   delete dashboardLaborSessions[String(orderNumber)];
   dashboardActivityOrders.delete(String(orderNumber));
   moneyLaborSummaryCache = Array.isArray(moneyLaborSummaryCache)
-    ? moneyLaborSummaryCache.filter(session => String(session.orderNumber) !== String(orderNumber))
+    ? moneyLaborSummaryCache.filter(
+        (session) => String(session.orderNumber) !== String(orderNumber),
+      )
     : moneyLaborSummaryCache;
 
-  if (currentOrder && String(currentOrder.orderNumber) === String(orderNumber)) {
+  if (
+    currentOrder &&
+    String(currentOrder.orderNumber) === String(orderNumber)
+  ) {
     currentOrder = null;
   }
 
@@ -6955,7 +8802,9 @@ async function deleteOrder(orderNumber) {
 }
 
 async function confirmAndDeleteOrder(orderNumber) {
-  const ok = confirm(`Delete order #${orderNumber}? This permanently removes its labor sessions, Bench Work, activity, and order history. Shared messages and gallery photos will be unlinked. This cannot be undone.`);
+  const ok = confirm(
+    `Delete order #${orderNumber}? This permanently removes its labor sessions, Bench Work, activity, and order history. Shared messages and gallery photos will be unlinked. This cannot be undone.`,
+  );
   if (!ok) return;
 
   try {
@@ -6976,7 +8825,7 @@ function renderOrders(list) {
     return;
   }
 
-  list.forEach(order => {
+  list.forEach((order) => {
     const row = document.createElement("div");
     row.className = "swipe-row";
 
@@ -6992,11 +8841,15 @@ function renderOrders(list) {
           <button class="swipe-action-btn swipe-circle-action swipe-circle-email swipe-action-email" type="button" aria-label="Email customer">
             ${SWIPE_ICONS.email}
           </button>
-          ${!isLocal ? `
+          ${
+            !isLocal
+              ? `
             <button class="swipe-action-btn swipe-circle-action swipe-circle-ship swipe-action-ship" type="button" aria-label="Open Pirate Ship">
               ${SWIPE_ICONS.ship}
             </button>
-          ` : ""}
+          `
+              : ""
+          }
         </div>
       </div>
 
@@ -7059,15 +8912,29 @@ function renderOrders(list) {
     });
 
     card.addEventListener("contextmenu", (e) => {
-      if (e.target.closest(".swipe-action-btn") || e.target.closest(".swipe-delete-btn") || e.target.closest(".order-actions-wrap")) return;
+      if (
+        e.target.closest(".swipe-action-btn") ||
+        e.target.closest(".swipe-delete-btn") ||
+        e.target.closest(".order-actions-wrap")
+      )
+        return;
       e.preventDefault();
       openWorkflowSheet(order, e);
     });
 
-    card.addEventListener("touchstart", (e) => {
-      if (e.target.closest(".swipe-action-btn") || e.target.closest(".swipe-delete-btn") || e.target.closest(".order-actions-wrap")) return;
-      startWorkflowPress(e, order);
-    }, { passive: true });
+    card.addEventListener(
+      "touchstart",
+      (e) => {
+        if (
+          e.target.closest(".swipe-action-btn") ||
+          e.target.closest(".swipe-delete-btn") ||
+          e.target.closest(".order-actions-wrap")
+        )
+          return;
+        startWorkflowPress(e, order);
+      },
+      { passive: true },
+    );
 
     card.addEventListener("touchmove", cancelWorkflowPress, { passive: true });
     card.addEventListener("touchend", cancelWorkflowPress);
@@ -7088,21 +8955,25 @@ function renderOrders(list) {
       row._closeSwipe?.(true);
       textOrderCustomer(order);
     });
-    
-    row.querySelector(".swipe-action-ship")?.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      suppressRowClick(row);
-      row._closeSwipe?.(true);
-      await copyPirateShipInfo(order);
-    });
 
-    row.querySelector(".swipe-delete-btn").addEventListener("click", async (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      suppressRowClick(row);
-      await confirmAndDeleteOrder(order.orderNumber);
-    });
+    row
+      .querySelector(".swipe-action-ship")
+      ?.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        suppressRowClick(row);
+        row._closeSwipe?.(true);
+        await copyPirateShipInfo(order);
+      });
+
+    row
+      .querySelector(".swipe-delete-btn")
+      .addEventListener("click", async (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        suppressRowClick(row);
+        await confirmAndDeleteOrder(order.orderNumber);
+      });
 
     row.querySelector(".order-actions-btn")?.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -7154,7 +9025,9 @@ function renderOrderDetail(order) {
     const titleName = String(order.customerName || "").trim();
     const titleNum = String(order.orderNumber || "").trim();
     const titleParts = [titleName, titleNum].filter(Boolean);
-    detailTitle.textContent = titleParts.length ? titleParts.join(" · ") : "Order Detail";
+    detailTitle.textContent = titleParts.length
+      ? titleParts.join(" · ")
+      : "Order Detail";
     requestAnimationFrame(fitDetailTitle);
   }
   if (saveOrderBtn) {
@@ -7166,7 +9039,8 @@ function renderOrderDetail(order) {
 
   const primaryLaceColor = order.primaryLaceColor || order.lacePrimary || "";
   const secondaryLaceColor = order.secondaryLaceColor || order.laceAccent || "";
-  const customColorRequest = order.customColorRequest || order.customLaceNotes || "";
+  const customColorRequest =
+    order.customColorRequest || order.customLaceNotes || "";
 
   const customerSection = renderCollapsibleDetailSection(
     "customer",
@@ -7192,7 +9066,7 @@ function renderOrderDetail(order) {
         ${renderReferralSourceEditor(order.referralSource || "")}
       </div>
     `,
-    { defaultExpanded: getDefaultSectionExpanded("customer") }
+    { defaultExpanded: getDefaultSectionExpanded("customer") },
   );
 
   const orderStatusSection = renderCollapsibleDetailSection(
@@ -7225,18 +9099,32 @@ function renderOrderDetail(order) {
             </select>
           </div>
 
-          ${getCustomerBillableOrders(order).length >= 2 ? `
+          ${
+            getCustomerBillableOrders(order).length >= 2
+              ? `
           <label class="detail-block full hold-billing-row">
             <input type="checkbox" id="editHoldBilling" />
             <span>Hold billing — don't auto-notify on this save (bill together with their other gloves)</span>
           </label>
-          ` : ""}
+          `
+              : ""
+          }
 
           <div class="detail-block">
             <div class="label">Price Quoted</div>
             <input id="editPriceQuoted" type="text" inputmode="decimal" placeholder="$0.00" />
-            ${(() => { const s = getEffectiveSuggestion(order); return s ? `<div class="price-suggest-hint muted">Suggested: ${escapeHtml(formatCurrency(s.price))} · ${escapeHtml(suggestionShortBasis(s))}</div>` : ""; })()}
-            ${(() => { const p = getPublishedPriceForOrder(order); return p ? `<div class="price-suggest-hint muted">Published ${escapeHtml(p.serviceName)}: ${escapeHtml(p.display)}</div>` : ""; })()}
+            ${(() => {
+              const s = getEffectiveSuggestion(order);
+              return s
+                ? `<div class="price-suggest-hint muted">Suggested: ${escapeHtml(formatCurrency(s.price))} · ${escapeHtml(suggestionShortBasis(s))}</div>`
+                : "";
+            })()}
+            ${(() => {
+              const p = getPublishedPriceForOrder(order);
+              return p
+                ? `<div class="price-suggest-hint muted">Published ${escapeHtml(p.serviceName)}: ${escapeHtml(p.display)}</div>`
+                : "";
+            })()}
           </div>
 
           <div class="detail-block">
@@ -7277,7 +9165,7 @@ function renderOrderDetail(order) {
           ${renderStatusDelivery(order)}
       </div>
     `,
-    { defaultExpanded: getDefaultSectionExpanded("orderStatus") }
+    { defaultExpanded: getDefaultSectionExpanded("orderStatus") },
   );
 
   orderDetailLaborMinutes = null;
@@ -7311,7 +9199,7 @@ function renderOrderDetail(order) {
         </div>
       </div>
     `,
-    { defaultExpanded: getDefaultSectionExpanded("gloveDetails") }
+    { defaultExpanded: getDefaultSectionExpanded("gloveDetails") },
   );
 
   const servicesSection = renderCollapsibleDetailSection(
@@ -7323,7 +9211,7 @@ function renderOrderDetail(order) {
         ${renderServicesEditor(order.servicesRequested || "")}
       </div>
     `,
-    { defaultExpanded: getDefaultSectionExpanded("services") }
+    { defaultExpanded: getDefaultSectionExpanded("services") },
   );
 
   const laceSection = renderCollapsibleDetailSection(
@@ -7352,7 +9240,7 @@ function renderOrderDetail(order) {
         </div>
       </div>
     `,
-    { defaultExpanded: getDefaultSectionExpanded("lace") }
+    { defaultExpanded: getDefaultSectionExpanded("lace") },
   );
 
   const showOnMapHtml = renderShowOnMapControl(order);
@@ -7405,8 +9293,8 @@ function renderOrderDetail(order) {
     {
       defaultExpanded: getDefaultSectionExpanded("shipping"),
       sectionId: "editShippingSection",
-      extraClass: isLocal ? "is-hidden" : ""
-    }
+      extraClass: isLocal ? "is-hidden" : "",
+    },
   );
 
   const notesSection = renderCollapsibleDetailSection(
@@ -7426,7 +9314,7 @@ function renderOrderDetail(order) {
         </div>
       </div>
     `,
-    { defaultExpanded: getDefaultSectionExpanded("notes") }
+    { defaultExpanded: getDefaultSectionExpanded("notes") },
   );
 
   orderDetail.innerHTML = `
@@ -7451,33 +9339,52 @@ function renderOrderDetail(order) {
   `;
 
   document.getElementById("editStatus").value = order.status || "Received";
-  document.getElementById("editPaid").value = normalizeText(order.paid) === "paid" ? "Paid" : "Unpaid";
-  document.getElementById("editPriceQuoted").value = formatMoneyForInput(order.priceQuoted);
-  document.getElementById("editCustomAddonAmount").value = formatMoneyForInput(order.customAddonAmount);
-  document.getElementById("editCustomAddonLabel").value = order.customAddonLabel || "";
-  document.getElementById("editShippingCost").value = formatMoneyForInput(order.shippingCost);
+  document.getElementById("editPaid").value =
+    normalizeText(order.paid) === "paid" ? "Paid" : "Unpaid";
+  document.getElementById("editPriceQuoted").value = formatMoneyForInput(
+    order.priceQuoted,
+  );
+  document.getElementById("editCustomAddonAmount").value = formatMoneyForInput(
+    order.customAddonAmount,
+  );
+  document.getElementById("editCustomAddonLabel").value =
+    order.customAddonLabel || "";
+  document.getElementById("editShippingCost").value = formatMoneyForInput(
+    order.shippingCost,
+  );
 
   const totalDue =
-     moneyNumber(order.priceQuoted) + moneyNumber(order.shippingCost);
+    moneyNumber(order.priceQuoted) + moneyNumber(order.shippingCost);
 
   document.getElementById("editTotalDue").textContent =
-     formatMoneyForInput(totalDue);
-  document.getElementById("editDateReceived").value = formatDateForInput(order.dateReceived);
-  document.getElementById("editEstimatedCompletion").value = formatDateForInput(order.estimatedCompletion);
-  document.getElementById("editDateCompleted").value = formatDateForInput(order.dateCompleted);
-  document.getElementById("editInternalNotes").value = order.internalNotes || "";
+    formatMoneyForInput(totalDue);
+  document.getElementById("editDateReceived").value = formatDateForInput(
+    order.dateReceived,
+  );
+  document.getElementById("editEstimatedCompletion").value = formatDateForInput(
+    order.estimatedCompletion,
+  );
+  document.getElementById("editDateCompleted").value = formatDateForInput(
+    order.dateCompleted,
+  );
+  document.getElementById("editInternalNotes").value =
+    order.internalNotes || "";
 
   document.getElementById("editBrandModel").value = order.brandModel || "";
   document.getElementById("editGloveType").value = order.gloveType || "";
   document.getElementById("editWebType").value = order.webType || "";
-  document.getElementById("editDropOffMethod").value = order.dropOffMethod || "";
-  document.getElementById("editGloveNotes").value = order.gloveNotes || order.customerNotes || "";
+  document.getElementById("editDropOffMethod").value =
+    order.dropOffMethod || "";
+  document.getElementById("editGloveNotes").value =
+    order.gloveNotes || order.customerNotes || "";
 
   document.getElementById("editPrimaryLaceColor").value = primaryLaceColor;
   document.getElementById("editSecondaryLaceColor").value = secondaryLaceColor;
   document.getElementById("editCustomColorRequest").value = customColorRequest;
-  document.getElementById("editPrimaryLaceUsed").value = order.primaryLaceUsed ?? "";
-  document.getElementById("editSecondaryLaceUsed").value = order.secondaryLaceUsed ?? "";
+  document.getElementById("editPrimaryLaceUsed").value =
+    order.primaryLaceUsed ?? "";
+  document.getElementById("editSecondaryLaceUsed").value =
+    order.secondaryLaceUsed ?? "";
 
   const trackingEl = document.getElementById("editTrackingNumber");
   const carrierEl = document.getElementById("editCarrier");
@@ -7487,17 +9394,21 @@ function renderOrderDetail(order) {
   const stateEl = document.getElementById("editState");
   const zipEl = document.getElementById("editZipCode");
 
-  if (trackingEl) trackingEl.value = order.trackingNumber || order.tracking || "";
+  if (trackingEl)
+    trackingEl.value = order.trackingNumber || order.tracking || "";
   if (carrierEl) carrierEl.value = order.carrier || "";
-  if (allowShipEl) allowShipEl.value = order.allowShipWithoutPayment ? "true" : "false";
+  if (allowShipEl)
+    allowShipEl.value = order.allowShipWithoutPayment ? "true" : "false";
   if (streetEl) streetEl.value = order.streetAddress || order.address || "";
   if (cityEl) cityEl.value = order.city || "";
   if (stateEl && !stateEl.value) stateEl.value = order.state || "";
   if (zipEl) zipEl.value = order.zipCode || order.zip || "";
 
-  document.getElementById("detailDeleteBtn")?.addEventListener("click", async () => {
-    await confirmAndDeleteOrder(order.orderNumber);
-  });
+  document
+    .getElementById("detailDeleteBtn")
+    ?.addEventListener("click", async () => {
+      await confirmAndDeleteOrder(order.orderNumber);
+    });
 
   wireOrderPhotoControls(order);
   wireOrderPhotoLightbox(order);
@@ -7507,8 +9418,12 @@ function renderOrderDetail(order) {
   ensureDetailCollapseDelegation();
   wireDetailSectionSummaries();
   if (!getOrderEconomicsSnapshot(order) && !Array.isArray(expensesCache)) {
-    warmExpensesCache().then(ready => {
-      if (ready && currentOrder && String(currentOrder.orderNumber) === String(order.orderNumber)) {
+    warmExpensesCache().then((ready) => {
+      if (
+        ready &&
+        currentOrder &&
+        String(currentOrder.orderNumber) === String(order.orderNumber)
+      ) {
         updateOrderEconomicsSection();
       }
     });
@@ -7525,7 +9440,8 @@ function renderOrderDetailBenchBanner(order) {
   const bench = benchFocusState.activeBench;
   if (!bench) return "";
   const labor = benchFocusState.activeLabor;
-  const viewingActiveBenchOrder = String(bench.orderNumber) === String(order.orderNumber);
+  const viewingActiveBenchOrder =
+    String(bench.orderNumber) === String(order.orderNumber);
   return `<aside class="detail-bench-focus-banner">
     <div><span>${viewingActiveBenchOrder ? "Bench Work" : "Another glove is on the bench"}</span><strong>#${escapeHtml(bench.orderNumber)} · Active · ${escapeHtml(formatBenchElapsed(bench.startedAt))}</strong>
     <small>${escapeHtml(labor?.phase || "No labor timer")} · ${labor ? escapeHtml(getLaborSessionStatus(labor) === "paused" ? "Paused" : "Running") : "Not recording labor"}</small></div>
@@ -7577,7 +9493,7 @@ function getBlankAdminOrder() {
     zipCode: "",
     gloveNotes: "",
     internalNotes: "",
-    smsOptIn: false
+    smsOptIn: false,
   };
 }
 
@@ -7797,7 +9713,7 @@ function getOrderRecencyTime(order) {
     order.createdAt,
     order.updatedAt,
     order.dateReceived,
-    order.timestampSubmitted
+    order.timestampSubmitted,
   ];
 
   for (const candidate of candidates) {
@@ -7817,7 +9733,7 @@ function buildCustomerSuggestions() {
   allOrders
     .slice()
     .sort((a, b) => getOrderRecencyTime(b) - getOrderRecencyTime(a))
-    .forEach(order => {
+    .forEach((order) => {
       const email = normalizeText(order.emailAddress).toLowerCase();
       const phone = digitsOnly(order.phoneNumber);
       const name = normalizeText(order.customerName).toLowerCase();
@@ -7850,25 +9766,30 @@ function customerMatchesQuery(order, query) {
     order.emailAddress,
     order.city,
     order.state,
-    order.orderNumber
-  ].map(value => normalizeText(value).toLowerCase());
+    order.orderNumber,
+  ].map((value) => normalizeText(value).toLowerCase());
 
-  const textMatch = q && haystack.some(value => value.includes(q));
+  const textMatch = q && haystack.some((value) => value.includes(q));
   const phoneMatch = qDigits && digitsOnly(order.phoneNumber).includes(qDigits);
   return textMatch || phoneMatch;
 }
 
 function renderCustomerSuggestionRow(order, index, activeIndex) {
-  const location = [order.city, order.state].map(normalizeText).filter(Boolean).join(", ");
+  const location = [order.city, order.state]
+    .map(normalizeText)
+    .filter(Boolean)
+    .join(", ");
   const contactBits = [
     formatPhoneForInput(order.phoneNumber || ""),
     order.emailAddress || "",
-    location
+    location,
   ].filter(Boolean);
   const meta = [
     order.orderNumber ? `#${order.orderNumber}` : "",
-    order.dateReceived || order.createdAt || ""
-  ].filter(Boolean).join(" · ");
+    order.dateReceived || order.createdAt || "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return `
     <button
@@ -7898,7 +9819,9 @@ function renderCustomerSuggestions() {
   }
 
   state.popover.innerHTML = state.matches
-    .map((order, index) => renderCustomerSuggestionRow(order, index, state.activeIndex))
+    .map((order, index) =>
+      renderCustomerSuggestionRow(order, index, state.activeIndex),
+    )
     .join("");
   state.popover.hidden = false;
 }
@@ -7915,9 +9838,11 @@ function updateCustomerSuggestions(query) {
   }
 
   customerSuggestionState.matches = buildCustomerSuggestions()
-    .filter(order => customerMatchesQuery(order, query))
+    .filter((order) => customerMatchesQuery(order, query))
     .slice(0, 6);
-  customerSuggestionState.activeIndex = customerSuggestionState.matches.length ? 0 : -1;
+  customerSuggestionState.activeIndex = customerSuggestionState.matches.length
+    ? 0
+    : -1;
   renderCustomerSuggestions();
 }
 
@@ -7925,7 +9850,11 @@ function setFieldValue(id, value) {
   const el = document.getElementById(id);
   if (!el) return;
   const nextValue = value || "";
-  if (el.tagName === "SELECT" && nextValue && !Array.from(el.options).some(option => option.value === nextValue)) {
+  if (
+    el.tagName === "SELECT" &&
+    nextValue &&
+    !Array.from(el.options).some((option) => option.value === nextValue)
+  ) {
     el.add(new Option(nextValue, nextValue));
   }
   el.value = nextValue;
@@ -7935,18 +9864,27 @@ function selectCustomerSuggestion(order) {
   if (!order) return;
 
   setFieldValue("editCustomerName", order.customerName || "");
-  setFieldValue("editPhoneNumber", formatPhoneForInput(order.phoneNumber || ""));
+  setFieldValue(
+    "editPhoneNumber",
+    formatPhoneForInput(order.phoneNumber || ""),
+  );
   setFieldValue("editEmailAddress", order.emailAddress || "");
   setFieldValue("editSmsOptIn", order.smsOptIn ? "true" : "false");
   setFieldValue("editSocialTag", order.socialTag || "");
   setFieldValue("editReferralSource", order.referralSource || "");
 
-  const dropOffMethod = order.dropOffMethod || order.dropoffMethod || "Local Drop-Off";
+  const dropOffMethod =
+    order.dropOffMethod || order.dropoffMethod || "Local Drop-Off";
   setFieldValue("editDropOffMethod", dropOffMethod);
-  document.getElementById("editDropOffMethod")?.dispatchEvent(new Event("change"));
+  document
+    .getElementById("editDropOffMethod")
+    ?.dispatchEvent(new Event("change"));
 
   if (!looksLocalDropOff({ dropOffMethod })) {
-    setFieldValue("editStreetAddress", order.streetAddress || order.address || "");
+    setFieldValue(
+      "editStreetAddress",
+      order.streetAddress || order.address || "",
+    );
     setFieldValue("editCity", order.city || "");
     setFieldValue("editState", order.state || "");
     setFieldValue("editZipCode", order.zipCode || order.zip || "");
@@ -7969,12 +9907,14 @@ function clearNewOrderCustomerInfo() {
     "editStreetAddress",
     "editCity",
     "editState",
-    "editZipCode"
-  ].forEach(id => setFieldValue(id, ""));
+    "editZipCode",
+  ].forEach((id) => setFieldValue(id, ""));
   setFieldValue("editSmsOptIn", "false");
   setFieldValue("editReferralSource", "");
   setFieldValue("editDropOffMethod", "Local Drop-Off");
-  document.getElementById("editDropOffMethod")?.dispatchEvent(new Event("change"));
+  document
+    .getElementById("editDropOffMethod")
+    ?.dispatchEvent(new Event("change"));
   if (saveStatusEl) {
     saveStatusEl.textContent = "Customer info cleared.";
   }
@@ -7990,23 +9930,30 @@ function wireNewOrderCustomerLookup() {
   customerSuggestionState = {
     popover,
     matches: [],
-    activeIndex: -1
+    activeIndex: -1,
   };
 
   const searchableInputs = [nameInput, phoneInput, emailInput];
-  searchableInputs.forEach(input => {
+  searchableInputs.forEach((input) => {
     input.setAttribute("autocomplete", "off");
     input.setAttribute("aria-autocomplete", "list");
     input.setAttribute("aria-controls", "customerLookupPopover");
-    input.addEventListener("input", () => updateCustomerSuggestions(input.value));
-    input.addEventListener("focus", () => updateCustomerSuggestions(input.value));
+    input.addEventListener("input", () =>
+      updateCustomerSuggestions(input.value),
+    );
+    input.addEventListener("focus", () =>
+      updateCustomerSuggestions(input.value),
+    );
     input.addEventListener("keydown", (e) => {
       const state = customerSuggestionState;
       if (!state || state.popover.hidden) return;
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        state.activeIndex = Math.min(state.matches.length - 1, state.activeIndex + 1);
+        state.activeIndex = Math.min(
+          state.matches.length - 1,
+          state.activeIndex + 1,
+        );
         renderCustomerSuggestions();
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
@@ -8021,14 +9968,16 @@ function wireNewOrderCustomerLookup() {
     });
   });
 
-  popover.addEventListener("pointerdown", e => {
+  popover.addEventListener("pointerdown", (e) => {
     e.preventDefault();
   });
 
-  popover.addEventListener("click", e => {
+  popover.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-customer-index]");
     if (!btn || !customerSuggestionState) return;
-    selectCustomerSuggestion(customerSuggestionState.matches[Number(btn.dataset.customerIndex)]);
+    selectCustomerSuggestion(
+      customerSuggestionState.matches[Number(btn.dataset.customerIndex)],
+    );
   });
 
   const clearBtn = document.createElement("button");
@@ -8041,7 +9990,11 @@ function wireNewOrderCustomerLookup() {
   document.addEventListener("click", (e) => {
     if (detailMode !== "new" || !customerSuggestionState?.popover) return;
     if (customerSuggestionState.popover !== popover) return;
-    if (popover.contains(e.target) || searchableInputs.some(input => input.contains(e.target))) return;
+    if (
+      popover.contains(e.target) ||
+      searchableInputs.some((input) => input.contains(e.target))
+    )
+      return;
     customerSuggestionState.popover.hidden = true;
   });
 }
@@ -8064,14 +10017,16 @@ function wireOrderPhotoControls(order) {
   });
 
   input?.addEventListener("change", async () => {
-    const files = Array.from(input.files || []).filter(file => file.type.startsWith("image/"));
+    const files = Array.from(input.files || []).filter((file) =>
+      file.type.startsWith("image/"),
+    );
     input.value = "";
     if (!files.length) return;
 
     await uploadOrderPhotos(order, files);
   });
 
-  document.querySelectorAll(".photo-thumb-img").forEach(img => {
+  document.querySelectorAll(".photo-thumb-img").forEach((img) => {
     const index = Number(img.dataset.index);
     const url = order.glovePhotos?.[index];
     if (!url) return;
@@ -8085,33 +10040,45 @@ function wireOrderPhotoControls(order) {
       e.preventDefault();
     });
 
-    img.addEventListener("touchstart", (e) => {
-      if (e.touches.length !== 1) return;
-      setAdminLongPressArmed(true);
-      const touch = e.touches[0];
-      orderPhotoPressStart = {
-        x: touch.clientX,
-        y: touch.clientY
-      };
-      orderPhotoPressTimer = window.setTimeout(() => {
-        orderPhotoPressTimer = null;
-        setAdminLongPressArmed(false);
-        suppressPhotoLightboxUntil = Date.now() + 700;
-        suppressNextAdminMenuActivation();
-        openOrderPhotoActionMenu(order, url, e);
-      }, 520);
-    }, { passive: true });
+    img.addEventListener(
+      "touchstart",
+      (e) => {
+        if (e.touches.length !== 1) return;
+        setAdminLongPressArmed(true);
+        const touch = e.touches[0];
+        orderPhotoPressStart = {
+          x: touch.clientX,
+          y: touch.clientY,
+        };
+        orderPhotoPressTimer = window.setTimeout(() => {
+          orderPhotoPressTimer = null;
+          setAdminLongPressArmed(false);
+          suppressPhotoLightboxUntil = Date.now() + 700;
+          suppressNextAdminMenuActivation();
+          openOrderPhotoActionMenu(order, url, e);
+        }, 520);
+      },
+      { passive: true },
+    );
 
-    img.addEventListener("touchmove", (e) => {
-      if (!orderPhotoPressStart || !e.touches.length) return;
-      const touch = e.touches[0];
-      const dx = Math.abs(touch.clientX - orderPhotoPressStart.x);
-      const dy = Math.abs(touch.clientY - orderPhotoPressStart.y);
-      if (dx > 10 || dy > 10) cancelOrderPhotoLongPress();
-    }, { passive: true });
+    img.addEventListener(
+      "touchmove",
+      (e) => {
+        if (!orderPhotoPressStart || !e.touches.length) return;
+        const touch = e.touches[0];
+        const dx = Math.abs(touch.clientX - orderPhotoPressStart.x);
+        const dy = Math.abs(touch.clientY - orderPhotoPressStart.y);
+        if (dx > 10 || dy > 10) cancelOrderPhotoLongPress();
+      },
+      { passive: true },
+    );
 
-    img.addEventListener("touchend", cancelOrderPhotoLongPress, { passive: true });
-    img.addEventListener("touchcancel", cancelOrderPhotoLongPress, { passive: true });
+    img.addEventListener("touchend", cancelOrderPhotoLongPress, {
+      passive: true,
+    });
+    img.addEventListener("touchcancel", cancelOrderPhotoLongPress, {
+      passive: true,
+    });
   });
 }
 
@@ -8151,7 +10118,7 @@ function wireOrderPhotoLightbox(order) {
     }
   }
 
-  document.querySelectorAll(".photo-thumb-img").forEach(img => {
+  document.querySelectorAll(".photo-thumb-img").forEach((img) => {
     img.addEventListener("click", (e) => {
       if (Date.now() < suppressPhotoLightboxUntil) {
         e.preventDefault();
@@ -8163,52 +10130,64 @@ function wireOrderPhotoLightbox(order) {
     });
   });
 
-  lightbox.addEventListener("touchstart", e => {
-    touchStartCount = e.touches.length;
-    touchMoved = false;
+  lightbox.addEventListener(
+    "touchstart",
+    (e) => {
+      touchStartCount = e.touches.length;
+      touchMoved = false;
 
-    if (e.touches.length === 1) {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-    }
-
-    if (e.touches.length > 1) {
-      ignoreNextClick = true;
-    }
-  }, { passive: true });
-
-  lightbox.addEventListener("touchmove", e => {
-    touchMoved = true;
-
-    if (e.touches.length > 1) {
-      ignoreNextClick = true;
-    }
-  }, { passive: true });
-
-  lightbox.addEventListener("touchend", e => {
-    if (touchStartCount > 1) {
-      ignoreNextClick = true;
-      return;
-    }
-
-    const touch = e.changedTouches[0];
-    if (!touch) return;
-
-    const diffX = touch.clientX - touchStartX;
-    const diffY = touch.clientY - touchStartY;
-
-    if (Math.abs(diffX) > 60 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
-      ignoreNextClick = true;
-
-      if (diffX < 0) {
-        nextPhoto();
-      } else {
-        prevPhoto();
+      if (e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
       }
-    }
-  }, { passive: true });
 
-  lightbox.addEventListener("click", e => {
+      if (e.touches.length > 1) {
+        ignoreNextClick = true;
+      }
+    },
+    { passive: true },
+  );
+
+  lightbox.addEventListener(
+    "touchmove",
+    (e) => {
+      touchMoved = true;
+
+      if (e.touches.length > 1) {
+        ignoreNextClick = true;
+      }
+    },
+    { passive: true },
+  );
+
+  lightbox.addEventListener(
+    "touchend",
+    (e) => {
+      if (touchStartCount > 1) {
+        ignoreNextClick = true;
+        return;
+      }
+
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+
+      const diffX = touch.clientX - touchStartX;
+      const diffY = touch.clientY - touchStartY;
+
+      if (Math.abs(diffX) > 60 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+        ignoreNextClick = true;
+
+        if (diffX < 0) {
+          nextPhoto();
+        } else {
+          prevPhoto();
+        }
+      }
+    },
+    { passive: true },
+  );
+
+  lightbox.addEventListener("click", (e) => {
     if (ignoreNextClick || touchMoved) {
       ignoreNextClick = false;
       touchMoved = false;
@@ -8220,10 +10199,7 @@ function wireOrderPhotoLightbox(order) {
     const y = e.clientY;
 
     const clickedImage =
-      x >= rect.left &&
-      x <= rect.right &&
-      y >= rect.top &&
-      y <= rect.bottom;
+      x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 
     if (!clickedImage) {
       closeLightbox();
@@ -8253,13 +10229,16 @@ async function uploadOrderPhotos(order, files) {
   for (const file of files) {
     try {
       const dataUrl = await fileToDataUrl(file);
-      const result = await postJson({
-        action: "uploadOrderPhoto",
-        orderNumber: order.orderNumber,
-        filename: file.name,
-        contentType: file.type || "image/jpeg",
-        dataUrl
-      }, true);
+      const result = await postJson(
+        {
+          action: "uploadOrderPhoto",
+          orderNumber: order.orderNumber,
+          filename: file.name,
+          contentType: file.type || "image/jpeg",
+          dataUrl,
+        },
+        true,
+      );
 
       uploaded += 1;
       latestPhotos = result.photos || result.order?.glovePhotos || latestPhotos;
@@ -8274,7 +10253,7 @@ async function uploadOrderPhotos(order, files) {
 
   const nextOrder = {
     ...(currentOrder || order),
-    glovePhotos: latestPhotos
+    glovePhotos: latestPhotos,
   };
   mergeUpdatedOrder(nextOrder);
   refreshOrderPhotoSection(nextOrder);
@@ -8292,7 +10271,9 @@ async function uploadOrderPhotos(order, files) {
 }
 
 function gallerySectionForGloveType(gloveType) {
-  const normalized = String(gloveType || "").trim().toLowerCase();
+  const normalized = String(gloveType || "")
+    .trim()
+    .toLowerCase();
   if (normalized === "catchers mitt") return "catchers-mitts";
   if (normalized === "first base mitt") return "first-base-mitts";
   return "fielding-gloves";
@@ -8306,13 +10287,14 @@ function chooseOrderPhotoDestination(anchor) {
     actions: [
       { label: "Customer / Order Photo", value: "order" },
       { label: "Gallery Photo", value: "gallery" },
-      { label: "Cancel", value: "" }
-    ]
+      { label: "Cancel", value: "" },
+    ],
   });
 }
 
 async function chooseOrderGalleryUpload(order, anchor) {
-  const visibleGloveType = document.getElementById("editGloveType")?.value || order.gloveType;
+  const visibleGloveType =
+    document.getElementById("editGloveType")?.value || order.gloveType;
   let section = gallerySectionForGloveType(visibleGloveType);
   let files = [];
   const orderNumber = String(order.orderNumber || "").trim();
@@ -8324,9 +10306,13 @@ async function chooseOrderGalleryUpload(order, anchor) {
       <div class="order-gallery-upload-fields">
         <label for="orderGallerySection">Gallery section</label>
         <select id="orderGallerySection">
-          ${Object.entries(GALLERY_SECTION_LABELS).map(([value, label]) => `
+          ${Object.entries(GALLERY_SECTION_LABELS)
+            .map(
+              ([value, label]) => `
             <option value="${escapeAttr(value)}"${value === section ? " selected" : ""}>${escapeHtml(label)}</option>
-          `).join("")}
+          `,
+            )
+            .join("")}
         </select>
         <label for="orderGalleryFiles">Photos</label>
         <input id="orderGalleryFiles" type="file" accept="image/*" multiple>
@@ -8335,8 +10321,8 @@ async function chooseOrderGalleryUpload(order, anchor) {
     `,
     actions: [
       { label: "Upload to Gallery", value: "upload" },
-      { label: "Cancel", value: "" }
-    ]
+      { label: "Cancel", value: "" },
+    ],
   });
 
   const root = getBenchChoiceRoot();
@@ -8350,7 +10336,9 @@ async function chooseOrderGalleryUpload(order, anchor) {
     section = sectionSelect.value || section;
   });
   fileInput?.addEventListener("change", () => {
-    files = Array.from(fileInput.files || []).filter(file => (file.type || "image/jpeg").startsWith("image/"));
+    files = Array.from(fileInput.files || []).filter((file) =>
+      (file.type || "image/jpeg").startsWith("image/"),
+    );
     if (fileStatus) {
       fileStatus.textContent = files.length
         ? `${files.length} photo${files.length === 1 ? "" : "s"} selected.`
@@ -8371,38 +10359,51 @@ async function uploadOrderGalleryPhotos(order, files, section) {
      lost its number, and setGalleryPhotoOrder treats an empty number as
      "clear the link" — which silently uploads the photos to the gallery
      unlinked. Never proceed without a real order number. */
-  const orderNumber = String(order?.orderNumber || currentOrder?.orderNumber || "").trim();
+  const orderNumber = String(
+    order?.orderNumber || currentOrder?.orderNumber || "",
+  ).trim();
   if (!orderNumber) {
-    setOrderPhotoStatus("Couldn't determine the order number — no photos were uploaded.");
+    setOrderPhotoStatus(
+      "Couldn't determine the order number — no photos were uploaded.",
+    );
     return;
   }
   let linked = 0;
   const failed = [];
 
   if (addBtn) addBtn.disabled = true;
-  setOrderPhotoStatus(`Uploading ${total} photo${total === 1 ? "" : "s"} to Gallery...`);
+  setOrderPhotoStatus(
+    `Uploading ${total} photo${total === 1 ? "" : "s"} to Gallery...`,
+  );
 
   for (const file of files) {
     try {
       const type = file.type || "image/jpeg";
       const dataUrl = await fileToDataUrl(file);
-      const result = await postJson({
-        action: "uploadGalleryPhoto",
-        section,
-        filename: file.name,
-        contentType: type,
-        dataUrl
-      }, true);
+      const result = await postJson(
+        {
+          action: "uploadGalleryPhoto",
+          section,
+          filename: file.name,
+          contentType: type,
+          dataUrl,
+        },
+        true,
+      );
 
-      const linkResp = await postJson({
-        action: "setGalleryPhotoOrder",
-        url: result.url,
-        path: result.path,
-        orderNumber
-      }, true);
+      const linkResp = await postJson(
+        {
+          action: "setGalleryPhotoOrder",
+          url: result.url,
+          path: result.path,
+          orderNumber,
+        },
+        true,
+      );
       /* ok:true + cleared means the server unlinked instead of linking — never
          let a photo land in the gallery unlinked without surfacing it. */
-      if (linkResp?.cleared) throw new Error("uploaded but did not link to the order");
+      if (linkResp?.cleared)
+        throw new Error("uploaded but did not link to the order");
       linked += 1;
       setOrderPhotoStatus(`Uploading to Gallery... ${linked}/${total}`);
     } catch (error) {
@@ -8412,9 +10413,13 @@ async function uploadOrderGalleryPhotos(order, files, section) {
 
   galleryPhotos = [];
   if (linked && failed.length) {
-    setOrderPhotoStatus(`${linked} added to Gallery and linked to #${orderNumber}; ${failed.length} failed.`);
+    setOrderPhotoStatus(
+      `${linked} added to Gallery and linked to #${orderNumber}; ${failed.length} failed.`,
+    );
   } else if (linked) {
-    setOrderPhotoStatus(`${linked} photo${linked === 1 ? "" : "s"} added to Gallery and linked to #${orderNumber}.`);
+    setOrderPhotoStatus(
+      `${linked} photo${linked === 1 ? "" : "s"} added to Gallery and linked to #${orderNumber}.`,
+    );
   } else {
     setOrderPhotoStatus(failed[0] || "Gallery upload failed.");
   }
@@ -8426,14 +10431,16 @@ function mergeUpdatedOrder(order) {
 
   currentOrder = {
     ...(currentOrder || {}),
-    ...order
+    ...order,
   };
 
-  const idx = allOrders.findIndex(item => String(item.orderNumber) === String(order.orderNumber));
+  const idx = allOrders.findIndex(
+    (item) => String(item.orderNumber) === String(order.orderNumber),
+  );
   if (idx !== -1) {
     allOrders[idx] = {
       ...allOrders[idx],
-      ...order
+      ...order,
     };
   } else {
     /* Brand-new order (e.g. just created): add it so openOrder can find it
@@ -8446,8 +10453,11 @@ function refreshOrderPhotoSection(order) {
   const existingSection = document.getElementById("detailPhotoSection");
   if (!existingSection) return;
 
-  if (!Object.prototype.hasOwnProperty.call(orderDetailCollapseState, "photos")) {
-    orderDetailCollapseState.photos = !existingSection.classList.contains("is-collapsed");
+  if (
+    !Object.prototype.hasOwnProperty.call(orderDetailCollapseState, "photos")
+  ) {
+    orderDetailCollapseState.photos =
+      !existingSection.classList.contains("is-collapsed");
   }
 
   const existingLightbox = document.getElementById("photoLightbox");
@@ -8464,7 +10474,10 @@ function refreshOrderPhotoSection(order) {
     nextSection?.insertAdjacentElement("afterend", nextLightbox);
   }
 
-  const expanded = getSectionExpanded("photos", getDefaultSectionExpanded("photos"));
+  const expanded = getSectionExpanded(
+    "photos",
+    getDefaultSectionExpanded("photos"),
+  );
   const section = document.getElementById("detailPhotoSection");
   const toggle = section?.querySelector("[data-section-toggle='photos']");
   section?.classList.toggle("is-collapsed", !expanded);
@@ -8493,7 +10506,8 @@ function ensureOrderPhotoActionMenu() {
   if (orderPhotoActionMenuEl) return orderPhotoActionMenuEl;
 
   orderPhotoActionMenuEl = document.createElement("div");
-  orderPhotoActionMenuEl.className = "admin-action-menu-root workflow-sheet-root order-photo-menu-root";
+  orderPhotoActionMenuEl.className =
+    "admin-action-menu-root workflow-sheet-root order-photo-menu-root";
   orderPhotoActionMenuEl.innerHTML = `
     <div class="admin-action-backdrop workflow-backdrop"></div>
     <div class="admin-action-menu workflow-sheet" role="menu" aria-label="Photo actions">
@@ -8506,18 +10520,22 @@ function ensureOrderPhotoActionMenu() {
   `;
 
   getAdminMenuLayer().appendChild(orderPhotoActionMenuEl);
-  orderPhotoActionMenuEl.querySelector(".workflow-backdrop")?.addEventListener("click", closeOrderPhotoActionMenu);
-  orderPhotoActionMenuEl.querySelector("[data-photo-action='remove']")?.addEventListener("click", async (e) => {
-    if (shouldSuppressAdminMenuActivation()) {
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-    const order = orderPhotoActionMenuEl.order;
-    const url = orderPhotoActionMenuEl.url;
-    closeOrderPhotoActionMenu();
-    await removeOrderPhoto(order, url);
-  });
+  orderPhotoActionMenuEl
+    .querySelector(".workflow-backdrop")
+    ?.addEventListener("click", closeOrderPhotoActionMenu);
+  orderPhotoActionMenuEl
+    .querySelector("[data-photo-action='remove']")
+    ?.addEventListener("click", async (e) => {
+      if (shouldSuppressAdminMenuActivation()) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      const order = orderPhotoActionMenuEl.order;
+      const url = orderPhotoActionMenuEl.url;
+      closeOrderPhotoActionMenu();
+      await removeOrderPhoto(order, url);
+    });
   return orderPhotoActionMenuEl;
 }
 
@@ -8525,7 +10543,10 @@ function openOrderPhotoActionMenu(order, url, source) {
   const root = ensureOrderPhotoActionMenu();
   root.order = order;
   root.url = url;
-  root.anchor = getAdminAnchorPosition(source, source?.currentTarget || source?.target);
+  root.anchor = getAdminAnchorPosition(
+    source,
+    source?.currentTarget || source?.target,
+  );
   root.classList.add("open");
   requestAnimationFrame(() => {
     positionWorkflowMenu(root.querySelector(".workflow-sheet"), root.anchor);
@@ -8546,16 +10567,19 @@ async function removeOrderPhoto(order, url) {
 
   try {
     setOrderPhotoStatus("Removing photo...");
-    const result = await postJson({
-      action: "removeOrderPhoto",
-      orderNumber: order.orderNumber,
-      url
-    }, true);
+    const result = await postJson(
+      {
+        action: "removeOrderPhoto",
+        orderNumber: order.orderNumber,
+        url,
+      },
+      true,
+    );
 
     const nextOrder = {
       ...(currentOrder || order),
       ...(result.order || {}),
-      glovePhotos: result.photos || result.order?.glovePhotos || []
+      glovePhotos: result.photos || result.order?.glovePhotos || [],
     };
     mergeUpdatedOrder(nextOrder);
     refreshOrderPhotoSection(nextOrder);
@@ -8583,11 +10607,13 @@ function wireDetailForm() {
       webTypeEl.value = "";
     }
 
-    const isLocal = looksLocalDropOff({ dropOffMethod: dropOffEl?.value || "" });
+    const isLocal = looksLocalDropOff({
+      dropOffMethod: dropOffEl?.value || "",
+    });
     document
       .getElementById("editShippingCostWrap")
       ?.classList.toggle("is-hidden", isLocal);
-    
+
     document
       .getElementById("editTotalDueWrap")
       ?.classList.toggle("is-hidden", isLocal);
@@ -8603,10 +10629,10 @@ function wireDetailForm() {
         "editStreetAddress",
         "editCity",
         "editState",
-        "editZipCode"
+        "editZipCode",
       ];
 
-      ids.forEach(id => {
+      ids.forEach((id) => {
         const el = document.getElementById(id);
         if (!el) return;
 
@@ -8658,7 +10684,9 @@ async function saveCurrentOrderFromForm() {
   const zipCode = isLocal ? "" : val("editZipCode");
   const trackingNumber = isLocal ? "" : val("editTrackingNumber");
   const carrier = isLocal ? "" : val("editCarrier");
-  const allowShipWithoutPayment = isLocal ? false : (val("editAllowShipWithoutPayment") === "true");
+  const allowShipWithoutPayment = isLocal
+    ? false
+    : val("editAllowShipWithoutPayment") === "true";
 
   let dateCompleted = val("editDateCompleted");
   const newStatus = val("editStatus");
@@ -8701,7 +10729,7 @@ async function saveCurrentOrderFromForm() {
     customColorRequest: val("editCustomColorRequest"),
     customLaceNotes: val("editCustomColorRequest"),
     primaryLaceUsed: emptyToNull(val("editPrimaryLaceUsed")),
-    secondaryLaceUsed: emptyToNull(val("editSecondaryLaceUsed"))
+    secondaryLaceUsed: emptyToNull(val("editSecondaryLaceUsed")),
   };
 
   if (!isLocal) {
@@ -8722,11 +10750,19 @@ async function saveCurrentOrderFromForm() {
     updates.zipCode = null;
   }
 
-  const holdBilling = document.getElementById("editHoldBilling")?.checked === true;
-  const updated = await saveOrderUpdate(currentOrder.orderNumber, updates, true, { suppressNotify: holdBilling });
+  const holdBilling =
+    document.getElementById("editHoldBilling")?.checked === true;
+  const updated = await saveOrderUpdate(
+    currentOrder.orderNumber,
+    updates,
+    true,
+    { suppressNotify: holdBilling },
+  );
   currentOrder = updated;
   renderOrderDetail(updated);
-  saveStatusEl.textContent = holdBilling ? "Saved — auto-message held." : "Saved.";
+  saveStatusEl.textContent = holdBilling
+    ? "Saved — auto-message held."
+    : "Saved.";
   resetAdminScroll(detailView);
 }
 
@@ -8756,15 +10792,23 @@ async function resendCurrentStatus(kind, order) {
 
   if (!window.confirm(confirmMessage)) return;
 
-  const button = document.getElementById(isEmail ? "resendStatusEmailBtn" : "resendStatusTextBtn");
+  const button = document.getElementById(
+    isEmail ? "resendStatusEmailBtn" : "resendStatusTextBtn",
+  );
   if (button) button.disabled = true;
-  setStatusDeliveryMessage(isEmail ? "Sending email..." : "Sending text...", "pending");
+  setStatusDeliveryMessage(
+    isEmail ? "Sending email..." : "Sending text...",
+    "pending",
+  );
 
   try {
-    const data = await postJson({
-      action: isEmail ? "resendStatusEmail" : "resendStatusText",
-      orderNumber: activeOrder.orderNumber
-    }, true);
+    const data = await postJson(
+      {
+        action: isEmail ? "resendStatusEmail" : "resendStatusText",
+        orderNumber: activeOrder.orderNumber,
+      },
+      true,
+    );
 
     const updated = data.order;
     if (!updated) {
@@ -8773,26 +10817,39 @@ async function resendCurrentStatus(kind, order) {
 
     mergeUpdatedOrder(updated);
     localStorage.setItem("mm_orders_cache", JSON.stringify(allOrders));
-    refreshStatusDelivery(updated, isEmail ? "Status email sent." : "Status text sent.", "success");
+    refreshStatusDelivery(
+      updated,
+      isEmail ? "Status email sent." : "Status text sent.",
+      "success",
+    );
     loadOrderActivity(updated.orderNumber);
   } catch (err) {
-    setStatusDeliveryMessage(err.message || "Unable to resend status.", "error");
+    setStatusDeliveryMessage(
+      err.message || "Unable to resend status.",
+      "error",
+    );
     if (button) button.disabled = false;
   }
 }
 
 function wireStatusDeliveryControls(order) {
-  document.getElementById("resendStatusEmailBtn")?.addEventListener("click", () => {
-    resendCurrentStatus("email", order);
-  });
+  document
+    .getElementById("resendStatusEmailBtn")
+    ?.addEventListener("click", () => {
+      resendCurrentStatus("email", order);
+    });
 
-  document.getElementById("resendStatusTextBtn")?.addEventListener("click", () => {
-    resendCurrentStatus("text", order);
-  });
+  document
+    .getElementById("resendStatusTextBtn")
+    ?.addEventListener("click", () => {
+      resendCurrentStatus("text", order);
+    });
 
-  document.getElementById("sendCombinedBillBtn")?.addEventListener("click", (e) => {
-    sendCombinedBillForCustomer(order, e.currentTarget);
-  });
+  document
+    .getElementById("sendCombinedBillBtn")
+    ?.addEventListener("click", (e) => {
+      sendCombinedBillForCustomer(order, e.currentTarget);
+    });
 
   document.getElementById("markAllPaidBtn")?.addEventListener("click", (e) => {
     markCustomerOrdersPaid(order, e.currentTarget);
@@ -8803,22 +10860,38 @@ async function sendCombinedBillForCustomer(order, btn) {
   const msgEl = document.getElementById("statusDeliveryMessage");
   const bill = getCustomerBillableOrders(order);
   if (bill.length < 2) {
-    if (msgEl) msgEl.textContent = "Need at least two unpaid gloves to combine.";
+    if (msgEl)
+      msgEl.textContent = "Need at least two unpaid gloves to combine.";
     return;
   }
-  const orderNumbers = bill.map(o => String(o.orderNumber));
-  const total = bill.reduce((s, o) => s + moneyNumber(o.priceQuoted) + moneyNumber(o.shippingCost), 0);
-  if (!window.confirm(`Send ONE combined bill for ${orderNumbers.map(n => "#" + n).join(", ")} — ${formatCurrency(total)} total?`)) return;
+  const orderNumbers = bill.map((o) => String(o.orderNumber));
+  const total = bill.reduce(
+    (s, o) => s + moneyNumber(o.priceQuoted) + moneyNumber(o.shippingCost),
+    0,
+  );
+  if (
+    !window.confirm(
+      `Send ONE combined bill for ${orderNumbers.map((n) => "#" + n).join(", ")} — ${formatCurrency(total)} total?`,
+    )
+  )
+    return;
 
   if (btn) btn.disabled = true;
   if (msgEl) msgEl.textContent = "Sending combined bill…";
   try {
-    const res = await postJson({ action: "sendCombinedBill", orderNumbers }, true);
-    if (!res || res.ok === false) throw new Error(res && res.error ? String(res.error) : "Send failed.");
+    const res = await postJson(
+      { action: "sendCombinedBill", orderNumbers },
+      true,
+    );
+    if (!res || res.ok === false)
+      throw new Error(res && res.error ? String(res.error) : "Send failed.");
     const parts = [];
-    if (res.sent && res.sent.email) parts.push(res.sent.email.ok === false ? "email failed" : "email sent");
-    if (res.sent && res.sent.sms) parts.push(res.sent.sms.ok === false ? "text failed" : "text sent");
-    if (msgEl) msgEl.textContent = `Combined bill for ${formatCurrency(res.total)} — ${parts.join(", ") || "no email/text on file"}.`;
+    if (res.sent && res.sent.email)
+      parts.push(res.sent.email.ok === false ? "email failed" : "email sent");
+    if (res.sent && res.sent.sms)
+      parts.push(res.sent.sms.ok === false ? "text failed" : "text sent");
+    if (msgEl)
+      msgEl.textContent = `Combined bill for ${formatCurrency(res.total)} — ${parts.join(", ") || "no email/text on file"}.`;
   } catch (err) {
     if (msgEl) msgEl.textContent = err.message || "Combined bill failed.";
   } finally {
@@ -8830,7 +10903,12 @@ async function markCustomerOrdersPaid(order, btn) {
   const msgEl = document.getElementById("statusDeliveryMessage");
   const bill = getCustomerBillableOrders(order);
   if (!bill.length) return;
-  if (!window.confirm(`Mark ${bill.map(o => "#" + o.orderNumber).join(", ")} as Paid?`)) return;
+  if (
+    !window.confirm(
+      `Mark ${bill.map((o) => "#" + o.orderNumber).join(", ")} as Paid?`,
+    )
+  )
+    return;
 
   if (btn) btn.disabled = true;
   if (msgEl) msgEl.textContent = "Marking paid…";
@@ -8839,7 +10917,10 @@ async function markCustomerOrdersPaid(order, btn) {
       await saveOrderUpdate(String(o.orderNumber), { paid: "Paid" }, false);
     }
     if (msgEl) msgEl.textContent = "Marked all paid.";
-    if (currentOrder && String(currentOrder.orderNumber) === String(order.orderNumber)) {
+    if (
+      currentOrder &&
+      String(currentOrder.orderNumber) === String(order.orderNumber)
+    ) {
       renderOrderDetail(currentOrder);
     }
   } catch (err) {
@@ -8884,7 +10965,7 @@ function getAdminOrderFormPayload() {
     streetAddress: isLocal ? null : emptyToNull(val("editStreetAddress")),
     city: isLocal ? null : emptyToNull(val("editCity")),
     state: isLocal ? null : emptyToNull(val("editState")),
-    zipCode: isLocal ? null : emptyToNull(val("editZipCode"))
+    zipCode: isLocal ? null : emptyToNull(val("editZipCode")),
   };
 
   return payload;
@@ -8904,7 +10985,12 @@ function validateNewOrderPayload(payload) {
   }
 
   if (!looksLocalDropOff({ dropOffMethod: payload.dropOffMethod })) {
-    if (!payload.streetAddress || !payload.city || !payload.state || !payload.zipCode) {
+    if (
+      !payload.streetAddress ||
+      !payload.city ||
+      !payload.state ||
+      !payload.zipCode
+    ) {
       return "Shipping orders need street, city, state, and zip.";
     }
   }
@@ -8924,10 +11010,13 @@ async function createNewOrderFromForm() {
 
   saveStatusEl.textContent = "Creating...";
 
-  const data = await postJson({
-    action: "createOrder",
-    order: payload
-  }, true);
+  const data = await postJson(
+    {
+      action: "createOrder",
+      order: payload,
+    },
+    true,
+  );
 
   if (!data.order) {
     throw new Error("Order created, but no order was returned.");
@@ -8940,25 +11029,38 @@ async function createNewOrderFromForm() {
   openOrder(created.orderNumber);
   if (saveStatusEl) {
     const statuses = data.delivery || {};
-    const failed = [statuses.email, statuses.sms].filter(item => item?.status === "failed");
-    const suppressed = [statuses.email, statuses.sms].filter(item => item?.status === "suppressed");
+    const failed = [statuses.email, statuses.sms].filter(
+      (item) => item?.status === "failed",
+    );
+    const suppressed = [statuses.email, statuses.sms].filter(
+      (item) => item?.status === "suppressed",
+    );
     if (statuses.warning) {
       saveStatusEl.textContent = `Created. ${statuses.warning}`;
     } else if (failed.length) {
-      saveStatusEl.textContent = `Created. Customer notification issue: ${failed.map(item => item.reason).filter(Boolean).join(" ")}`;
+      saveStatusEl.textContent = `Created. Customer notification issue: ${failed
+        .map((item) => item.reason)
+        .filter(Boolean)
+        .join(" ")}`;
     } else if (suppressed.length) {
-      saveStatusEl.textContent = "Created. Customer notifications were suppressed in Preview.";
+      saveStatusEl.textContent =
+        "Created. Customer notifications were suppressed in Preview.";
     } else {
       saveStatusEl.textContent = "Created. Customer notifications processed.";
     }
   }
 }
 
-async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false, options = {}) {
+async function saveOrderUpdate(
+  orderNumber,
+  updates,
+  stayOnDetail = false,
+  options = {},
+) {
   const requestBody = {
     action: "updateOrder",
     orderNumber,
-    updates
+    updates,
   };
   // Hold billing: skip this order's auto status message so the customer can be
   // billed once, combined with their other gloves.
@@ -8966,7 +11068,9 @@ async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false, optio
   const data = await postJson(requestBody, true);
 
   const updatedOrder = data.order;
-  const idx = allOrders.findIndex(o => String(o.orderNumber) === String(updatedOrder.orderNumber));
+  const idx = allOrders.findIndex(
+    (o) => String(o.orderNumber) === String(updatedOrder.orderNumber),
+  );
 
   if (idx !== -1) {
     allOrders[idx] = updatedOrder;
@@ -8974,7 +11078,10 @@ async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false, optio
     allOrders.push(updatedOrder);
   }
 
-  if (currentOrder && String(currentOrder.orderNumber) === String(updatedOrder.orderNumber)) {
+  if (
+    currentOrder &&
+    String(currentOrder.orderNumber) === String(updatedOrder.orderNumber)
+  ) {
     currentOrder = updatedOrder;
   }
 
@@ -8984,15 +11091,15 @@ async function saveOrderUpdate(orderNumber, updates, stayOnDetail = false, optio
 }
 
 const LACE_COLOR_MAP = {
-  "black": "#111111",
-  "gray": "#777777",
-  "grey": "#777777",
-  "silver": "#bfc3c7",
-  "white": "#f4eee4",
+  black: "#111111",
+  gray: "#777777",
+  grey: "#777777",
+  silver: "#bfc3c7",
+  white: "#f4eee4",
 
   "tan – camel": "#d7cb9d",
   "tan - camel": "#d7cb9d",
-  "camel": "#d7cb9d",
+  camel: "#d7cb9d",
 
   "tan – japan": "#a84d1c",
   "tan - japan": "#a84d1c",
@@ -9017,7 +11124,7 @@ const LACE_COLOR_MAP = {
 
   "brown – chocolate": "#4a2616",
   "brown - chocolate": "#4a2616",
-  "chocolate": "#4a2616",
+  chocolate: "#4a2616",
 
   "blue – royal": "#1f4fbf",
   "blue - royal": "#1f4fbf",
@@ -9031,21 +11138,21 @@ const LACE_COLOR_MAP = {
   "blue - carolina": "#78aeda",
   "carolina blue": "#78aeda",
 
-  "red": "#b01f2e",
+  red: "#b01f2e",
   "red – dark": "#6f111a",
   "red - dark": "#6f111a",
   "dark red": "#6f111a",
 
-  "orange": "#d46a1f",
-  "yellow": "#d6b21f",
-  "pink": "#e889b9",
+  orange: "#d46a1f",
+  yellow: "#d6b21f",
+  pink: "#e889b9",
 
-  "purple": "#6b3fa0",
+  purple: "#6b3fa0",
   "purple – dark": "#432069",
   "purple - dark": "#432069",
   "dark purple": "#432069",
 
-  "green": "#2e7d32",
+  green: "#2e7d32",
   "green – lime": "#8bc34a",
   "green - lime": "#8bc34a",
   "lime green": "#8bc34a",
@@ -9055,7 +11162,7 @@ const LACE_COLOR_MAP = {
   "teal - dark": "#0e5a63",
   "dark teal": "#0e5a63",
 
-  "other (special order)": "linear"
+  "other (special order)": "linear",
 };
 
 function normalizeLaceName(value) {
@@ -9068,10 +11175,22 @@ function normalizeLaceName(value) {
 /* Fallback hue per color FAMILY (the part before the dash), so an unrecognized
    color like "Blue - Something" shows blue instead of the old tan default. */
 const LACE_FAMILY_MAP = {
-  "black": "#111111", "gray": "#777777", "grey": "#777777", "silver": "#bfc3c7", "white": "#f4eee4",
-  "tan": "#c49a6c", "brown": "#5a3720", "vintage": "#7a3f1d",
-  "blue": "#2f5fbf", "teal": "#0e5a63", "green": "#2e7d32",
-  "red": "#b01f2e", "orange": "#d46a1f", "yellow": "#d6b21f", "purple": "#6b3fa0", "pink": "#e889b9"
+  black: "#111111",
+  gray: "#777777",
+  grey: "#777777",
+  silver: "#bfc3c7",
+  white: "#f4eee4",
+  tan: "#c49a6c",
+  brown: "#5a3720",
+  vintage: "#7a3f1d",
+  blue: "#2f5fbf",
+  teal: "#0e5a63",
+  green: "#2e7d32",
+  red: "#b01f2e",
+  orange: "#d46a1f",
+  yellow: "#d6b21f",
+  purple: "#6b3fa0",
+  pink: "#e889b9",
 };
 
 function getLaceColor(value) {
@@ -9103,7 +11222,7 @@ function getInventoryStatus(item) {
     return {
       key: "ignore",
       label: "Ignore",
-      note: "No alert"
+      note: "No alert",
     };
   }
 
@@ -9111,7 +11230,7 @@ function getInventoryStatus(item) {
     return {
       key: "out",
       label: "Out",
-      note: "Reorder"
+      note: "Reorder",
     };
   }
 
@@ -9119,14 +11238,14 @@ function getInventoryStatus(item) {
     return {
       key: "low",
       label: "Low",
-      note: "Reorder"
+      note: "Reorder",
     };
   }
 
   return {
     key: "ok",
     label: "OK",
-    note: "Stocked"
+    note: "Stocked",
   };
 }
 
@@ -9160,9 +11279,11 @@ function renderLaceChips(order) {
     chips.push(`
       <span 
   class="lace-dot ${getLaceColor(primary) === "linear" ? "custom-dot" : ""}"
-  style="${getLaceColor(primary) === "linear"
-    ? ""
-    : `background:${getLaceColor(primary)}`}"
+  style="${
+    getLaceColor(primary) === "linear"
+      ? ""
+      : `background:${getLaceColor(primary)}`
+  }"
 >
   ${getLaceColor(primary) === "linear" ? "?" : ""}
 </span>
@@ -9173,9 +11294,11 @@ function renderLaceChips(order) {
     chips.push(`
       <span 
   class="lace-dot ${getLaceColor(secondary) === "linear" ? "custom-dot" : ""}"
-  style="${getLaceColor(secondary) === "linear"
-    ? ""
-    : `background:${getLaceColor(secondary)}`}"
+  style="${
+    getLaceColor(secondary) === "linear"
+      ? ""
+      : `background:${getLaceColor(secondary)}`
+  }"
 >
   ${getLaceColor(secondary) === "linear" ? "?" : ""}
 </span>
@@ -9183,15 +11306,15 @@ function renderLaceChips(order) {
   }
 
   if (custom) {
-  const customColor = getCustomLaceColor(custom);
+    const customColor = getCustomLaceColor(custom);
 
-  chips.push(`
+    chips.push(`
     <span
       class="lace-dot ${customColor ? "" : "custom-dot"}"
       style="${customColor ? `background:${escapeAttr(customColor)}` : ""}"
     >${customColor ? "" : "?"}</span>
   `);
-}
+  }
 
   return chips.length
     ? `<div class="lace-dot-row">${chips.join("")}</div>`
@@ -9201,13 +11324,19 @@ function renderLaceChips(order) {
 function getWorkflowStep(order) {
   const status = normalizeStatus(order.status);
   if (status === "received") return 1;
-  if (status === "estimate sent" || status === "pending response" || status === "on hold") return 2;
+  if (
+    status === "estimate sent" ||
+    status === "pending response" ||
+    status === "on hold"
+  )
+    return 2;
   if (
     status === "customer approved" ||
     status === "in transit to me" ||
     status === "waiting on lace/parts" ||
     status === "in progress"
-  ) return 3;
+  )
+    return 3;
   if (status === "ready to go") return 4;
   if (status === "completed" || status === "picked up") return 5;
   return 1;
@@ -9250,24 +11379,39 @@ function openWorkflowSheet(order, source, suppressOpeningTouch = false) {
   }
 
   workflowSheetEl.order = order;
-  workflowSheetEl.anchor = getAdminAnchorPosition(source, source?.currentTarget);
+  workflowSheetEl.anchor = getAdminAnchorPosition(
+    source,
+    source?.currentTarget,
+  );
   workflowSuppressOpeningTouch = suppressOpeningTouch;
   clearWorkflowOpeningTouchTimer();
-  document.removeEventListener("touchend", consumeWorkflowOpeningTouchEnd, true);
+  document.removeEventListener(
+    "touchend",
+    consumeWorkflowOpeningTouchEnd,
+    true,
+  );
   if (suppressOpeningTouch) {
     document.addEventListener("touchend", consumeWorkflowOpeningTouchEnd, {
       capture: true,
-      once: true
+      once: true,
     });
     workflowSuppressOpeningTouchTimer = setTimeout(() => {
       workflowSuppressOpeningTouch = false;
       workflowSuppressOpeningTouchTimer = null;
-      document.removeEventListener("touchend", consumeWorkflowOpeningTouchEnd, true);
+      document.removeEventListener(
+        "touchend",
+        consumeWorkflowOpeningTouchEnd,
+        true,
+      );
     }, 700);
   }
-  const headerCustomer = workflowSheetEl.querySelector(".workflow-customer-name");
+  const headerCustomer = workflowSheetEl.querySelector(
+    ".workflow-customer-name",
+  );
   const headerNumber = workflowSheetEl.querySelector(".workflow-order-number");
-  const headerStatus = workflowSheetEl.querySelector(".workflow-current-status");
+  const headerStatus = workflowSheetEl.querySelector(
+    ".workflow-current-status",
+  );
   const actions = workflowSheetEl.querySelector(".workflow-action-list");
   const form = workflowSheetEl.querySelector(".workflow-sheet-form");
 
@@ -9275,26 +11419,37 @@ function openWorkflowSheet(order, source, suppressOpeningTouch = false) {
   headerNumber.textContent = `Order #${order.orderNumber || ""}`;
   headerStatus.textContent = order.status || "";
   actions.innerHTML = getWorkflowActions(order)
-    .map(action => `
+    .map(
+      (action) => `
       <button class="workflow-action-btn" type="button" role="menuitem" aria-haspopup="true" data-action="${action.key}">
         <span>${escapeHtml(action.label)}</span>
         <span class="workflow-menu-chevron" aria-hidden="true">›</span>
       </button>
-    `)
+    `,
+    )
     .join("");
 
   form.innerHTML = "";
   form.classList.remove("is-submenu");
-  workflowSheetEl.querySelector(".workflow-sheet-title").textContent = "Workflow actions";
-  workflowSheetEl.classList.remove("workflow-action-selected", "workflow-form-compact", "workflow-form-small", "workflow-form-large");
+  workflowSheetEl.querySelector(".workflow-sheet-title").textContent =
+    "Workflow actions";
+  workflowSheetEl.classList.remove(
+    "workflow-action-selected",
+    "workflow-form-compact",
+    "workflow-form-small",
+    "workflow-form-large",
+  );
   workflowSheetEl.classList.add("open");
   document.body.classList.add("workflow-open");
   document.addEventListener("keydown", handleWorkflowMenuKeydown);
   requestAnimationFrame(() => {
-    positionWorkflowMenu(workflowSheetEl.querySelector(".workflow-sheet"), workflowSheetEl.anchor);
+    positionWorkflowMenu(
+      workflowSheetEl.querySelector(".workflow-sheet"),
+      workflowSheetEl.anchor,
+    );
   });
 
-  actions.querySelectorAll(".workflow-action-btn").forEach(btn => {
+  actions.querySelectorAll(".workflow-action-btn").forEach((btn) => {
     btn.addEventListener("mouseenter", () => {
       if (!isDesktopHoverMenu()) return;
       openWorkflowActionForm(order, btn.dataset.action, { button: btn });
@@ -9306,15 +11461,28 @@ function closeWorkflowSheet() {
   if (!workflowSheetEl) return;
   workflowSuppressOpeningTouch = false;
   clearWorkflowOpeningTouchTimer();
-  document.removeEventListener("touchend", consumeWorkflowOpeningTouchEnd, true);
+  document.removeEventListener(
+    "touchend",
+    consumeWorkflowOpeningTouchEnd,
+    true,
+  );
   document.removeEventListener("keydown", handleWorkflowMenuKeydown);
   workflowSheetEl.classList.remove("open");
-  workflowSheetEl.classList.remove("workflow-action-selected", "workflow-form-compact", "workflow-form-small", "workflow-form-large");
+  workflowSheetEl.classList.remove(
+    "workflow-action-selected",
+    "workflow-form-compact",
+    "workflow-form-small",
+    "workflow-form-large",
+  );
   workflowSheetEl.querySelector(".workflow-action-list").innerHTML = "";
   const form = workflowSheetEl.querySelector(".workflow-sheet-form");
   if (form) {
     form.innerHTML = "";
-    form.classList.remove("is-submenu", "workflow-submenu--confirm", "workflow-submenu--form");
+    form.classList.remove(
+      "is-submenu",
+      "workflow-submenu--confirm",
+      "workflow-submenu--form",
+    );
     form.style.left = "";
     form.style.top = "";
     form.style.right = "";
@@ -9362,8 +11530,12 @@ function createWorkflowSheet() {
     </div>
   `;
 
-  workflowSheetEl.querySelector(".workflow-backdrop").addEventListener("click", closeWorkflowSheet);
-  workflowSheetEl.querySelector(".workflow-close-btn").addEventListener("click", closeWorkflowSheet);
+  workflowSheetEl
+    .querySelector(".workflow-backdrop")
+    .addEventListener("click", closeWorkflowSheet);
+  workflowSheetEl
+    .querySelector(".workflow-close-btn")
+    .addEventListener("click", closeWorkflowSheet);
 
   workflowSheetEl.addEventListener("click", (e) => {
     const actionBtn = e.target.closest(".workflow-action-btn");
@@ -9373,7 +11545,9 @@ function createWorkflowSheet() {
         e.stopPropagation();
         return;
       }
-      openWorkflowActionForm(workflowSheetEl.order, actionBtn.dataset.action, { button: actionBtn });
+      openWorkflowActionForm(workflowSheetEl.order, actionBtn.dataset.action, {
+        button: actionBtn,
+      });
       return;
     }
 
@@ -9418,13 +11592,13 @@ function getAdminAnchorPosition(event, element) {
   if (rect) {
     return {
       x: rect.left + Math.min(rect.width / 2, 32),
-      y: rect.top + Math.min(rect.height / 2, 32)
+      y: rect.top + Math.min(rect.height / 2, 32),
     };
   }
 
   return {
     x: Math.round(window.innerWidth / 2),
-    y: Math.round(window.innerHeight / 2)
+    y: Math.round(window.innerHeight / 2),
   };
 }
 
@@ -9467,7 +11641,7 @@ function positionAdminFilterPopover(popover, toggle) {
   const rect = toggle.getBoundingClientRect();
   const anchor = {
     x: rect.right,
-    y: rect.bottom + 8
+    y: rect.bottom + 8,
   };
 
   popover.style.left = "0px";
@@ -9484,11 +11658,11 @@ function positionAdminFilterPopover(popover, toggle) {
   const containingBlockTop = popoverRect.top;
   const left = Math.min(
     Math.max(margin, anchor.x - popoverRect.width),
-    Math.max(margin, window.innerWidth - popoverRect.width - margin)
+    Math.max(margin, window.innerWidth - popoverRect.width - margin),
   );
   const top = Math.min(
     Math.max(margin, anchor.y),
-    Math.max(margin, window.innerHeight - popoverRect.height - margin)
+    Math.max(margin, window.innerHeight - popoverRect.height - margin),
   );
 
   popover.style.left = `${left - containingBlockLeft}px`;
@@ -9555,12 +11729,17 @@ function syncStorePhotoActionSelect(select) {
 }
 
 function isAdminPhotoActionValue(value, allowedActions) {
-  const normalized = String(value || "").trim().toLowerCase();
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
   if (ADMIN_PHOTO_PLACEHOLDER_VALUES.has(normalized)) return false;
   return allowedActions.has(normalized);
 }
 
-function bindAdminPhotoActionSelect(select, { allowedActions, restore, onAction }) {
+function bindAdminPhotoActionSelect(
+  select,
+  { allowedActions, restore, onAction },
+) {
   if (!select || select.dataset.actionSelectBound === "true") return;
   select.dataset.actionSelectBound = "true";
 
@@ -9575,8 +11754,12 @@ function bindAdminPhotoActionSelect(select, { allowedActions, restore, onAction 
   select.addEventListener("focus", captureOpenValue);
 
   select.addEventListener("change", async () => {
-    const actionValue = String(select.value || "").trim().toLowerCase();
-    const previousValue = String(valueBeforeOpen || "").trim().toLowerCase();
+    const actionValue = String(select.value || "")
+      .trim()
+      .toLowerCase();
+    const previousValue = String(valueBeforeOpen || "")
+      .trim()
+      .toLowerCase();
 
     if (!isAdminPhotoActionValue(actionValue, allowedActions)) {
       restore(select);
@@ -9602,12 +11785,9 @@ function getWorkflowFormSize(actionKey) {
     "customerApproved",
     "pendingResponse",
     "inTransitToMe",
-    "markPaid"
+    "markPaid",
   ]);
-  const large = new Set([
-    "readyToGo",
-    "completed"
-  ]);
+  const large = new Set(["readyToGo", "completed"]);
 
   if (compact.has(actionKey)) return "compact";
   if (large.has(actionKey)) return "large";
@@ -9632,7 +11812,11 @@ function openAdminActionSubmenu(root, button, html, options = {}) {
     root.actionKey = actionKey;
   }
 
-  root.classList.remove("workflow-form-compact", "workflow-form-small", "workflow-form-large");
+  root.classList.remove(
+    "workflow-form-compact",
+    "workflow-form-small",
+    "workflow-form-large",
+  );
   root.classList.add(`workflow-form-${options.formSize || "small"}`);
   root.classList.add("workflow-action-selected");
   root.querySelectorAll(".workflow-action-btn").forEach((actionBtn) => {
@@ -9641,7 +11825,11 @@ function openAdminActionSubmenu(root, button, html, options = {}) {
     actionBtn.classList.toggle("active", active);
   });
 
-  form.classList.remove("is-submenu", "workflow-submenu--confirm", "workflow-submenu--form");
+  form.classList.remove(
+    "is-submenu",
+    "workflow-submenu--confirm",
+    "workflow-submenu--form",
+  );
   form.style.left = "";
   form.style.top = "";
   form.style.right = "";
@@ -9654,7 +11842,11 @@ function openAdminActionSubmenu(root, button, html, options = {}) {
 
   if (desktopMenu) {
     const formSize = options.formSize || "small";
-    form.classList.add(formSize === "compact" ? "workflow-submenu--confirm" : "workflow-submenu--form");
+    form.classList.add(
+      formSize === "compact"
+        ? "workflow-submenu--confirm"
+        : "workflow-submenu--form",
+    );
   }
 
   requestAnimationFrame(() => {
@@ -9717,10 +11909,16 @@ function positionActionSubmenu(root, activeButton) {
       if (viewportLeft + width > window.innerWidth - margin) {
         viewportLeft = menuRect.left - gap - width;
       }
-      viewportLeft = Math.max(margin, Math.min(viewportLeft, window.innerWidth - margin - width));
+      viewportLeft = Math.max(
+        margin,
+        Math.min(viewportLeft, window.innerWidth - margin - width),
+      );
 
       let viewportTop = itemRect.top;
-      viewportTop = Math.max(margin, Math.min(viewportTop, window.innerHeight - margin - height));
+      viewportTop = Math.max(
+        margin,
+        Math.min(viewportTop, window.innerHeight - margin - height),
+      );
 
       form.style.left = `${viewportLeft - menuRect.left}px`;
       form.style.top = `${viewportTop - menuRect.top}px`;
@@ -9795,15 +11993,21 @@ function getWorkflowActions(order) {
 }
 
 function openWorkflowActionForm(order, actionKey, options = {}) {
-  const activeButton = options.button || Array.from(workflowSheetEl.querySelectorAll(".workflow-action-btn"))
-    .find(button => button.dataset.action === actionKey);
+  const activeButton =
+    options.button ||
+    Array.from(workflowSheetEl.querySelectorAll(".workflow-action-btn")).find(
+      (button) => button.dataset.action === actionKey,
+    );
   const isLocal = looksLocalDropOff(order);
   const existingNote = order.internalNotes || "";
   const priceQuoted = order.priceQuoted ?? "";
   const dateReceived = order.dateReceived || todayForInput();
-  const estimatedCompletion = actionKey === "startWork"
-    ? (getPromiseProposal(order)?.dateKey || order.estimatedCompletion || todayForInput())
-    : (order.estimatedCompletion || todayForInput());
+  const estimatedCompletion =
+    actionKey === "startWork"
+      ? getPromiseProposal(order)?.dateKey ||
+        order.estimatedCompletion ||
+        todayForInput()
+      : order.estimatedCompletion || todayForInput();
   const dateCompleted = order.dateCompleted || todayForInput();
   const shippingCost = order.shippingCost ?? "";
   const primaryLaceUsed = order.primaryLaceUsed ?? "";
@@ -9818,7 +12022,12 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
         <label>Estimated amount</label>
         <input id="workflowPriceQuoted" type="text" inputmode="decimal" value="${escapeAttr(formatMoneyForInput(priceQuoted))}" />
         ${suggested ? `<p class="muted workflow-price-hint">Suggested: ${escapeHtml(formatCurrency(suggested.price))} · ${escapeHtml(suggestionShortBasis(suggested))}</p>` : ""}
-        ${(() => { const p = getPublishedPriceForOrder(order); return p ? `<p class="muted workflow-price-hint">Published ${escapeHtml(p.serviceName)}: ${escapeHtml(p.display)}</p>` : ""; })()}
+        ${(() => {
+          const p = getPublishedPriceForOrder(order);
+          return p
+            ? `<p class="muted workflow-price-hint">Published ${escapeHtml(p.serviceName)}: ${escapeHtml(p.display)}</p>`
+            : "";
+        })()}
       </div>
     `;
   } else if (actionKey === "customerApproved") {
@@ -9855,16 +12064,24 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
       <div class="workflow-action-form">
         <label>Date completed</label>
         <input id="workflowDateCompleted" type="date" value="${escapeAttr(dateCompleted)}" />
-        ${!isLocal ? `
+        ${
+          !isLocal
+            ? `
           <label>Shipping cost</label>
           <input id="workflowShippingCost" type="text" inputmode="decimal" value="${escapeAttr(formatMoneyForInput(shippingCost))}" />
-        ` : ""}
+        `
+            : ""
+        }
         <label>Primary lace used</label>
         <input id="workflowPrimaryLaceUsed" type="text" inputmode="decimal" value="${escapeAttr(primaryLaceUsed)}" />
-        ${order.secondaryLaceColor || order.laceAccent ? `
+        ${
+          order.secondaryLaceColor || order.laceAccent
+            ? `
           <label>Secondary lace used</label>
           <input id="workflowSecondaryLaceUsed" type="text" inputmode="decimal" value="${escapeAttr(secondaryLaceUsed)}" />
-        ` : ""}
+        `
+            : ""
+        }
       </div>
     `;
   } else if (actionKey === "completed") {
@@ -9875,7 +12092,9 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
           <option value="Paid"${normalizeText(order.paid) === "paid" ? " selected" : ""}>Paid</option>
           <option value="Unpaid"${normalizeText(order.paid) !== "paid" ? " selected" : ""}>Unpaid</option>
         </select>
-        ${!isLocal ? `
+        ${
+          !isLocal
+            ? `
           <label>Carrier</label>
           <select id="workflowCarrier">
             <option value="">Select carrier</option>
@@ -9885,7 +12104,9 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
           </select>
           <label>Tracking number</label>
           <input id="workflowTrackingNumber" type="text" value="${escapeAttr(order.trackingNumber || order.tracking || "")}" />
-        ` : ""}
+        `
+            : ""
+        }
       </div>
     `;
   } else if (actionKey === "markPaid") {
@@ -9898,7 +12119,10 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
 
   const formSize = getWorkflowFormSize(actionKey);
 
-  openAdminActionSubmenu(workflowSheetEl, activeButton, `
+  openAdminActionSubmenu(
+    workflowSheetEl,
+    activeButton,
+    `
     <div class="workflow-form-content">
       ${inner}
       <div class="workflow-form-actions">
@@ -9906,15 +12130,27 @@ function openWorkflowActionForm(order, actionKey, options = {}) {
         <button class="primary workflow-form-submit" type="button">Save</button>
       </div>
     </div>
-  `, { assignActionKey: true, formSize });
+  `,
+    { assignActionKey: true, formSize },
+  );
 
   if (actionKey === "startWork" && !Array.isArray(moneyLaborSummaryCache)) {
     const input = document.getElementById("workflowEstimatedCompletion");
     let edited = false;
-    input?.addEventListener("input", () => { edited = true; }, { once: true });
+    input?.addEventListener(
+      "input",
+      () => {
+        edited = true;
+      },
+      { once: true },
+    );
     warmLaborSummaryCache().then(() => {
       const proposal = getPromiseProposal(order);
-      if (document.getElementById("workflowEstimatedCompletion") === input && !edited && proposal) {
+      if (
+        document.getElementById("workflowEstimatedCompletion") === input &&
+        !edited &&
+        proposal
+      ) {
         input.value = proposal.dateKey;
       }
     });
@@ -9939,28 +12175,41 @@ async function submitWorkflowAction(order, actionKey) {
     updates.status = "In Transit to Me";
   } else if (actionKey === "waitingOnLaceParts") {
     updates.status = "Waiting on Lace/Parts";
-    if (note) updates.internalNotes = appendInternalNote(order.internalNotes, note);
+    if (note)
+      updates.internalNotes = appendInternalNote(order.internalNotes, note);
   } else if (actionKey === "startWork") {
     updates.status = "In Progress";
-    updates.dateReceived = document.getElementById("workflowDateReceived")?.value || todayForInput();
-    updates.estimatedCompletion = document.getElementById("workflowEstimatedCompletion")?.value || null;
+    updates.dateReceived =
+      document.getElementById("workflowDateReceived")?.value || todayForInput();
+    updates.estimatedCompletion =
+      document.getElementById("workflowEstimatedCompletion")?.value || null;
   } else if (actionKey === "onHold") {
     updates.status = "On Hold";
-    if (note) updates.internalNotes = appendInternalNote(order.internalNotes, note);
+    if (note)
+      updates.internalNotes = appendInternalNote(order.internalNotes, note);
   } else if (actionKey === "readyToGo") {
     updates.status = "Ready to Go";
-    updates.dateCompleted = document.getElementById("workflowDateCompleted")?.value || null;
-    updates.shippingCost = !isLocal ? (parseMoneyInput(document.getElementById("workflowShippingCost")?.value || "") || null) : null;
-    updates.primaryLaceUsed = document.getElementById("workflowPrimaryLaceUsed")?.value || null;
+    updates.dateCompleted =
+      document.getElementById("workflowDateCompleted")?.value || null;
+    updates.shippingCost = !isLocal
+      ? parseMoneyInput(
+          document.getElementById("workflowShippingCost")?.value || "",
+        ) || null
+      : null;
+    updates.primaryLaceUsed =
+      document.getElementById("workflowPrimaryLaceUsed")?.value || null;
     if (order.secondaryLaceColor || order.laceAccent) {
-      updates.secondaryLaceUsed = document.getElementById("workflowSecondaryLaceUsed")?.value || null;
+      updates.secondaryLaceUsed =
+        document.getElementById("workflowSecondaryLaceUsed")?.value || null;
     }
   } else if (actionKey === "completed") {
     updates.status = "Completed";
     updates.paid = document.getElementById("workflowPaid")?.value || "Unpaid";
     if (!isLocal) {
-      updates.carrier = document.getElementById("workflowCarrier")?.value || null;
-      updates.trackingNumber = document.getElementById("workflowTrackingNumber")?.value || null;
+      updates.carrier =
+        document.getElementById("workflowCarrier")?.value || null;
+      updates.trackingNumber =
+        document.getElementById("workflowTrackingNumber")?.value || null;
     }
   } else if (actionKey === "markPaid") {
     updates.paid = "Paid";
@@ -9976,7 +12225,10 @@ async function submitWorkflowAction(order, actionKey) {
     closeWorkflowSheet();
   } catch (err) {
     const form = workflowSheetEl.querySelector(".workflow-sheet-form");
-    form.insertAdjacentHTML("afterbegin", `<div class="workflow-form-message">${escapeHtml(err.message || "Unable to save.")}</div>`);
+    form.insertAdjacentHTML(
+      "afterbegin",
+      `<div class="workflow-form-message">${escapeHtml(err.message || "Unable to save.")}</div>`,
+    );
   }
 }
 
@@ -10050,12 +12302,17 @@ function mapAddressHasStreet(address) {
   const value = String(address || "").trim();
   if (!value) return false;
   if (/^\d+\s+\S/.test(value)) return true;
-  return /\b(st|street|ave|avenue|rd|road|dr|drive|ln|lane|way|blvd|boulevard|ct|court|pl|place|cir|circle|hwy|highway|pkwy|parkway|trl|trail|pike|run|pass|cove|loop)\b/i.test(value);
+  return /\b(st|street|ave|avenue|rd|road|dr|drive|ln|lane|way|blvd|boulevard|ct|court|pl|place|cir|circle|hwy|highway|pkwy|parkway|trl|trail|pike|run|pass|cove|loop)\b/i.test(
+    value,
+  );
 }
 
 function mapStreetTokens(streetAddress) {
   const cleaned = String(streetAddress || "")
-    .replace(/\b(?:apt|apartment|unit|ste|suite|bldg|building|fl|floor|#)\s*[\w-]+.*$/i, "")
+    .replace(
+      /\b(?:apt|apartment|unit|ste|suite|bldg|building|fl|floor|#)\s*[\w-]+.*$/i,
+      "",
+    )
     .replace(/[.,;]+/g, " ")
     .trim()
     .toLowerCase();
@@ -10064,7 +12321,7 @@ function mapStreetTokens(streetAddress) {
 
   return cleaned
     .split(/\s+/)
-    .filter(token => token && !/^\d+$/.test(token) && token.length > 2)
+    .filter((token) => token && !/^\d+$/.test(token) && token.length > 2)
     .slice(0, 3);
 }
 
@@ -10072,7 +12329,7 @@ function mapStreetAppearsInGeocodedText(streetAddress, geocodedText) {
   const tokens = mapStreetTokens(streetAddress);
   if (!tokens.length) return true;
   const haystack = String(geocodedText || "").toLowerCase();
-  return tokens.some(token => haystack.includes(token));
+  return tokens.some((token) => haystack.includes(token));
 }
 
 function isMapCityStateZipOnlyAddress(address) {
@@ -10083,7 +12340,9 @@ function isMapCityStateZipOnlyAddress(address) {
 function deriveMapGeocodeQuality(order) {
   const street = String(order?.streetAddress || order?.address || "").trim();
   const geocoded = String(order?.mapGeocodedAddress || "").trim();
-  const source = String(order?.mapGeocodeSource || "").trim().toLowerCase();
+  const source = String(order?.mapGeocodeSource || "")
+    .trim()
+    .toLowerCase();
 
   if (order?.mapGeocodeStatus === "failed" || !hasOrderMapCoordinates(order)) {
     return "failed";
@@ -10093,12 +12352,24 @@ function deriveMapGeocodeQuality(order) {
     return "approximate";
   }
 
-  if (street && mapAddressHasStreet(street) && geocoded && !mapStreetAppearsInGeocodedText(street, geocoded)) {
+  if (
+    street &&
+    mapAddressHasStreet(street) &&
+    geocoded &&
+    !mapStreetAppearsInGeocodedText(street, geocoded)
+  ) {
     return "approximate";
   }
 
-  if (source === "nominatim" && street && mapAddressHasStreet(street) && geocoded) {
-    return mapStreetAppearsInGeocodedText(street, geocoded) ? "exact" : "approximate";
+  if (
+    source === "nominatim" &&
+    street &&
+    mapAddressHasStreet(street) &&
+    geocoded
+  ) {
+    return mapStreetAppearsInGeocodedText(street, geocoded)
+      ? "exact"
+      : "approximate";
   }
 
   return "exact";
@@ -10107,7 +12378,9 @@ function deriveMapGeocodeQuality(order) {
 function getMapGeocodeQuality(order) {
   if (!order) return "failed";
 
-  const stored = String(order.mapGeocodeQuality || "").trim().toLowerCase();
+  const stored = String(order.mapGeocodeQuality || "")
+    .trim()
+    .toLowerCase();
   if (stored === "exact" || stored === "approximate" || stored === "failed") {
     return stored;
   }
@@ -10123,7 +12396,12 @@ function getMapFocusZoom(quality) {
 
 function canShowOrderOnMap(order) {
   if (!order || !hasOrderMapCoordinates(order)) return false;
-  if (String(order.mapGeocodeStatus || "").trim().toLowerCase() === "failed") return false;
+  if (
+    String(order.mapGeocodeStatus || "")
+      .trim()
+      .toLowerCase() === "failed"
+  )
+    return false;
 
   const currentHash = buildMapAddressHash(order);
   const storedHash = String(order.mapAddressHash || "").trim();
@@ -10139,7 +12417,7 @@ function renderShowOnMapControl(order) {
 }
 
 function wireShowOnMapControl() {
-  orderDetail?.querySelectorAll("[data-show-on-map]").forEach(button => {
+  orderDetail?.querySelectorAll("[data-show-on-map]").forEach((button) => {
     if (button.dataset.showOnMapBound === "1") return;
     button.dataset.showOnMapBound = "1";
     button.addEventListener("click", (e) => {
@@ -10160,7 +12438,9 @@ function focusMapOnOrder(orderNumber) {
   const marker = orderMapMarkerByNumber.get(String(orderNumber || "").trim());
   if (!marker || !orderMap) return false;
 
-  const order = allOrders.find(item => String(item.orderNumber) === String(orderNumber));
+  const order = allOrders.find(
+    (item) => String(item.orderNumber) === String(orderNumber),
+  );
   const quality = getMapGeocodeQuality(order);
   const zoom = getMapFocusZoom(quality);
 
@@ -10207,22 +12487,23 @@ async function renderMapView() {
 
   const storedItems = orders
     .map(applyStoredMapLocation)
-    .filter(item => item.mapLocation);
-  const needsGeocode = orders.filter(item => !getStoredMapLocation(item));
+    .filter((item) => item.mapLocation);
+  const needsGeocode = orders.filter((item) => !getStoredMapLocation(item));
 
-  if (mapCount) mapCount.textContent = `${orders.length} address${orders.length === 1 ? "" : "es"}`;
+  if (mapCount)
+    mapCount.textContent = `${orders.length} address${orders.length === 1 ? "" : "es"}`;
 
   if (storedItems.length) {
     renderOrderMapMarkers(storedItems, token, {
       includeFailures: false,
       updateStatus: false,
-      total: orders.length
+      total: orders.length,
     });
   } else {
     renderOrderMapMarkers([], token, {
       includeFailures: false,
       updateStatus: false,
-      total: orders.length
+      total: orders.length,
     });
   }
 
@@ -10234,13 +12515,12 @@ async function renderMapView() {
 
   const finalItems = getMappableOrders()
     .map(applyStoredMapLocation)
-    .map(item => applyTransientMapGeocodeResult(item, geocodeResults))
+    .map((item) => applyTransientMapGeocodeResult(item, geocodeResults))
     .map(applyLocalMapCacheFallback);
-  const mapWarningBeforeFinal = mapStatus && !mapStatus.hidden
-    ? mapStatus.textContent
-    : "";
+  const mapWarningBeforeFinal =
+    mapStatus && !mapStatus.hidden ? mapStatus.textContent : "";
   const finalRender = renderOrderMapMarkers(finalItems, token, {
-    total: finalItems.length
+    total: finalItems.length,
   });
 
   if (mapWarningBeforeFinal && finalRender && !finalRender.failures.length) {
@@ -10256,7 +12536,10 @@ function setMapStatus(message, tone = "") {
   const text = String(message || "").trim();
   mapStatus.textContent = text;
   mapStatus.hidden = !text;
-  mapStatus.classList.toggle("map-status-warning", !!text && tone === "warning");
+  mapStatus.classList.toggle(
+    "map-status-warning",
+    !!text && tone === "warning",
+  );
 }
 
 function initOrderMap() {
@@ -10270,14 +12553,18 @@ function initOrderMap() {
       wheelPxPerZoomLevel: 80,
       wheelDebounceTime: 20,
       zoomAnimation: true,
-      markerZoomAnimation: true
+      markerZoomAnimation: true,
     }).setView([39.5, -98.35], 4);
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      subdomains: "abcd",
-      maxZoom: 20,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-    }).addTo(orderMap);
+    L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=cb1_4ih6_1_d36cfd0c45422603aff18262",
+      {
+        subdomains: "abcd",
+        maxZoom: 20,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      },
+    ).addTo(orderMap);
 
     orderMapMarkers = L.layerGroup().addTo(orderMap);
 
@@ -10296,11 +12583,13 @@ function initOrderMap() {
 
 function getMappableOrders() {
   return allOrders
-    .map(order => ({
+    .map((order) => ({
       order,
       key: String(order.orderNumber || "").trim(),
       streetAddress: String(order.streetAddress || order.address || "").trim(),
-      address2: String(order.address2 || order.aptUnit || order.apartment || "").trim(),
+      address2: String(
+        order.address2 || order.aptUnit || order.apartment || "",
+      ).trim(),
       city: String(order.city || "").trim(),
       state: String(order.state || "").trim(),
       zipCode: String(order.zipCode || order.zip || "").trim(),
@@ -10313,9 +12602,9 @@ function getMappableOrders() {
       storedGeocodeError: order.mapGeocodeError,
       storedGeocodeSource: order.mapGeocodeSource,
       storedAddressHash: order.mapAddressHash,
-      currentAddressHash: buildMapAddressHash(order)
+      currentAddressHash: buildMapAddressHash(order),
     }))
-    .filter(item => item.address);
+    .filter((item) => item.address);
 }
 
 function buildFullAddress(order) {
@@ -10334,7 +12623,7 @@ function buildMapAddressHash(order) {
     order.streetAddress || order.address,
     order.city,
     order.state,
-    order.zipCode || order.zip
+    order.zipCode || order.zip,
   ]
     .map(normalizeMapAddressHashPart)
     .join("|");
@@ -10366,13 +12655,16 @@ function buildMapAddressCandidates(order) {
     `${cleanedStreet}, ${city}, ${state} ${zip5}`,
     cityStateZip,
     cityStateZip5,
-    zip5
+    zip5,
   ]);
 }
 
 function cleanMapStreetAddress(street) {
   return String(street || "")
-    .replace(/\b(?:apt|apartment|unit|ste|suite|bldg|building|fl|floor|#)\s*[\w-]+.*$/i, "")
+    .replace(
+      /\b(?:apt|apartment|unit|ste|suite|bldg|building|fl|floor|#)\s*[\w-]+.*$/i,
+      "",
+    )
     .replace(/[.,;]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -10394,7 +12686,7 @@ function getStoredMapLocation(item) {
     address: item.storedGeocodedAddress || item.address,
     coords: { lat, lng },
     source: item.storedGeocodeSource || "stored",
-    quality: getMapGeocodeQuality(item.order)
+    quality: getMapGeocodeQuality(item.order),
   };
 }
 
@@ -10403,9 +12695,10 @@ function applyStoredMapLocation(item) {
     ...item,
     mapLocation: getStoredMapLocation(item),
     mapFailureReason:
-      item.storedGeocodeStatus === "failed" && item.storedAddressHash === item.currentAddressHash
+      item.storedGeocodeStatus === "failed" &&
+      item.storedAddressHash === item.currentAddressHash
         ? item.storedGeocodeError
-        : ""
+        : "",
   };
 }
 
@@ -10420,8 +12713,8 @@ function applyLocalMapCacheFallback(item) {
         mapLocation: {
           address,
           coords,
-          source: "local-cache"
-        }
+          source: "local-cache",
+        },
       };
     }
   }
@@ -10437,7 +12730,7 @@ function applyTransientMapGeocodeResult(item, geocodeResults) {
 
   return {
     ...item,
-    mapFailureReason: formatMapGeocodeResultError(result)
+    mapFailureReason: formatMapGeocodeResultError(result),
   };
 }
 
@@ -10454,20 +12747,25 @@ function formatMapGeocodeResultError(result) {
 
 async function geocodeMissingMapAddresses(items, token) {
   const input = items
-    .filter(item => item.key && item.addressCandidates?.length)
-    .map(item => ({
+    .filter((item) => item.key && item.addressCandidates?.length)
+    .map((item) => ({
       orderNumber: item.key,
       addressHash: item.currentAddressHash,
-      candidates: item.addressCandidates?.length ? item.addressCandidates : [item.address]
+      candidates: item.addressCandidates?.length
+        ? item.addressCandidates
+        : [item.address],
     }));
 
   if (!input.length) return new Map();
 
   try {
-    const data = await postJson({
-      action: "geocodeMissingOrderAddresses",
-      items: input
-    }, true);
+    const data = await postJson(
+      {
+        action: "geocodeMissingOrderAddresses",
+        items: input,
+      },
+      true,
+    );
 
     if (token !== mapRenderToken) return new Map();
 
@@ -10475,7 +12773,10 @@ async function geocodeMissingMapAddresses(items, token) {
     return new Map(Object.entries(data.results || {}));
   } catch (err) {
     if (token === mapRenderToken) {
-      setMapStatus(`Geocoding failed. ${err.message || "Using saved locations."}`, "warning");
+      setMapStatus(
+        `Geocoding failed. ${err.message || "Using saved locations."}`,
+        "warning",
+      );
     }
     return new Map();
   }
@@ -10484,24 +12785,34 @@ async function geocodeMissingMapAddresses(items, token) {
 function mergeMapGeocodeResults(results) {
   let changed = false;
 
-  Object.values(results || {}).forEach(result => {
+  Object.values(results || {}).forEach((result) => {
     if (!result?.order?.orderNumber) return;
 
-    const idx = allOrders.findIndex(order => String(order.orderNumber) === String(result.order.orderNumber));
+    const idx = allOrders.findIndex(
+      (order) => String(order.orderNumber) === String(result.order.orderNumber),
+    );
     if (idx === -1) {
       allOrders.push(result.order);
     } else {
       allOrders[idx] = result.order;
     }
 
-    if (currentOrder && String(currentOrder.orderNumber) === String(result.order.orderNumber)) {
+    if (
+      currentOrder &&
+      String(currentOrder.orderNumber) === String(result.order.orderNumber)
+    ) {
       currentOrder = result.order;
     }
 
-    if (result.ok && result.address && Number.isFinite(Number(result.lat)) && Number.isFinite(Number(result.lng))) {
+    if (
+      result.ok &&
+      result.address &&
+      Number.isFinite(Number(result.lat)) &&
+      Number.isFinite(Number(result.lng))
+    ) {
       setCachedCoordinates(result.address, {
         lat: Number(result.lat),
-        lng: Number(result.lng)
+        lng: Number(result.lng),
       });
     }
 
@@ -10517,7 +12828,7 @@ function uniqueAddresses(addresses) {
   const seen = new Set();
   const out = [];
 
-  addresses.forEach(address => {
+  addresses.forEach((address) => {
     const key = normalizeAddress(address);
     if (!key || seen.has(key)) return;
     seen.add(key);
@@ -10539,7 +12850,9 @@ function getCachedCoordinates(address) {
   if (!key) return null;
 
   try {
-    const cache = JSON.parse(localStorage.getItem("mm_geocode_cache_v1") || "{}");
+    const cache = JSON.parse(
+      localStorage.getItem("mm_geocode_cache_v1") || "{}",
+    );
     const coords = cache[key];
     if (!coords) return null;
 
@@ -10558,10 +12871,12 @@ function setCachedCoordinates(address, coords) {
   if (!key) return;
 
   try {
-    const cache = JSON.parse(localStorage.getItem("mm_geocode_cache_v1") || "{}");
+    const cache = JSON.parse(
+      localStorage.getItem("mm_geocode_cache_v1") || "{}",
+    );
     cache[key] = {
       lat: Number(coords.lat),
-      lng: Number(coords.lng)
+      lng: Number(coords.lng),
     };
     localStorage.setItem("mm_geocode_cache_v1", JSON.stringify(cache));
   } catch {
@@ -10588,10 +12903,20 @@ function renderOrderMapMarkers(items, token, options = {}) {
     if (item.mapLocation?.coords) {
       const { coords } = item.mapLocation;
       const marker = L.marker([coords.lat, coords.lng]);
-      const quality = item.mapLocation.quality || getMapGeocodeQuality(item.order);
-      marker.bindPopup(renderMapPopup(item.order, item.mapLocation.address || item.address, quality));
+      const quality =
+        item.mapLocation.quality || getMapGeocodeQuality(item.order);
+      marker.bindPopup(
+        renderMapPopup(
+          item.order,
+          item.mapLocation.address || item.address,
+          quality,
+        ),
+      );
       marker.addTo(orderMapMarkers);
-      orderMapMarkerByNumber.set(String(item.order.orderNumber || "").trim(), marker);
+      orderMapMarkerByNumber.set(
+        String(item.order.orderNumber || "").trim(),
+        marker,
+      );
 
       bounds.push([coords.lat, coords.lng]);
       mapped += 1;
@@ -10599,7 +12924,7 @@ function renderOrderMapMarkers(items, token, options = {}) {
       failures.push({
         order: item.order,
         address: item.address,
-        reason: item.mapFailureReason || "No coordinates found."
+        reason: item.mapFailureReason || "No coordinates found.",
       });
     }
   }
@@ -10607,18 +12932,23 @@ function renderOrderMapMarkers(items, token, options = {}) {
   if (token !== mapRenderToken) return null;
 
   if (bounds.length === 1 && !mapFocusOrderNumber) {
-    const singleItem = items.find(item => item.mapLocation?.coords);
-    const quality = singleItem?.mapLocation?.quality || getMapGeocodeQuality(singleItem?.order);
+    const singleItem = items.find((item) => item.mapLocation?.coords);
+    const quality =
+      singleItem?.mapLocation?.quality ||
+      getMapGeocodeQuality(singleItem?.order);
     orderMap.setView(bounds[0], getMapFocusZoom(quality));
   } else if (bounds.length > 1 && !mapFocusOrderNumber) {
     orderMap.fitBounds(bounds, {
       padding: [28, 28],
-      maxZoom: 10
+      maxZoom: 10,
     });
   }
 
   if (updateStatus) {
-    setMapStatus(getMapStatusText(mapped, total, failures.length), failures.length ? "warning" : "");
+    setMapStatus(
+      getMapStatusText(mapped, total, failures.length),
+      failures.length ? "warning" : "",
+    );
   }
   if (mapCount) {
     mapCount.textContent = `${mapped} mapped`;
@@ -10636,7 +12966,9 @@ function getMapPopupStatusToneClass(status) {
 function renderMapPopupMeta(order) {
   const orderNumber = String(order.orderNumber || "").trim();
   const statusLabel = String(getOrderStatusDisplay(order.status) || "").trim();
-  const statusClass = statusLabel ? getMapPopupStatusToneClass(order.status) : "";
+  const statusClass = statusLabel
+    ? getMapPopupStatusToneClass(order.status)
+    : "";
 
   if (orderNumber && statusLabel) {
     return `Order #${escapeHtml(orderNumber)} · <span class="map-popup-status${statusClass ? ` ${statusClass}` : ""}">${escapeHtml(statusLabel)}</span>`;
@@ -10657,9 +12989,10 @@ function renderMapPopup(order, address, quality = "") {
   const location = getMapPopupLocation(order, address);
   const metaHtml = renderMapPopupMeta(order);
   const resolvedQuality = quality || getMapGeocodeQuality(order);
-  const approximateNote = resolvedQuality === "approximate"
-    ? `<div class="map-popup-approximate">Approximate location</div>`
-    : "";
+  const approximateNote =
+    resolvedQuality === "approximate"
+      ? `<div class="map-popup-approximate">Approximate location</div>`
+      : "";
 
   return `
     <div class="map-popup">
@@ -10711,7 +13044,9 @@ function renderUnmappedAddresses(failures) {
   mapUnmappedList.hidden = false;
   mapUnmappedList.innerHTML = `
     <div class="map-unmapped-title">Unmapped addresses (${failures.length})</div>
-    ${failures.map(({ order, address, reason }) => `
+    ${failures
+      .map(
+        ({ order, address, reason }) => `
       <div class="map-unmapped-item">
         <div class="map-unmapped-main">
           <strong>${escapeHtml(order.customerName || "Customer")}</strong>
@@ -10721,7 +13056,9 @@ function renderUnmappedAddresses(failures) {
         </div>
         <button class="map-unmapped-btn" type="button" data-map-order="${escapeAttr(order.orderNumber || "")}">View Order</button>
       </div>
-    `).join("")}
+    `,
+      )
+      .join("")}
   `;
 }
 
@@ -10751,7 +13088,7 @@ async function login(email, password) {
     const data = await postJson({
       action: "login",
       email,
-      password
+      password,
     });
 
     await finishLoginWithToken(data.token, data.role);
@@ -10784,15 +13121,19 @@ async function finishLoginWithToken(token, role) {
    PASSKEY / FACE ID
 ========================= */
 function isPasskeySupported() {
-  return typeof window !== "undefined" &&
+  return (
+    typeof window !== "undefined" &&
     !!window.PublicKeyCredential &&
     !!navigator.credentials &&
-    typeof navigator.credentials.get === "function";
+    typeof navigator.credentials.get === "function"
+  );
 }
 
 function base64UrlToBuf(str) {
   const input = String(str || "");
-  const base64 = input.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((input.length + 3) % 4);
+  const base64 =
+    input.replace(/-/g, "+").replace(/_/g, "/") +
+    "===".slice((input.length + 3) % 4);
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -10803,7 +13144,10 @@ function bufToBase64Url(buffer) {
   const bytes = new Uint8Array(buffer);
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
 async function signInWithPasskey() {
@@ -10814,7 +13158,8 @@ async function signInWithPasskey() {
   try {
     const opt = await postJson({ action: "webauthnLoginOptions" });
     if (!opt.hasCredentials) {
-      loginStatus.textContent = "No passkey set up yet. Log in with your passcode, then choose “Set up Face ID.”";
+      loginStatus.textContent =
+        "No passkey set up yet. Log in with your passcode, then choose “Set up Face ID.”";
       return;
     }
 
@@ -10825,11 +13170,11 @@ async function signInWithPasskey() {
         rpId: o.rpId,
         timeout: o.timeout,
         userVerification: o.userVerification,
-        allowCredentials: (o.allowCredentials || []).map(cred => ({
+        allowCredentials: (o.allowCredentials || []).map((cred) => ({
           id: base64UrlToBuf(cred.id),
-          type: "public-key"
-        }))
-      }
+          type: "public-key",
+        })),
+      },
     });
 
     const res = await postJson({
@@ -10840,11 +13185,15 @@ async function signInWithPasskey() {
         rawId: bufToBase64Url(assertion.rawId),
         response: {
           clientDataJSON: bufToBase64Url(assertion.response.clientDataJSON),
-          authenticatorData: bufToBase64Url(assertion.response.authenticatorData),
+          authenticatorData: bufToBase64Url(
+            assertion.response.authenticatorData,
+          ),
           signature: bufToBase64Url(assertion.response.signature),
-          userHandle: assertion.response.userHandle ? bufToBase64Url(assertion.response.userHandle) : null
-        }
-      }
+          userHandle: assertion.response.userHandle
+            ? bufToBase64Url(assertion.response.userHandle)
+            : null,
+        },
+      },
     });
 
     await finishLoginWithToken(res.token, res.role);
@@ -10876,35 +13225,41 @@ async function enrollPasskey() {
         user: {
           id: base64UrlToBuf(o.user.id),
           name: o.user.name,
-          displayName: o.user.displayName
+          displayName: o.user.displayName,
         },
         pubKeyCredParams: o.pubKeyCredParams,
         authenticatorSelection: o.authenticatorSelection,
         timeout: o.timeout,
         attestation: o.attestation,
-        excludeCredentials: (o.excludeCredentials || []).map(c => ({
+        excludeCredentials: (o.excludeCredentials || []).map((c) => ({
           id: base64UrlToBuf(c.id),
-          type: "public-key"
-        }))
-      }
+          type: "public-key",
+        })),
+      },
     });
 
-    await postJson({
-      action: "webauthnRegisterVerify",
-      challengeToken: opt.challengeToken,
-      label: "Face ID",
-      credential: {
-        id: cred.id,
-        rawId: bufToBase64Url(cred.rawId),
-        transports: cred.response.getTransports ? cred.response.getTransports() : [],
-        response: {
-          clientDataJSON: bufToBase64Url(cred.response.clientDataJSON),
-          attestationObject: bufToBase64Url(cred.response.attestationObject)
-        }
-      }
-    }, true);
+    await postJson(
+      {
+        action: "webauthnRegisterVerify",
+        challengeToken: opt.challengeToken,
+        label: "Face ID",
+        credential: {
+          id: cred.id,
+          rawId: bufToBase64Url(cred.rawId),
+          transports: cred.response.getTransports
+            ? cred.response.getTransports()
+            : [],
+          response: {
+            clientDataJSON: bufToBase64Url(cred.response.clientDataJSON),
+            attestationObject: bufToBase64Url(cred.response.attestationObject),
+          },
+        },
+      },
+      true,
+    );
 
-    if (sideNavPasskeyBtn) sideNavPasskeyBtn.textContent = "Face ID is set up ✓";
+    if (sideNavPasskeyBtn)
+      sideNavPasskeyBtn.textContent = "Face ID is set up ✓";
     /* It's registered now — retire the setup entry after a brief confirmation. */
     setTimeout(() => {
       if (sideNavPasskeyBtn) {
@@ -10921,7 +13276,9 @@ async function enrollPasskey() {
       /* The device already holds a passkey for this site (it's the one
          that's registered), so it won't create a duplicate — hide the entry. */
       if (sideNavPasskeyBtn) sideNavPasskeyBtn.hidden = true;
-      alert("Face ID is already set up on this device. Just use “Sign in with Face ID” on the login screen.");
+      alert(
+        "Face ID is already set up on this device. Just use “Sign in with Face ID” on the login screen.",
+      );
       return;
     }
     alert(err && err.message ? err.message : "Could not set up Face ID.");
@@ -10956,7 +13313,9 @@ async function refreshPasskeySetupVisibility() {
 function syncRoleUI() {
   const role = getCurrentRole();
   const isAdmin = role === "admin";
-  document.querySelectorAll(".nav-admin-only").forEach(el => { el.hidden = !isAdmin; });
+  document.querySelectorAll(".nav-admin-only").forEach((el) => {
+    el.hidden = !isAdmin;
+  });
   document.body.classList.toggle("is-demo", role === "demo");
 }
 
@@ -10974,20 +13333,25 @@ async function renderUsersView() {
   }
 
   const countEl = document.getElementById("usersCount");
-  if (countEl) countEl.textContent = `${users.length} ${users.length === 1 ? "account" : "accounts"}`;
+  if (countEl)
+    countEl.textContent = `${users.length} ${users.length === 1 ? "account" : "accounts"}`;
 
   usersPanel.innerHTML = renderUsersContent(users);
   wireUsersPanel();
 }
 
 function renderUsersContent(users) {
-  const rows = users.map(u => {
-    const flags = [];
-    if (!u.active) flags.push(`<span class="user-flag user-flag--off">disabled</span>`);
-    if (u.invitePending) flags.push(`<span class="user-flag">invite pending</span>`);
-    else if (!u.hasPassword) flags.push(`<span class="user-flag">no password</span>`);
+  const rows = users
+    .map((u) => {
+      const flags = [];
+      if (!u.active)
+        flags.push(`<span class="user-flag user-flag--off">disabled</span>`);
+      if (u.invitePending)
+        flags.push(`<span class="user-flag">invite pending</span>`);
+      else if (!u.hasPassword)
+        flags.push(`<span class="user-flag">no password</span>`);
 
-    return `
+      return `
       <div class="user-row"
         data-user-id="${escapeAttr(u.id)}"
         data-user-email="${escapeAttr(u.email)}"
@@ -11012,7 +13376,8 @@ function renderUsersContent(users) {
         </div>
       </div>
     `;
-  }).join("");
+    })
+    .join("");
 
   return `
     <div class="dashboard-shell users-shell">
@@ -11050,7 +13415,9 @@ function wireUsersPanel() {
     if (menuBtn) {
       const pop = menuBtn.parentElement.querySelector(".user-menu-pop");
       const wasHidden = pop.hidden;
-      usersPanel.querySelectorAll(".user-menu-pop").forEach(el => { el.hidden = true; });
+      usersPanel.querySelectorAll(".user-menu-pop").forEach((el) => {
+        el.hidden = true;
+      });
       pop.hidden = !wasHidden;
       return;
     }
@@ -11062,14 +13429,16 @@ function wireUsersPanel() {
       userId: row.dataset.userId,
       email: row.dataset.userEmail,
       role: row.dataset.userRole,
-      active: row.dataset.userActive === "true"
+      active: row.dataset.userActive === "true",
     });
   });
 }
 
 document.addEventListener("click", (e) => {
   if (e.target.closest?.(".user-menu-wrap")) return;
-  usersPanel?.querySelectorAll(".user-menu-pop").forEach(el => { el.hidden = true; });
+  usersPanel?.querySelectorAll(".user-menu-pop").forEach((el) => {
+    el.hidden = true;
+  });
 });
 
 async function handleUserInvite() {
@@ -11086,12 +13455,15 @@ async function handleUserInvite() {
 
   if (statusEl) statusEl.textContent = "Sending invite…";
   try {
-    const data = await postJson({
-      action: "createUserInvite",
-      email,
-      displayName: nameEl?.value || "",
-      role: roleEl?.value || "demo"
-    }, true);
+    const data = await postJson(
+      {
+        action: "createUserInvite",
+        email,
+        displayName: nameEl?.value || "",
+        role: roleEl?.value || "demo",
+      },
+      true,
+    );
 
     if (data.emailed) {
       if (statusEl) statusEl.textContent = `Invite emailed to ${email}.`;
@@ -11103,7 +13475,8 @@ async function handleUserInvite() {
     if (nameEl) nameEl.value = "";
     renderUsersView();
   } catch (err) {
-    if (statusEl) statusEl.textContent = err.message || "Could not send the invite.";
+    if (statusEl)
+      statusEl.textContent = err.message || "Could not send the invite.";
   }
 }
 
@@ -11118,7 +13491,10 @@ async function handleUserRowAction(action, { userId, email, role, active }) {
     } else if (action === "password") {
       const pw = prompt(`Set a password for ${email} (at least 8 characters):`);
       if (!pw) return;
-      await postJson({ action: "setUserPassword", userId, password: pw.trim() }, true);
+      await postJson(
+        { action: "setUserPassword", userId, password: pw.trim() },
+        true,
+      );
     } else if (action === "remove") {
       if (!confirm(`Remove ${email}? This deletes their account.`)) return;
       await postJson({ action: "deleteUser", userId }, true);
@@ -11163,30 +13539,49 @@ async function startInviteFlow(token) {
   try {
     invite = await postJson({ action: "getInvite", token });
   } catch (err) {
-    if (intro) intro.textContent = err.message || "This invite is invalid or expired.";
+    if (intro)
+      intro.textContent = err.message || "This invite is invalid or expired.";
     return;
   }
 
-  if (intro) intro.textContent = `Welcome${invite.displayName ? `, ${invite.displayName}` : ""}! Set a password for ${invite.email} (${invite.role}).`;
+  if (intro)
+    intro.textContent = `Welcome${invite.displayName ? `, ${invite.displayName}` : ""}! Set a password for ${invite.email} (${invite.role}).`;
   if (form) form.hidden = false;
 
   const submit = async () => {
     const p1 = (pw1?.value || "").trim();
     const p2 = (pw2?.value || "").trim();
-    if (p1.length < 8) { if (status) status.textContent = "Password must be at least 8 characters."; return; }
-    if (p1 !== p2) { if (status) status.textContent = "Passwords don't match."; return; }
+    if (p1.length < 8) {
+      if (status)
+        status.textContent = "Password must be at least 8 characters.";
+      return;
+    }
+    if (p1 !== p2) {
+      if (status) status.textContent = "Passwords don't match.";
+      return;
+    }
     if (status) status.textContent = "Creating your account…";
     try {
-      const data = await postJson({ action: "acceptInvite", token, password: p1 });
+      const data = await postJson({
+        action: "acceptInvite",
+        token,
+        password: p1,
+      });
       clearInviteFromUrl();
       await finishLoginWithToken(data.token, data.role);
     } catch (err) {
-      if (status) status.textContent = err.message || "Could not set your password.";
+      if (status)
+        status.textContent = err.message || "Could not set your password.";
     }
   };
 
   submitBtn?.addEventListener("click", submit);
-  pw2?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } });
+  pw2?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      submit();
+    }
+  });
 }
 
 /* =========================
@@ -11201,13 +13596,19 @@ let messageSending = false;
 const ORDERS_SEEN_KEY = "mm_orders_seen_ts";
 
 function msgThreadKey(m) {
-  const d = String(m.phoneNumber || "").replace(/\D/g, "").slice(-10);
+  const d = String(m.phoneNumber || "")
+    .replace(/\D/g, "")
+    .slice(-10);
   return d || String(m.phoneNumber || "");
 }
 
 function formatPhone(v) {
-  const d = String(v || "").replace(/\D/g, "").slice(-10);
-  return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : String(v || "");
+  const d = String(v || "")
+    .replace(/\D/g, "")
+    .slice(-10);
+  return d.length === 10
+    ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`
+    : String(v || "");
 }
 
 function formatMessageTime(iso) {
@@ -11227,7 +13628,7 @@ function formatConversationMessageTime(iso) {
 
 function groupMessageThreads(messages) {
   const map = new Map();
-  messages.forEach(m => {
+  messages.forEach((m) => {
     const key = msgThreadKey(m);
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(m);
@@ -11237,8 +13638,8 @@ function groupMessageThreads(messages) {
   for (const [key, msgs] of map.entries()) {
     msgs.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     const last = msgs[msgs.length - 1];
-    const named = [...msgs].reverse().find(x => x.customerName);
-    const ordered = [...msgs].reverse().find(x => x.orderNumber);
+    const named = [...msgs].reverse().find((x) => x.customerName);
+    const ordered = [...msgs].reverse().find((x) => x.orderNumber);
     threads.push({
       key,
       phoneNumber: last.phoneNumber,
@@ -11246,10 +13647,12 @@ function groupMessageThreads(messages) {
       orderNumber: ordered ? ordered.orderNumber : "",
       messages: msgs,
       last,
-      unread: msgs.filter(x => x.direction === "in" && !x.read).length
+      unread: msgs.filter((x) => x.direction === "in" && !x.read).length,
     });
   }
-  threads.sort((a, b) => new Date(b.last.createdAt) - new Date(a.last.createdAt));
+  threads.sort(
+    (a, b) => new Date(b.last.createdAt) - new Date(a.last.createdAt),
+  );
   return threads;
 }
 
@@ -11265,8 +13668,10 @@ function setMessagesTopbar(mode, thread = null) {
   }
   if (messagesTitle) {
     messagesTitle.textContent = inThread
-      ? (thread?.customerName || formatPhone(thread?.phoneNumber))
-      : (composing ? "New message" : "Messages");
+      ? thread?.customerName || formatPhone(thread?.phoneNumber)
+      : composing
+        ? "New message"
+        : "Messages";
   }
   if (messagesCount && (inThread || composing)) {
     if (inThread && thread) {
@@ -11323,9 +13728,11 @@ async function renderMessagesView() {
   messagesPanel.innerHTML = `
     <div class="dashboard-shell messages-shell">
       <div class="dashboard-card msg-inbox-card">
-        ${threads.length
-          ? threads.map(renderThreadRow).join("")
-          : `<div class="msg-empty muted">No text messages yet. Incoming texts to your Twilio number will show up here.</div>`}
+        ${
+          threads.length
+            ? threads.map(renderThreadRow).join("")
+            : `<div class="msg-empty muted">No text messages yet. Incoming texts to your Twilio number will show up here.</div>`
+        }
       </div>
     </div>`;
   wireMessagesPanel();
@@ -11333,10 +13740,17 @@ async function renderMessagesView() {
 
 function renderThreadRow(t) {
   const title = t.customerName || formatPhone(t.phoneNumber);
-  const preview = (t.last.direction === "out" ? "You: " : "") +
+  const preview =
+    (t.last.direction === "out" ? "You: " : "") +
     (t.last.body || (t.last.mediaUrls.length ? "[Photo]" : ""));
-  const initials = (t.customerName || "")
-    .split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "#";
+  const initials =
+    (t.customerName || "")
+      .split(/\s+/)
+      .map((w) => w[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "#";
   return `
     <div class="msg-swipe">
       <button type="button" class="msg-swipe-del" data-del-thread="${escapeAttr(t.key)}">Delete</button>
@@ -11363,24 +13777,46 @@ function buildMessageBubbles(messages) {
     const day = d.toDateString();
     if (day !== prevDay) {
       prevDay = day;
-      const label = day === new Date().toDateString()
-        ? "Today"
-        : d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+      const label =
+        day === new Date().toDateString()
+          ? "Today"
+          : d.toLocaleDateString([], {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            });
       bubbles += `<div class="msg-day"><strong>${escapeHtml(label)}</strong></div>`;
     }
     /* Tail only on the last bubble of a same-direction run (iMessage-style). */
     const next = messages[i + 1];
-    const tail = !next || (next.direction === "out" ? "out" : "in") !== dir ||
+    const tail =
+      !next ||
+      (next.direction === "out" ? "out" : "in") !== dir ||
       new Date(next.createdAt).toDateString() !== day;
     const mediaUrls = Array.isArray(m.mediaUrls) ? m.mediaUrls : [];
-    const media = mediaUrls.map(u => `<a href="${escapeAttr(u)}" target="_blank" rel="noopener"><img class="msg-media-img" src="${escapeAttr(u)}" alt="Photo" loading="lazy"></a>`).join("");
+    const media = mediaUrls
+      .map(
+        (u) =>
+          `<a href="${escapeAttr(u)}" target="_blank" rel="noopener"><img class="msg-media-img" src="${escapeAttr(u)}" alt="Photo" loading="lazy"></a>`,
+      )
+      .join("");
     const mediaOnly = !m.body && mediaUrls.length ? " msg-media-only" : "";
-    const state = m.state === "pending" ? " is-pending" : (m.state === "failed" ? " is-failed" : "");
-    const time = m.state === "pending"
-      ? "Sending…"
-      : (m.state === "failed" ? "Not sent" : formatConversationMessageTime(m.createdAt));
+    const state =
+      m.state === "pending"
+        ? " is-pending"
+        : m.state === "failed"
+          ? " is-failed"
+          : "";
+    const time =
+      m.state === "pending"
+        ? "Sending…"
+        : m.state === "failed"
+          ? "Not sent"
+          : formatConversationMessageTime(m.createdAt);
     const messageId = String(m.id || "");
-    const messageIdAttr = messageId.startsWith("pending-") ? "" : ` data-mid="${escapeAttr(messageId)}"`;
+    const messageIdAttr = messageId.startsWith("pending-")
+      ? ""
+      : ` data-mid="${escapeAttr(messageId)}"`;
     bubbles += `
     <div class="msg-line msg-line-${dir}${tail ? " msg-tail" : ""}${state}"${messageIdAttr}>
       <div class="msg-bubble msg-${dir}${mediaOnly}">${m.body ? escapeHtml(m.body) : ""}${media}</div>
@@ -11391,7 +13827,9 @@ function buildMessageBubbles(messages) {
 }
 
 function isMessageThreadNearBottom(convo) {
-  return !convo || convo.scrollHeight - convo.scrollTop - convo.clientHeight < 80;
+  return (
+    !convo || convo.scrollHeight - convo.scrollTop - convo.clientHeight < 80
+  );
 }
 
 function scrollMessageThreadToBottom() {
@@ -11403,7 +13841,10 @@ function scrollMessageThreadToBottom() {
   if (latest) latest.hidden = true;
 }
 
-function renderOpenMessageStream(thread, { forceBottom = false, showLatest = false } = {}) {
+function renderOpenMessageStream(
+  thread,
+  { forceBottom = false, showLatest = false } = {},
+) {
   const convo = messagesPanel?.querySelector(".msg-convo");
   if (!convo) return;
   const previousTop = convo.scrollTop;
@@ -11412,32 +13853,52 @@ function renderOpenMessageStream(thread, { forceBottom = false, showLatest = fal
   messageThreadPinned = forceBottom || isMessageThreadNearBottom(convo);
   const latest = messagesPanel.querySelector("[data-msg-latest]");
   if (latest) latest.hidden = !showLatest || messageThreadPinned;
-  convo.querySelectorAll("img").forEach(img => {
-    if (!img.complete) img.addEventListener("load", () => {
-      if (messageThreadPinned) scrollMessageThreadToBottom();
-    }, { once: true });
+  convo.querySelectorAll("img").forEach((img) => {
+    if (!img.complete)
+      img.addEventListener(
+        "load",
+        () => {
+          if (messageThreadPinned) scrollMessageThreadToBottom();
+        },
+        { once: true },
+      );
   });
 }
 
 function refreshOpenMessageThread() {
-  const t = groupMessageThreads(allMessages).find(x => x.key === openThreadKey);
+  const t = groupMessageThreads(allMessages).find(
+    (x) => x.key === openThreadKey,
+  );
   if (!t) {
     renderMessagesView();
     return;
   }
   const convo = messagesPanel?.querySelector(".msg-convo");
-  const renderedIds = new Set(Array.from(convo?.querySelectorAll("[data-mid]") || [], el => el.dataset.mid));
-  const hasNewMessage = t.messages.some(message => !renderedIds.has(String(message.id)));
+  const renderedIds = new Set(
+    Array.from(
+      convo?.querySelectorAll("[data-mid]") || [],
+      (el) => el.dataset.mid,
+    ),
+  );
+  const hasNewMessage = t.messages.some(
+    (message) => !renderedIds.has(String(message.id)),
+  );
   const stayAtBottom = messageThreadPinned || isMessageThreadNearBottom(convo);
   setMessagesTopbar("thread", t);
-  renderOpenMessageStream(t, { forceBottom: stayAtBottom, showLatest: hasNewMessage && !stayAtBottom });
+  renderOpenMessageStream(t, {
+    forceBottom: stayAtBottom,
+    showLatest: hasNewMessage && !stayAtBottom,
+  });
   if (t.unread) markThreadRead(t.phoneNumber);
 }
 
 function openMessageThread(key) {
-  const t = groupMessageThreads(allMessages).find(x => x.key === key);
+  const t = groupMessageThreads(allMessages).find((x) => x.key === key);
   if (!t || !messagesPanel) return;
-  const prevDraft = (openThreadKey === key && document.getElementById("msgReplyInput")?.value) || "";
+  const prevDraft =
+    (openThreadKey === key &&
+      document.getElementById("msgReplyInput")?.value) ||
+    "";
   openThreadKey = key;
   messageThreadPinned = true;
   setMessagesTopbar("thread", t);
@@ -11446,7 +13907,9 @@ function openMessageThread(key) {
     <div class="dashboard-shell messages-shell msg-convo-shell">
       <div class="msg-convo">${buildMessageBubbles(t.messages)}</div>
       <button type="button" class="msg-jump-latest" data-msg-latest hidden>New messages&nbsp;↓</button>
-      ${t.phoneNumber ? `
+      ${
+        t.phoneNumber
+          ? `
         <div id="msgAttachPreview" class="msg-attach-preview" hidden></div>
         <div class="msg-reply msg-replybar" data-photo-drop="msgAttachInput">
           <button type="button" id="msgAttachBtn" class="msg-attach-btn" aria-label="Attach photo">
@@ -11458,7 +13921,9 @@ function openMessageThread(key) {
             data-thread="${escapeAttr(key)}" data-phone="${escapeAttr(t.phoneNumber)}"
             data-order="${escapeAttr(t.orderNumber)}" data-name="${escapeAttr(t.customerName)}">↑</button>
         </div>
-        <p id="msgReplyStatus" class="status muted"></p>` : ""}
+        <p id="msgReplyStatus" class="status muted"></p>`
+          : ""
+      }
     </div>`;
 
   if (t.unread) markThreadRead(t.phoneNumber);
@@ -11475,12 +13940,16 @@ function openMessageThread(key) {
 }
 
 async function markThreadRead(phoneNumber) {
-  const key = String(phoneNumber || "").replace(/\D/g, "").slice(-10);
-  allMessages.forEach(m => {
+  const key = String(phoneNumber || "")
+    .replace(/\D/g, "")
+    .slice(-10);
+  allMessages.forEach((m) => {
     if (m.direction === "in" && msgThreadKey(m) === key) m.read = true;
   });
   syncNotificationBadges();
-  try { await postJson({ action: "markMessagesRead", phoneNumber }, true); } catch {}
+  try {
+    await postJson({ action: "markMessagesRead", phoneNumber }, true);
+  } catch {}
 }
 
 function renderComposeView() {
@@ -11520,7 +13989,10 @@ function syncMessageComposer() {
     input.style.height = "auto";
     input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
   }
-  if (btn) btn.disabled = messageSending || (!String(input?.value || "").trim() && !pendingMsgPhoto);
+  if (btn)
+    btn.disabled =
+      messageSending ||
+      (!String(input?.value || "").trim() && !pendingMsgPhoto);
   const attach = document.getElementById("msgAttachBtn");
   if (attach) attach.classList.toggle("has-photo", !!pendingMsgPhoto);
 }
@@ -11531,9 +14003,14 @@ async function handleMessageReply(btn) {
   const statusEl = document.getElementById("msgReplyStatus");
   const text = (input?.value || "").trim();
   const isCompose = btn.dataset.compose === "1";
-  const phone = isCompose ? (document.getElementById("msgComposeTo")?.value || "").trim() : btn.dataset.phone;
+  const phone = isCompose
+    ? (document.getElementById("msgComposeTo")?.value || "").trim()
+    : btn.dataset.phone;
   if (!text && !pendingMsgPhoto) return;
-  if (!phone) { if (statusEl) statusEl.textContent = "Enter a phone number."; return; }
+  if (!phone) {
+    if (statusEl) statusEl.textContent = "Enter a phone number.";
+    return;
+  }
 
   const mediaDataUrl = pendingMsgPhoto;
   messageSending = true;
@@ -11542,11 +14019,14 @@ async function handleMessageReply(btn) {
   let optimisticId = "";
   if (!isCompose) {
     optimisticId = `pending-${Date.now()}`;
-    allMessages = allMessages.filter(message => !(
-      message.state === "failed" &&
-      msgThreadKey(message) === openThreadKey &&
-      String(message.body || "") === text
-    ));
+    allMessages = allMessages.filter(
+      (message) =>
+        !(
+          message.state === "failed" &&
+          msgThreadKey(message) === openThreadKey &&
+          String(message.body || "") === text
+        ),
+    );
     allMessages.push({
       id: optimisticId,
       direction: "out",
@@ -11557,25 +14037,30 @@ async function handleMessageReply(btn) {
       mediaUrls: mediaDataUrl ? [mediaDataUrl] : [],
       read: true,
       createdAt: new Date().toISOString(),
-      state: "pending"
+      state: "pending",
     });
     if (input) input.value = "";
     pendingMsgPhoto = "";
     renderPendingMsgPhoto();
-    const thread = groupMessageThreads(allMessages).find(item => item.key === openThreadKey);
+    const thread = groupMessageThreads(allMessages).find(
+      (item) => item.key === openThreadKey,
+    );
     if (thread) renderOpenMessageStream(thread, { forceBottom: true });
   }
   try {
-    await postJson({
-      action: "sendMessageReply",
-      phoneNumber: phone,
-      body: text,
-      mediaDataUrl,
-      orderNumber: btn.dataset.order || "",
-      customerName: btn.dataset.name || ""
-    }, true);
+    await postJson(
+      {
+        action: "sendMessageReply",
+        phoneNumber: phone,
+        body: text,
+        mediaDataUrl,
+        orderNumber: btn.dataset.order || "",
+        customerName: btn.dataset.name || "",
+      },
+      true,
+    );
     const optimistic = optimisticId
-      ? allMessages.find(message => String(message.id) === optimisticId)
+      ? allMessages.find((message) => String(message.id) === optimisticId)
       : null;
     if (optimistic) optimistic.state = "sent";
     if (isCompose) {
@@ -11593,15 +14078,20 @@ async function handleMessageReply(btn) {
   } catch (err) {
     messageSending = false;
     if (optimisticId) {
-      const pending = allMessages.find(message => String(message.id) === optimisticId);
+      const pending = allMessages.find(
+        (message) => String(message.id) === optimisticId,
+      );
       if (pending) pending.state = "failed";
-      const thread = groupMessageThreads(allMessages).find(item => item.key === openThreadKey);
+      const thread = groupMessageThreads(allMessages).find(
+        (item) => item.key === openThreadKey,
+      );
       if (thread) renderOpenMessageStream(thread, { forceBottom: true });
       if (input) input.value = text;
       pendingMsgPhoto = mediaDataUrl;
       renderPendingMsgPhoto();
     }
-    if (statusEl) statusEl.textContent = err.message || "Could not send the message.";
+    if (statusEl)
+      statusEl.textContent = err.message || "Could not send the message.";
     syncMessageComposer();
   }
 }
@@ -11610,10 +14100,19 @@ function wireMessagesPanel() {
   if (!messagesPanel || messagesPanel.dataset.wired === "true") return;
   messagesPanel.dataset.wired = "true";
   messagesPanel.addEventListener("click", async (e) => {
-    if (e.target.closest("[data-msg-back]")) { renderMessagesView(); return; }
-    if (e.target.closest("[data-msg-latest]")) { scrollMessageThreadToBottom(); return; }
+    if (e.target.closest("[data-msg-back]")) {
+      renderMessagesView();
+      return;
+    }
+    if (e.target.closest("[data-msg-latest]")) {
+      scrollMessageThreadToBottom();
+      return;
+    }
     const del = e.target.closest("[data-del-thread]");
-    if (del) { await deleteMessageThread(del.dataset.delThread); return; }
+    if (del) {
+      await deleteMessageThread(del.dataset.delThread);
+      return;
+    }
     if (e.target.closest("#msgAttachBtn")) {
       document.getElementById("msgAttachInput")?.click();
       return;
@@ -11623,11 +14122,17 @@ function wireMessagesPanel() {
       return;
     }
     const sendBtn = e.target.closest("#msgReplyBtn");
-    if (sendBtn) { await handleMessageReply(sendBtn); return; }
+    if (sendBtn) {
+      await handleMessageReply(sendBtn);
+      return;
+    }
     const thread = e.target.closest("[data-thread]");
     if (thread) {
       const wrap = thread.closest(".msg-swipe");
-      if (wrap && wrap.classList.contains("is-open")) { wrap.classList.remove("is-open"); return; }
+      if (wrap && wrap.classList.contains("is-open")) {
+        wrap.classList.remove("is-open");
+        return;
+      }
       openMessageThread(thread.dataset.thread);
       return;
     }
@@ -11638,24 +14143,33 @@ function wireMessagesPanel() {
   });
 
   messagesPanel.addEventListener("keydown", (e) => {
-    if (e.target?.id !== "msgReplyInput" || e.key !== "Enter" || e.shiftKey) return;
-    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    if (e.target?.id !== "msgReplyInput" || e.key !== "Enter" || e.shiftKey)
+      return;
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches)
+      return;
     e.preventDefault();
     const sendBtn = document.getElementById("msgReplyBtn");
     if (sendBtn && !sendBtn.disabled) handleMessageReply(sendBtn);
   });
 
-  messagesPanel.addEventListener("scroll", (e) => {
-    if (!e.target?.classList?.contains("msg-convo")) return;
-    messageThreadPinned = isMessageThreadNearBottom(e.target);
-    if (messageThreadPinned) {
-      const latest = messagesPanel.querySelector("[data-msg-latest]");
-      if (latest) latest.hidden = true;
-    }
-  }, true);
+  messagesPanel.addEventListener(
+    "scroll",
+    (e) => {
+      if (!e.target?.classList?.contains("msg-convo")) return;
+      messageThreadPinned = isMessageThreadNearBottom(e.target);
+      if (messageThreadPinned) {
+        const latest = messagesPanel.querySelector("[data-msg-latest]");
+        if (latest) latest.hidden = true;
+      }
+    },
+    true,
+  );
 
   /* Apple-style swipe-to-delete on inbox rows. */
-  let swipeEl = null, swipeX = 0, swipeY = 0, swiping = false;
+  let swipeEl = null,
+    swipeX = 0,
+    swipeY = 0,
+    swiping = false;
   armMessageDelete(messagesPanel);
 
   messagesPanel.addEventListener("change", (e) => {
@@ -11672,21 +14186,38 @@ function wireMessagesPanel() {
     reader.readAsDataURL(file);
   });
 
-  messagesPanel.addEventListener("touchstart", (e) => {
-    const wrap = e.target.closest?.(".msg-swipe");
-    if (!wrap) return;
-    swipeEl = wrap; swipeX = e.touches[0].clientX; swipeY = e.touches[0].clientY; swiping = false;
-    messagesPanel.querySelectorAll(".msg-swipe.is-open").forEach(el => { if (el !== wrap) el.classList.remove("is-open"); });
-  }, { passive: true });
-  messagesPanel.addEventListener("touchmove", (e) => {
-    if (!swipeEl) return;
-    const dx = e.touches[0].clientX - swipeX;
-    const dy = e.touches[0].clientY - swipeY;
-    if (!swiping && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy)) swiping = true;
-    if (swiping && dx < -30) swipeEl.classList.add("is-open");
-    if (swiping && dx > 30) swipeEl.classList.remove("is-open");
-  }, { passive: true });
-  messagesPanel.addEventListener("touchend", () => { swipeEl = null; swiping = false; });
+  messagesPanel.addEventListener(
+    "touchstart",
+    (e) => {
+      const wrap = e.target.closest?.(".msg-swipe");
+      if (!wrap) return;
+      swipeEl = wrap;
+      swipeX = e.touches[0].clientX;
+      swipeY = e.touches[0].clientY;
+      swiping = false;
+      messagesPanel.querySelectorAll(".msg-swipe.is-open").forEach((el) => {
+        if (el !== wrap) el.classList.remove("is-open");
+      });
+    },
+    { passive: true },
+  );
+  messagesPanel.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!swipeEl) return;
+      const dx = e.touches[0].clientX - swipeX;
+      const dy = e.touches[0].clientY - swipeY;
+      if (!swiping && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy))
+        swiping = true;
+      if (swiping && dx < -30) swipeEl.classList.add("is-open");
+      if (swiping && dx > 30) swipeEl.classList.remove("is-open");
+    },
+    { passive: true },
+  );
+  messagesPanel.addEventListener("touchend", () => {
+    swipeEl = null;
+    swiping = false;
+  });
 }
 
 function clearPendingMsgPhoto() {
@@ -11704,12 +14235,19 @@ function armMessageDelete(panel) {
   const start = (e, mid) => {
     msgPressTimer = setTimeout(() => confirmDeleteMessage(mid), 550);
   };
-  panel.addEventListener("touchstart", (e) => {
-    const line = e.target.closest?.(".msg-line[data-mid]");
-    if (line) start(e, line.dataset.mid);
-  }, { passive: true });
-  ["touchmove", "touchend", "touchcancel"].forEach(ev =>
-    panel.addEventListener(ev, () => clearTimeout(msgPressTimer), { passive: true }));
+  panel.addEventListener(
+    "touchstart",
+    (e) => {
+      const line = e.target.closest?.(".msg-line[data-mid]");
+      if (line) start(e, line.dataset.mid);
+    },
+    { passive: true },
+  );
+  ["touchmove", "touchend", "touchcancel"].forEach((ev) =>
+    panel.addEventListener(ev, () => clearTimeout(msgPressTimer), {
+      passive: true,
+    }),
+  );
   panel.addEventListener("contextmenu", (e) => {
     const line = e.target.closest?.(".msg-line[data-mid]");
     if (!line) return;
@@ -11726,7 +14264,7 @@ async function confirmDeleteMessage(mid) {
   if (!confirm("Delete this message?")) return;
   try {
     await postJson({ action: "deleteMessage", id: mid }, true);
-    allMessages = allMessages.filter(m => String(m.id) !== String(mid));
+    allMessages = allMessages.filter((m) => String(m.id) !== String(mid));
     if (openThreadKey) openMessageThread(openThreadKey);
     syncNotificationBadges();
   } catch (err) {
@@ -11735,14 +14273,20 @@ async function confirmDeleteMessage(mid) {
 }
 
 async function deleteMessageThread(key) {
-  const t = groupMessageThreads(allMessages).find(x => x.key === key);
+  const t = groupMessageThreads(allMessages).find((x) => x.key === key);
   if (!t) return;
   const who = t.customerName || formatPhone(t.phoneNumber);
-  if (!confirm(`Delete the conversation with ${who}? This can't be undone.`)) return;
-  const phones = [...new Set(t.messages.map(m => m.phoneNumber).filter(Boolean))];
+  if (!confirm(`Delete the conversation with ${who}? This can't be undone.`))
+    return;
+  const phones = [
+    ...new Set(t.messages.map((m) => m.phoneNumber).filter(Boolean)),
+  ];
   try {
-    await postJson({ action: "deleteMessageThread", phoneNumbers: phones }, true);
-    allMessages = allMessages.filter(m => msgThreadKey(m) !== key);
+    await postJson(
+      { action: "deleteMessageThread", phoneNumbers: phones },
+      true,
+    );
+    allMessages = allMessages.filter((m) => msgThreadKey(m) !== key);
     syncNotificationBadges();
     renderMessagesView();
   } catch (err) {
@@ -11760,7 +14304,10 @@ async function deleteMessageThread(key) {
    the pan by translating the app shell and capping its height to vv.height,
    which keeps header + reply bar glued to the visible screen. */
 function isStandaloneMode() {
-  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true
+  );
 }
 
 function convoIsOpen() {
@@ -11792,14 +14339,18 @@ function fitConvoToViewport() {
   const topbar = messagesView?.querySelector(".topbar");
   const shellEl = messagesPanel.querySelector(".msg-convo-shell");
   if (shellEl) {
-    shellEl.style.height = Math.max(220, vvH - (topbar?.offsetHeight || 0) - 24) + "px";
+    shellEl.style.height =
+      Math.max(220, vvH - (topbar?.offsetHeight || 0) - 24) + "px";
   }
   if (messageThreadPinned) convo.scrollTop = convo.scrollHeight;
 }
 
 function releaseConvoViewport() {
   const shell = document.querySelector(".app-shell");
-  if (shell) { shell.style.transform = ""; shell.style.height = ""; }
+  if (shell) {
+    shell.style.transform = "";
+    shell.style.height = "";
+  }
 }
 
 if (window.visualViewport) {
@@ -11818,21 +14369,23 @@ document.addEventListener("focusin", (e) => {
   if (e.target?.id === "msgReplyInput") setTimeout(fitConvoToViewport, 350);
 });
 document.addEventListener("focusout", (e) => {
-  if (e.target?.id === "msgReplyInput") setTimeout(() => {
-    if (convoIsOpen()) fitConvoToViewport();
-    else releaseConvoViewport();
-  }, 350);
+  if (e.target?.id === "msgReplyInput")
+    setTimeout(() => {
+      if (convoIsOpen()) fitConvoToViewport();
+      else releaseConvoViewport();
+    }, 350);
 });
 
 /* ---- In-app notification badges (unread texts + new orders) ---- */
 function getUnreadMessageCount() {
-  return (allMessages || []).filter(m => m.direction === "in" && !m.read).length;
+  return (allMessages || []).filter((m) => m.direction === "in" && !m.read)
+    .length;
 }
 
 function getNewOrdersCount() {
   const seen = Number(localStorage.getItem(ORDERS_SEEN_KEY) || 0);
   if (!seen) return 0;
-  return (allOrders || []).filter(o => {
+  return (allOrders || []).filter((o) => {
     if (!isCurrentOrder(o)) return false;
     const t = new Date(o.createdAt || o.dateReceived || 0).getTime();
     return t && t > seen;
@@ -11859,7 +14412,7 @@ function syncNotificationBadges() {
   const newOrders = getNewOrdersCount();
   setNavBadge(document.getElementById("messagesNavBadge"), unread);
   setNavBadge(document.getElementById("clubhouseNavBadge"), newOrders);
-  document.body.classList.toggle("has-notifications", (unread + newOrders) > 0);
+  document.body.classList.toggle("has-notifications", unread + newOrders > 0);
 }
 
 async function loadOrders() {
@@ -11876,12 +14429,12 @@ async function loadOrders() {
 
   applyFilters();
   try {
-     const inv = await postJson({ action: "listInventory" }, true);
-     laceInventory = inv.inventory || [];
-     renderReorderBanner(laceInventory);
-   } catch {
-     // Don't block orders if inventory check fails.
-   }
+    const inv = await postJson({ action: "listInventory" }, true);
+    laceInventory = inv.inventory || [];
+    renderReorderBanner(laceInventory);
+  } catch {
+    // Don't block orders if inventory check fails.
+  }
 
   if (activeView === "dashboard") {
     renderHomeDashboard();
@@ -11891,18 +14444,19 @@ async function loadOrders() {
 }
 
 async function loadSaleGloves() {
-  saleGlovesList.innerHTML =
-    `<div class="store-empty-state">Loading gloves...</div>`;
+  saleGlovesList.innerHTML = `<div class="store-empty-state">Loading gloves...</div>`;
 
   try {
-    const data = await postJson({
-      action: "listSaleGloves"
-    }, true);
+    const data = await postJson(
+      {
+        action: "listSaleGloves",
+      },
+      true,
+    );
 
     const gloves = data.gloves || [];
 
-    saleGlovesCount.textContent =
-      `${gloves.length} listing${gloves.length === 1 ? "" : "s"}`;
+    saleGlovesCount.textContent = `${gloves.length} listing${gloves.length === 1 ? "" : "s"}`;
 
     if (!gloves.length) {
       saleGlovesList.innerHTML = `
@@ -11913,20 +14467,23 @@ async function loadSaleGloves() {
         </div>
       `;
 
-      saleGlovesList.querySelector(".store-empty-add")?.addEventListener("click", () => {
-        renderSaleGloveEditor(null);
-      });
+      saleGlovesList
+        .querySelector(".store-empty-add")
+        ?.addEventListener("click", () => {
+          renderSaleGloveEditor(null);
+        });
       resetStoreScrollSoon();
       return;
     }
 
     saleGlovesList.innerHTML = `
       <div class="sale-gloves-list">
-        ${gloves.map(glove => {
-          const status = getSaleGloveStatus(glove.status);
-          const meta = getSaleGloveMeta(glove);
+        ${gloves
+          .map((glove) => {
+            const status = getSaleGloveStatus(glove.status);
+            const meta = getSaleGloveMeta(glove);
 
-          return `
+            return `
             <button class="sale-glove-row"
                  type="button"
                  data-id="${escapeAttr(glove.id)}">
@@ -11941,40 +14498,42 @@ async function loadSaleGloves() {
               </span>
             </button>
           `;
-        }).join("")}
+          })
+          .join("")}
       </div>
     `;
 
-    saleGlovesList
-      .querySelectorAll(".sale-glove-row")
-      .forEach(row => {
-        row.addEventListener("click", async () => {
-          const gloveId = row.dataset.id;
+    saleGlovesList.querySelectorAll(".sale-glove-row").forEach((row) => {
+      row.addEventListener("click", async () => {
+        const gloveId = row.dataset.id;
 
-          try {
-            const data = await postJson({
+        try {
+          const data = await postJson(
+            {
               action: "getSaleGlove",
-              id: gloveId
-            }, true);
+              id: gloveId,
+            },
+            true,
+          );
 
-            renderSaleGloveEditor(data.glove);
-          } catch (err) {
-            alert(err.message);
-          }
-        });
+          renderSaleGloveEditor(data.glove);
+        } catch (err) {
+          alert(err.message);
+        }
       });
+    });
 
     resetStoreScrollSoon();
-
   } catch (err) {
-    saleGlovesList.innerHTML =
-      `<div class="store-empty-state">${escapeHtml(err.message)}</div>`;
+    saleGlovesList.innerHTML = `<div class="store-empty-state">${escapeHtml(err.message)}</div>`;
     resetStoreScrollSoon();
   }
 }
 
 function getSaleGloveStatus(statusValue) {
-  const status = String(statusValue || "available").trim().toLowerCase();
+  const status = String(statusValue || "available")
+    .trim()
+    .toLowerCase();
 
   if (status === "sold") {
     return { key: "sold", label: "Sold" };
@@ -11988,12 +14547,8 @@ function getSaleGloveStatus(statusValue) {
 }
 
 function getSaleGloveMeta(glove) {
-  return [
-    glove.gloveSize,
-    glove.position,
-    glove.throwHand
-  ]
-    .map(value => String(value || "").trim())
+  return [glove.gloveSize, glove.position, glove.throwHand]
+    .map((value) => String(value || "").trim())
     .filter(Boolean)
     .slice(0, 2)
     .join(" · ");
@@ -12109,7 +14664,10 @@ function renderSaleGloveEditor(glove) {
           </div>
         </div>
 
-        ${isNew ? "" : `
+        ${
+          isNew
+            ? ""
+            : `
            <div class="store-photo-section">
              <div class="upload-card-heading store-photo-header">
                <div>
@@ -12149,7 +14707,8 @@ function renderSaleGloveEditor(glove) {
              </p>
             <div id="saleGlovePhotosList"></div>
            </div>
-        `}
+        `
+        }
 
         <div class="admin-action-row store-editor-actions">
            <button id="saveSaleGloveBtn" class="secondary admin-action-btn admin-action-btn-primary store-save-btn" type="button">
@@ -12158,11 +14717,15 @@ function renderSaleGloveEditor(glove) {
 
            <button id="cancelSaleGloveBtn" class="secondary admin-action-btn store-cancel-btn" type="button">Cancel</button>
 
-           ${isNew ? "" : `
+           ${
+             isNew
+               ? ""
+               : `
              <button id="deleteSaleGloveBtn" class="secondary admin-action-btn admin-action-btn-danger store-delete-btn" type="button">
                Delete
              </button>
-           `}
+           `
+           }
          </div>
 
         <p id="saleGloveEditStatus" class="upload-status"></p>
@@ -12172,98 +14735,95 @@ function renderSaleGloveEditor(glove) {
 
   resetStoreScrollSoon();
 
-  document.getElementById("cancelSaleGloveBtn")?.addEventListener("click", loadSaleGloves);
+  document
+    .getElementById("cancelSaleGloveBtn")
+    ?.addEventListener("click", loadSaleGloves);
 
-  document.getElementById("saveSaleGloveBtn")
-     ?.addEventListener("click", async () => {
+  document
+    .getElementById("saveSaleGloveBtn")
+    ?.addEventListener("click", async () => {
+      const statusEl = document.getElementById("saleGloveEditStatus");
 
-     const statusEl =
-       document.getElementById("saleGloveEditStatus");
+      try {
+        statusEl.textContent = "Saving...";
 
-     try {
-       statusEl.textContent = "Saving...";
+        const result = await postJson(
+          {
+            action: isNew ? "createSaleGlove" : "updateSaleGlove",
+            id: glove?.id,
 
-       const result = await postJson({
-         action: isNew ? "createSaleGlove" : "updateSaleGlove",
-         id: glove?.id,
+            slug: val("saleSlug"),
+            title: val("saleTitle"),
 
-         slug: val("saleSlug"),
-         title: val("saleTitle"),
+            shortDescription: val("saleShortDescription"),
 
-         shortDescription:
-           val("saleShortDescription"),
+            description: val("saleDescription"),
 
-         description:
-           val("saleDescription"),
+            price: parseMoneyInput(val("salePrice")),
 
-         price: parseMoneyInput(
-           val("salePrice")
-         ),
+            brand: val("saleBrand"),
+            model: val("saleModel"),
 
-         brand: val("saleBrand"),
-         model: val("saleModel"),
+            gloveSize: val("saleSize"),
+            position: val("salePosition"),
+            web: val("saleWeb"),
 
-         gloveSize: val("saleSize"),
-         position: val("salePosition"),
-         web: val("saleWeb"),
+            throwHand: val("saleThrowHand"),
 
-         throwHand: val("saleThrowHand"),
+            condition: val("saleCondition"),
 
-         condition: val("saleCondition"),
-   
-         status: val("saleStatus"),
+            status: val("saleStatus"),
 
-         featured:
-           val("saleFeatured") === "true",
+            featured: val("saleFeatured") === "true",
 
-         sortOrder:
-           Number(val("saleSortOrder") || 0),
+            sortOrder: Number(val("saleSortOrder") || 0),
 
-         purchaseUrl:
-           val("salePurchaseUrl")
+            purchaseUrl: val("salePurchaseUrl"),
+          },
+          true,
+        );
 
-       }, true);
+        statusEl.textContent = isNew ? "Glove created." : "Glove updated.";
 
-       statusEl.textContent = isNew
-        ? "Glove created."
-        : "Glove updated.";
+        if (isNew && result.glove?.id) {
+          renderSaleGloveEditor(result.glove);
+          return;
+        }
 
-       if (isNew && result.glove?.id) {
-        renderSaleGloveEditor(result.glove);
-        return;
-       }
+        await loadSaleGloves();
+      } catch (err) {
+        statusEl.textContent = err.message || "Save failed.";
+      }
+    });
 
-       await loadSaleGloves();
+  document
+    .getElementById("deleteSaleGloveBtn")
+    ?.addEventListener("click", async () => {
+      if (isNew || !glove?.id) return;
 
-     } catch (err) {
-       statusEl.textContent =
-         err.message || "Save failed.";
-     }
-  });
+      const ok = confirm(
+        `Delete "${glove.title || "this glove"}"? This cannot be undone.`,
+      );
+      if (!ok) return;
 
-  document.getElementById("deleteSaleGloveBtn")
-  ?.addEventListener("click", async () => {
-    if (isNew || !glove?.id) return;
+      const statusEl = document.getElementById("saleGloveEditStatus");
 
-    const ok = confirm(`Delete "${glove.title || "this glove"}"? This cannot be undone.`);
-    if (!ok) return;
+      try {
+        statusEl.textContent = "Deleting...";
 
-    const statusEl = document.getElementById("saleGloveEditStatus");
+        await postJson(
+          {
+            action: "deleteSaleGlove",
+            id: glove.id,
+          },
+          true,
+        );
 
-    try {
-      statusEl.textContent = "Deleting...";
-
-      await postJson({
-        action: "deleteSaleGlove",
-        id: glove.id
-      }, true);
-
-      await loadSaleGloves();
-
-    } catch (err) {
-      statusEl.textContent = err.message || "Delete failed.";
-    }
-  });
+        await loadSaleGloves();
+      } catch (err) {
+        statusEl.textContent = err.message || "Delete failed.";
+      }
+    });
 
   if (!isNew && glove?.id) {
     initSaleGlovePhotoUploader(glove);
@@ -12299,22 +14859,25 @@ function initSaleGlovePhotoUploader(glove) {
       return;
     }
 
-    preview.innerHTML = stagedFiles.map((file, index) => `
+    preview.innerHTML = stagedFiles
+      .map(
+        (file, index) => `
       <div class="upload-preview-item">
         <img src="${escapeAttr(URL.createObjectURL(file))}" alt="Selected photo ${index + 1}">
         <div class="upload-preview-name">${escapeHtml(file.name)}</div>
       </div>
-    `).join("");
+    `,
+      )
+      .join("");
 
     uploadBtn.disabled = false;
     clearBtn.disabled = false;
 
-    status.textContent =
-      `${stagedFiles.length} photo${stagedFiles.length === 1 ? "" : "s"} selected. Review, then click Upload.`;
+    status.textContent = `${stagedFiles.length} photo${stagedFiles.length === 1 ? "" : "s"} selected. Review, then click Upload.`;
   }
 
   input.addEventListener("change", () => {
-    stagedFiles = Array.from(input.files || []).filter(file => {
+    stagedFiles = Array.from(input.files || []).filter((file) => {
       const type = file.type || "image/jpeg";
       return type.startsWith("image/");
     });
@@ -12336,26 +14899,27 @@ function initSaleGlovePhotoUploader(glove) {
     let uploaded = 0;
     const failed = [];
 
-    status.textContent =
-      `Uploading ${stagedFiles.length} photo${stagedFiles.length === 1 ? "" : "s"}...`;
+    status.textContent = `Uploading ${stagedFiles.length} photo${stagedFiles.length === 1 ? "" : "s"}...`;
 
     for (const file of stagedFiles) {
       try {
         const contentType = file.type || "image/jpeg";
         const dataUrl = await fileToDataUrl(file);
 
-        await postJson({
-          action: "uploadSaleGlovePhoto",
-          gloveId: glove.id,
-          filename: file.name,
-          contentType,
-          dataUrl
-        }, true);
+        await postJson(
+          {
+            action: "uploadSaleGlovePhoto",
+            gloveId: glove.id,
+            filename: file.name,
+            contentType,
+            dataUrl,
+          },
+          true,
+        );
 
         uploaded++;
 
-        status.textContent =
-          `Uploaded ${uploaded} of ${stagedFiles.length} photo${stagedFiles.length === 1 ? "" : "s"}...`;
+        status.textContent = `Uploaded ${uploaded} of ${stagedFiles.length} photo${stagedFiles.length === 1 ? "" : "s"}...`;
       } catch (err) {
         failed.push(`${file.name}: ${err.message || "Upload failed"}`);
       }
@@ -12370,8 +14934,7 @@ function initSaleGlovePhotoUploader(glove) {
 
     clearSelection();
     await loadSaleGlovePhotos(glove.id);
-    status.textContent =
-      `Uploaded ${uploaded} photo${uploaded === 1 ? "" : "s"}.`;
+    status.textContent = `Uploaded ${uploaded} photo${uploaded === 1 ? "" : "s"}.`;
   });
 }
 
@@ -12380,10 +14943,13 @@ async function loadSaleGlovePhotos(gloveId) {
   if (!wrap) return;
 
   try {
-    const data = await postJson({
-      action: "listSaleGlovePhotos",
-      gloveId
-    }, true);
+    const data = await postJson(
+      {
+        action: "listSaleGlovePhotos",
+        gloveId,
+      },
+      true,
+    );
 
     const photos = data.photos || [];
 
@@ -12398,7 +14964,9 @@ async function loadSaleGlovePhotos(gloveId) {
 
     wrap.innerHTML = `
       <div class="store-photo-grid">
-        ${photos.map(photo => `
+        ${photos
+          .map(
+            (photo) => `
           <div class="upload-preview-item sale-photo-item">
             <img
               src="${escapeAttr(photo.url)}"
@@ -12423,11 +14991,13 @@ async function loadSaleGlovePhotos(gloveId) {
               </select>
             </div>
           </div>
-        `).join("")}
+        `,
+          )
+          .join("")}
       </div>
     `;
 
-    wrap.querySelectorAll(".sale-photo-action-select").forEach(select => {
+    wrap.querySelectorAll(".sale-photo-action-select").forEach((select) => {
       bindAdminPhotoActionSelect(select, {
         allowedActions: ADMIN_STORE_PHOTO_ACTIONS,
         restore: syncStorePhotoActionSelect,
@@ -12453,11 +15023,14 @@ async function loadSaleGlovePhotos(gloveId) {
                   ? "setSalePhotoHover"
                   : "deleteSaleGlovePhoto";
 
-            await postJson({
-              action,
-              gloveId: gloveIdFromSelect,
-              photoId
-            }, true);
+            await postJson(
+              {
+                action,
+                gloveId: gloveIdFromSelect,
+                photoId,
+              },
+              true,
+            );
 
             await loadSaleGlovePhotos(gloveId);
           } catch (err) {
@@ -12466,10 +15039,9 @@ async function loadSaleGlovePhotos(gloveId) {
           } finally {
             actionSelect.disabled = false;
           }
-        }
+        },
       });
     });
-
   } catch (err) {
     wrap.innerHTML = `
       <p class="muted">
@@ -12488,25 +15060,34 @@ async function loadInventory() {
 
 function renderInventory(rows) {
   const viewMode = window.inventoryViewMode || "active";
-  const activeRows = rows.filter(item => item.active !== false);
-  const hiddenRows = rows.filter(item => item.active === false);
-  const filteredRows = viewMode === "hidden"
-    ? hiddenRows
-    : viewMode === "needs"
-      ? activeRows.filter(inventoryNeedsOrder)
-      : activeRows;
+  const activeRows = rows.filter((item) => item.active !== false);
+  const hiddenRows = rows.filter((item) => item.active === false);
+  const filteredRows =
+    viewMode === "hidden"
+      ? hiddenRows
+      : viewMode === "needs"
+        ? activeRows.filter(inventoryNeedsOrder)
+        : activeRows;
 
-  const modeLabel = viewMode === "hidden" ? " · Hidden" : viewMode === "needs" ? " · Needs Order" : "";
+  const modeLabel =
+    viewMode === "hidden"
+      ? " · Hidden"
+      : viewMode === "needs"
+        ? " · Needs Order"
+        : "";
   orderCount.textContent = `${filteredRows.length} color${filteredRows.length === 1 ? "" : "s"}${modeLabel}`;
   ordersList.innerHTML = "";
   syncInventoryFilterUI();
 
   if (!filteredRows.length) {
-    ordersList.insertAdjacentHTML("beforeend", `<div class="no-results">No matching lace inventory.</div>`);
+    ordersList.insertAdjacentHTML(
+      "beforeend",
+      `<div class="no-results">No matching lace inventory.</div>`,
+    );
     return;
   }
 
-  filteredRows.forEach(item => {
+  filteredRows.forEach((item) => {
     const colorName = String(item.color || "").trim();
     const qty = getInventoryQuantity(item);
     const reorderAt = getInventoryReorderAt(item);
@@ -12544,7 +15125,9 @@ function renderInventory(rows) {
 }
 
 function getLowInventoryItems(rows) {
-  return rows.filter(item => item.active !== false).filter(inventoryNeedsOrder);
+  return rows
+    .filter((item) => item.active !== false)
+    .filter(inventoryNeedsOrder);
 }
 
 function syncInventoryFilterUI() {
@@ -12553,9 +15136,15 @@ function syncInventoryFilterUI() {
 
   if (inventoryFilterToggleBtn) {
     inventoryFilterToggleBtn.hidden = !showInventoryFilter;
-    inventoryFilterToggleBtn.setAttribute("aria-expanded", showPopover ? "true" : "false");
+    inventoryFilterToggleBtn.setAttribute(
+      "aria-expanded",
+      showPopover ? "true" : "false",
+    );
     inventoryFilterToggleBtn.classList.toggle("is-active", showPopover);
-    inventoryFilterToggleBtn.classList.toggle("has-active-filter", (window.inventoryViewMode || "active") !== "active");
+    inventoryFilterToggleBtn.classList.toggle(
+      "has-active-filter",
+      (window.inventoryViewMode || "active") !== "active",
+    );
   }
 
   if (inventoryAddBtn) {
@@ -12565,7 +15154,12 @@ function syncInventoryFilterUI() {
   if (inventoryFilterPopover) {
     inventoryFilterPopover.hidden = !showPopover;
     if (showPopover) {
-      requestAnimationFrame(() => positionAdminFilterPopover(inventoryFilterPopover, inventoryFilterToggleBtn));
+      requestAnimationFrame(() =>
+        positionAdminFilterPopover(
+          inventoryFilterPopover,
+          inventoryFilterToggleBtn,
+        ),
+      );
     }
   }
 
@@ -12617,32 +15211,42 @@ function attachInventoryRowActions(row, item) {
     openInventoryActions(item, row);
   });
 
-  row.addEventListener("touchstart", (e) => {
-    if (e.touches.length !== 1) return;
-    setAdminLongPressArmed(true);
-    const touch = e.touches[0];
-    inventoryPressStart = {
-      x: touch.clientX,
-      y: touch.clientY
-    };
-    inventoryPressTimer = window.setTimeout(() => {
-      inventoryPressTimer = null;
-      setAdminLongPressArmed(false);
-      suppressNextAdminMenuActivation();
-      openInventoryActions(item, row);
-    }, 520);
-  }, { passive: true });
+  row.addEventListener(
+    "touchstart",
+    (e) => {
+      if (e.touches.length !== 1) return;
+      setAdminLongPressArmed(true);
+      const touch = e.touches[0];
+      inventoryPressStart = {
+        x: touch.clientX,
+        y: touch.clientY,
+      };
+      inventoryPressTimer = window.setTimeout(() => {
+        inventoryPressTimer = null;
+        setAdminLongPressArmed(false);
+        suppressNextAdminMenuActivation();
+        openInventoryActions(item, row);
+      }, 520);
+    },
+    { passive: true },
+  );
 
-  row.addEventListener("touchmove", (e) => {
-    if (!inventoryPressStart || !e.touches.length) return;
-    const touch = e.touches[0];
-    const dx = Math.abs(touch.clientX - inventoryPressStart.x);
-    const dy = Math.abs(touch.clientY - inventoryPressStart.y);
-    if (dx > 10 || dy > 10) cancelInventoryLongPress();
-  }, { passive: true });
+  row.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!inventoryPressStart || !e.touches.length) return;
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - inventoryPressStart.x);
+      const dy = Math.abs(touch.clientY - inventoryPressStart.y);
+      if (dx > 10 || dy > 10) cancelInventoryLongPress();
+    },
+    { passive: true },
+  );
 
   row.addEventListener("touchend", cancelInventoryLongPress, { passive: true });
-  row.addEventListener("touchcancel", cancelInventoryLongPress, { passive: true });
+  row.addEventListener("touchcancel", cancelInventoryLongPress, {
+    passive: true,
+  });
 }
 
 function cancelInventoryLongPress() {
@@ -12658,7 +15262,8 @@ function ensureInventorySheet() {
   if (inventorySheetEl) return inventorySheetEl;
 
   inventorySheetEl = document.createElement("div");
-  inventorySheetEl.className = "admin-action-menu-root workflow-sheet-root inventory-sheet-root";
+  inventorySheetEl.className =
+    "admin-action-menu-root workflow-sheet-root inventory-sheet-root";
   inventorySheetEl.innerHTML = `
     <div class="admin-action-backdrop workflow-backdrop"></div>
     <div class="admin-action-menu workflow-sheet inventory-sheet" role="menu" aria-label="Lace inventory actions">
@@ -12676,15 +15281,27 @@ function ensureInventorySheet() {
   `;
 
   getAdminMenuLayer().appendChild(inventorySheetEl);
-  inventorySheetEl.querySelector(".workflow-backdrop")?.addEventListener("click", closeInventorySheet);
-  inventorySheetEl.querySelector(".workflow-close-btn")?.addEventListener("click", closeInventorySheet);
+  inventorySheetEl
+    .querySelector(".workflow-backdrop")
+    ?.addEventListener("click", closeInventorySheet);
+  inventorySheetEl
+    .querySelector(".workflow-close-btn")
+    ?.addEventListener("click", closeInventorySheet);
   return inventorySheetEl;
 }
 
 function closeInventorySheet() {
   if (!inventorySheetEl) return;
-  inventorySheetEl.classList.remove("open", "workflow-action-selected", "workflow-form-compact", "workflow-form-small", "workflow-form-large");
-  inventorySheetEl.querySelector(".workflow-sheet-form")?.classList.remove("is-submenu");
+  inventorySheetEl.classList.remove(
+    "open",
+    "workflow-action-selected",
+    "workflow-form-compact",
+    "workflow-form-small",
+    "workflow-form-large",
+  );
+  inventorySheetEl
+    .querySelector(".workflow-sheet-form")
+    ?.classList.remove("is-submenu");
   inventorySheetEl.anchor = null;
 }
 
@@ -12698,24 +15315,32 @@ function openInventoryActions(item, source) {
   const status = getInventoryStatus(item);
   const alertEnabled = inventoryAlertEnabled(item);
 
-  sheetRoot.anchor = getAdminAnchorPosition(source, source?.currentTarget || source);
-  sheetRoot.className = "admin-action-menu-root workflow-sheet-root inventory-sheet-root open";
-  sheetRoot.querySelector(".workflow-customer-name").textContent = colorName ? adminLaceLabel(colorName) : "Lace color";
-  sheetRoot.querySelector(".workflow-current-status").textContent = `${qty} on hand · ${status.label}`;
+  sheetRoot.anchor = getAdminAnchorPosition(
+    source,
+    source?.currentTarget || source,
+  );
+  sheetRoot.className =
+    "admin-action-menu-root workflow-sheet-root inventory-sheet-root open";
+  sheetRoot.querySelector(".workflow-customer-name").textContent = colorName
+    ? adminLaceLabel(colorName)
+    : "Lace color";
+  sheetRoot.querySelector(".workflow-current-status").textContent =
+    `${qty} on hand · ${status.label}`;
   form.innerHTML = "";
   form.classList.remove("is-submenu");
   form.style.left = "";
   form.style.top = "";
   form.style.right = "";
   form.style.bottom = "";
-  list.innerHTML = item.active === false
-    ? `
+  list.innerHTML =
+    item.active === false
+      ? `
       <button class="workflow-action-btn" type="button" data-inventory-action="restore">Restore Color</button>
       <button class="workflow-action-btn" type="button" data-inventory-action="set">Set Quantity <span class="workflow-menu-chevron">›</span></button>
       <button class="workflow-action-btn" type="button" data-inventory-action="alertSettings">Alert Settings <span class="workflow-menu-chevron">›</span></button>
       <button class="workflow-action-btn" type="button" data-inventory-action="rename">Edit Lace Color <span class="workflow-menu-chevron">›</span></button>
     `
-    : `
+      : `
       <button class="workflow-action-btn" type="button" data-inventory-action="set">Set Quantity <span class="workflow-menu-chevron">›</span></button>
       <button class="workflow-action-btn" type="button" data-inventory-action="alertSettings">Alert Settings <span class="workflow-menu-chevron">›</span></button>
       <button class="workflow-action-btn" type="button" data-inventory-action="photo">Set Photo <span class="workflow-menu-chevron">›</span></button>
@@ -12723,7 +15348,7 @@ function openInventoryActions(item, source) {
       <button class="workflow-action-btn danger" type="button" data-inventory-action="deactivate">Deactivate / Hide Color</button>
     `;
 
-  list.querySelectorAll("[data-inventory-action]").forEach(btn => {
+  list.querySelectorAll("[data-inventory-action]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       if (shouldSuppressAdminMenuActivation()) {
         e.preventDefault();
@@ -12737,10 +15362,12 @@ function openInventoryActions(item, source) {
       if (!inventoryActionHasForm(btn.dataset.inventoryAction)) {
         form.innerHTML = "";
         form.classList.remove("is-submenu");
-        sheetRoot.querySelectorAll(".workflow-action-btn").forEach(actionBtn => {
-          actionBtn.classList.remove("active");
-          actionBtn.hidden = false;
-        });
+        sheetRoot
+          .querySelectorAll(".workflow-action-btn")
+          .forEach((actionBtn) => {
+            actionBtn.classList.remove("active");
+            actionBtn.hidden = false;
+          });
         return;
       }
       renderInventoryActionForm(item, btn.dataset.inventoryAction, btn);
@@ -12765,7 +15392,12 @@ function handleInventoryAction(item, action, button) {
 }
 
 function inventoryActionHasForm(action) {
-  return action === "set" || action === "alertSettings" || action === "rename" || action === "photo";
+  return (
+    action === "set" ||
+    action === "alertSettings" ||
+    action === "rename" ||
+    action === "photo"
+  );
 }
 
 function renderInventoryActionForm(item, action, button) {
@@ -12778,7 +15410,7 @@ function renderInventoryActionForm(item, action, button) {
     set: "Set quantity",
     alertSettings: "Alert settings",
     photo: "Set photo",
-    rename: "Edit lace color"
+    rename: "Edit lace color",
   };
 
   const currentQty = getInventoryQuantity(item || {});
@@ -12804,9 +15436,11 @@ function renderInventoryActionForm(item, action, button) {
   } else if (action === "photo") {
     const photoUrl = String(item?.photo_url || "").trim();
     fields = `
-      <div class="inventory-photo-current">${photoUrl
-        ? `<img src="${escapeAttr(photoUrl)}" alt="" class="inventory-photo-thumb" />`
-        : `<span class="muted">No photo yet — this color is hidden from customers until one is added.</span>`}</div>
+      <div class="inventory-photo-current">${
+        photoUrl
+          ? `<img src="${escapeAttr(photoUrl)}" alt="" class="inventory-photo-thumb" />`
+          : `<span class="muted">No photo yet — this color is hidden from customers until one is added.</span>`
+      }</div>
       <label for="inventoryPhotoInput">Swatch photo</label>
       <input id="inventoryPhotoInput" type="file" accept="image/*" />
       <p class="workflow-form-helper">Shown on the services page and the order form.</p>
@@ -12845,9 +15479,15 @@ function renderInventoryActionForm(item, action, button) {
   `;
 
   if (button) {
-    openAdminActionSubmenu(sheetRoot, button, html, { formSize: getInventoryFormSize(action) });
+    openAdminActionSubmenu(sheetRoot, button, html, {
+      formSize: getInventoryFormSize(action),
+    });
   } else {
-    sheetRoot.classList.remove("workflow-form-compact", "workflow-form-small", "workflow-form-large");
+    sheetRoot.classList.remove(
+      "workflow-form-compact",
+      "workflow-form-small",
+      "workflow-form-large",
+    );
     sheetRoot.classList.add("workflow-form-large");
     sheetRoot.classList.add("workflow-action-selected");
     form.classList.remove("is-submenu");
@@ -12880,8 +15520,10 @@ function openAddInventoryForm(source) {
   sheetRoot.anchor = rect
     ? { x: rect.right, y: rect.bottom + 8 }
     : getAdminAnchorPosition(null, source);
-  sheetRoot.className = "admin-action-menu-root workflow-sheet-root inventory-sheet-root open workflow-action-selected workflow-form-large";
-  sheetRoot.querySelector(".workflow-customer-name").textContent = "New lace color";
+  sheetRoot.className =
+    "admin-action-menu-root workflow-sheet-root inventory-sheet-root open workflow-action-selected workflow-form-large";
+  sheetRoot.querySelector(".workflow-customer-name").textContent =
+    "New lace color";
   sheetRoot.querySelector(".workflow-current-status").textContent = "Inventory";
   sheetRoot.querySelector(".workflow-action-list").innerHTML = "";
   renderInventoryActionForm(null, "add", null);
@@ -12903,7 +15545,7 @@ function readInventoryInteger(id, { allowBlank = false, min = 0 } = {}) {
 function inventoryColorExists(color, currentColor = "") {
   const next = normalizeLaceName(color);
   const current = normalizeLaceName(currentColor);
-  return laceInventory.some(item => {
+  return laceInventory.some((item) => {
     const itemColor = normalizeLaceName(item.color);
     return itemColor && itemColor === next && itemColor !== current;
   });
@@ -12918,40 +15560,56 @@ async function saveInventoryAction(item, action, formEl) {
     submitBtn.disabled = true;
 
     if (action === "add") {
-      const color = String(document.getElementById("inventoryColorInput")?.value || "").trim();
+      const color = String(
+        document.getElementById("inventoryColorInput")?.value || "",
+      ).trim();
       if (!color) throw new Error("Enter a lace color.");
-      if (inventoryColorExists(color)) throw new Error("That lace color already exists.");
+      if (inventoryColorExists(color))
+        throw new Error("That lace color already exists.");
 
       const photoUrl = await uploadLaceInventoryPhoto(color); // null when none chosen
 
-      await postJson({
-        action: "createInventoryItem",
-        color,
-        quantityOnHand: readInventoryInteger("inventoryQtyInput"),
-        reorderAt: readInventoryInteger("inventoryReorderAtInput"),
-        reorderAlertEnabled: document.getElementById("inventoryAlertEnabledInput")?.checked === true,
-        active: document.getElementById("inventoryActiveInput")?.checked === true,
-        ...(photoUrl ? { photoUrl } : {})
-      }, true);
+      await postJson(
+        {
+          action: "createInventoryItem",
+          color,
+          quantityOnHand: readInventoryInteger("inventoryQtyInput"),
+          reorderAt: readInventoryInteger("inventoryReorderAtInput"),
+          reorderAlertEnabled:
+            document.getElementById("inventoryAlertEnabledInput")?.checked ===
+            true,
+          active:
+            document.getElementById("inventoryActiveInput")?.checked === true,
+          ...(photoUrl ? { photoUrl } : {}),
+        },
+        true,
+      );
     } else if (action === "photo") {
       const photoUrl = await uploadLaceInventoryPhoto(item.color);
       if (!photoUrl) throw new Error("Choose a photo to upload.");
       await updateInventoryItem(item, { photoUrl });
     } else if (action === "set") {
       await updateInventoryItem(item, {
-        quantityOnHand: readInventoryInteger("inventoryQtyInput")
+        quantityOnHand: readInventoryInteger("inventoryQtyInput"),
       });
     } else if (action === "alertSettings") {
       await updateInventoryItem(item, {
         reorderAt: readInventoryInteger("inventoryReorderAtInput"),
-        reorderAlertEnabled: document.getElementById("inventoryAlertEnabledInput")?.checked === true
+        reorderAlertEnabled:
+          document.getElementById("inventoryAlertEnabledInput")?.checked ===
+          true,
       });
     } else if (action === "rename") {
-      const color = String(document.getElementById("inventoryColorInput")?.value || "").trim();
+      const color = String(
+        document.getElementById("inventoryColorInput")?.value || "",
+      ).trim();
       if (!color) throw new Error("Enter a lace color.");
-      if (inventoryColorExists(color, item.color)) throw new Error("That lace color already exists.");
+      if (inventoryColorExists(color, item.color))
+        throw new Error("That lace color already exists.");
       if (normalizeLaceName(color) !== normalizeLaceName(item.color)) {
-        const ok = window.confirm("Rename this lace color? Existing orders may still reference the old color name.");
+        const ok = window.confirm(
+          "Rename this lace color? Existing orders may still reference the old color name.",
+        );
         if (!ok) return;
       }
       await updateInventoryItem(item, { color });
@@ -12968,11 +15626,14 @@ async function saveInventoryAction(item, action, formEl) {
 }
 
 async function updateInventoryItem(item, updates) {
-  await postJson({
-    action: "updateInventoryItem",
-    color: item.color,
-    updates
-  }, true);
+  await postJson(
+    {
+      action: "updateInventoryItem",
+      color: item.color,
+      updates,
+    },
+    true,
+  );
 }
 
 /* Upload the staged swatch photo (if any) to the lace bucket, return its URL or
@@ -12981,23 +15642,31 @@ async function uploadLaceInventoryPhoto(color) {
   const input = document.getElementById("inventoryPhotoInput");
   const file = input?.files?.[0];
   if (!file) return null;
-  if (!(file.type || "").startsWith("image/")) throw new Error("Choose an image file.");
+  if (!(file.type || "").startsWith("image/"))
+    throw new Error("Choose an image file.");
   const dataUrl = await fileToDataUrl(file);
-  const res = await postJson({
-    action: "uploadLacePhoto",
-    color,
-    filename: file.name,
-    contentType: file.type || "image/jpeg",
-    dataUrl
-  }, true);
+  const res = await postJson(
+    {
+      action: "uploadLacePhoto",
+      color,
+      filename: file.name,
+      contentType: file.type || "image/jpeg",
+      dataUrl,
+    },
+    true,
+  );
   if (!res || res.ok === false || !res.url) {
-    throw new Error(res && res.error ? String(res.error) : "Photo upload failed.");
+    throw new Error(
+      res && res.error ? String(res.error) : "Photo upload failed.",
+    );
   }
   return res.url;
 }
 
 async function deactivateInventoryItem(item, button) {
-  const ok = window.confirm(`Hide ${item.color ? adminLaceLabel(item.color) : "this lace color"} from the inventory list?`);
+  const ok = window.confirm(
+    `Hide ${item.color ? adminLaceLabel(item.color) : "this lace color"} from the inventory list?`,
+  );
   if (!ok) return;
 
   button.disabled = true;
@@ -13035,11 +15704,13 @@ function renderReorderBanner(rows) {
   const lowItems = getLowInventoryItems(rows);
   if (!lowItems.length) return;
 
-  const lowText = lowItems.map(item => {
-    const color = String(item.color || "").trim();
-    const qty = Number(item.quantity_on_hand ?? 0);
-    return `${color ? adminLaceLabel(color) : "Unknown"} (${qty} left)`;
-  }).join(", ");
+  const lowText = lowItems
+    .map((item) => {
+      const color = String(item.color || "").trim();
+      const qty = Number(item.quantity_on_hand ?? 0);
+      return `${color ? adminLaceLabel(color) : "Unknown"} (${qty} left)`;
+    })
+    .join(", ");
 
   const banner = document.createElement("div");
   banner.id = "reorderBanner";
@@ -13062,10 +15733,12 @@ function renderReorderBanner(rows) {
     dashboardTopbar.insertAdjacentElement("afterend", banner);
   }
 
-  document.getElementById("reorderDismissBtn")?.addEventListener("click", () => {
-    reorderBannerDismissed = true;
-    banner.remove();
-  });
+  document
+    .getElementById("reorderDismissBtn")
+    ?.addEventListener("click", () => {
+      reorderBannerDismissed = true;
+      banner.remove();
+    });
 
   document.getElementById("reorderViewBtn")?.addEventListener("click", () => {
     setActiveView("inventory");
@@ -13088,13 +15761,23 @@ function initUploadView() {
   function setGalleryUploaderOpen(open) {
     galleryUploaderCard?.classList.toggle("is-collapsed", !open);
     if (galleryUploaderToggleBtn) {
-      galleryUploaderToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
-      galleryUploaderToggleBtn.setAttribute("aria-label", open ? "Hide gallery uploader" : "Show gallery uploader");
+      galleryUploaderToggleBtn.setAttribute(
+        "aria-expanded",
+        open ? "true" : "false",
+      );
+      galleryUploaderToggleBtn.setAttribute(
+        "aria-label",
+        open ? "Hide gallery uploader" : "Show gallery uploader",
+      );
     }
     // The uploader sits at the top of the manager. When it's opened while
     // scrolled down (hunting for orders that still need photos), bring it into
     // view rather than making the user scroll back up to find it.
-    if (open) galleryUploaderCard?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (open)
+      galleryUploaderCard?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
   }
 
   function clearSelection() {
@@ -13114,12 +15797,16 @@ function initUploadView() {
       return;
     }
 
-    preview.innerHTML = stagedFiles.map((file, index) => `
+    preview.innerHTML = stagedFiles
+      .map(
+        (file, index) => `
       <div class="upload-preview-item">
         <img src="${escapeAttr(URL.createObjectURL(file))}" alt="Selected photo ${index + 1}">
         <div class="upload-preview-name">${escapeHtml(file.name)}</div>
       </div>
-    `).join("");
+    `,
+      )
+      .join("");
 
     uploadBtn.disabled = false;
     clearBtn.disabled = false;
@@ -13127,7 +15814,7 @@ function initUploadView() {
   }
 
   input.addEventListener("change", () => {
-    stagedFiles = Array.from(input.files || []).filter(file => {
+    stagedFiles = Array.from(input.files || []).filter((file) => {
       const type = file.type || "image/jpeg";
       return type.startsWith("image/");
     });
@@ -13138,7 +15825,8 @@ function initUploadView() {
   clearBtn.addEventListener("click", clearSelection);
 
   galleryUploaderToggleBtn?.addEventListener("click", () => {
-    const nextOpen = galleryUploaderCard?.classList.contains("is-collapsed") !== false;
+    const nextOpen =
+      galleryUploaderCard?.classList.contains("is-collapsed") !== false;
     setGalleryUploaderOpen(nextOpen);
   });
 
@@ -13151,7 +15839,7 @@ function initUploadView() {
   function sectionForLinkedOrder(orderNumber) {
     const n = String(orderNumber || "").trim();
     if (!n) return "";
-    return galleryPhotos.find(p => p.linkedOrder === n)?.section || "";
+    return galleryPhotos.find((p) => p.linkedOrder === n)?.section || "";
   }
 
   const uploadOrderInput = document.getElementById("galleryUploadOrderInput");
@@ -13166,7 +15854,10 @@ function initUploadView() {
     const files = stagedFiles;
     const orderInput = document.getElementById("galleryUploadOrderInput");
     const linkOrderNumber = orderInput?.value.trim() || "";
-    const section = sectionForLinkedOrder(linkOrderNumber) || sectionSelect?.value || "fielding-gloves";
+    const section =
+      sectionForLinkedOrder(linkOrderNumber) ||
+      sectionSelect?.value ||
+      "fielding-gloves";
 
     if (!files.length) {
       status.textContent = "Choose photos before uploading.";
@@ -13184,9 +15875,12 @@ function initUploadView() {
     /* Auto-group: a multi-photo upload with no order # is treated as one shop
        glove (its angles shot together), so they all get one shared group_key
        and collapse into a single album. Order-linked uploads group by order. */
-    const autoGroupKey = (!linkOrderNumber && files.length >= 2 && typeof crypto?.randomUUID === "function")
-      ? crypto.randomUUID()
-      : "";
+    const autoGroupKey =
+      !linkOrderNumber &&
+      files.length >= 2 &&
+      typeof crypto?.randomUUID === "function"
+        ? crypto.randomUUID()
+        : "";
 
     for (const file of files) {
       try {
@@ -13198,13 +15892,16 @@ function initUploadView() {
 
         const dataUrl = await fileToDataUrl(file);
 
-        const result = await postJson({
-          action: "uploadGalleryPhoto",
-          section,
-          filename: file.name,
-          contentType: type,
-          dataUrl
-        }, true);
+        const result = await postJson(
+          {
+            action: "uploadGalleryPhoto",
+            section,
+            filename: file.name,
+            contentType: type,
+            dataUrl,
+          },
+          true,
+        );
 
         uploaded++;
 
@@ -13213,12 +15910,15 @@ function initUploadView() {
            but never blocks the uploads themselves. */
         if (linkOrderNumber && !linkError && result?.url) {
           try {
-            await postJson({
-              action: "setGalleryPhotoOrder",
-              url: result.url,
-              path: result.path,
-              orderNumber: linkOrderNumber
-            }, true);
+            await postJson(
+              {
+                action: "setGalleryPhotoOrder",
+                url: result.url,
+                path: result.path,
+                orderNumber: linkOrderNumber,
+              },
+              true,
+            );
             linked++;
           } catch (err) {
             linkError = err.message || "Could not link to that order.";
@@ -13230,13 +15930,18 @@ function initUploadView() {
         // group stamp must never block the uploads themselves.
         if (autoGroupKey && result?.url) {
           try {
-            await postJson({
-              action: "setGalleryPhotoGroup",
-              url: result.url,
-              path: result.path,
-              groupKey: autoGroupKey
-            }, true);
-          } catch (err) { /* grouping is best-effort */ }
+            await postJson(
+              {
+                action: "setGalleryPhotoGroup",
+                url: result.url,
+                path: result.path,
+                groupKey: autoGroupKey,
+              },
+              true,
+            );
+          } catch (err) {
+            /* grouping is best-effort */
+          }
         }
 
         status.textContent = `Uploaded ${uploaded} of ${files.length} photo${files.length === 1 ? "" : "s"} to ${section}...`;
@@ -13255,7 +15960,9 @@ function initUploadView() {
     clearSelection();
     if (orderInput) orderInput.value = "";
     const linkNote = linkOrderNumber
-      ? (linkError ? ` Link failed: ${linkError}` : ` Linked ${linked} to order #${linkOrderNumber}.`)
+      ? linkError
+        ? ` Link failed: ${linkError}`
+        : ` Linked ${linked} to order #${linkOrderNumber}.`
       : "";
     status.textContent = `Uploaded ${uploaded} photo${uploaded === 1 ? "" : "s"} to the website gallery.${linkNote}`;
     await loadGalleryManagerPhotos();
@@ -13270,9 +15977,15 @@ function initUploadView() {
     galleryManagerSearch = managerSearch.value.trim().toLowerCase();
     renderGalleryManagerPhotos();
   });
-  document.getElementById("galleryManagerSelectBtn")?.addEventListener("click", toggleGallerySelectMode);
-  document.getElementById("galleryManagerGroupBtn")?.addEventListener("click", groupSelectedGalleryPhotos);
-  document.getElementById("galleryManagerUngroupBtn")?.addEventListener("click", ungroupSelectedGalleryPhotos);
+  document
+    .getElementById("galleryManagerSelectBtn")
+    ?.addEventListener("click", toggleGallerySelectMode);
+  document
+    .getElementById("galleryManagerGroupBtn")
+    ?.addEventListener("click", groupSelectedGalleryPhotos);
+  document
+    .getElementById("galleryManagerUngroupBtn")
+    ?.addEventListener("click", ungroupSelectedGalleryPhotos);
   setGalleryUploaderOpen(false);
   loadGalleryManagerPhotos();
 }
@@ -13282,7 +15995,7 @@ const GALLERY_SECTION_LABELS = {
   "catchers-mitts": "Catcher's Mitts",
   "first-base-mitts": "First Base Mitts",
   "custom-color-relaces": "Custom Color Relaces",
-  "vintage": "Vintage"
+  vintage: "Vintage",
 };
 
 function getGallerySectionLabel(section) {
@@ -13300,7 +16013,7 @@ function getGalleryManagerThumbnailUrl(photoUrl) {
 
     url.pathname = url.pathname.replace(
       objectPrefix,
-      "/storage/v1/render/image/public/gallery/"
+      "/storage/v1/render/image/public/gallery/",
     );
     url.searchParams.set("width", "480");
     url.searchParams.set("quality", "72");
@@ -13337,7 +16050,11 @@ function wireGalleryManagerThumbnails(root) {
   }
 
   function enqueue(image) {
-    if (!image?.dataset?.galleryThumbSrc || image.dataset.galleryThumbQueued === "true") return;
+    if (
+      !image?.dataset?.galleryThumbSrc ||
+      image.dataset.galleryThumbQueued === "true"
+    )
+      return;
     image.dataset.galleryThumbQueued = "true";
     queue.push(image);
     pump();
@@ -13349,15 +16066,18 @@ function wireGalleryManagerThumbnails(root) {
     return;
   }
 
-  galleryThumbnailObserver = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting) return;
-      galleryThumbnailObserver?.unobserve(entry.target);
-      enqueue(entry.target);
-    });
-  }, { root: null, rootMargin: "120px 0px" });
+  galleryThumbnailObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        galleryThumbnailObserver?.unobserve(entry.target);
+        enqueue(entry.target);
+      });
+    },
+    { root: null, rootMargin: "120px 0px" },
+  );
 
-  images.forEach(image => galleryThumbnailObserver.observe(image));
+  images.forEach((image) => galleryThumbnailObserver.observe(image));
 }
 
 async function loadGalleryManagerPhotos() {
@@ -13369,17 +16089,23 @@ async function loadGalleryManagerPhotos() {
     status.textContent = "Loading gallery photos...";
     list.innerHTML = "";
 
-    const data = await postJson({
-      action: "listGalleryPhotos",
-      includeHidden: true
-    }, true);
+    const data = await postJson(
+      {
+        action: "listGalleryPhotos",
+        includeHidden: true,
+      },
+      true,
+    );
 
-    galleryPhotos = flattenGalleryPhotos(data.gallery || {}, data.hiddenGallery || {});
+    galleryPhotos = flattenGalleryPhotos(
+      data.gallery || {},
+      data.hiddenGallery || {},
+    );
     const glinks = data.photoLinks || {};
     const gmeta = data.photoGloveMeta || {};
     const gcovers = data.photoCovers || {};
     const ggroups = data.photoGroups || {};
-    galleryPhotos.forEach(ph => {
+    galleryPhotos.forEach((ph) => {
       ph.linkedOrder = glinks[ph.url] || "";
       ph.gloveMeta = gmeta[ph.url] || null;
       ph.isCover = !!gcovers[ph.url];
@@ -13395,22 +16121,24 @@ async function loadGalleryManagerPhotos() {
 
 function flattenGalleryPhotos(gallery, hiddenGallery) {
   const sections = Object.keys(GALLERY_SECTION_LABELS);
-  return sections.flatMap(section => {
-    const active = (Array.isArray(gallery[section]) ? gallery[section] : [])
-      .map(photo => ({
-        ...photo,
-        section,
-        sectionLabel: getGallerySectionLabel(section),
-        hidden: false
-      }));
+  return sections.flatMap((section) => {
+    const active = (
+      Array.isArray(gallery[section]) ? gallery[section] : []
+    ).map((photo) => ({
+      ...photo,
+      section,
+      sectionLabel: getGallerySectionLabel(section),
+      hidden: false,
+    }));
 
-    const hidden = (Array.isArray(hiddenGallery[section]) ? hiddenGallery[section] : [])
-      .map(photo => ({
-        ...photo,
-        section,
-        sectionLabel: getGallerySectionLabel(section),
-        hidden: true
-      }));
+    const hidden = (
+      Array.isArray(hiddenGallery[section]) ? hiddenGallery[section] : []
+    ).map((photo) => ({
+      ...photo,
+      section,
+      sectionLabel: getGallerySectionLabel(section),
+      hidden: true,
+    }));
 
     return [...active, ...hidden];
   });
@@ -13428,10 +16156,11 @@ function renderGalleryManagerPhotos() {
   }
 
   const entries = getFilteredGalleryManagerEntries();
-  const activeCount = entries.filter(entry => !entry.photo.hidden).length;
-  const hiddenCount = entries.filter(entry => entry.photo.hidden).length;
+  const activeCount = entries.filter((entry) => !entry.photo.hidden).length;
+  const hiddenCount = entries.filter((entry) => entry.photo.hidden).length;
   const hiddenOnly = activeFilter === "hidden";
-  const filterLabel = activeFilter === "all" ? "" : ` ${getGallerySectionLabel(activeFilter)}`;
+  const filterLabel =
+    activeFilter === "all" ? "" : ` ${getGallerySectionLabel(activeFilter)}`;
 
   status.textContent = galleryPhotos.length
     ? hiddenOnly
@@ -13451,9 +16180,11 @@ function renderGalleryManagerPhotos() {
 
   list.innerHTML = `
     <div class="gallery-manager-grid${gallerySelectMode ? " is-selecting" : ""}">
-      ${entries.map(({ photo, index }) => {
-        const selected = gallerySelectMode && gallerySelectedUrls.has(photo.url);
-        return `
+      ${entries
+        .map(({ photo, index }) => {
+          const selected =
+            gallerySelectMode && gallerySelectedUrls.has(photo.url);
+          return `
         <article
           class="gallery-manager-item${photo.hidden ? " is-gallery-hidden" : ""}${selected ? " is-selected" : ""}"
           data-gallery-index="${index}"
@@ -13467,10 +16198,13 @@ function renderGalleryManagerPhotos() {
             <div class="gallery-manager-subrow">
               <span>${escapeHtml(photo.sectionLabel)}</span>
               ${
-                photo.hidden ? `<span class="gallery-manager-pill">Hidden</span>`
-                : photo.linkedOrder ? `<span class="gallery-manager-pill gallery-linked-pill">#${escapeHtml(photo.linkedOrder)}</span>`
-                : photo.gloveMeta ? `<span class="gallery-manager-pill gallery-linked-pill">Shop glove</span>`
-                : ""
+                photo.hidden
+                  ? `<span class="gallery-manager-pill">Hidden</span>`
+                  : photo.linkedOrder
+                    ? `<span class="gallery-manager-pill gallery-linked-pill">#${escapeHtml(photo.linkedOrder)}</span>`
+                    : photo.gloveMeta
+                      ? `<span class="gallery-manager-pill gallery-linked-pill">Shop glove</span>`
+                      : ""
               }
             </div>
           </div>
@@ -13480,11 +16214,13 @@ function renderGalleryManagerPhotos() {
           </select>
           ${gallerySelectMode ? `<button class="gallery-select-overlay" type="button" data-gallery-select-toggle aria-pressed="${selected ? "true" : "false"}" aria-label="${selected ? "Deselect photo" : "Select photo"}"><span class="gallery-select-check" aria-hidden="true">${selected ? "✓" : ""}</span></button>` : ""}
         </article>
-      `;}).join("")}
+      `;
+        })
+        .join("")}
     </div>
   `;
 
-  list.querySelectorAll(".gallery-manager-item").forEach(item => {
+  list.querySelectorAll(".gallery-manager-item").forEach((item) => {
     attachGalleryManagerItemActions(item);
   });
   wireGalleryManagerThumbnails(list);
@@ -13515,13 +16251,18 @@ function toggleGalleryPhotoSelected(url) {
   const selected = !gallerySelectedUrls.has(url);
   if (selected) gallerySelectedUrls.add(url);
   else gallerySelectedUrls.delete(url);
-  const item = document.querySelector(`.gallery-manager-item[data-photo-url="${CSS.escape(url)}"]`);
+  const item = document.querySelector(
+    `.gallery-manager-item[data-photo-url="${CSS.escape(url)}"]`,
+  );
   if (item) {
     item.classList.toggle("is-selected", selected);
     const toggle = item.querySelector("[data-gallery-select-toggle]");
     if (toggle) {
       toggle.setAttribute("aria-pressed", selected ? "true" : "false");
-      toggle.setAttribute("aria-label", selected ? "Deselect photo" : "Select photo");
+      toggle.setAttribute(
+        "aria-label",
+        selected ? "Deselect photo" : "Select photo",
+      );
       const check = toggle.querySelector(".gallery-select-check");
       if (check) check.textContent = selected ? "✓" : "";
     }
@@ -13540,7 +16281,9 @@ function updateGallerySelectBar() {
   // Group needs 2+ photos; Ungroup needs at least one already-grouped photo.
   if (groupBtn) groupBtn.disabled = n < 2;
   if (ungroupBtn) {
-    const anyGrouped = [...gallerySelectedUrls].some(u => galleryPhotos.find(p => p.url === u)?.groupKey);
+    const anyGrouped = [...gallerySelectedUrls].some(
+      (u) => galleryPhotos.find((p) => p.url === u)?.groupKey,
+    );
     ungroupBtn.disabled = !anyGrouped;
   }
 }
@@ -13549,23 +16292,34 @@ async function groupSelectedGalleryPhotos() {
   const status = document.getElementById("galleryManagerStatus");
   const urls = [...gallerySelectedUrls];
   if (urls.length < 2) return;
-  const groupKey = (typeof crypto?.randomUUID === "function")
-    ? crypto.randomUUID()
-    : `sg-${Date.now()}-${Math.round(performance.now())}`;
-  const byUrl = new Map(galleryPhotos.map(p => [p.url, p]));
+  const groupKey =
+    typeof crypto?.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `sg-${Date.now()}-${Math.round(performance.now())}`;
+  const byUrl = new Map(galleryPhotos.map((p) => [p.url, p]));
   try {
     for (const url of urls) {
-      await postJson({ action: "setGalleryPhotoGroup", url, path: byUrl.get(url)?.path, groupKey }, true);
+      await postJson(
+        {
+          action: "setGalleryPhotoGroup",
+          url,
+          path: byUrl.get(url)?.path,
+          groupKey,
+        },
+        true,
+      );
     }
     // Give the group a cover if none of the selected photos already is one.
-    if (!urls.some(u => byUrl.get(u)?.isCover)) {
+    if (!urls.some((u) => byUrl.get(u)?.isCover)) {
       await postJson({ action: "setGalleryPhotoCover", url: urls[0] }, true);
     }
-    if (status) status.textContent = `Grouped ${urls.length} photos into one glove.`;
+    if (status)
+      status.textContent = `Grouped ${urls.length} photos into one glove.`;
     exitGallerySelectMode();
     await loadGalleryManagerPhotos();
   } catch (err) {
-    if (status) status.textContent = err.message || "Could not group the photos.";
+    if (status)
+      status.textContent = err.message || "Could not group the photos.";
   }
 }
 
@@ -13573,12 +16327,21 @@ async function ungroupSelectedGalleryPhotos() {
   const status = document.getElementById("galleryManagerStatus");
   const urls = [...gallerySelectedUrls];
   if (!urls.length) return;
-  const byUrl = new Map(galleryPhotos.map(p => [p.url, p]));
+  const byUrl = new Map(galleryPhotos.map((p) => [p.url, p]));
   try {
     for (const url of urls) {
-      await postJson({ action: "setGalleryPhotoGroup", url, path: byUrl.get(url)?.path, groupKey: "" }, true);
+      await postJson(
+        {
+          action: "setGalleryPhotoGroup",
+          url,
+          path: byUrl.get(url)?.path,
+          groupKey: "",
+        },
+        true,
+      );
     }
-    if (status) status.textContent = `Ungrouped ${urls.length} photo${urls.length === 1 ? "" : "s"}.`;
+    if (status)
+      status.textContent = `Ungrouped ${urls.length} photo${urls.length === 1 ? "" : "s"}.`;
     exitGallerySelectMode();
     await loadGalleryManagerPhotos();
   } catch (err) {
@@ -13591,11 +16354,23 @@ function getFilteredGalleryManagerEntries() {
 
   const entries = galleryPhotos
     .map((photo, index) => ({ photo, index }))
-    .filter(({ photo }) => activeFilter === "all" || (activeFilter === "hidden" ? photo.hidden : photo.section === activeFilter))
+    .filter(
+      ({ photo }) =>
+        activeFilter === "all" ||
+        (activeFilter === "hidden"
+          ? photo.hidden
+          : photo.section === activeFilter),
+    )
     .filter(({ photo }) => {
       if (!galleryManagerSearch) return true;
-      const hay = [photo.linkedOrder, photo.name, photo.sectionLabel, photo.gloveMeta?.brandModel]
-        .map(v => String(v || "").toLowerCase()).join(" ");
+      const hay = [
+        photo.linkedOrder,
+        photo.name,
+        photo.sectionLabel,
+        photo.gloveMeta?.brandModel,
+      ]
+        .map((v) => String(v || "").toLowerCase())
+        .join(" ");
       return hay.includes(galleryManagerSearch);
     });
 
@@ -13604,11 +16379,13 @@ function getFilteredGalleryManagerEntries() {
      means a group's cover leads its own group instead of floating up with
      every other cover. */
   const albumIdOf = ({ photo, index }) =>
-    photo.linkedOrder ? `o:${photo.linkedOrder}`
-      : photo.groupKey ? `g:${photo.groupKey}`
-      : `s:${index}`;
+    photo.linkedOrder
+      ? `o:${photo.linkedOrder}`
+      : photo.groupKey
+        ? `g:${photo.groupKey}`
+        : `s:${index}`;
   const albumFirstIndex = new Map();
-  entries.forEach(e => {
+  entries.forEach((e) => {
     const id = albumIdOf(e);
     if (!albumFirstIndex.has(id)) albumFirstIndex.set(id, e.index);
   });
@@ -13621,9 +16398,11 @@ function getFilteredGalleryManagerEntries() {
     const bo = b.photo.linkedOrder ? parseInt(b.photo.linkedOrder, 10) : null;
     if ((ao === null) !== (bo === null)) return ao === null ? -1 : 1;
     if (ao !== null && bo !== null && ao !== bo) return bo - ao;
-    const aid = albumIdOf(a), bid = albumIdOf(b);
+    const aid = albumIdOf(a),
+      bid = albumIdOf(b);
     if (aid !== bid) return albumFirstIndex.get(aid) - albumFirstIndex.get(bid);
-    if (!!a.photo.isCover !== !!b.photo.isCover) return a.photo.isCover ? -1 : 1;
+    if (!!a.photo.isCover !== !!b.photo.isCover)
+      return a.photo.isCover ? -1 : 1;
     return a.index - b.index;
   });
 }
@@ -13655,39 +16434,53 @@ function attachGalleryManagerItemActions(item) {
         const photo = getGalleryManagerPhoto(item);
         if (photo) await runGalleryPhotoAction(photo, action);
         resetAdminPhotoActionSelect(actionSelect);
-      }
+      },
     });
   }
 
-  item.querySelector("[data-gallery-action='view']")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    if (gallerySelectMode) return;
-    const photo = getGalleryManagerPhoto(item);
-    if (photo?.url) window.open(photo.url, "_blank", "noopener");
-  });
-
-  item.addEventListener("touchstart", (e) => {
-    if (gallerySelectMode) return;
-    const touch = e.touches?.[0];
-    galleryPhotoPressStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
-    clearTimeout(galleryPhotoPressTimer);
-    galleryPhotoPressTimer = setTimeout(() => {
+  item
+    .querySelector("[data-gallery-action='view']")
+    ?.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (gallerySelectMode) return;
       const photo = getGalleryManagerPhoto(item);
-      if (photo) openGalleryPhotoActionMenu(photo, e);
-    }, 520);
-  }, { passive: true });
+      if (photo?.url) window.open(photo.url, "_blank", "noopener");
+    });
 
-  item.addEventListener("touchmove", (e) => {
-    if (!galleryPhotoPressStart) return;
-    const touch = e.touches?.[0];
-    if (!touch) return;
-    const dx = Math.abs(touch.clientX - galleryPhotoPressStart.x);
-    const dy = Math.abs(touch.clientY - galleryPhotoPressStart.y);
-    if (dx > 10 || dy > 10) cancelGalleryPhotoPress();
-  }, { passive: true });
+  item.addEventListener(
+    "touchstart",
+    (e) => {
+      if (gallerySelectMode) return;
+      const touch = e.touches?.[0];
+      galleryPhotoPressStart = touch
+        ? { x: touch.clientX, y: touch.clientY }
+        : null;
+      clearTimeout(galleryPhotoPressTimer);
+      galleryPhotoPressTimer = setTimeout(() => {
+        const photo = getGalleryManagerPhoto(item);
+        if (photo) openGalleryPhotoActionMenu(photo, e);
+      }, 520);
+    },
+    { passive: true },
+  );
+
+  item.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!galleryPhotoPressStart) return;
+      const touch = e.touches?.[0];
+      if (!touch) return;
+      const dx = Math.abs(touch.clientX - galleryPhotoPressStart.x);
+      const dy = Math.abs(touch.clientY - galleryPhotoPressStart.y);
+      if (dx > 10 || dy > 10) cancelGalleryPhotoPress();
+    },
+    { passive: true },
+  );
 
   item.addEventListener("touchend", cancelGalleryPhotoPress, { passive: true });
-  item.addEventListener("touchcancel", cancelGalleryPhotoPress, { passive: true });
+  item.addEventListener("touchcancel", cancelGalleryPhotoPress, {
+    passive: true,
+  });
 }
 
 function cancelGalleryPhotoPress() {
@@ -13707,7 +16500,8 @@ function ensureGalleryPhotoActionMenu() {
   if (galleryPhotoActionMenuEl) return galleryPhotoActionMenuEl;
 
   galleryPhotoActionMenuEl = document.createElement("div");
-  galleryPhotoActionMenuEl.className = "admin-action-menu-root workflow-sheet-root gallery-photo-menu-root";
+  galleryPhotoActionMenuEl.className =
+    "admin-action-menu-root workflow-sheet-root gallery-photo-menu-root";
   galleryPhotoActionMenuEl.innerHTML = `
     <div class="admin-action-backdrop workflow-backdrop"></div>
     <div class="admin-action-menu workflow-sheet" role="menu" aria-label="Gallery photo actions">
@@ -13718,7 +16512,9 @@ function ensureGalleryPhotoActionMenu() {
   `;
 
   getAdminMenuLayer().appendChild(galleryPhotoActionMenuEl);
-  galleryPhotoActionMenuEl.querySelector(".workflow-backdrop")?.addEventListener("click", closeGalleryPhotoActionMenu);
+  galleryPhotoActionMenuEl
+    .querySelector(".workflow-backdrop")
+    ?.addEventListener("click", closeGalleryPhotoActionMenu);
   galleryPhotoActionMenuEl.addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-gallery-menu-action]");
     if (!btn) return;
@@ -13772,7 +16568,7 @@ function openGalleryDescribeDialog(photo) {
     }
     if (e.target.closest("[data-describe-save]")) {
       const descriptors = {};
-      overlay.querySelectorAll("[data-describe-field]").forEach(input => {
+      overlay.querySelectorAll("[data-describe-field]").forEach((input) => {
         descriptors[input.dataset.describeField] = input.value.trim();
       });
       saveGalleryDescribe(photo, descriptors);
@@ -13782,7 +16578,9 @@ function openGalleryDescribeDialog(photo) {
   /* Autofill from past work: typing in Brand/Model suggests glove combos
      already in the database (orders + described shop gloves); picking one
      fills the whole form. */
-  const brandInput = overlay.querySelector('[data-describe-field="brandModel"]');
+  const brandInput = overlay.querySelector(
+    '[data-describe-field="brandModel"]',
+  );
   const suggestEl = overlay.querySelector("[data-describe-suggest]");
   const suggestionPool = buildDescribeSuggestionPool();
 
@@ -13794,21 +16592,36 @@ function openGalleryDescribeDialog(photo) {
 
   brandInput?.addEventListener("input", () => {
     const q = brandInput.value.trim().toLowerCase();
-    if (q.length < 2) { hideDescribeSuggest(); return; }
+    if (q.length < 2) {
+      hideDescribeSuggest();
+      return;
+    }
     const terms = q.split(/\s+/).filter(Boolean);
-    const matches = suggestionPool.filter(g => terms.every(t => g.hay.includes(t))).slice(0, 6);
-    if (!matches.length) { hideDescribeSuggest(); return; }
+    const matches = suggestionPool
+      .filter((g) => terms.every((t) => g.hay.includes(t)))
+      .slice(0, 6);
+    if (!matches.length) {
+      hideDescribeSuggest();
+      return;
+    }
 
-    suggestEl.innerHTML = matches.map((g, i) => `
+    suggestEl.innerHTML = matches
+      .map(
+        (g, i) => `
       <button type="button" data-suggest-index="${i}">
         <strong>${escapeHtml(g.brandModel)}</strong>
         <span>${escapeHtml([g.gloveType, g.webType, [g.primaryLaceColor && adminOrderLaceLabel(g.primaryLaceColor), g.secondaryLaceColor && adminOrderLaceLabel(g.secondaryLaceColor)].filter(Boolean).join("/")].filter(Boolean).join(" · "))}</span>
       </button>
-    `).join("");
+    `,
+      )
+      .join("");
     suggestEl.hidden = false;
-    suggestEl.querySelectorAll("[data-suggest-index]").forEach(btn => {
+    suggestEl.querySelectorAll("[data-suggest-index]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        applyDescribeSuggestion(overlay, matches[Number(btn.dataset.suggestIndex)]);
+        applyDescribeSuggestion(
+          overlay,
+          matches[Number(btn.dataset.suggestIndex)],
+        );
         hideDescribeSuggest();
       });
     });
@@ -13816,7 +16629,8 @@ function openGalleryDescribeDialog(photo) {
 
   /* Any click outside the suggestion list dismisses it. */
   overlay.addEventListener("click", (e) => {
-    if (!e.target.closest(".gallery-describe-suggest-wrap")) hideDescribeSuggest();
+    if (!e.target.closest(".gallery-describe-suggest-wrap"))
+      hideDescribeSuggest();
   });
 
   document.body.appendChild(overlay);
@@ -13839,8 +16653,11 @@ function openGalleryMoveDialog(photo) {
       <p>Currently in ${escapeHtml(photo.sectionLabel || photo.section || "")}. The photo keeps its order link and cover flag.</p>
       <div class="gallery-move-options">
         ${Object.keys(GALLERY_SECTION_LABELS)
-          .filter(section => section !== photo.section)
-          .map(section => `<button type="button" data-move-section="${escapeAttr(section)}">${escapeHtml(getGallerySectionLabel(section))}</button>`)
+          .filter((section) => section !== photo.section)
+          .map(
+            (section) =>
+              `<button type="button" data-move-section="${escapeAttr(section)}">${escapeHtml(getGallerySectionLabel(section))}</button>`,
+          )
           .join("")}
       </div>
       <div class="gallery-describe-actions">
@@ -13860,24 +16677,29 @@ function openGalleryMoveDialog(photo) {
     const section = pick.dataset.moveSection;
     const status = document.getElementById("galleryManagerStatus");
     try {
-      const result = await postJson({
-        action: "moveGalleryPhoto",
-        path: photo.path,
-        url: photo.url,
-        section
-      }, true);
+      const result = await postJson(
+        {
+          action: "moveGalleryPhoto",
+          path: photo.path,
+          url: photo.url,
+          section,
+        },
+        true,
+      );
       closeGalleryDescribeDialog();
-      const target = galleryPhotos.find(p => p.url === photo.url) || photo;
+      const target = galleryPhotos.find((p) => p.url === photo.url) || photo;
       if (result?.photo) {
         target.url = result.photo.url || target.url;
         target.path = result.photo.path || target.path;
       }
       target.section = section;
       target.sectionLabel = getGallerySectionLabel(section);
-      if (status) status.textContent = `Moved to ${getGallerySectionLabel(section)}.`;
+      if (status)
+        status.textContent = `Moved to ${getGallerySectionLabel(section)}.`;
       renderGalleryManagerPhotos();
     } catch (err) {
-      if (status) status.textContent = err.message || "Could not move the photo.";
+      if (status)
+        status.textContent = err.message || "Could not move the photo.";
     }
   });
 
@@ -13897,17 +16719,26 @@ function buildDescribeSuggestionPool() {
       gloveType: String(source.gloveType || "").trim(),
       webType: String(source.webType || "").trim(),
       primaryLaceColor: String(source.primaryLaceColor || "").trim(),
-      secondaryLaceColor: String(source.secondaryLaceColor || "").trim()
+      secondaryLaceColor: String(source.secondaryLaceColor || "").trim(),
     };
-    const key = [combo.brandModel, combo.gloveType, combo.webType, combo.primaryLaceColor, combo.secondaryLaceColor]
-      .join("|").toLowerCase();
+    const key = [
+      combo.brandModel,
+      combo.gloveType,
+      combo.webType,
+      combo.primaryLaceColor,
+      combo.secondaryLaceColor,
+    ]
+      .join("|")
+      .toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
     combo.hay = key.replace(/\|/g, " ");
     pool.push(combo);
   };
   (Array.isArray(allOrders) ? allOrders : []).forEach(addCombo);
-  (Array.isArray(galleryPhotos) ? galleryPhotos : []).forEach(ph => { if (ph.gloveMeta) addCombo(ph.gloveMeta); });
+  (Array.isArray(galleryPhotos) ? galleryPhotos : []).forEach((ph) => {
+    if (ph.gloveMeta) addCombo(ph.gloveMeta);
+  });
   return pool;
 }
 
@@ -13915,10 +16746,19 @@ function setDescribeFieldValue(overlay, field, value) {
   const el = overlay.querySelector(`[data-describe-field="${field}"]`);
   if (!el) return;
   const v = String(value || "").trim();
-  if (el.tagName === "INPUT") { el.value = v; return; }
-  if (!v) { el.value = ""; return; }
-  if (!Array.from(el.options).some(o => o.value === v)) {
-    el.insertAdjacentHTML("afterbegin", `<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`);
+  if (el.tagName === "INPUT") {
+    el.value = v;
+    return;
+  }
+  if (!v) {
+    el.value = "";
+    return;
+  }
+  if (!Array.from(el.options).some((o) => o.value === v)) {
+    el.insertAdjacentHTML(
+      "afterbegin",
+      `<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`,
+    );
   }
   el.value = v;
 }
@@ -13928,7 +16768,11 @@ function applyDescribeSuggestion(overlay, combo) {
   setDescribeFieldValue(overlay, "gloveType", combo.gloveType);
   setDescribeFieldValue(overlay, "webType", combo.webType);
   setDescribeFieldValue(overlay, "primaryLaceColor", combo.primaryLaceColor);
-  setDescribeFieldValue(overlay, "secondaryLaceColor", combo.secondaryLaceColor);
+  setDescribeFieldValue(
+    overlay,
+    "secondaryLaceColor",
+    combo.secondaryLaceColor,
+  );
 }
 
 function closeGalleryDescribeDialog() {
@@ -13947,21 +16791,28 @@ async function saveGalleryDescribe(photo, descriptors) {
   const status = document.getElementById("galleryManagerStatus");
   const clearing = !descriptors || !Object.values(descriptors).some(Boolean);
   try {
-    await postJson({
-      action: "setGalleryPhotoOrder",
-      url: photo.url,
-      path: photo.path,
-      orderNumber: "",
-      descriptors: clearing ? null : descriptors
-    }, true);
+    await postJson(
+      {
+        action: "setGalleryPhotoOrder",
+        url: photo.url,
+        path: photo.path,
+        orderNumber: "",
+        descriptors: clearing ? null : descriptors,
+      },
+      true,
+    );
     closeGalleryDescribeDialog();
-    if (status) status.textContent = clearing ? "Shop glove details removed." : "Shop glove details saved.";
-    const target = galleryPhotos.find(p => p.url === photo.url) || photo;
+    if (status)
+      status.textContent = clearing
+        ? "Shop glove details removed."
+        : "Shop glove details saved.";
+    const target = galleryPhotos.find((p) => p.url === photo.url) || photo;
     target.gloveMeta = clearing ? null : { ...descriptors };
     target.linkedOrder = "";
     renderGalleryManagerPhotos();
   } catch (err) {
-    if (status) status.textContent = err.message || "Could not save glove details.";
+    if (status)
+      status.textContent = err.message || "Could not save glove details.";
   }
 }
 
@@ -13970,16 +16821,21 @@ function openGalleryPhotoActionMenu(photo, source) {
   const root = ensureGalleryPhotoActionMenu();
   const actions = root.querySelector(".workflow-action-list");
   root.photo = photo;
-  root.anchor = getAdminAnchorPosition(source, source?.currentTarget || source?.target);
+  root.anchor = getAdminAnchorPosition(
+    source,
+    source?.currentTarget || source?.target,
+  );
 
   actions.innerHTML = `
     <button class="workflow-action-btn" type="button" data-gallery-menu-action="view">View Full Photo</button>
-    ${photo.hidden
-      ? `<button class="workflow-action-btn" type="button" data-gallery-menu-action="restore">Restore / Show in Gallery</button>`
-      : `<button class="workflow-action-btn" type="button" data-gallery-menu-action="hide">Hide from Gallery</button>`}
+    ${
+      photo.hidden
+        ? `<button class="workflow-action-btn" type="button" data-gallery-menu-action="restore">Restore / Show in Gallery</button>`
+        : `<button class="workflow-action-btn" type="button" data-gallery-menu-action="hide">Hide from Gallery</button>`
+    }
     <button class="workflow-action-btn" type="button" data-gallery-menu-action="link">${photo.linkedOrder ? `Linked to #${escapeHtml(photo.linkedOrder)} — change…` : "Link to Order…"}</button>
     <button class="workflow-action-btn" type="button" data-gallery-menu-action="describe">${photo.gloveMeta ? "Shop glove details — edit…" : "Describe Glove (no order)…"}</button>
-    ${(photo.linkedOrder || photo.groupKey) ? `<button class="workflow-action-btn" type="button" data-gallery-menu-action="cover">${photo.isCover ? "Album Cover ✓" : "Make Album Cover"}</button>` : ""}
+    ${photo.linkedOrder || photo.groupKey ? `<button class="workflow-action-btn" type="button" data-gallery-menu-action="cover">${photo.isCover ? "Album Cover ✓" : "Make Album Cover"}</button>` : ""}
     <button class="workflow-action-btn" type="button" data-gallery-menu-action="move">Move to Section…</button>
     <button class="workflow-action-btn danger" type="button" data-gallery-menu-action="delete">Delete Photo</button>
   `;
@@ -14027,18 +16883,20 @@ async function runGalleryPhotoAction(photo, action) {
       await postJson({ action: "setGalleryPhotoCover", url: photo.url }, true);
       // Cover is scoped to an album: an order, or a shop-glove group.
       const albumKey = photo.linkedOrder || photo.groupKey;
-      galleryPhotos.forEach(p => {
+      galleryPhotos.forEach((p) => {
         const pk = p.linkedOrder || p.groupKey;
         if (albumKey && pk === albumKey) p.isCover = false;
       });
-      const target = galleryPhotos.find(p => p.url === photo.url) || photo;
+      const target = galleryPhotos.find((p) => p.url === photo.url) || photo;
       target.isCover = true;
-      if (status) status.textContent = photo.linkedOrder
-        ? `Set as the album cover for #${photo.linkedOrder}.`
-        : "Set as this shop glove's cover.";
+      if (status)
+        status.textContent = photo.linkedOrder
+          ? `Set as the album cover for #${photo.linkedOrder}.`
+          : "Set as this shop glove's cover.";
       renderGalleryManagerPhotos();
     } catch (err) {
-      if (status) status.textContent = err.message || "Could not set the cover.";
+      if (status)
+        status.textContent = err.message || "Could not set the cover.";
     }
     return;
   }
@@ -14046,46 +16904,65 @@ async function runGalleryPhotoAction(photo, action) {
   if (action === "link") {
     const entered = prompt(
       "Link this gallery photo to an order number (blank to remove the link):",
-      photo.linkedOrder || ""
+      photo.linkedOrder || "",
     );
     if (entered === null) return;
     const orderNumber = entered.trim();
     try {
-      await postJson({ action: "setGalleryPhotoOrder", url: photo.url, path: photo.path, orderNumber }, true);
-      if (status) status.textContent = orderNumber ? `Linked to order #${orderNumber}.` : "Link removed.";
+      await postJson(
+        {
+          action: "setGalleryPhotoOrder",
+          url: photo.url,
+          path: photo.path,
+          orderNumber,
+        },
+        true,
+      );
+      if (status)
+        status.textContent = orderNumber
+          ? `Linked to order #${orderNumber}.`
+          : "Link removed.";
       /* Update in place — a full reload wipes and refetches the whole grid,
          which reads as a page refresh and loses the scroll position. */
-      const target = galleryPhotos.find(p => p.url === photo.url) || photo;
+      const target = galleryPhotos.find((p) => p.url === photo.url) || photo;
       target.linkedOrder = orderNumber;
       if (orderNumber) target.gloveMeta = null;
       renderGalleryManagerPhotos();
     } catch (err) {
-      if (status) status.textContent = err.message || "Could not save the link.";
+      if (status)
+        status.textContent = err.message || "Could not save the link.";
     }
     return;
   }
 
   if (action === "delete") {
-    const ok = window.confirm("Delete this gallery photo? This removes it from the website gallery storage bucket.");
+    const ok = window.confirm(
+      "Delete this gallery photo? This removes it from the website gallery storage bucket.",
+    );
     if (!ok) return;
   }
 
   try {
     if (status) status.textContent = "Updating gallery photo...";
-    const apiAction = action === "hide"
-      ? "hideGalleryPhoto"
-      : action === "restore"
-        ? "restoreGalleryPhoto"
-        : "deleteGalleryPhoto";
+    const apiAction =
+      action === "hide"
+        ? "hideGalleryPhoto"
+        : action === "restore"
+          ? "restoreGalleryPhoto"
+          : "deleteGalleryPhoto";
 
-    await postJson({
-      action: apiAction,
-      path: photo.path
-    }, true);
+    await postJson(
+      {
+        action: apiAction,
+        path: photo.path,
+      },
+      true,
+    );
 
     await loadGalleryManagerPhotos();
   } catch (err) {
-    if (status) status.textContent = err.message || "Gallery photo action failed.";
+    if (status)
+      status.textContent = err.message || "Gallery photo action failed.";
   }
 }
 
@@ -14121,7 +16998,9 @@ function openOrder(orderNumber, { returnView } = {}) {
   listScrollY = getAdminScrollTop();
   orderDetailReturnView = returnView || activeView || "current";
 
-  const order = allOrders.find(o => String(o.orderNumber) === String(orderNumber));
+  const order = allOrders.find(
+    (o) => String(o.orderNumber) === String(orderNumber),
+  );
   if (!order) {
     alert("Order not found.");
     return;
@@ -14245,7 +17124,7 @@ orderFilterPopover?.addEventListener("click", (e) => {
   e.stopPropagation();
 });
 
-orderFilterButtons.forEach(btn => {
+orderFilterButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
     const nextFilter = btn.dataset.orderFilter;
     if (!isOrderFilterView(nextFilter)) return;
@@ -14381,10 +17260,22 @@ window.addEventListener("resize", () => {
   fitDetailTitle();
 });
 
-window.addEventListener("scroll", closeDesktopOrderActionMenus, { passive: true, capture: true });
-window.addEventListener("scroll", closeInventorySheet, { passive: true, capture: true });
-window.addEventListener("scroll", closeOrderPhotoActionMenu, { passive: true, capture: true });
-window.addEventListener("scroll", closeAdminFilterPopovers, { passive: true, capture: true });
+window.addEventListener("scroll", closeDesktopOrderActionMenus, {
+  passive: true,
+  capture: true,
+});
+window.addEventListener("scroll", closeInventorySheet, {
+  passive: true,
+  capture: true,
+});
+window.addEventListener("scroll", closeOrderPhotoActionMenu, {
+  passive: true,
+  capture: true,
+});
+window.addEventListener("scroll", closeAdminFilterPopovers, {
+  passive: true,
+  capture: true,
+});
 
 backBtn.addEventListener("click", closeOrderDetail);
 
@@ -14437,7 +17328,9 @@ homeMenuBtn?.addEventListener("click", openMenu);
 document.getElementById("usersMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("pricingMenuBtn")?.addEventListener("click", openMenu);
 document.getElementById("reviewsMenuBtn")?.addEventListener("click", openMenu);
-document.getElementById("customersMenuBtn")?.addEventListener("click", openMenu);
+document
+  .getElementById("customersMenuBtn")
+  ?.addEventListener("click", openMenu);
 document.getElementById("calendarMenuBtn")?.addEventListener("click", openMenu);
 messagesMenuBtn?.addEventListener("click", openMenu);
 messagesBackBtn?.addEventListener("click", renderMessagesView);
@@ -14448,12 +17341,15 @@ msgThreadDeleteBtn?.addEventListener("click", () => {
 });
 
 /* Poll the Twilio inbox so new-text and new-order badges stay live. */
-setInterval(() => { if (getToken()) refreshMessages({ rerender: true }); }, 30000);
+setInterval(() => {
+  if (getToken()) refreshMessages({ rerender: true });
+}, 30000);
 
 /* Instant inbox update: the service worker pings us when a push arrives. */
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("message", (e) => {
-    if (e.data && e.data.type === "push" && getToken()) refreshMessages({ rerender: true });
+    if (e.data && e.data.type === "push" && getToken())
+      refreshMessages({ rerender: true });
   });
 }
 closeMenuBtn.addEventListener("click", closeMenu);
@@ -14514,7 +17410,10 @@ function endAdminBoot() {
   const root = document.documentElement;
   if (!root.classList.contains("admin-booting")) return;
   root.classList.add("admin-boot-done");
-  setTimeout(() => root.classList.remove("admin-booting", "admin-boot-done"), 260);
+  setTimeout(
+    () => root.classList.remove("admin-booting", "admin-boot-done"),
+    260,
+  );
 }
 
 (async function init() {
@@ -14568,12 +17467,17 @@ async function initAdminApp() {
 const sideNavPushBtn = document.getElementById("sideNavPushBtn");
 
 function isPushSupported() {
-  return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  return (
+    "serviceWorker" in navigator &&
+    "PushManager" in window &&
+    "Notification" in window
+  );
 }
 
 function pushKeyToBytes(s) {
-  const b = s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4);
-  return Uint8Array.from(atob(b), c => c.charCodeAt(0));
+  const b =
+    s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4);
+  return Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
 }
 
 async function getPushRegistration() {
@@ -14582,7 +17486,10 @@ async function getPushRegistration() {
 
 async function refreshPushButtonVisibility() {
   if (!sideNavPushBtn) return;
-  if (!isPushSupported() || !getToken() || isDemoRole()) { sideNavPushBtn.hidden = true; return; }
+  if (!isPushSupported() || !getToken() || isDemoRole()) {
+    sideNavPushBtn.hidden = true;
+    return;
+  }
   try {
     const reg = await getPushRegistration();
     const sub = await reg.pushManager.getSubscription();
@@ -14600,21 +17507,32 @@ async function enablePushNotifications() {
     if (perm !== "granted") throw new Error("Notifications were not allowed.");
 
     const cfg = await postJson({ action: "getPushPublicKey" });
-    if (!cfg.publicKey) throw new Error("Push is not configured on the server.");
+    if (!cfg.publicKey)
+      throw new Error("Push is not configured on the server.");
 
     const reg = await getPushRegistration();
     await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: pushKeyToBytes(cfg.publicKey)
+      applicationServerKey: pushKeyToBytes(cfg.publicKey),
     });
 
-    await postJson({ action: "savePushSubscription", subscription: sub.toJSON(), label: navigator.userAgent.slice(0, 80) }, true);
+    await postJson(
+      {
+        action: "savePushSubscription",
+        subscription: sub.toJSON(),
+        label: navigator.userAgent.slice(0, 80),
+      },
+      true,
+    );
     await postJson({ action: "sendTestPush" }, true);
 
     if (sideNavPushBtn) {
       sideNavPushBtn.textContent = "Notifications on ✓";
-      setTimeout(() => { sideNavPushBtn.textContent = prev; sideNavPushBtn.hidden = true; }, 2000);
+      setTimeout(() => {
+        sideNavPushBtn.textContent = prev;
+        sideNavPushBtn.hidden = true;
+      }, 2000);
     }
   } catch (err) {
     if (sideNavPushBtn) sideNavPushBtn.textContent = prev;
@@ -14622,7 +17540,10 @@ async function enablePushNotifications() {
   }
 }
 
-sideNavPushBtn?.addEventListener("click", () => { closeMenu(); enablePushNotifications(); });
+sideNavPushBtn?.addEventListener("click", () => {
+  closeMenu();
+  enablePushNotifications();
+});
 if (isPushSupported() && getToken()) refreshPushButtonVisibility();
 
 /* =========================
@@ -14649,19 +17570,25 @@ async function checkForNewBuild() {
     /* Watch the deployed assets' ETags, not index.html (which rarely
        changes) — JS/CSS-only deploys must trigger the refresh too. */
     const heads = await Promise.all(
-      ["/admin/index.html", "/admin/admin.js", "/admin/admin.css"].map(u =>
-        fetch(u, { method: "HEAD", cache: "no-store" })
-      )
+      ["/admin/index.html", "/admin/admin.js", "/admin/admin.css"].map((u) =>
+        fetch(u, { method: "HEAD", cache: "no-store" }),
+      ),
     );
-    if (heads.some(r => !r.ok)) return;
-    const sig = heads.map(r =>
-      (r.headers.get("etag") || "") + (r.headers.get("last-modified") || "")
-    ).join("|");
+    if (heads.some((r) => !r.ok)) return;
+    const sig = heads
+      .map(
+        (r) =>
+          (r.headers.get("etag") || "") +
+          (r.headers.get("last-modified") || ""),
+      )
+      .join("|");
     const hash = hashStr(sig);
     const stored = localStorage.getItem(BUILD_HASH_KEY);
     localStorage.setItem(BUILD_HASH_KEY, hash);
     if (stored && stored !== hash) location.reload();
-  } catch { /* offline — try again later */ }
+  } catch {
+    /* offline — try again later */
+  }
 }
 
 checkForNewBuild();
@@ -14679,31 +17606,51 @@ document.addEventListener("visibilitychange", () => {
    or message swipe gestures, the map, or pull-to-refresh.
 ========================= */
 (function initEdgeSwipeMenu() {
-  let tracking = false, startX = 0, startY = 0;
+  let tracking = false,
+    startX = 0,
+    startY = 0;
 
-  document.addEventListener("touchstart", (e) => {
-    tracking = false;
-    if (!window.matchMedia("(max-width: 899px)").matches) return;
-    if (!isAuthenticated() || sideMenu.classList.contains("open")) return;
-    if (e.touches.length !== 1 || e.touches[0].clientX > 20) return;
-    if (e.target.closest?.(".swipe-row, .msg-swipe, .leaflet-container, input, textarea, select")) return;
-    tracking = true;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  }, { passive: true });
-
-  document.addEventListener("touchmove", (e) => {
-    if (!tracking) return;
-    const dx = e.touches[0].clientX - startX;
-    const dy = e.touches[0].clientY - startY;
-    if (Math.abs(dy) > 40 && Math.abs(dy) > Math.abs(dx)) { tracking = false; return; }
-    if (dx > 60 && Math.abs(dx) > 1.5 * Math.abs(dy)) {
+  document.addEventListener(
+    "touchstart",
+    (e) => {
       tracking = false;
-      openMenu();
-    }
-  }, { passive: true });
+      if (!window.matchMedia("(max-width: 899px)").matches) return;
+      if (!isAuthenticated() || sideMenu.classList.contains("open")) return;
+      if (e.touches.length !== 1 || e.touches[0].clientX > 20) return;
+      if (
+        e.target.closest?.(
+          ".swipe-row, .msg-swipe, .leaflet-container, input, textarea, select",
+        )
+      )
+        return;
+      tracking = true;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    },
+    { passive: true },
+  );
 
-  document.addEventListener("touchend", () => { tracking = false; });
+  document.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!tracking) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (Math.abs(dy) > 40 && Math.abs(dy) > Math.abs(dx)) {
+        tracking = false;
+        return;
+      }
+      if (dx > 60 && Math.abs(dx) > 1.5 * Math.abs(dy)) {
+        tracking = false;
+        openMenu();
+      }
+    },
+    { passive: true },
+  );
+
+  document.addEventListener("touchend", () => {
+    tracking = false;
+  });
 })();
 
 // =========================
@@ -14718,13 +17665,17 @@ document.addEventListener("visibilitychange", () => {
   }
 
   function clearActive(except) {
-    document.querySelectorAll(".photo-drop-active").forEach(el => {
+    document.querySelectorAll(".photo-drop-active").forEach((el) => {
       if (el !== except) el.classList.remove("photo-drop-active");
     });
   }
 
   document.addEventListener("dragover", (e) => {
-    if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes("Files")) return;
+    if (
+      !e.dataTransfer ||
+      !Array.from(e.dataTransfer.types || []).includes("Files")
+    )
+      return;
     e.preventDefault();
     const zone = e.target.closest?.("[data-photo-drop]") || null;
     clearActive(zone);
@@ -14748,11 +17699,15 @@ document.addEventListener("visibilitychange", () => {
     if (!zone) return;
 
     const input = zoneInput(zone);
-    const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith("image/"));
+    const files = Array.from(e.dataTransfer?.files || []).filter((f) =>
+      f.type.startsWith("image/"),
+    );
     if (!input || !files.length) return;
 
     const dt = new DataTransfer();
-    (input.multiple ? files : files.slice(0, 1)).forEach(f => dt.items.add(f));
+    (input.multiple ? files : files.slice(0, 1)).forEach((f) =>
+      dt.items.add(f),
+    );
     input.files = dt.files;
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
@@ -14777,7 +17732,11 @@ function customerDisplayDate(value) {
   if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function buildCustomerIndex() {
@@ -14786,13 +17745,18 @@ function buildCustomerIndex() {
   const byName = new Map();
 
   const orders = [...allOrders].sort(
-    (a, b) => (parseInt(b.orderNumber, 10) || 0) - (parseInt(a.orderNumber, 10) || 0)
+    (a, b) =>
+      (parseInt(b.orderNumber, 10) || 0) - (parseInt(a.orderNumber, 10) || 0),
   );
 
   for (const order of orders) {
     const phoneKey = normalizeCustomerPhone(order.phoneNumber);
-    const emailKey = String(order.emailAddress || "").trim().toLowerCase();
-    const nameKey = String(order.customerName || "").trim().toLowerCase();
+    const emailKey = String(order.emailAddress || "")
+      .trim()
+      .toLowerCase();
+    const nameKey = String(order.customerName || "")
+      .trim()
+      .toLowerCase();
     if (!phoneKey && !emailKey && !nameKey) continue;
 
     let customer =
@@ -14803,12 +17767,16 @@ function buildCustomerIndex() {
 
     if (!customer) {
       customer = {
-        key: phoneKey ? `p:${phoneKey}` : emailKey ? `e:${emailKey}` : `n:${nameKey}`,
+        key: phoneKey
+          ? `p:${phoneKey}`
+          : emailKey
+            ? `e:${emailKey}`
+            : `n:${nameKey}`,
         name: String(order.customerName || "").trim() || "Unknown",
         phones: new Map(),
         emails: new Map(),
         socialTags: new Set(),
-        orders: []
+        orders: [],
       };
       customers.push(customer);
     }
@@ -14818,23 +17786,31 @@ function buildCustomerIndex() {
     if (nameKey) byName.set(nameKey, customer);
 
     if (phoneKey && !customer.phones.has(phoneKey)) {
-      customer.phones.set(phoneKey, formatPhoneForInput(order.phoneNumber) || String(order.phoneNumber).trim());
+      customer.phones.set(
+        phoneKey,
+        formatPhoneForInput(order.phoneNumber) ||
+          String(order.phoneNumber).trim(),
+      );
     }
     if (emailKey && !customer.emails.has(emailKey)) {
       customer.emails.set(emailKey, String(order.emailAddress).trim());
     }
-    if (order.socialTag) customer.socialTags.add(String(order.socialTag).trim());
+    if (order.socialTag)
+      customer.socialTags.add(String(order.socialTag).trim());
     customer.orders.push(order);
   }
 
   for (const c of customers) {
     c.orderCount = c.orders.length;
     c.lifetimePaid = c.orders
-      .filter(o => String(o.paid || "").toLowerCase() === "paid")
+      .filter((o) => String(o.paid || "").toLowerCase() === "paid")
       .reduce((sum, o) => sum + (Number(o.priceQuoted) || 0), 0);
-    c.pendingCount = c.orders.filter(o => String(o.paid || "").toLowerCase() !== "paid").length;
+    c.pendingCount = c.orders.filter(
+      (o) => String(o.paid || "").toLowerCase() !== "paid",
+    ).length;
     c.lastOrder = c.orders[0];
-    c.lastDate = c.lastOrder?.timestampSubmitted || c.lastOrder?.dateCompleted || "";
+    c.lastDate =
+      c.lastOrder?.timestampSubmitted || c.lastOrder?.dateCompleted || "";
 
     const laceCounts = new Map();
     for (const o of c.orders) {
@@ -14845,20 +17821,29 @@ function buildCustomerIndex() {
     let fav = "";
     let favCount = 0;
     for (const [lace, count] of laceCounts) {
-      if (count > favCount) { fav = lace; favCount = count; }
+      if (count > favCount) {
+        fav = lace;
+        favCount = count;
+      }
     }
     /* Only claim a "go-to" when a color actually repeats — with all-distinct
        colors there is no preference to report. */
     c.favoriteLace = fav && favCount >= 2 ? adminOrderLaceLabel(fav) : "";
   }
 
-  customers.sort((a, b) => new Date(b.lastDate || 0) - new Date(a.lastDate || 0));
+  customers.sort(
+    (a, b) => new Date(b.lastDate || 0) - new Date(a.lastDate || 0),
+  );
   return customers;
 }
 
 function findCustomerForOrder(orderNumber) {
   const num = String(orderNumber || "");
-  return buildCustomerIndex().find(c => c.orders.some(o => String(o.orderNumber) === num)) || null;
+  return (
+    buildCustomerIndex().find((c) =>
+      c.orders.some((o) => String(o.orderNumber) === num),
+    ) || null
+  );
 }
 
 function renderCustomersView() {
@@ -14869,7 +17854,7 @@ function renderCustomersView() {
   const customers = buildCustomerIndex();
 
   if (activeCustomerKey) {
-    const customer = customers.find(c => c.key === activeCustomerKey);
+    const customer = customers.find((c) => c.key === activeCustomerKey);
     if (customer) {
       renderCustomerProfile(panel, count, customer);
       wireCustomersPanel(panel);
@@ -14880,27 +17865,35 @@ function renderCustomersView() {
 
   const q = customersSearch.trim().toLowerCase();
   const filtered = q
-    ? customers.filter(c => {
+    ? customers.filter((c) => {
         const hay = [
           c.name,
           ...c.phones.values(),
           ...c.phones.keys(),
           ...c.emails.values(),
-          ...c.orders.map(o => `${o.orderNumber} ${o.brandModel || ""}`)
-        ].join(" ").toLowerCase();
+          ...c.orders.map((o) => `${o.orderNumber} ${o.brandModel || ""}`),
+        ]
+          .join(" ")
+          .toLowerCase();
         return hay.includes(q);
       })
     : customers;
 
-  if (count) count.textContent = `${customers.length} customer${customers.length === 1 ? "" : "s"}`;
+  if (count)
+    count.textContent = `${customers.length} customer${customers.length === 1 ? "" : "s"}`;
 
   const due = buildMaintenanceDue(customers);
   panel.innerHTML = `
     <div class="dashboard-shell">
-    ${due.length ? `
+    ${
+      due.length
+        ? `
     <div class="dashboard-card customers-card maintenance-card">
       <h3 class="money-card-title">Maintenance Due</h3>
-      ${due.slice(0, 8).map(d => `
+      ${due
+        .slice(0, 8)
+        .map(
+          (d) => `
         <div class="customer-order-row maintenance-row">
           <button class="customer-row-main maintenance-open" type="button" data-customer-key="${escapeAttr(d.customerKey)}">
             <span class="customer-row-name">${escapeHtml(d.customerName)} · ${escapeHtml(d.gloveLabel)}</span>
@@ -14908,13 +17901,21 @@ function renderCustomersView() {
           </button>
           ${d.smsHref ? `<a class="secondary maintenance-text-btn" href="${escapeAttr(d.smsHref)}">Text</a>` : ""}
         </div>
-      `).join("")}
-    </div>` : ""}
+      `,
+        )
+        .join("")}
+    </div>`
+        : ""
+    }
     <div class="dashboard-card customers-card">
       <input id="customersSearchInput" class="customers-search" type="search"
         placeholder="Name, phone, order #" autocomplete="off" value="${escapeAttr(customersSearch)}">
       <div class="customers-list">
-        ${filtered.length ? filtered.map(c => `
+        ${
+          filtered.length
+            ? filtered
+                .map(
+                  (c) => `
           <button class="customer-row" type="button" data-customer-key="${escapeAttr(c.key)}">
             <span class="customer-row-main">
               <span class="customer-row-name">${escapeHtml(c.name)}</span>
@@ -14925,7 +17926,11 @@ function renderCustomersView() {
               <span class="customer-row-chevron" aria-hidden="true">›</span>
             </span>
           </button>
-        `).join("") : `<p class="muted customers-empty">No customers match.</p>`}
+        `,
+                )
+                .join("")
+            : `<p class="muted customers-empty">No customers match.</p>`
+        }
       </div>
     </div>
     </div>
@@ -14939,36 +17944,45 @@ let customerGalleryLinksCache = null;
 function warmCustomerGalleryLinks() {
   if (customerGalleryLinksCache) return;
   customerGalleryLinksCache = {};
-  postJson({ action: "listGalleryPhotos" }, true).then(data => {
-    const byOrder = {};
-    Object.entries(data.photoLinks || {}).forEach(([url, orderNumber]) => {
-      if (!byOrder[orderNumber]) byOrder[orderNumber] = [];
-      /* covers lead so the record opens on the glove's best shot */
-      if ((data.photoCovers || {})[url]) byOrder[orderNumber].unshift(url);
-      else byOrder[orderNumber].push(url);
-    });
-    customerGalleryLinksCache = byOrder;
-    if (activeView === "customers" && activeCustomerKey) renderCustomersView();
-  }).catch(() => {});
+  postJson({ action: "listGalleryPhotos" }, true)
+    .then((data) => {
+      const byOrder = {};
+      Object.entries(data.photoLinks || {}).forEach(([url, orderNumber]) => {
+        if (!byOrder[orderNumber]) byOrder[orderNumber] = [];
+        /* covers lead so the record opens on the glove's best shot */
+        if ((data.photoCovers || {})[url]) byOrder[orderNumber].unshift(url);
+        else byOrder[orderNumber].push(url);
+      });
+      customerGalleryLinksCache = byOrder;
+      if (activeView === "customers" && activeCustomerKey)
+        renderCustomersView();
+    })
+    .catch(() => {});
 }
 
 /* Glove Service Records (3.1): within a customer, orders sharing a
    normalized brand/model + glove type are one glove's history. Derived,
    like customers themselves — no schema, self-maintaining. */
 function customerGloveKey(order) {
-  const brand = String(order.brandModel || "").trim().toLowerCase().replace(/\s+/g, " ");
-  return `${brand || "unknown"}|${String(order.gloveType || "").trim().toLowerCase()}`;
+  const brand = String(order.brandModel || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+  return `${brand || "unknown"}|${String(order.gloveType || "")
+    .trim()
+    .toLowerCase()}`;
 }
 
 function groupCustomerGloves(orders) {
   const gloves = new Map();
-  orders.forEach(o => {
+  orders.forEach((o) => {
     const key = customerGloveKey(o);
     if (!gloves.has(key)) {
       gloves.set(key, {
-        label: String(o.brandModel || "").trim() || String(o.gloveType || "Glove"),
+        label:
+          String(o.brandModel || "").trim() || String(o.gloveType || "Glove"),
         gloveType: String(o.gloveType || ""),
-        orders: []
+        orders: [],
       });
     }
     gloves.get(key).orders.push(o);
@@ -14981,9 +17995,15 @@ function renderCustomerProfile(panel, count, c) {
   warmCustomerGalleryLinks();
 
   const contactBits = [
-    ...[...c.phones.values()].map(p => `<a class="customer-contact-link" href="tel:${escapeAttr(p.replace(/[^+\d]/g, ""))}">${escapeHtml(p)}</a>`),
-    ...[...c.emails.values()].map(e => `<a class="customer-contact-link" href="mailto:${escapeAttr(e)}">${escapeHtml(e)}</a>`),
-    ...[...c.socialTags].map(t => `<span>${escapeHtml(t)}</span>`)
+    ...[...c.phones.values()].map(
+      (p) =>
+        `<a class="customer-contact-link" href="tel:${escapeAttr(p.replace(/[^+\d]/g, ""))}">${escapeHtml(p)}</a>`,
+    ),
+    ...[...c.emails.values()].map(
+      (e) =>
+        `<a class="customer-contact-link" href="mailto:${escapeAttr(e)}">${escapeHtml(e)}</a>`,
+    ),
+    ...[...c.socialTags].map((t) => `<span>${escapeHtml(t)}</span>`),
   ];
   const contactChips = contactBits.length
     ? `<p class="customer-contact">${contactBits.join(`<span class="customer-contact-sep"> · </span>`)}</p>`
@@ -15006,29 +18026,49 @@ function renderCustomerProfile(panel, count, c) {
         ${c.pendingCount ? `<div class="customer-stat"><span class="customer-stat-value">${c.pendingCount}</span><span class="customer-stat-label">Unpaid</span></div>` : ""}
         ${c.favoriteLace ? `<div class="customer-stat"><span class="customer-stat-value customer-stat-lace">${escapeHtml(c.favoriteLace)}</span><span class="customer-stat-label">Go-to lace</span></div>` : ""}
       </div>
-      ${gloves.map(g => {
-        const first = g.orders[g.orders.length - 1];
-        const galleryByOrder = customerGalleryLinksCache || {};
-        const photos = [
-          ...g.orders.flatMap(o => (galleryByOrder[String(o.orderNumber)] || []).map(url => ({ url, orderNumber: o.orderNumber }))),
-          ...g.orders.flatMap(o => (Array.isArray(o.glovePhotos) ? o.glovePhotos : []).map(url => ({ url, orderNumber: o.orderNumber })))
-        ].slice(0, 8);
-        return `
+      ${gloves
+        .map((g) => {
+          const first = g.orders[g.orders.length - 1];
+          const galleryByOrder = customerGalleryLinksCache || {};
+          const photos = [
+            ...g.orders.flatMap((o) =>
+              (galleryByOrder[String(o.orderNumber)] || []).map((url) => ({
+                url,
+                orderNumber: o.orderNumber,
+              })),
+            ),
+            ...g.orders.flatMap((o) =>
+              (Array.isArray(o.glovePhotos) ? o.glovePhotos : []).map(
+                (url) => ({ url, orderNumber: o.orderNumber }),
+              ),
+            ),
+          ].slice(0, 8);
+          return `
         <div class="glove-record">
           <div class="glove-record-head">
             <span class="glove-record-name">${escapeHtml(g.label)}${g.gloveType && g.label !== g.gloveType ? ` <span class="glove-record-type">· ${escapeHtml(g.gloveType)}</span>` : ""}</span>
             <span class="glove-record-meta">${g.orders.length} service${g.orders.length === 1 ? "" : "s"}${first ? ` · since ${customerDisplayDate(first.timestampSubmitted || first.dateCompleted)}` : ""}</span>
           </div>
-          ${photos.length ? `
+          ${
+            photos.length
+              ? `
             <div class="customer-photo-strip">
-              ${photos.map(p => `
+              ${photos
+                .map(
+                  (p) => `
                 <button class="customer-photo" type="button" data-customer-order="${escapeAttr(String(p.orderNumber))}" aria-label="Open order ${escapeAttr(String(p.orderNumber))}">
                   <img src="${escapeAttr(p.url)}" alt="Glove photo" loading="lazy" onerror="this.closest('.customer-photo').style.display='none'">
                 </button>
-              `).join("")}
+              `,
+                )
+                .join("")}
             </div>
-          ` : ""}
-          ${g.orders.map(o => `
+          `
+              : ""
+          }
+          ${g.orders
+            .map(
+              (o) => `
             <button class="customer-order-row" type="button" data-customer-order="${escapeAttr(String(o.orderNumber))}">
               <span class="customer-row-main">
                 <span class="customer-row-name">#${escapeHtml(String(o.orderNumber))} · ${escapeHtml(getOrderSelectedServices(o).join(" + ") || o.status || "Service")}</span>
@@ -15039,10 +18079,13 @@ function renderCustomerProfile(panel, count, c) {
                 <span class="customer-row-chevron" aria-hidden="true">›</span>
               </span>
             </button>
-          `).join("")}
+          `,
+            )
+            .join("")}
         </div>
         `;
-      }).join("")}
+        })
+        .join("")}
     </div>
     </div>
   `;
@@ -15079,7 +18122,9 @@ function wireCustomersPanel(panel) {
     const input = document.getElementById("customersSearchInput");
     if (input) {
       input.focus();
-      try { input.setSelectionRange(pos, pos); } catch {}
+      try {
+        input.setSelectionRange(pos, pos);
+      } catch {}
     }
   });
 }
@@ -15103,8 +18148,8 @@ document.addEventListener("click", (e) => {
    arriving (In Transit to Me), done (Completed/Picked Up on date_completed).
 ========================= */
 
-let calendarMonth = null;        // Date pinned to the 1st of the shown month
-let calendarSelectedKey = "";    // YYYY-MM-DD
+let calendarMonth = null; // Date pinned to the 1st of the shown month
+let calendarSelectedKey = ""; // YYYY-MM-DD
 let calendarShowUnscheduled = false;
 
 const CALENDAR_DONE_STATUSES = new Set(["Completed", "Picked Up"]);
@@ -15139,7 +18184,8 @@ function buildCalendarEvents() {
 
   for (const order of allOrders) {
     const status = String(order.status || "");
-    const isDone = CALENDAR_DONE_STATUSES.has(status) || status === "Ready to Go";
+    const isDone =
+      CALENDAR_DONE_STATUSES.has(status) || status === "Ready to Go";
     const dateKey = isDone
       ? calKeyFromValue(order.dateCompleted || order.estimatedCompletion)
       : calKeyFromValue(order.estimatedCompletion);
@@ -15150,10 +18196,15 @@ function buildCalendarEvents() {
     }
 
     if (!events.has(dateKey)) events.set(dateKey, []);
-    events.get(dateKey).push({ order, kind: calOrderKind(order, dateKey, todayKey) });
+    events
+      .get(dateKey)
+      .push({ order, kind: calOrderKind(order, dateKey, todayKey) });
   }
 
-  unscheduledOrders.sort((a, b) => (parseInt(b.orderNumber, 10) || 0) - (parseInt(a.orderNumber, 10) || 0));
+  unscheduledOrders.sort(
+    (a, b) =>
+      (parseInt(b.orderNumber, 10) || 0) - (parseInt(a.orderNumber, 10) || 0),
+  );
   return { events, unscheduledOrders };
 }
 
@@ -15173,45 +18224,70 @@ function renderCalendarView() {
   const todayKey = calTodayKey();
   const year = calendarMonth.getFullYear();
   const month = calendarMonth.getMonth();
-  const monthLabel = calendarMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const monthLabel = calendarMonth.toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
 
   let activeThisMonth = 0;
   for (const [key, list] of events) {
     if (key.startsWith(`${year}-${String(month + 1).padStart(2, "0")}`)) {
-      activeThisMonth += list.filter(e => e.kind !== "done" && e.kind !== "ready").length;
+      activeThisMonth += list.filter(
+        (e) => e.kind !== "done" && e.kind !== "ready",
+      ).length;
     }
   }
   if (count) {
-    count.innerHTML = `${activeThisMonth} due this month${unscheduled
-      ? ` · <button type="button" class="cal-undated-link" data-cal-undated>${unscheduled} active without a date</button>`
-      : ""}`;
+    count.innerHTML = `${activeThisMonth} due this month${
+      unscheduled
+        ? ` · <button type="button" class="cal-undated-link" data-cal-undated>${unscheduled} active without a date</button>`
+        : ""
+    }`;
   }
 
   const firstDow = new Date(year, month, 1).getDay();
   const gridStart = new Date(year, month, 1 - firstDow);
   const cells = [];
   for (let i = 0; i < 42; i += 1) {
-    const d = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+    const d = new Date(
+      gridStart.getFullYear(),
+      gridStart.getMonth(),
+      gridStart.getDate() + i,
+    );
     const key = calDateKey(d);
     const dayEvents = events.get(key) || [];
-    const kinds = [...new Set(dayEvents.map(e => e.kind))];
+    const kinds = [...new Set(dayEvents.map((e) => e.kind))];
     cells.push(`
       <button type="button" class="cal-day${d.getMonth() !== month ? " is-other" : ""}${key === todayKey ? " is-today" : ""}${key === calendarSelectedKey ? " is-selected" : ""}" data-cal-day="${key}">
         <span class="cal-day-num">${d.getDate()}</span>
-        ${kinds.length ? `<span class="cal-dots">${kinds.map(k => `<span class="cal-dot cal-dot-${k}"></span>`).join("")}</span>` : ""}
+        ${kinds.length ? `<span class="cal-dots">${kinds.map((k) => `<span class="cal-dot cal-dot-${k}"></span>`).join("")}</span>` : ""}
       </button>
     `);
   }
 
-  const selectedEvents = (events.get(calendarSelectedKey) || [])
-    .sort((a, b) => (a.kind === "done") - (b.kind === "done"));
+  const selectedEvents = (events.get(calendarSelectedKey) || []).sort(
+    (a, b) => (a.kind === "done") - (b.kind === "done"),
+  );
   const selectedDate = calKeyFromValue(calendarSelectedKey);
   const selectedLabel = selectedDate
-    ? new Date(...calendarSelectedKey.split("-").map((v, i) => i === 1 ? Number(v) - 1 : Number(v)))
-        .toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })
+    ? new Date(
+        ...calendarSelectedKey
+          .split("-")
+          .map((v, i) => (i === 1 ? Number(v) - 1 : Number(v))),
+      ).toLocaleDateString(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      })
     : "";
 
-  const kindLabel = { due: "Due", overdue: "Overdue", arriving: "In Transit", ready: "Ready", done: "Done" };
+  const kindLabel = {
+    due: "Due",
+    overdue: "Overdue",
+    arriving: "In Transit",
+    ready: "Ready",
+    done: "Done",
+  };
 
   panel.innerHTML = `
     <div class="dashboard-shell">
@@ -15224,7 +18300,7 @@ function renderCalendarView() {
           <button type="button" class="cal-nav-btn" data-cal-nav="1" aria-label="Next month">&#8250;</button>
         </div>
       </div>
-      <div class="cal-weekdays">${["S","M","T","W","T","F","S"].map(d => `<span>${d}</span>`).join("")}</div>
+      <div class="cal-weekdays">${["S", "M", "T", "W", "T", "F", "S"].map((d) => `<span>${d}</span>`).join("")}</div>
       <div class="cal-grid">${cells.join("")}</div>
       <div class="cal-legend">
         <span><span class="cal-dot cal-dot-due"></span> Due</span>
@@ -15235,9 +18311,14 @@ function renderCalendarView() {
       </div>
     </div>
     <div class="dashboard-card cal-agenda-card">
-      ${calendarShowUnscheduled ? `
+      ${
+        calendarShowUnscheduled
+          ? `
         <div class="cal-agenda-title">Active without a date · set estimated completions to put them on the calendar</div>
-        ${unscheduledOrders.map(order => `
+        ${
+          unscheduledOrders
+            .map(
+              (order) => `
           <button class="customer-order-row" type="button" data-cal-order="${escapeAttr(String(order.orderNumber))}">
             <span class="customer-row-main">
               <span class="customer-row-name">#${escapeHtml(String(order.orderNumber))} · ${escapeHtml(order.customerName || "Customer")}</span>
@@ -15248,10 +18329,19 @@ function renderCalendarView() {
               <span class="customer-row-chevron" aria-hidden="true">&#8250;</span>
             </span>
           </button>
-        `).join("") || `<p class="muted cal-agenda-empty">Every active order has a date.</p>`}
-      ` : `
+        `,
+            )
+            .join("") ||
+          `<p class="muted cal-agenda-empty">Every active order has a date.</p>`
+        }
+      `
+          : `
       <div class="cal-agenda-title">${escapeHtml(selectedLabel)}</div>
-      ${selectedEvents.length ? selectedEvents.map(({ order, kind }) => `
+      ${
+        selectedEvents.length
+          ? selectedEvents
+              .map(
+                ({ order, kind }) => `
         <button class="customer-order-row" type="button" data-cal-order="${escapeAttr(String(order.orderNumber))}">
           <span class="customer-row-main">
             <span class="customer-row-name">#${escapeHtml(String(order.orderNumber))} · ${escapeHtml(order.customerName || "Customer")}</span>
@@ -15262,8 +18352,13 @@ function renderCalendarView() {
             <span class="customer-row-chevron" aria-hidden="true">&#8250;</span>
           </span>
         </button>
-      `).join("") : `<p class="muted cal-agenda-empty">Nothing on this day.</p>`}
-      `}
+      `,
+              )
+              .join("")
+          : `<p class="muted cal-agenda-empty">Nothing on this day.</p>`
+      }
+      `
+      }
     </div>
     </div>
   `;
@@ -15288,7 +18383,11 @@ function wireCalendarPanel(panel) {
   panel.addEventListener("click", (e) => {
     const nav = e.target.closest("[data-cal-nav]");
     if (nav) {
-      calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + Number(nav.dataset.calNav), 1);
+      calendarMonth = new Date(
+        calendarMonth.getFullYear(),
+        calendarMonth.getMonth() + Number(nav.dataset.calNav),
+        1,
+      );
       renderCalendarView();
       return;
     }
@@ -15321,10 +18420,10 @@ function wireCalendarPanel(panel) {
    reads only published rows; editing here never touches historical orders.
 ========================= */
 
-let pricingStateCache = null;      // { services, settings } from listServicePricing
-let pricingExpandedKey = null;     // which service card is open in the editor
-let pricingHistoryCache = {};      // serviceKey -> [history rows]
-let pricingCreating = false;       // "new service" mini-form visible
+let pricingStateCache = null; // { services, settings } from listServicePricing
+let pricingExpandedKey = null; // which service card is open in the editor
+let pricingHistoryCache = {}; // serviceKey -> [history rows]
+let pricingCreating = false; // "new service" mini-form visible
 let pricingDelegated = false;
 /* Orders drill-down from a pricing-intelligence "Measured jobs" count:
    { orderNumbers: string[], context: string } or null. */
@@ -15345,17 +18444,36 @@ function pricingDisplayText(fields) {
   const base = fields.basePrice;
   const premium = fields.premiumPrice;
   const suffix = String(fields.priceSuffix || "").trim();
-  const hasBase = base !== null && base !== undefined && base !== "" && Number.isFinite(Number(base));
-  const hasPremium = premium !== null && premium !== undefined && premium !== "" && Number.isFinite(Number(premium));
+  const hasBase =
+    base !== null &&
+    base !== undefined &&
+    base !== "" &&
+    Number.isFinite(Number(base));
+  const hasPremium =
+    premium !== null &&
+    premium !== undefined &&
+    premium !== "" &&
+    Number.isFinite(Number(premium));
   const money = (n) => `$${pricingFormatAmount(n)}`;
   switch (type) {
-    case "variable": return "Prices vary";
-    case "starting_at": return hasBase ? `Starting at ${money(base)}` : "Prices vary";
-    case "per_item": return hasBase ? `${money(base)}${suffix ? ` ${suffix}` : " each"}` : "Prices vary";
+    case "variable":
+      return "Prices vary";
+    case "starting_at":
+      return hasBase ? `Starting at ${money(base)}` : "Prices vary";
+    case "per_item":
+      return hasBase
+        ? `${money(base)}${suffix ? ` ${suffix}` : " each"}`
+        : "Prices vary";
     case "range":
-    case "tiered": return hasBase && hasPremium ? `${money(base)}–${money(premium)}` : (hasBase ? money(base) : "Prices vary");
+    case "tiered":
+      return hasBase && hasPremium
+        ? `${money(base)}–${money(premium)}`
+        : hasBase
+          ? money(base)
+          : "Prices vary";
     case "fixed":
-    default: return hasBase ? money(base) : "Prices vary";
+    default:
+      return hasBase ? money(base) : "Prices vary";
   }
 }
 
@@ -15368,7 +18486,10 @@ function pricingRoundToIncrement(amount, increment) {
 }
 
 function pricingMedian(list) {
-  const a = (list || []).filter((x) => Number.isFinite(x)).slice().sort((x, y) => x - y);
+  const a = (list || [])
+    .filter((x) => Number.isFinite(x))
+    .slice()
+    .sort((x, y) => x - y);
   if (!a.length) return null;
   const mid = Math.floor(a.length / 2);
   return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
@@ -15389,7 +18510,7 @@ const PRICING_TYPE_OPTIONS = [
   ["range", "Range"],
   ["starting_at", "Starting at"],
   ["per_item", "Per item"],
-  ["variable", "Variable"]
+  ["variable", "Variable"],
 ];
 
 function pricingTypeLabel(type) {
@@ -15401,9 +18522,14 @@ function pricingTypeLabel(type) {
 function getPricingSettings() {
   const s = (pricingStateCache && pricingStateCache.settings) || {};
   return {
-    targetLaborRate: Number.isFinite(Number(s.targetLaborRate)) ? Number(s.targetLaborRate) : SHOP_ECONOMICS.targetHourlyRate,
-    minShopCharge: Number.isFinite(Number(s.minShopCharge)) ? Number(s.minShopCharge) : 30,
-    roundingIncrement: Number(s.roundingIncrement) > 0 ? Number(s.roundingIncrement) : 5
+    targetLaborRate: Number.isFinite(Number(s.targetLaborRate))
+      ? Number(s.targetLaborRate)
+      : SHOP_ECONOMICS.targetHourlyRate,
+    minShopCharge: Number.isFinite(Number(s.minShopCharge))
+      ? Number(s.minShopCharge)
+      : 30,
+    roundingIncrement:
+      Number(s.roundingIncrement) > 0 ? Number(s.roundingIncrement) : 5,
   };
 }
 
@@ -15424,18 +18550,26 @@ function attributeOrderToServiceKey(order, services) {
       return true;
     });
     if (!matched) continue;
-    const rank = (svc.category === "relacing" ? 0 : 1000) + (Number(svc.sortOrder) || 0);
-    if (rank < bestRank) { bestRank = rank; best = svc.serviceKey; }
+    const rank =
+      (svc.category === "relacing" ? 0 : 1000) + (Number(svc.sortOrder) || 0);
+    if (rank < bestRank) {
+      bestRank = rank;
+      best = svc.serviceKey;
+    }
   }
   return best;
 }
 
 function pricingTimeTrend(measuredJobs) {
   if (measuredJobs.length < 4) return "insufficient";
-  const sorted = measuredJobs.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const sorted = measuredJobs
+    .slice()
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const half = Math.floor(sorted.length / 2);
   const earlier = pricingMedian(sorted.slice(0, half).map((j) => j.minutes));
-  const recent = pricingMedian(sorted.slice(sorted.length - half).map((j) => j.minutes));
+  const recent = pricingMedian(
+    sorted.slice(sorted.length - half).map((j) => j.minutes),
+  );
   if (!earlier || !recent) return "insufficient";
   if (recent < earlier * 0.9) return "improved";
   if (recent > earlier * 1.1) return "slower";
@@ -15446,7 +18580,7 @@ const PRICING_TREND_LABELS = {
   improved: "Efficiency Improved",
   stable: "Stable",
   slower: "Slower Recently",
-  insufficient: "Not Enough Data"
+  insufficient: "Not Enough Data",
 };
 
 /* Core pricing intelligence for one service. Keeps published price, average
@@ -15457,7 +18591,8 @@ const PRICING_TREND_LABELS = {
    ONE tier, so standard and premium never double-count each other. */
 function orderPricingTier(order) {
   const glove = String(getHistoricalOrderBasis(order)?.gloveType || "");
-  if (glove === "Catchers Mitt" || glove === "First Base Mitt") return "premium";
+  if (glove === "Catchers Mitt" || glove === "First Base Mitt")
+    return "premium";
   if (glove === "Fielders Glove" && orderHasTrapezeWeb(order)) return "premium";
   return "standard";
 }
@@ -15469,7 +18604,11 @@ function orderPricingTier(order) {
    a dedicated "Palm Pad" labor phase, a known $20 price, and an identifiable
    $1.25 material. Loop/Web live in free-text with no phase or known price, so
    their components are marked UNALLOCATED rather than guessed. */
-const ADDON_SERVICE_KEYS = new Set(["palm_padding", "loop_replacement", "web_replacement"]);
+const ADDON_SERVICE_KEYS = new Set([
+  "palm_padding",
+  "loop_replacement",
+  "web_replacement",
+]);
 const PALM_PAD_PHASE = "Palm Pad";
 
 function orderAddonKeys(order) {
@@ -15479,26 +18618,34 @@ function orderAddonKeys(order) {
   /* A declared custom add-on supersedes the free-text "web" inference: the
      manual amount + Custom Work phase already account for that bespoke work, so
      the order is cleanly separable rather than an unpriceable web add-on. */
-  if (orderHasWebReplacement(order) && orderCustomAddonAmount(order) == null) keys.push("web_replacement");
+  if (orderHasWebReplacement(order) && orderCustomAddonAmount(order) == null)
+    keys.push("web_replacement");
   return keys;
 }
 
 /* Base (non-add-on) service an order maps to, or null for an add-on-only job. */
 function attributeOrderToBaseServiceKey(order, services) {
-  return attributeOrderToServiceKey(order, services.filter((s) => !ADDON_SERVICE_KEYS.has(s.serviceKey)));
+  return attributeOrderToServiceKey(
+    order,
+    services.filter((s) => !ADDON_SERVICE_KEYS.has(s.serviceKey)),
+  );
 }
 
 /* Palm Pad phase minutes per order, from the labor cache. */
 function buildPalmPadMinutesByOrder() {
   const map = {};
-  (Array.isArray(moneyLaborSummaryCache) ? moneyLaborSummaryCache : []).forEach((s) => {
-    if (String(s.phase || "") !== PALM_PAD_PHASE) return;
-    const k = String(s.orderNumber || "");
-    if (k) map[k] = (map[k] || 0) + (Number(s.durationMinutes) || 0);
-  });
-  allOrders.forEach(order => {
+  (Array.isArray(moneyLaborSummaryCache) ? moneyLaborSummaryCache : []).forEach(
+    (s) => {
+      if (String(s.phase || "") !== PALM_PAD_PHASE) return;
+      const k = String(s.orderNumber || "");
+      if (k) map[k] = (map[k] || 0) + (Number(s.durationMinutes) || 0);
+    },
+  );
+  allOrders.forEach((order) => {
     const snapshot = getOrderEconomicsSnapshot(order);
-    if (snapshot) map[String(order.orderNumber || "")] = Number(snapshot.phase_minutes?.[PALM_PAD_PHASE]) || 0;
+    if (snapshot)
+      map[String(order.orderNumber || "")] =
+        Number(snapshot.phase_minutes?.[PALM_PAD_PHASE]) || 0;
   });
   return map;
 }
@@ -15507,14 +18654,18 @@ function buildPalmPadMinutesByOrder() {
    when an order has a declared custom add-on. Same shape as the Palm Pad map. */
 function buildCustomWorkMinutesByOrder() {
   const map = {};
-  (Array.isArray(moneyLaborSummaryCache) ? moneyLaborSummaryCache : []).forEach((s) => {
-    if (String(s.phase || "") !== LABOR_CUSTOM_PHASE) return;
-    const k = String(s.orderNumber || "");
-    if (k) map[k] = (map[k] || 0) + (Number(s.durationMinutes) || 0);
-  });
-  allOrders.forEach(order => {
+  (Array.isArray(moneyLaborSummaryCache) ? moneyLaborSummaryCache : []).forEach(
+    (s) => {
+      if (String(s.phase || "") !== LABOR_CUSTOM_PHASE) return;
+      const k = String(s.orderNumber || "");
+      if (k) map[k] = (map[k] || 0) + (Number(s.durationMinutes) || 0);
+    },
+  );
+  allOrders.forEach((order) => {
     const snapshot = getOrderEconomicsSnapshot(order);
-    if (snapshot) map[String(order.orderNumber || "")] = Number(snapshot.phase_minutes?.[LABOR_CUSTOM_PHASE]) || 0;
+    if (snapshot)
+      map[String(order.orderNumber || "")] =
+        Number(snapshot.phase_minutes?.[LABOR_CUSTOM_PHASE]) || 0;
   });
   return map;
 }
@@ -15527,47 +18678,73 @@ function buildCustomWorkMinutesByOrder() {
    - revenueUnallocated: true only when a price existed but couldn't be split.
    - minutes: allocated minutes (0 if none logged).
    - minutesUnallocated: true when labor exists but can't be attributed. */
-function allocateOrderForService(order, service, totalMinutes, palmPadMinutes, customWorkMinutes) {
+function allocateOrderForService(
+  order,
+  service,
+  totalMinutes,
+  palmPadMinutes,
+  customWorkMinutes,
+) {
   const orderNumber = String(order.orderNumber || "");
   const basis = getHistoricalOrderBasis(order);
-  const date = basis.dateCompleted || order.createdAt || order.timestampSubmitted || "";
+  const date =
+    basis.dateCompleted || order.createdAt || order.timestampSubmitted || "";
   const total = orderChargedPrice(order); // positive price, or null (gift/blank)
   const mats = getOrderMaterialsCost(order);
   const key = service.serviceKey;
 
   if (key === "palm_padding") {
-    const publishedPalmPrice = getPublishedServiceUnitPrice("palm_padding", basis);
+    const publishedPalmPrice = getPublishedServiceUnitPrice(
+      "palm_padding",
+      basis,
+    );
     return {
-      order, orderNumber, date,
+      order,
+      orderNumber,
+      date,
       revenue: total != null ? publishedPalmPrice : null, // gift order → no revenue
       revenueUnallocated: total != null && publishedPalmPrice === null,
       minutes: palmPadMinutes,
       minutesUnallocated: palmPadMinutes <= 0 && totalMinutes > 0, // present but no Palm Pad phase → can't measure it
       materials: mats.palmPadCost,
-      materialsUnallocated: false
+      materialsUnallocated: false,
     };
   }
 
   if (key === "loop_replacement") {
-    const publishedLoopPrice = getPublishedServiceUnitPrice("loop_replacement", basis);
+    const publishedLoopPrice = getPublishedServiceUnitPrice(
+      "loop_replacement",
+      basis,
+    );
     const loopCount = orderLoopCount(order);
     return {
-      order, orderNumber, date,
-      revenue: total != null && publishedLoopPrice !== null ? loopCount * publishedLoopPrice : null,
+      order,
+      orderNumber,
+      date,
+      revenue:
+        total != null && publishedLoopPrice !== null
+          ? loopCount * publishedLoopPrice
+          : null,
       revenueUnallocated: total != null && publishedLoopPrice === null,
       minutes: 0,
       minutesUnallocated: totalMinutes > 0,
-      materials: null, materialsUnallocated: false
+      materials: null,
+      materialsUnallocated: false,
     };
   }
 
   if (ADDON_SERVICE_KEYS.has(key)) {
     // Web Replacement: price varies, no phase, no tracked material — unallocated.
     return {
-      order, orderNumber, date,
-      revenue: null, revenueUnallocated: total != null,
-      minutes: 0, minutesUnallocated: totalMinutes > 0,
-      materials: null, materialsUnallocated: false
+      order,
+      orderNumber,
+      date,
+      revenue: null,
+      revenueUnallocated: total != null,
+      minutes: 0,
+      minutesUnallocated: totalMinutes > 0,
+      materials: null,
+      materialsUnallocated: false,
     };
   }
 
@@ -15579,32 +18756,41 @@ function allocateOrderForService(order, service, totalMinutes, palmPadMinutes, c
   const hasWeb = addons.includes("web_replacement");
   const loopCount = hasLoop ? orderLoopCount(order) : 0;
   const customAddon = orderCustomAddonAmount(order) || 0; // $ carved out, 0 if none
-  const customMinutes = customAddon > 0 ? (Number(customWorkMinutes) || 0) : 0;
-  const publishedPalmPrice = getPublishedServiceUnitPrice("palm_padding", basis);
-  const publishedLoopPrice = getPublishedServiceUnitPrice("loop_replacement", basis);
+  const customMinutes = customAddon > 0 ? Number(customWorkMinutes) || 0 : 0;
+  const publishedPalmPrice = getPublishedServiceUnitPrice(
+    "palm_padding",
+    basis,
+  );
+  const publishedLoopPrice = getPublishedServiceUnitPrice(
+    "loop_replacement",
+    basis,
+  );
   const addonPricingUnavailable =
-    (hasPalmPad && publishedPalmPrice === null) || (hasLoop && publishedLoopPrice === null);
+    (hasPalmPad && publishedPalmPrice === null) ||
+    (hasLoop && publishedLoopPrice === null);
   const separableAddonRevenue =
-    (hasPalmPad ? publishedPalmPrice || 0 : 0)
-    + loopCount * (publishedLoopPrice || 0)
-    + customAddon;
+    (hasPalmPad ? publishedPalmPrice || 0 : 0) +
+    loopCount * (publishedLoopPrice || 0) +
+    customAddon;
 
-  let revenue = null, revenueUnallocated = false;
+  let revenue = null,
+    revenueUnallocated = false;
   if (total == null) {
-    revenue = null;                       // gift — no revenue (not "unallocated")
+    revenue = null; // gift — no revenue (not "unallocated")
   } else if (hasWeb || addonPricingUnavailable) {
-    revenueUnallocated = true;            // web price is unknown — can't split it off
+    revenueUnallocated = true; // web price is unknown — can't split it off
   } else {
     revenue = total - separableAddonRevenue; // includes the declared custom add-on
   }
 
-  let minutes = 0, minutesUnallocated = false;
+  let minutes = 0,
+    minutesUnallocated = false;
   if (totalMinutes <= 0) {
-    minutes = 0;                          // no labor logged (not "unallocated")
+    minutes = 0; // no labor logged (not "unallocated")
   } else if (hasWeb || hasLoop) {
-    minutesUnallocated = true;            // web/loop labor has no phase to remove
+    minutesUnallocated = true; // web/loop labor has no phase to remove
   } else if (hasPalmPad && palmPadMinutes <= 0) {
-    minutesUnallocated = true;            // palm pad present but not phased — can't separate
+    minutesUnallocated = true; // palm pad present but not phased — can't separate
   } else {
     // Custom Work minutes are carved out just like the Palm Pad phase.
     minutes = totalMinutes - (hasPalmPad ? palmPadMinutes : 0) - customMinutes;
@@ -15614,7 +18800,17 @@ function allocateOrderForService(order, service, totalMinutes, palmPadMinutes, c
   // Web materials aren't tracked, so they aren't in mats.total anyway.
   const materials = mats.total - (hasPalmPad ? mats.palmPadCost : 0);
 
-  return { order, orderNumber, date, revenue, revenueUnallocated, minutes, minutesUnallocated, materials, materialsUnallocated: false };
+  return {
+    order,
+    orderNumber,
+    date,
+    revenue,
+    revenueUnallocated,
+    minutes,
+    minutesUnallocated,
+    materials,
+    materialsUnallocated: false,
+  };
 }
 
 /* Core intelligence for one already-allocated set of components (one tier).
@@ -15634,46 +18830,77 @@ function computeTierIntel(allocations, settings) {
   const paid = allocations.filter((a) => a.revenue != null && a.revenue > 0);
   const paidCount = paid.length;
   const paidOrderNumbers = paid.map((a) => a.orderNumber).filter(Boolean);
-  const avgCharged = paidCount ? paid.reduce((s, a) => s + a.revenue, 0) / paidCount : null;
+  const avgCharged = paidCount
+    ? paid.reduce((s, a) => s + a.revenue, 0) / paidCount
+    : null;
 
   // MEASURED — allocated labor >= 1 minute (gifts included).
-  const measured = allocations.filter((a) => !a.minutesUnallocated && a.minutes >= 1);
+  const measured = allocations.filter(
+    (a) => !a.minutesUnallocated && a.minutes >= 1,
+  );
   const n = measured.length;
-  const measuredOrderNumbers = measured.map((a) => a.orderNumber).filter(Boolean);
-  const medianMinutes = n ? pricingMedian(measured.map((a) => a.minutes)) : null;
-  const measWithMat = measured.filter((a) => a.materials != null && !a.materialsUnallocated);
-  const avgMaterials = measWithMat.length ? measWithMat.reduce((s, a) => s + a.materials, 0) / measWithMat.length : null;
+  const measuredOrderNumbers = measured
+    .map((a) => a.orderNumber)
+    .filter(Boolean);
+  const medianMinutes = n
+    ? pricingMedian(measured.map((a) => a.minutes))
+    : null;
+  const measWithMat = measured.filter(
+    (a) => a.materials != null && !a.materialsUnallocated,
+  );
+  const avgMaterials = measWithMat.length
+    ? measWithMat.reduce((s, a) => s + a.materials, 0) / measWithMat.length
+    : null;
 
   // PAID + MEASURED — needs a price, logged time, and allocated materials.
-  const paidMeasured = measured.filter((a) => a.revenue != null && a.revenue > 0 && a.materials != null && !a.materialsUnallocated);
+  const paidMeasured = measured.filter(
+    (a) =>
+      a.revenue != null &&
+      a.revenue > 0 &&
+      a.materials != null &&
+      !a.materialsUnallocated,
+  );
   const paidMeasuredCount = paidMeasured.length;
-  const paidMeasuredOrderNumbers = paidMeasured.map((a) => a.orderNumber).filter(Boolean);
+  const paidMeasuredOrderNumbers = paidMeasured
+    .map((a) => a.orderNumber)
+    .filter(Boolean);
   /* Effective labor rate = (allocated revenue − allocated materials) ÷ logged
      hours. Nets out materials — it is a labor rate, not the charged price. */
-  const netSum = paidMeasured.reduce((s, a) => s + (a.revenue - a.materials), 0);
+  const netSum = paidMeasured.reduce(
+    (s, a) => s + (a.revenue - a.materials),
+    0,
+  );
   const hoursSum = paidMeasured.reduce((s, a) => s + a.minutes / 60, 0);
   const effectiveRate = hoursSum > 0 ? netSum / hoursSum : null;
 
   // UNALLOCATED — components (revenue or time) we couldn't separate reliably.
-  const unallocated = allocations.filter((a) => a.revenueUnallocated || a.minutesUnallocated);
+  const unallocated = allocations.filter(
+    (a) => a.revenueUnallocated || a.minutesUnallocated,
+  );
   const unallocatedCount = unallocated.length;
-  const unallocatedOrderNumbers = [...new Set(unallocated.map((a) => a.orderNumber).filter(Boolean))];
+  const unallocatedOrderNumbers = [
+    ...new Set(unallocated.map((a) => a.orderNumber).filter(Boolean)),
+  ];
 
   // Target estimate uses the measured population (time + materials).
   let rawEstimate = null;
   let suggestedPrice = null;
   let minChargeApplied = false;
   if (n >= 1 && medianMinutes != null && avgMaterials != null) {
-    rawEstimate = (medianMinutes / 60) * settings.targetLaborRate + avgMaterials;
+    rawEstimate =
+      (medianMinutes / 60) * settings.targetLaborRate + avgMaterials;
     const floored = Math.max(rawEstimate, settings.minShopCharge);
     minChargeApplied = floored > rawEstimate + 0.001;
-    suggestedPrice = pricingRoundToIncrement(floored, settings.roundingIncrement);
+    suggestedPrice = pricingRoundToIncrement(
+      floored,
+      settings.roundingIncrement,
+    );
   }
 
   const trend = pricingTimeTrend(measured);
 
   return {
-    n,                       // measured count — drives confidence, interpretation, estimate
+    n, // measured count — drives confidence, interpretation, estimate
     paidCount,
     paidMeasuredCount,
     unallocatedCount,
@@ -15690,7 +18917,7 @@ function computeTierIntel(allocations, settings) {
     suggestedPrice,
     minChargeApplied,
     trend,
-    confidence: pricingConfidenceLabel(n)
+    confidence: pricingConfidenceLabel(n),
   };
 }
 
@@ -15710,42 +18937,70 @@ function computeServicePricingIntel(service, services, laborByOrder) {
      qualifying order that contains the add-on (combined or standalone); base
      services use the orders whose primary base service is this one, with each
      add-on's share removed. */
-  const eligible = allOrders.filter((o) => isMoneyEligibleOrder(o) && isAfterPricingCutoff(o));
+  const eligible = allOrders.filter(
+    (o) => isMoneyEligibleOrder(o) && isAfterPricingCutoff(o),
+  );
   const relevant = isAddon
     ? eligible.filter((o) => orderAddonKeys(o).includes(service.serviceKey))
-    : eligible.filter((o) => attributeOrderToBaseServiceKey(o, services) === service.serviceKey);
+    : eligible.filter(
+        (o) =>
+          attributeOrderToBaseServiceKey(o, services) === service.serviceKey,
+      );
 
-  const allocations = relevant.map((o) => allocateOrderForService(
-    o, service,
-    getOrderEconomicsSnapshot(o)
-      ? Number(getOrderEconomicsSnapshot(o).labor_minutes) || 0
-      : laborByOrder[String(o.orderNumber)] || 0,
-    palmPadByOrder[String(o.orderNumber)] || 0,
-    customWorkByOrder[String(o.orderNumber)] || 0
-  ));
+  const allocations = relevant.map((o) =>
+    allocateOrderForService(
+      o,
+      service,
+      getOrderEconomicsSnapshot(o)
+        ? Number(getOrderEconomicsSnapshot(o).labor_minutes) || 0
+        : laborByOrder[String(o.orderNumber)] || 0,
+      palmPadByOrder[String(o.orderNumber)] || 0,
+      customWorkByOrder[String(o.orderNumber)] || 0,
+    ),
+  );
 
   // Add-ons are never tiered; base tiered services split standard vs premium.
   const isTiered = service.pricingType === "tiered" && !isAddon;
   const tierDefs = isTiered
     ? [
-        { key: "standard", label: "Standard · fielder's glove", price: service.basePrice, match: (o) => orderPricingTier(o) === "standard" },
-        { key: "premium", label: "Premium · catcher's / first base / trapeze", price: service.premiumPrice, match: (o) => orderPricingTier(o) === "premium" }
+        {
+          key: "standard",
+          label: "Standard · fielder's glove",
+          price: service.basePrice,
+          match: (o) => orderPricingTier(o) === "standard",
+        },
+        {
+          key: "premium",
+          label: "Premium · catcher's / first base / trapeze",
+          price: service.premiumPrice,
+          match: (o) => orderPricingTier(o) === "premium",
+        },
       ]
     : [
-        { key: "single", label: "", price: service.basePrice, match: () => true }
+        {
+          key: "single",
+          label: "",
+          price: service.basePrice,
+          match: () => true,
+        },
       ];
 
-  const tiers = tierDefs.map((def) => Object.assign(
-    { key: def.key, label: def.label, publishedPrice: def.price },
-    computeTierIntel(allocations.filter((a) => def.match(a.order)), settings)
-  ));
+  const tiers = tierDefs.map((def) =>
+    Object.assign(
+      { key: def.key, label: def.label, publishedPrice: def.price },
+      computeTierIntel(
+        allocations.filter((a) => def.match(a.order)),
+        settings,
+      ),
+    ),
+  );
 
   return {
     isTiered,
     tiers,
     settings,
     totalN: tiers.reduce((s, t) => s + t.n, 0),
-    totalJobCount: allocations.length
+    totalJobCount: allocations.length,
   };
 }
 
@@ -15755,25 +19010,49 @@ function pricingTierInterpretation(tier, settings) {
   const { n, effectiveRate, trend } = tier;
   const targetRate = settings.targetLaborRate;
 
-  if (n === 0) return { label: "Needs More Data", tone: "neutral", detail: "No measured jobs with logged labor yet. Run timers on this service to build a benchmark." };
-  if (n < 3) return { label: "Learning", tone: "neutral", detail: `Early estimate from ${n} measured job${n === 1 ? "" : "s"} — not enough data to price against with confidence.` };
-  if (effectiveRate == null) return { label: "Needs More Data", tone: "neutral", detail: "Measured times exist, but no priced jobs yet to calculate an effective rate." };
+  if (n === 0)
+    return {
+      label: "Needs More Data",
+      tone: "neutral",
+      detail:
+        "No measured jobs with logged labor yet. Run timers on this service to build a benchmark.",
+    };
+  if (n < 3)
+    return {
+      label: "Learning",
+      tone: "neutral",
+      detail: `Early estimate from ${n} measured job${n === 1 ? "" : "s"} — not enough data to price against with confidence.`,
+    };
+  if (effectiveRate == null)
+    return {
+      label: "Needs More Data",
+      tone: "neutral",
+      detail:
+        "Measured times exist, but no priced jobs yet to calculate an effective rate.",
+    };
 
-  let label; let tone; let detail;
+  let label;
+  let tone;
+  let detail;
   if (effectiveRate >= targetRate && trend === "improved") {
-    label = "Efficiency Improved"; tone = "good";
+    label = "Efficiency Improved";
+    tone = "good";
     detail = `Median time dropped while the price held — effective rate rose to ${formatCurrency(effectiveRate)}/hr against a ${formatCurrency(targetRate)}/hr target. Faster work is margin, not a reason to lower the price.`;
   } else if (effectiveRate < targetRate * 0.7) {
-    label = "Review Recommended"; tone = "warn";
+    label = "Review Recommended";
+    tone = "warn";
     detail = `Effective rate ${formatCurrency(effectiveRate)}/hr is well under the ${formatCurrency(targetRate)}/hr target at the current median time. Worth reviewing the price or the time it takes.`;
   } else if (effectiveRate < targetRate) {
-    label = "Below Target at Current Median Time"; tone = "warn";
+    label = "Below Target at Current Median Time";
+    tone = "warn";
     detail = `At the median time this job earns ${formatCurrency(effectiveRate)}/hr vs the ${formatCurrency(targetRate)}/hr target.`;
   } else if (effectiveRate >= targetRate * 1.2) {
-    label = "Strong Margin"; tone = "good";
+    label = "Strong Margin";
+    tone = "good";
     detail = `Effective rate ${formatCurrency(effectiveRate)}/hr comfortably clears the ${formatCurrency(targetRate)}/hr target.`;
   } else {
-    label = "Price Covers Target"; tone = "good";
+    label = "Price Covers Target";
+    tone = "good";
     detail = `The published price covers the ${formatCurrency(targetRate)}/hr target at the current median time.`;
   }
   return { label, tone, detail };
@@ -15782,13 +19061,21 @@ function pricingTierInterpretation(tier, settings) {
 /* Published price + display for the service an order maps to. Used by the Order
    Detail economics card as a non-destructive quote suggestion. */
 function getPublishedPriceForOrder(order) {
-  const services = pricingStateCache && Array.isArray(pricingStateCache.services) ? pricingStateCache.services : null;
+  const services =
+    pricingStateCache && Array.isArray(pricingStateCache.services)
+      ? pricingStateCache.services
+      : null;
   if (!services) return null;
   const key = attributeOrderToServiceKey(order, services);
   if (!key) return null;
   const svc = services.find((s) => s.serviceKey === key);
   if (!svc || !svc.isActive || !svc.publishedAt) return null;
-  return { serviceName: svc.serviceName, display: svc.display, basePrice: svc.basePrice, premiumPrice: svc.premiumPrice };
+  return {
+    serviceName: svc.serviceName,
+    display: svc.display,
+    basePrice: svc.basePrice,
+    premiumPrice: svc.premiumPrice,
+  };
 }
 
 async function warmPricingCache(force = false) {
@@ -15815,13 +19102,17 @@ async function renderPricingView() {
   await warmLaborSummaryCache();
   const expensesReady = await warmExpensesCache();
 
-  let loadError = expensesReady ? "" : (expensesCacheError || "Material costs could not be loaded. Retry Pricing Intelligence.");
+  let loadError = expensesReady
+    ? ""
+    : expensesCacheError ||
+      "Material costs could not be loaded. Retry Pricing Intelligence.";
   try {
     const data = await postJson({ action: "listServicePricing" }, true);
     if (data && data.ok !== false) pricingStateCache = data;
     else loadError = (data && data.error) || "Pricing could not be loaded.";
   } catch (err) {
-    if (!pricingStateCache) loadError = err?.message || "Pricing could not be loaded.";
+    if (!pricingStateCache)
+      loadError = err?.message || "Pricing could not be loaded.";
   }
 
   if (activeView !== "pricing") return;
@@ -15838,13 +19129,18 @@ function renderPricingViewContent(loadError) {
   const count = document.getElementById("pricingCount");
 
   const laborByOrder = {};
-  (Array.isArray(moneyLaborSummaryCache) ? moneyLaborSummaryCache : []).forEach((s) => {
-    const k = String(s.orderNumber || "");
-    if (!k) return;
-    laborByOrder[k] = (laborByOrder[k] || 0) + (Number(s.durationMinutes) || 0);
-  });
+  (Array.isArray(moneyLaborSummaryCache) ? moneyLaborSummaryCache : []).forEach(
+    (s) => {
+      const k = String(s.orderNumber || "");
+      if (!k) return;
+      laborByOrder[k] =
+        (laborByOrder[k] || 0) + (Number(s.durationMinutes) || 0);
+    },
+  );
 
-  const published = services.filter((s) => s.isPublic && s.isActive && s.publishedAt).length;
+  const published = services.filter(
+    (s) => s.isPublic && s.isActive && s.publishedAt,
+  ).length;
   const withDrafts = services.filter((s) => s.draft && s.draft.differs).length;
   const lastUpdate = services.reduce((max, s) => {
     const t = s.publishedAt ? new Date(s.publishedAt).getTime() : 0;
@@ -15857,9 +19153,12 @@ function renderPricingViewContent(loadError) {
     return intel.tiers.some((t) => t.n < 3);
   }).length;
 
-  if (count) count.textContent = `${services.length} service${services.length === 1 ? "" : "s"}`;
+  if (count)
+    count.textContent = `${services.length} service${services.length === 1 ? "" : "s"}`;
 
-  const errorHtml = loadError ? `<div class="money-error">${escapeHtml(loadError)}</div>` : "";
+  const errorHtml = loadError
+    ? `<div class="money-error">${escapeHtml(loadError)}</div>`
+    : "";
 
   const statsHtml = `
     <div class="dashboard-grid money-stat-grid">
@@ -15875,12 +19174,15 @@ function renderPricingViewContent(loadError) {
   const relacing = services.filter((s) => s.category === "relacing");
   const additional = services.filter((s) => s.category !== "relacing");
 
-  const groupHtml = (title, list) => list.length ? `
+  const groupHtml = (title, list) =>
+    list.length
+      ? `
     <div class="pricing-group">
       <h3 class="money-card-title pricing-group-title">${escapeHtml(title)}</h3>
       ${list.map((s) => renderServicePricingCard(s, services, laborByOrder)).join("")}
     </div>
-  ` : "";
+  `
+      : "";
 
   /* Rendered directly into #pricingPanel (.money-panel) — the same grid
      container the Money view uses, so the gutters/width/spacing match exactly. */
@@ -15932,8 +19234,12 @@ function renderServicePricingCard(service, services, laborByOrder) {
 
   const statusPills = [
     draftDiffers ? pricingPill("Draft", "warn") : pricingPill("Live", "good"),
-    service.isPublic ? pricingPill("Public", "neutral") : pricingPill("Hidden", "muted"),
-    service.isActive ? pricingPill("Active", "neutral") : pricingPill("Inactive", "muted")
+    service.isPublic
+      ? pricingPill("Public", "neutral")
+      : pricingPill("Hidden", "muted"),
+    service.isActive
+      ? pricingPill("Active", "neutral")
+      : pricingPill("Inactive", "muted"),
   ].join("");
 
   const draftPriceHtml = draftDiffers
@@ -15965,20 +19271,22 @@ function renderServicePricingCard(service, services, laborByOrder) {
 }
 
 function renderServicePricingEditor(service, intel) {
-  const f = service.draft ? service.draft.fields : {
-    serviceName: service.serviceName,
-    category: service.category,
-    shortDescription: service.shortDescription,
-    bulletDetails: service.bulletDetails,
-    pricingType: service.pricingType,
-    basePrice: service.basePrice,
-    premiumPrice: service.premiumPrice,
-    priceSuffix: service.priceSuffix,
-    displayOverride: service.displayOverride,
-    isPublic: service.isPublic,
-    isActive: service.isActive,
-    sortOrder: service.sortOrder
-  };
+  const f = service.draft
+    ? service.draft.fields
+    : {
+        serviceName: service.serviceName,
+        category: service.category,
+        shortDescription: service.shortDescription,
+        bulletDetails: service.bulletDetails,
+        pricingType: service.pricingType,
+        basePrice: service.basePrice,
+        premiumPrice: service.premiumPrice,
+        priceSuffix: service.priceSuffix,
+        displayOverride: service.displayOverride,
+        isPublic: service.isPublic,
+        isActive: service.isActive,
+        sortOrder: service.sortOrder,
+      };
   const draftNote = service.draft ? service.draft.note : "";
   const history = pricingHistoryCache[service.serviceKey];
   const key = escapeAttr(service.serviceKey);
@@ -16070,9 +19378,11 @@ function renderServicePricingEditor(service, intel) {
         <summary class="pricing-section-summary">Price History</summary>
         <div class="pricing-section-body">
           <div class="pricing-history" data-pricing-history-body="${key}">
-            ${history
-              ? renderPricingHistoryList(service.serviceKey, history)
-              : `<button class="pricing-link" type="button" data-pricing-action="load-history" data-service="${key}">View price history</button>`}
+            ${
+              history
+                ? renderPricingHistoryList(service.serviceKey, history)
+                : `<button class="pricing-link" type="button" data-pricing-action="load-history" data-service="${key}">View price history</button>`
+            }
           </div>
         </div>
       </details>
@@ -16107,47 +19417,106 @@ function renderPricingPreviewInner(fields) {
 function renderServicePricingIntelBlock(service, intel) {
   const settings = intel.settings;
 
-  const tierBlocks = intel.tiers.map((tier) => {
-    const interp = pricingTierInterpretation(tier, settings);
-    const tierName = tier.label ? `${service.serviceName} · ${tier.label.split("·")[0].trim()}` : service.serviceName;
+  const tierBlocks = intel.tiers
+    .map((tier) => {
+      const interp = pricingTierInterpretation(tier, settings);
+      const tierName = tier.label
+        ? `${service.serviceName} · ${tier.label.split("·")[0].trim()}`
+        : service.serviceName;
 
-    /* Each population gets a clickable sample count next to the metric it feeds,
+      /* Each population gets a clickable sample count next to the metric it feeds,
        so you can see and open exactly which orders produced each number. */
-    const drill = (count, nums, label) => (count > 0 && nums && nums.length)
-      ? `<button type="button" class="pricing-jobs-link pricing-jobs-link--sub" data-jobs="${escapeAttr(nums.join(","))}" data-context="${escapeAttr(`${tierName} · ${label}`)}">${count} ${escapeHtml(label)}</button>`
-      : `<span class="muted pricing-intel-sub">${count} ${escapeHtml(label)}</span>`;
+      const drill = (count, nums, label) =>
+        count > 0 && nums && nums.length
+          ? `<button type="button" class="pricing-jobs-link pricing-jobs-link--sub" data-jobs="${escapeAttr(nums.join(","))}" data-context="${escapeAttr(`${tierName} · ${label}`)}">${count} ${escapeHtml(label)}</button>`
+          : `<span class="muted pricing-intel-sub">${count} ${escapeHtml(label)}</span>`;
 
-    const withSamples = (valueStr, count, nums, label) =>
-      ({ html: `${escapeHtml(valueStr)} <span class="pricing-intel-samples">${drill(count, nums, label)}</span>` });
+      const withSamples = (valueStr, count, nums, label) => ({
+        html: `${escapeHtml(valueStr)} <span class="pricing-intel-samples">${drill(count, nums, label)}</span>`,
+      });
 
-    const rows = [
-      ["Published price", tier.publishedPrice != null ? formatCurrency(tier.publishedPrice) : (service.display || "—")],
-      ["Average charged", withSamples(tier.avgCharged != null ? formatCurrency(tier.avgCharged) : "—", tier.paidCount, tier.paidOrderNumbers, "paid")],
-      ["Median labor time", withSamples(tier.medianMinutes != null ? formatLaborDuration(tier.medianMinutes) : "—", tier.n, tier.measuredOrderNumbers, "measured")],
-      ["Average materials", tier.avgMaterials != null ? formatCurrency(tier.avgMaterials) : "—"],
-      ["Effective labor rate", withSamples(tier.effectiveRate != null ? `${formatCurrency(tier.effectiveRate)}/hr` : "—", tier.paidMeasuredCount, tier.paidMeasuredOrderNumbers, "paid+measured")],
-      ["Target labor rate", `${formatCurrency(settings.targetLaborRate)}/hr`],
-      ["Raw target-price estimate", tier.rawEstimate != null ? formatCurrency(tier.rawEstimate) : "—"],
-      ["Rounded suggestion", tier.suggestedPrice != null ? `${formatCurrency(tier.suggestedPrice)}${tier.minChargeApplied ? " (min charge)" : ""}` : "—"],
-      ["Pricing confidence", tier.confidence],
-      ["Recent time trend", PRICING_TREND_LABELS[tier.trend] || "—"]
-    ];
-    if (tier.unallocatedCount > 0) {
-      rows.push(["Unallocated", { html: drill(tier.unallocatedCount, tier.unallocatedOrderNumbers, "orders") }]);
-    }
-    return `
+      const rows = [
+        [
+          "Published price",
+          tier.publishedPrice != null
+            ? formatCurrency(tier.publishedPrice)
+            : service.display || "—",
+        ],
+        [
+          "Average charged",
+          withSamples(
+            tier.avgCharged != null ? formatCurrency(tier.avgCharged) : "—",
+            tier.paidCount,
+            tier.paidOrderNumbers,
+            "paid",
+          ),
+        ],
+        [
+          "Median labor time",
+          withSamples(
+            tier.medianMinutes != null
+              ? formatLaborDuration(tier.medianMinutes)
+              : "—",
+            tier.n,
+            tier.measuredOrderNumbers,
+            "measured",
+          ),
+        ],
+        [
+          "Average materials",
+          tier.avgMaterials != null ? formatCurrency(tier.avgMaterials) : "—",
+        ],
+        [
+          "Effective labor rate",
+          withSamples(
+            tier.effectiveRate != null
+              ? `${formatCurrency(tier.effectiveRate)}/hr`
+              : "—",
+            tier.paidMeasuredCount,
+            tier.paidMeasuredOrderNumbers,
+            "paid+measured",
+          ),
+        ],
+        ["Target labor rate", `${formatCurrency(settings.targetLaborRate)}/hr`],
+        [
+          "Raw target-price estimate",
+          tier.rawEstimate != null ? formatCurrency(tier.rawEstimate) : "—",
+        ],
+        [
+          "Rounded suggestion",
+          tier.suggestedPrice != null
+            ? `${formatCurrency(tier.suggestedPrice)}${tier.minChargeApplied ? " (min charge)" : ""}`
+            : "—",
+        ],
+        ["Pricing confidence", tier.confidence],
+        ["Recent time trend", PRICING_TREND_LABELS[tier.trend] || "—"],
+      ];
+      if (tier.unallocatedCount > 0) {
+        rows.push([
+          "Unallocated",
+          {
+            html: drill(
+              tier.unallocatedCount,
+              tier.unallocatedOrderNumbers,
+              "orders",
+            ),
+          },
+        ]);
+      }
+      return `
       <div class="pricing-intel-tier">
         <div class="pricing-intel-head">
           <span class="pricing-intel-title">${escapeHtml(tier.label || "Measured performance")}</span>
           ${pricingPill(interp.label, interp.tone)}
         </div>
         <dl class="pricing-intel-grid">
-          ${rows.map(([k, v]) => `<div class="pricing-intel-row"><dt>${escapeHtml(k)}</dt><dd>${(v && typeof v === "object" && v.html) ? v.html : escapeHtml(String(v))}</dd></div>`).join("")}
+          ${rows.map(([k, v]) => `<div class="pricing-intel-row"><dt>${escapeHtml(k)}</dt><dd>${v && typeof v === "object" && v.html ? v.html : escapeHtml(String(v))}</dd></div>`).join("")}
         </dl>
         <p class="pricing-intel-note muted">${escapeHtml(interp.detail)}</p>
       </div>
     `;
-  }).join("");
+    })
+    .join("");
 
   return `
     <div class="pricing-intel">
@@ -16161,11 +19530,14 @@ function renderServicePricingIntelBlock(service, intel) {
 }
 
 function renderPricingHistoryList(serviceKey, history) {
-  if (!history.length) return `<p class="muted pricing-history-empty">No published history yet.</p>`;
+  if (!history.length)
+    return `<p class="muted pricing-history-empty">No published history yet.</p>`;
   return `
     <div class="pricing-history-list">
       <span class="pricing-history-title">Price history</span>
-      ${history.map((h) => `
+      ${history
+        .map(
+          (h) => `
         <div class="pricing-history-row">
           <div class="pricing-history-main">
             <span class="pricing-history-change">${h.previousDisplay ? `${escapeHtml(h.previousDisplay)} → ` : ""}${escapeHtml(h.newDisplay || "")}</span>
@@ -16174,7 +19546,9 @@ function renderPricingHistoryList(serviceKey, history) {
           ${h.note ? `<span class="pricing-history-note muted">${escapeHtml(h.note)}</span>` : ""}
           <button class="pricing-link" type="button" data-pricing-action="restore" data-revision="${escapeAttr(h.id)}" data-service="${escapeAttr(serviceKey)}">Restore as draft</button>
         </div>
-      `).join("")}
+      `,
+        )
+        .join("")}
     </div>
   `;
 }
@@ -16219,7 +19593,10 @@ function collectPricingEditor() {
     serviceName: q("pricingEditName")?.value || "",
     category: q("pricingEditCategory")?.value || "additional",
     shortDescription: q("pricingEditShort")?.value || "",
-    bulletDetails: bulletsRaw.split("\n").map((s) => s.trim()).filter(Boolean),
+    bulletDetails: bulletsRaw
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean),
     pricingType: q("pricingEditType")?.value || "fixed",
     basePrice: q("pricingEditBase")?.value || "",
     premiumPrice: q("pricingEditPremium")?.value || "",
@@ -16228,7 +19605,7 @@ function collectPricingEditor() {
     isPublic: !!q("pricingEditPublic")?.checked,
     isActive: !!q("pricingEditActive")?.checked,
     sortOrder: q("pricingEditSort")?.value || "0",
-    note: q("pricingEditNote")?.value || ""
+    note: q("pricingEditNote")?.value || "",
   };
 }
 
@@ -16237,7 +19614,10 @@ function collectPricingEditor() {
 function pricingEditorMatchesLive(service) {
   const f = collectPricingEditor();
   const norm = (s) => String(s == null ? "" : s).trim();
-  const num = (v) => { const s = String(v).replace(/[^\d.-]/g, ""); return s === "" ? null : Number(s); };
+  const num = (v) => {
+    const s = String(v).replace(/[^\d.-]/g, "");
+    return s === "" ? null : Number(s);
+  };
   if (norm(f.serviceName) !== norm(service.serviceName)) return false;
   if (f.category !== service.category) return false;
   if (norm(f.shortDescription) !== norm(service.shortDescription)) return false;
@@ -16245,13 +19625,22 @@ function pricingEditorMatchesLive(service) {
   const lb = (service.bulletDetails || []).map((x) => String(x).trim());
   if (fb.length !== lb.length || fb.some((v, i) => v !== lb[i])) return false;
   if (f.pricingType !== service.pricingType) return false;
-  if (num(f.basePrice) !== (service.basePrice == null ? null : Number(service.basePrice))) return false;
-  if (num(f.premiumPrice) !== (service.premiumPrice == null ? null : Number(service.premiumPrice))) return false;
+  if (
+    num(f.basePrice) !==
+    (service.basePrice == null ? null : Number(service.basePrice))
+  )
+    return false;
+  if (
+    num(f.premiumPrice) !==
+    (service.premiumPrice == null ? null : Number(service.premiumPrice))
+  )
+    return false;
   if (norm(f.priceSuffix) !== norm(service.priceSuffix)) return false;
   if (norm(f.displayOverride) !== norm(service.displayOverride)) return false;
   if (!!f.isPublic !== !!service.isPublic) return false;
   if (!!f.isActive !== !!service.isActive) return false;
-  if ((Number(f.sortOrder) || 0) !== (Number(service.sortOrder) || 0)) return false;
+  if ((Number(f.sortOrder) || 0) !== (Number(service.sortOrder) || 0))
+    return false;
   return true;
 }
 
@@ -16267,7 +19656,8 @@ function ensurePricingDelegation() {
 function onPricingInput(e) {
   if (!e.target.matches("[data-pricing-field]")) return;
   const preview = document.querySelector(".pricing-preview-body");
-  if (preview) preview.innerHTML = renderPricingPreviewInner(collectPricingEditor());
+  if (preview)
+    preview.innerHTML = renderPricingPreviewInner(collectPricingEditor());
 }
 
 async function onPricingClick(e) {
@@ -16283,102 +19673,191 @@ async function onPricingClick(e) {
   }
 
   try {
-  if (action === "save-settings") {
-    const rate = document.getElementById("pricingSettingRate")?.value;
-    const min = document.getElementById("pricingSettingMin")?.value;
-    const round = document.getElementById("pricingSettingRound")?.value;
-    btn.disabled = true;
-    const res = await postJson({ action: "saveShopSettings", targetLaborRate: rate, minShopCharge: min, roundingIncrement: round }, true);
-    btn.disabled = false;
-    if (!res.ok) { alert(res.error || "Settings could not be saved."); return; }
-    if (pricingStateCache) pricingStateCache.settings = res.settings;
-    renderPricingView();
-    return;
-  }
-
-  if (action === "save-draft") {
-    const fields = collectPricingEditor();
-    if (!fields.serviceName.trim()) { alert("Service name is required."); return; }
-    btn.disabled = true;
-    const res = await postJson({ action: "saveServicePricingDraft", serviceKey, ...fields }, true);
-    btn.disabled = false;
-    if (!res.ok) { alert(res.error || "Draft could not be saved."); return; }
-    pricingStateCache = null;
-    renderPricingView();
-    return;
-  }
-
-  if (action === "discard-draft") {
-    if (!confirm("Discard this draft and keep the live published pricing?")) return;
-    const res = await postJson({ action: "discardServicePricingDraft", serviceKey }, true);
-    if (!res.ok) { alert(res.error || "Draft could not be discarded."); return; }
-    pricingStateCache = null;
-    renderPricingView();
-    return;
-  }
-
-  if (action === "publish") {
-    const state = pricingStateCache || { services: [] };
-    const service = (state.services || []).find((s) => s.serviceKey === serviceKey);
-    if (service && !service.draft && pricingEditorMatchesLive(service)) {
-      alert("No changes to publish. Edit a field or save a draft first.");
+    if (action === "save-settings") {
+      const rate = document.getElementById("pricingSettingRate")?.value;
+      const min = document.getElementById("pricingSettingMin")?.value;
+      const round = document.getElementById("pricingSettingRound")?.value;
+      btn.disabled = true;
+      const res = await postJson(
+        {
+          action: "saveShopSettings",
+          targetLaborRate: rate,
+          minShopCharge: min,
+          roundingIncrement: round,
+        },
+        true,
+      );
+      btn.disabled = false;
+      if (!res.ok) {
+        alert(res.error || "Settings could not be saved.");
+        return;
+      }
+      if (pricingStateCache) pricingStateCache.settings = res.settings;
+      renderPricingView();
       return;
     }
-    if (!confirm("Publish these pricing changes to the public website? Customers will see the new price. This does not change any existing order.")) return;
-    const fields = collectPricingEditor();
-    btn.disabled = true;
-    const saved = await postJson({ action: "saveServicePricingDraft", serviceKey, ...fields }, true);
-    if (!saved.ok) { btn.disabled = false; alert(saved.error || "Could not save before publishing."); return; }
-    const res = await postJson({ action: "publishServicePricing", serviceKey, note: fields.note }, true);
-    btn.disabled = false;
-    if (!res.ok) { alert(res.error || "Publish failed."); return; }
-    pricingStateCache = null;
-    delete pricingHistoryCache[serviceKey];
-    renderPricingView();
-    return;
-  }
 
-  if (action === "load-history") {
-    btn.disabled = true;
-    const res = await postJson({ action: "listServicePricingHistory", serviceKey }, true);
-    if (!res.ok) { btn.disabled = false; alert(res.error || "History could not be loaded."); return; }
-    pricingHistoryCache[serviceKey] = res.history || [];
-    /* Targeted swap so the open Price History section stays open (a full
+    if (action === "save-draft") {
+      const fields = collectPricingEditor();
+      if (!fields.serviceName.trim()) {
+        alert("Service name is required.");
+        return;
+      }
+      btn.disabled = true;
+      const res = await postJson(
+        { action: "saveServicePricingDraft", serviceKey, ...fields },
+        true,
+      );
+      btn.disabled = false;
+      if (!res.ok) {
+        alert(res.error || "Draft could not be saved.");
+        return;
+      }
+      pricingStateCache = null;
+      renderPricingView();
+      return;
+    }
+
+    if (action === "discard-draft") {
+      if (!confirm("Discard this draft and keep the live published pricing?"))
+        return;
+      const res = await postJson(
+        { action: "discardServicePricingDraft", serviceKey },
+        true,
+      );
+      if (!res.ok) {
+        alert(res.error || "Draft could not be discarded.");
+        return;
+      }
+      pricingStateCache = null;
+      renderPricingView();
+      return;
+    }
+
+    if (action === "publish") {
+      const state = pricingStateCache || { services: [] };
+      const service = (state.services || []).find(
+        (s) => s.serviceKey === serviceKey,
+      );
+      if (service && !service.draft && pricingEditorMatchesLive(service)) {
+        alert("No changes to publish. Edit a field or save a draft first.");
+        return;
+      }
+      if (
+        !confirm(
+          "Publish these pricing changes to the public website? Customers will see the new price. This does not change any existing order.",
+        )
+      )
+        return;
+      const fields = collectPricingEditor();
+      btn.disabled = true;
+      const saved = await postJson(
+        { action: "saveServicePricingDraft", serviceKey, ...fields },
+        true,
+      );
+      if (!saved.ok) {
+        btn.disabled = false;
+        alert(saved.error || "Could not save before publishing.");
+        return;
+      }
+      const res = await postJson(
+        { action: "publishServicePricing", serviceKey, note: fields.note },
+        true,
+      );
+      btn.disabled = false;
+      if (!res.ok) {
+        alert(res.error || "Publish failed.");
+        return;
+      }
+      pricingStateCache = null;
+      delete pricingHistoryCache[serviceKey];
+      renderPricingView();
+      return;
+    }
+
+    if (action === "load-history") {
+      btn.disabled = true;
+      const res = await postJson(
+        { action: "listServicePricingHistory", serviceKey },
+        true,
+      );
+      if (!res.ok) {
+        btn.disabled = false;
+        alert(res.error || "History could not be loaded.");
+        return;
+      }
+      pricingHistoryCache[serviceKey] = res.history || [];
+      /* Targeted swap so the open Price History section stays open (a full
        re-render would collapse it). */
-    const body = document.querySelector(`[data-pricing-history-body="${serviceKey}"]`);
-    if (body) body.innerHTML = renderPricingHistoryList(serviceKey, pricingHistoryCache[serviceKey]);
-    else renderPricingView();
-    return;
-  }
+      const body = document.querySelector(
+        `[data-pricing-history-body="${serviceKey}"]`,
+      );
+      if (body)
+        body.innerHTML = renderPricingHistoryList(
+          serviceKey,
+          pricingHistoryCache[serviceKey],
+        );
+      else renderPricingView();
+      return;
+    }
 
-  if (action === "restore") {
-    const revisionId = btn.dataset.revision;
-    if (!confirm("Restore this revision as a new draft? Review it, then publish to make it live.")) return;
-    const res = await postJson({ action: "restoreServicePricingRevision", revisionId }, true);
-    if (!res.ok) { alert(res.error || "Restore failed."); return; }
-    pricingStateCache = null;
-    pricingExpandedKey = serviceKey;
-    renderPricingView();
-    return;
-  }
+    if (action === "restore") {
+      const revisionId = btn.dataset.revision;
+      if (
+        !confirm(
+          "Restore this revision as a new draft? Review it, then publish to make it live.",
+        )
+      )
+        return;
+      const res = await postJson(
+        { action: "restoreServicePricingRevision", revisionId },
+        true,
+      );
+      if (!res.ok) {
+        alert(res.error || "Restore failed.");
+        return;
+      }
+      pricingStateCache = null;
+      pricingExpandedKey = serviceKey;
+      renderPricingView();
+      return;
+    }
 
-  if (action === "new-toggle") { pricingCreating = true; renderPricingView(); return; }
-  if (action === "new-cancel") { pricingCreating = false; renderPricingView(); return; }
+    if (action === "new-toggle") {
+      pricingCreating = true;
+      renderPricingView();
+      return;
+    }
+    if (action === "new-cancel") {
+      pricingCreating = false;
+      renderPricingView();
+      return;
+    }
 
-  if (action === "create") {
-    const name = document.getElementById("pricingNewName")?.value || "";
-    const category = document.getElementById("pricingNewCategory")?.value || "additional";
-    if (!name.trim()) { alert("Service name is required."); return; }
-    btn.disabled = true;
-    const res = await postJson({ action: "createServicePricing", serviceName: name, category }, true);
-    btn.disabled = false;
-    if (!res.ok) { alert(res.error || "Service could not be created."); return; }
-    pricingCreating = false;
-    pricingStateCache = null;
-    if (res.service) pricingExpandedKey = res.service.serviceKey;
-    renderPricingView();
-    return;
-  }
+    if (action === "create") {
+      const name = document.getElementById("pricingNewName")?.value || "";
+      const category =
+        document.getElementById("pricingNewCategory")?.value || "additional";
+      if (!name.trim()) {
+        alert("Service name is required.");
+        return;
+      }
+      btn.disabled = true;
+      const res = await postJson(
+        { action: "createServicePricing", serviceName: name, category },
+        true,
+      );
+      btn.disabled = false;
+      if (!res.ok) {
+        alert(res.error || "Service could not be created.");
+        return;
+      }
+      pricingCreating = false;
+      pricingStateCache = null;
+      if (res.service) pricingExpandedKey = res.service.serviceKey;
+      renderPricingView();
+      return;
+    }
   } catch (error) {
     alert(error?.message || "Pricing could not be updated. Please try again.");
   } finally {
@@ -16390,42 +19869,86 @@ async function onPricingClick(e) {
    currently published service_pricing rows every time the form opens. */
 
 const ORDER_TEMPLATES = [
-  { name: "Standard Full Service — Fielders", gloveType: "Fielders Glove", webType: "",
-    services: ["Cleaning + Conditioning + Relacing"] },
-  { name: "Standard Full Service — Catchers Mitt", gloveType: "Catchers Mitt", webType: "",
-    services: ["Cleaning + Conditioning + Relacing"] },
-  { name: "Standard Full Service — First Base Mitt", gloveType: "First Base Mitt", webType: "",
-    services: ["Cleaning + Conditioning + Relacing"] },
-  { name: "Full Service + Palm Pad — Fielders", gloveType: "Fielders Glove", webType: "",
-    services: ["Cleaning + Conditioning + Relacing", "ShockTec Air2Gel Palm Pad"] },
-  { name: "Full Relace — Fielders", gloveType: "Fielders Glove", webType: "", services: ["Relacing"] },
-  { name: "Full Relace — Catchers Mitt", gloveType: "Catchers Mitt", webType: "", services: ["Relacing"] },
-  { name: "Full Relace — First Base Mitt", gloveType: "First Base Mitt", webType: "", services: ["Relacing"] },
-  { name: "Clean & Condition", gloveType: "Fielders Glove", webType: "", services: ["Cleaning + Conditioning"] }
+  {
+    name: "Standard Full Service — Fielders",
+    gloveType: "Fielders Glove",
+    webType: "",
+    services: ["Cleaning + Conditioning + Relacing"],
+  },
+  {
+    name: "Standard Full Service — Catchers Mitt",
+    gloveType: "Catchers Mitt",
+    webType: "",
+    services: ["Cleaning + Conditioning + Relacing"],
+  },
+  {
+    name: "Standard Full Service — First Base Mitt",
+    gloveType: "First Base Mitt",
+    webType: "",
+    services: ["Cleaning + Conditioning + Relacing"],
+  },
+  {
+    name: "Full Service + Palm Pad — Fielders",
+    gloveType: "Fielders Glove",
+    webType: "",
+    services: [
+      "Cleaning + Conditioning + Relacing",
+      "ShockTec Air2Gel Palm Pad",
+    ],
+  },
+  {
+    name: "Full Relace — Fielders",
+    gloveType: "Fielders Glove",
+    webType: "",
+    services: ["Relacing"],
+  },
+  {
+    name: "Full Relace — Catchers Mitt",
+    gloveType: "Catchers Mitt",
+    webType: "",
+    services: ["Relacing"],
+  },
+  {
+    name: "Full Relace — First Base Mitt",
+    gloveType: "First Base Mitt",
+    webType: "",
+    services: ["Relacing"],
+  },
+  {
+    name: "Clean & Condition",
+    gloveType: "Fielders Glove",
+    webType: "",
+    services: ["Cleaning + Conditioning"],
+  },
 ];
 
 let newOrderQuoteManuallyEdited = false;
 
 function getNewOrderPricingShape() {
-  if (detailMode !== "new" || !document.getElementById("editGloveType")) return getBlankAdminOrder();
+  if (detailMode !== "new" || !document.getElementById("editGloveType"))
+    return getBlankAdminOrder();
   return {
-    gloveType: document.getElementById("editGloveType")?.value || "Fielders Glove",
+    gloveType:
+      document.getElementById("editGloveType")?.value || "Fielders Glove",
     webType: document.getElementById("editWebType")?.value || "",
-    servicesRequested: getSelectedServices()
+    servicesRequested: getSelectedServices(),
   };
 }
 
 function getNewOrderSuggestionText(order = getNewOrderPricingShape()) {
   const suggestion = getSuggestedPrice(order);
-  if (suggestion) return `Published price suggestion: ${formatCurrency(suggestion.price)}`;
-  return pricingStateCache ? "Select services for a published price suggestion." : "Pricing unavailable.";
+  if (suggestion)
+    return `Published price suggestion: ${formatCurrency(suggestion.price)}`;
+  return pricingStateCache
+    ? "Select services for a published price suggestion."
+    : "Pricing unavailable.";
 }
 
 function getOrderTemplateLabel(template) {
   const suggestion = getSuggestedPrice({
     gloveType: template.gloveType,
     webType: template.webType,
-    servicesRequested: template.services
+    servicesRequested: template.services,
   });
   return `${template.name} (${suggestion ? formatCurrency(suggestion.price) : "pricing unavailable"})`;
 }
@@ -16449,9 +19972,11 @@ function applyOrderTemplate(index) {
   const webType = document.getElementById("editWebType");
   if (webType) webType.value = template.webType || "";
 
-  document.querySelectorAll('input[name="editServicesRequested"]').forEach(box => {
-    box.checked = template.services.includes(box.value);
-  });
+  document
+    .querySelectorAll('input[name="editServicesRequested"]')
+    .forEach((box) => {
+      box.checked = template.services.includes(box.value);
+    });
 
   const suggestion = getSuggestedPrice(getNewOrderPricingShape());
   const price = document.getElementById("editPriceQuoted");
@@ -16466,10 +19991,13 @@ document.addEventListener("change", (e) => {
     if (value !== "") applyOrderTemplate(Number(value));
     return;
   }
-  if (detailMode === "new" && (
-    e.target?.id === "editGloveType" || e.target?.id === "editWebType" ||
-    e.target?.name === "editServicesRequested"
-  )) updateNewOrderPriceSuggestion();
+  if (
+    detailMode === "new" &&
+    (e.target?.id === "editGloveType" ||
+      e.target?.id === "editWebType" ||
+      e.target?.name === "editServicesRequested")
+  )
+    updateNewOrderPriceSuggestion();
 });
 
 document.addEventListener("input", (e) => {
@@ -16490,14 +20018,18 @@ const MEASURED_MIN_JOB_MINUTES = 1;
 const MEASURED_MIN_BUCKET_JOBS = 3;
 
 function orderHasCustomWork(order) {
-  const parsed = parseServicesValue(getHistoricalOrderBasis(order)?.servicesRequested || "");
+  const parsed = parseServicesValue(
+    getHistoricalOrderBasis(order)?.servicesRequested || "",
+  );
   return !!(parsed.otherChecked || String(parsed.otherText || "").trim());
 }
 
 function measuredBucketKey(order) {
-  const services = getOrderSelectedServices(order).slice().sort().join(" + ") || "Other";
+  const services =
+    getOrderSelectedServices(order).slice().sort().join(" + ") || "Other";
   const glove = String(getHistoricalOrderBasis(order)?.gloveType || "Unknown");
-  const trapeze = glove === "Fielders Glove" && orderHasTrapezeWeb(order) ? " (Trapeze)" : "";
+  const trapeze =
+    glove === "Fielders Glove" && orderHasTrapezeWeb(order) ? " (Trapeze)" : "";
   return `${glove}${trapeze} · ${services}`;
 }
 
@@ -16505,29 +20037,30 @@ const LABOR_CUSTOM_PHASE = "Custom Work";
 
 function buildMeasuredJobStats(sessions) {
   const perOrder = new Map(); // orderNumber -> { standard, custom } minutes
-  (Array.isArray(sessions) ? sessions : []).forEach(s => {
+  (Array.isArray(sessions) ? sessions : []).forEach((s) => {
     const key = String(s.orderNumber || "");
     if (!key) return;
     if (!perOrder.has(key)) perOrder.set(key, { standard: 0, custom: 0 });
     const slot = perOrder.get(key);
-    if (String(s.phase || "") === LABOR_CUSTOM_PHASE) slot.custom += Number(s.durationMinutes) || 0;
+    if (String(s.phase || "") === LABOR_CUSTOM_PHASE)
+      slot.custom += Number(s.durationMinutes) || 0;
     else slot.standard += Number(s.durationMinutes) || 0;
   });
-  allOrders.forEach(order => {
+  allOrders.forEach((order) => {
     const snapshot = getOrderEconomicsSnapshot(order);
     if (!snapshot) return;
     const key = String(order.orderNumber || "");
     const custom = Number(snapshot.phase_minutes?.[LABOR_CUSTOM_PHASE]) || 0;
     perOrder.set(key, {
       custom,
-      standard: Math.max(0, (Number(snapshot.labor_minutes) || 0) - custom)
+      standard: Math.max(0, (Number(snapshot.labor_minutes) || 0) - custom),
     });
   });
 
   const buckets = new Map();
   for (const [orderNumber, mins] of perOrder) {
     if (mins.standard < MEASURED_MIN_JOB_MINUTES) continue;
-    const order = allOrders.find(o => String(o.orderNumber) === orderNumber);
+    const order = allOrders.find((o) => String(o.orderNumber) === orderNumber);
     if (!order) continue;
     /* Custom ("Other") jobs feed the medians ONLY when their bespoke time
        was timed under the Custom Work phase — then the standard minutes are
@@ -16543,7 +20076,8 @@ function buildMeasuredJobStats(sessions) {
   for (const [key, list] of buckets) {
     list.sort((a, b) => a - b);
     const mid = Math.floor(list.length / 2);
-    const median = list.length % 2 ? list[mid] : (list[mid - 1] + list[mid]) / 2;
+    const median =
+      list.length % 2 ? list[mid] : (list[mid - 1] + list[mid]) / 2;
     stats.set(key, { medianMinutes: median, n: list.length });
   }
   return stats;
@@ -16551,11 +20085,14 @@ function buildMeasuredJobStats(sessions) {
 
 function getMeasuredSuggestion(order) {
   if (!Array.isArray(moneyLaborSummaryCache)) return null;
-  const stats = buildMeasuredJobStats(moneyLaborSummaryCache).get(measuredBucketKey(order));
+  const stats = buildMeasuredJobStats(moneyLaborSummaryCache).get(
+    measuredBucketKey(order),
+  );
   if (!stats || stats.n < MEASURED_MIN_BUCKET_JOBS) return null;
   const materials = getOrderMaterialsCost(order).total;
   if (materials === null) return null;
-  const raw = materials + (stats.medianMinutes / 60) * SHOP_ECONOMICS.targetHourlyRate;
+  const raw =
+    materials + (stats.medianMinutes / 60) * SHOP_ECONOMICS.targetHourlyRate;
   return { ...stats, price: Math.round(raw / 5) * 5 };
 }
 
@@ -16563,13 +20100,21 @@ function getMeasuredSuggestion(order) {
    Returns { price, measured, n, medianMinutes } or null. */
 function getEffectiveSuggestion(order) {
   const m = getMeasuredSuggestion(order);
-  if (m) return { price: m.price, measured: true, n: m.n, medianMinutes: m.medianMinutes };
+  if (m)
+    return {
+      price: m.price,
+      measured: true,
+      n: m.n,
+      medianMinutes: m.medianMinutes,
+    };
   const rule = getSuggestedPrice(order);
   return rule ? { price: rule.price, measured: false } : null;
 }
 
 function suggestionShortBasis(sug) {
-  return sug.measured ? `from ${sug.n} measured job${sug.n === 1 ? "" : "s"}` : "rule-based";
+  return sug.measured
+    ? `from ${sug.n} measured job${sug.n === 1 ? "" : "s"}`
+    : "rule-based";
 }
 
 /* Money view: the engine's dashboard — every bucket, its median, and
@@ -16587,16 +20132,22 @@ function renderMeasuredTimesTable(sessions) {
             <tr><th>Job type</th><th>Jobs</th><th>Median time</th><th>Pricing basis</th></tr>
           </thead>
           <tbody>
-            ${rows.map(([key, s]) => `
+            ${rows
+              .map(
+                ([key, s]) => `
               <tr>
                 <td>${escapeHtml(key)}</td>
                 <td>${s.n}</td>
                 <td>${escapeHtml(formatLaborDuration(s.medianMinutes))}</td>
-                <td>${s.n >= MEASURED_MIN_BUCKET_JOBS
-                  ? `<span class="measured-tag measured-tag-live">Measured</span>`
-                  : `<span class="measured-tag">${MEASURED_MIN_BUCKET_JOBS - s.n} more to go live</span>`}</td>
+                <td>${
+                  s.n >= MEASURED_MIN_BUCKET_JOBS
+                    ? `<span class="measured-tag measured-tag-live">Measured</span>`
+                    : `<span class="measured-tag">${MEASURED_MIN_BUCKET_JOBS - s.n} more to go live</span>`
+                }</td>
               </tr>
-            `).join("")}
+            `,
+              )
+              .join("")}
           </tbody>
         </table>
       </div>
@@ -16619,7 +20170,11 @@ setTimeout(warmLaborSummaryCache, 2500);
 function orderCustomPhaseMinutes(orderNumber) {
   if (!Array.isArray(moneyLaborSummaryCache)) return 0;
   return moneyLaborSummaryCache
-    .filter(s => String(s.orderNumber) === String(orderNumber) && String(s.phase || "") === LABOR_CUSTOM_PHASE)
+    .filter(
+      (s) =>
+        String(s.orderNumber) === String(orderNumber) &&
+        String(s.phase || "") === LABOR_CUSTOM_PHASE,
+    )
     .reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
 }
 
@@ -16632,8 +20187,12 @@ function orderCustomPhaseMinutes(orderNumber) {
 ========================= */
 
 const PROMISE_QUEUE_STATUSES = new Set([
-  "Received", "Estimate Sent", "Customer Approved",
-  "In Transit to Me", "In Progress", "Waiting on Lace/Parts"
+  "Received",
+  "Estimate Sent",
+  "Customer Approved",
+  "In Transit to Me",
+  "In Progress",
+  "Waiting on Lace/Parts",
 ]);
 const PROMISE_FALLBACK_JOB_MINUTES = 120;
 const PROMISE_FALLBACK_PACE_MINUTES_PER_DAY = 120;
@@ -16642,9 +20201,14 @@ const PROMISE_PACE_WINDOW_DAYS = 28;
 function getEstimatedJobMinutes(order, stats) {
   const bucket = stats.get(measuredBucketKey(order));
   if (bucket && bucket.n >= MEASURED_MIN_BUCKET_JOBS) {
-    return { minutes: bucket.medianMinutes, basis: `measured (${bucket.n} jobs)` };
+    return {
+      minutes: bucket.medianMinutes,
+      basis: `measured (${bucket.n} jobs)`,
+    };
   }
-  const all = [...stats.values()].map(s => s.medianMinutes).sort((a, b) => a - b);
+  const all = [...stats.values()]
+    .map((s) => s.medianMinutes)
+    .sort((a, b) => a - b);
   if (all.length) {
     const mid = Math.floor(all.length / 2);
     const median = all.length % 2 ? all[mid] : (all[mid - 1] + all[mid]) / 2;
@@ -16656,18 +20220,21 @@ function getEstimatedJobMinutes(order, stats) {
 /* Measured pace: how many bench minutes you actually log per day lately. */
 function getMeasuredDailyPace() {
   if (!Array.isArray(moneyLaborSummaryCache)) return null;
-  const sessions = laborSessionsWithDates().filter(s => s.endedMs);
+  const sessions = laborSessionsWithDates().filter((s) => s.endedMs);
   if (!sessions.length) return null;
   const cutoff = Date.now() - PROMISE_PACE_WINDOW_DAYS * 86400000;
-  const recent = sessions.filter(s => s.endedMs >= cutoff);
-  const total = recent.reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
+  const recent = sessions.filter((s) => s.endedMs >= cutoff);
+  const total = recent.reduce(
+    (sum, s) => sum + (Number(s.durationMinutes) || 0),
+    0,
+  );
   if (total < 300) return null; // under 5 recent hours: not enough signal
   /* Divide by days the habit has actually existed, not the full window —
      otherwise pre-timer days dilute the pace and stretch every promise. */
-  const earliest = Math.min(...sessions.map(s => s.endedMs));
+  const earliest = Math.min(...sessions.map((s) => s.endedMs));
   const effectiveDays = Math.min(
     PROMISE_PACE_WINDOW_DAYS,
-    Math.max(7, (Date.now() - Math.max(cutoff, earliest)) / 86400000)
+    Math.max(7, (Date.now() - Math.max(cutoff, earliest)) / 86400000),
   );
   return total / effectiveDays;
 }
@@ -16677,15 +20244,21 @@ function getPromiseProposal(order) {
 
   const stats = buildMeasuredJobStats(moneyLaborSummaryCache);
   const loggedByOrder = new Map();
-  moneyLaborSummaryCache.forEach(s => {
+  moneyLaborSummaryCache.forEach((s) => {
     const key = String(s.orderNumber || "");
     if (!key) return;
-    loggedByOrder.set(key, (loggedByOrder.get(key) || 0) + (Number(s.durationMinutes) || 0));
+    loggedByOrder.set(
+      key,
+      (loggedByOrder.get(key) || 0) + (Number(s.durationMinutes) || 0),
+    );
   });
 
   const thisNum = parseInt(order.orderNumber, 10) || 0;
   const thisJob = getEstimatedJobMinutes(order, stats);
-  const thisRemaining = Math.max(0, thisJob.minutes - (loggedByOrder.get(String(order.orderNumber)) || 0));
+  const thisRemaining = Math.max(
+    0,
+    thisJob.minutes - (loggedByOrder.get(String(order.orderNumber)) || 0),
+  );
 
   let queueMinutes = 0;
   let queueJobs = 0;
@@ -16694,7 +20267,10 @@ function getPromiseProposal(order) {
     const num = parseInt(other.orderNumber, 10) || 0;
     if (num >= thisNum) continue; // FIFO: only work ahead of this order
     const est = getEstimatedJobMinutes(other, stats).minutes;
-    const remaining = Math.max(0, est - (loggedByOrder.get(String(other.orderNumber)) || 0));
+    const remaining = Math.max(
+      0,
+      est - (loggedByOrder.get(String(other.orderNumber)) || 0),
+    );
     if (remaining <= 0) continue;
     queueMinutes += remaining;
     queueJobs += 1;
@@ -16702,19 +20278,26 @@ function getPromiseProposal(order) {
 
   const measuredPace = getMeasuredDailyPace();
   const pace = measuredPace || PROMISE_FALLBACK_PACE_MINUTES_PER_DAY;
-  const days = Math.max(1, Math.ceil((queueMinutes + thisRemaining) / pace) + 1); // +1 buffer day
+  const days = Math.max(
+    1,
+    Math.ceil((queueMinutes + thisRemaining) / pace) + 1,
+  ); // +1 buffer day
   const target = new Date();
   target.setDate(target.getDate() + days);
 
   return {
     dateKey: calDateKey(target),
-    dateLabel: target.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }),
+    dateLabel: target.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }),
     queueHours: queueMinutes / 60,
     queueJobs,
     jobHours: thisRemaining / 60,
     jobBasis: thisJob.basis,
     paceHours: pace / 60,
-    paceMeasured: !!measuredPace
+    paceMeasured: !!measuredPace,
   };
 }
 
@@ -16722,7 +20305,10 @@ function renderPromiseProposal() {
   const el = document.getElementById("promiseProposal");
   if (!el) return;
   const order = detailMode === "new" ? getBlankAdminOrder() : currentOrder;
-  if (!order) { el.hidden = true; return; }
+  if (!order) {
+    el.hidden = true;
+    return;
+  }
 
   const fill = () => {
     const p = getPromiseProposal(order);
@@ -16756,9 +20342,9 @@ document.addEventListener("click", (e) => {
    derive from durations attributed to the summary fetch time window via the
    endedMs field when present; fall back to counting everything. */
 function laborSessionsWithDates() {
-  return (moneyLaborSummaryCache || []).map(s => ({
+  return (moneyLaborSummaryCache || []).map((s) => ({
     ...s,
-    endedMs: s.endedAt ? new Date(s.endedAt).getTime() : null
+    endedMs: s.endedAt ? new Date(s.endedAt).getTime() : null,
   }));
 }
 
@@ -16775,7 +20361,7 @@ function renderPhaseHoursTable(sessions) {
   let recentTotal = 0;
   let allTimeTotal = 0;
 
-  (Array.isArray(sessions) ? sessions : []).forEach(s => {
+  (Array.isArray(sessions) ? sessions : []).forEach((s) => {
     const phase = String(s.phase || "Work");
     const minutes = Number(s.durationMinutes) || 0;
     if (!minutes) return;
@@ -16792,7 +20378,9 @@ function renderPhaseHoursTable(sessions) {
 
   if (!allTimeTotal) return "";
 
-  const sorted = [...rows.entries()].sort((a, b) => b[1].allTime - a[1].allTime);
+  const sorted = [...rows.entries()].sort(
+    (a, b) => b[1].allTime - a[1].allTime,
+  );
   return `
     <div class="dashboard-card money-card">
       <h3 class="money-card-title">Where the Hours Go</h3>
@@ -16802,14 +20390,18 @@ function renderPhaseHoursTable(sessions) {
             <tr><th>Phase</th><th>Last 28 days</th><th>Share</th><th>All-time</th></tr>
           </thead>
           <tbody>
-            ${sorted.map(([phase, m]) => `
+            ${sorted
+              .map(
+                ([phase, m]) => `
               <tr>
                 <td>${escapeHtml(phase)}</td>
                 <td>${escapeHtml(formatLaborDuration(m.recent))}</td>
                 <td>${recentTotal ? `${Math.round((m.recent / recentTotal) * 100)}%` : "—"}</td>
                 <td>${escapeHtml(formatLaborDuration(m.allTime))}</td>
               </tr>
-            `).join("")}
+            `,
+              )
+              .join("")}
           </tbody>
         </table>
       </div>
@@ -16830,35 +20422,52 @@ let expensesCacheStatus = "idle";
 let expensesCacheError = "";
 let expensesShowAll = false;
 
-const EXPENSE_CATEGORIES = ["Lace", "Packaging", "Products", "Shipping Supplies", "Equipment", "Other"];
+const EXPENSE_CATEGORIES = [
+  "Lace",
+  "Packaging",
+  "Products",
+  "Shipping Supplies",
+  "Equipment",
+  "Other",
+];
 const EXPENSE_UNIT_KINDS = [
   { value: "", label: "No unit tracking" },
   { value: "lace_piece", label: "Lace pieces" },
   { value: "business_card", label: "Business cards" },
   { value: "sticker", label: "Stickers" },
-  { value: "consumable", label: "Consumable (per-glove burn)" }
+  { value: "consumable", label: "Consumable (per-glove burn)" },
 ];
 
 /* Consumables cost per glove: trailing-12-month tagged spend / gloves
    cleaned in the same window. Measured burn, not a guess — and homemade
    product ingredients flow in with no per-bottle bookkeeping. */
 function getConsumablesPerGlove() {
-  if (!Array.isArray(expensesCache)) return SHOP_ECONOMICS.consumablesPerCleaning;
+  if (!Array.isArray(expensesCache))
+    return SHOP_ECONOMICS.consumablesPerCleaning;
   const cutoff = Date.now() - 365 * 86400000;
   const spend = expensesCache
-    .filter(e => e.unitKind === "consumable" && new Date(e.expenseDate).getTime() >= cutoff)
+    .filter(
+      (e) =>
+        e.unitKind === "consumable" &&
+        new Date(e.expenseDate).getTime() >= cutoff,
+    )
     .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   if (!spend) return SHOP_ECONOMICS.consumablesPerCleaning;
-  const cleaned = allOrders.filter(o =>
-    orderHasCleaningService(o) &&
-    o.dateCompleted && new Date(o.dateCompleted).getTime() >= cutoff).length;
+  const cleaned = allOrders.filter(
+    (o) =>
+      orderHasCleaningService(o) &&
+      o.dateCompleted &&
+      new Date(o.dateCompleted).getTime() >= cutoff,
+  ).length;
   if (cleaned < 10) return SHOP_ECONOMICS.consumablesPerCleaning;
   return spend / cleaned;
 }
 
 function getUnitCost(kind, fallback) {
   if (!Array.isArray(expensesCache)) return fallback;
-  const latest = expensesCache.find(e => e.unitKind === kind && e.quantity > 0 && e.amount > 0);
+  const latest = expensesCache.find(
+    (e) => e.unitKind === kind && e.quantity > 0 && e.amount > 0,
+  );
   return latest ? latest.amount / latest.quantity : fallback;
 }
 
@@ -16869,7 +20478,14 @@ function getWeightedAverageUnitCost(expenses, kind) {
   for (const expense of expenses) {
     const rowAmount = Number(expense?.amount);
     const rowQuantity = Number(expense?.quantity);
-    if (expense?.unitKind !== kind || !Number.isFinite(rowAmount) || rowAmount <= 0 || !Number.isFinite(rowQuantity) || rowQuantity <= 0) continue;
+    if (
+      expense?.unitKind !== kind ||
+      !Number.isFinite(rowAmount) ||
+      rowAmount <= 0 ||
+      !Number.isFinite(rowQuantity) ||
+      rowQuantity <= 0
+    )
+      continue;
     amount += rowAmount;
     quantity += rowQuantity;
   }
@@ -16878,7 +20494,10 @@ function getWeightedAverageUnitCost(expenses, kind) {
 
 function getResolvedLaceUnitCost() {
   if (!Array.isArray(expensesCache)) return null;
-  return getWeightedAverageUnitCost(expensesCache, "lace_piece") ?? SHOP_ECONOMICS.laceCostPerPiece;
+  return (
+    getWeightedAverageUnitCost(expensesCache, "lace_piece") ??
+    SHOP_ECONOMICS.laceCostPerPiece
+  );
 }
 
 async function warmExpensesCache() {
@@ -16893,7 +20512,8 @@ async function warmExpensesCache() {
     return true;
   } catch (error) {
     expensesCacheStatus = "error";
-    expensesCacheError = error?.message || "Material costs could not be loaded.";
+    expensesCacheError =
+      error?.message || "Material costs could not be loaded.";
     return false;
   }
 }
@@ -16904,14 +20524,24 @@ function renderExpensesCard() {
   const monthKey = new Date().toISOString().slice(0, 7);
 
   const monthExpenses = expenses
-    .filter(e => !e.unitKind && String(e.expenseDate || "").startsWith(monthKey))
+    .filter(
+      (e) => !e.unitKind && String(e.expenseDate || "").startsWith(monthKey),
+    )
     .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
-  const monthOrders = allOrders.filter(o =>
-    String(o.paid || "").toLowerCase() === "paid" &&
-    String(o.dateCompleted || "").startsWith(monthKey));
-  const monthRevenue = monthOrders.reduce((sum, o) => sum + (orderChargedPrice(o) || 0), 0);
-  const monthMaterials = monthOrders.reduce((sum, o) => sum + getOrderMaterialsCost(o).total, 0);
+  const monthOrders = allOrders.filter(
+    (o) =>
+      String(o.paid || "").toLowerCase() === "paid" &&
+      String(o.dateCompleted || "").startsWith(monthKey),
+  );
+  const monthRevenue = monthOrders.reduce(
+    (sum, o) => sum + (orderChargedPrice(o) || 0),
+    0,
+  );
+  const monthMaterials = monthOrders.reduce(
+    (sum, o) => sum + getOrderMaterialsCost(o).total,
+    0,
+  );
   const monthProfit = monthRevenue - monthMaterials - monthExpenses;
 
   const today = calDateKey(new Date());
@@ -16924,34 +20554,42 @@ function renderExpensesCard() {
       </div>
       <div class="expense-form">
         <input id="expenseDate" type="date" value="${escapeAttr(today)}" aria-label="Expense date">
-        <select id="expenseCategory" aria-label="Category">${EXPENSE_CATEGORIES.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join("")}</select>
+        <select id="expenseCategory" aria-label="Category">${EXPENSE_CATEGORIES.map((c) => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join("")}</select>
         <input id="expenseDescription" type="text" placeholder="Description" aria-label="Description">
         <input id="expenseAmount" type="text" inputmode="decimal" placeholder="$" aria-label="Amount">
         <input id="expenseQuantity" type="text" inputmode="numeric" placeholder="Qty" aria-label="Quantity">
-        <select id="expenseUnitKind" aria-label="Unit kind">${EXPENSE_UNIT_KINDS.map(k => `<option value="${escapeAttr(k.value)}">${escapeHtml(k.label)}</option>`).join("")}</select>
+        <select id="expenseUnitKind" aria-label="Unit kind">${EXPENSE_UNIT_KINDS.map((k) => `<option value="${escapeAttr(k.value)}">${escapeHtml(k.label)}</option>`).join("")}</select>
         <button id="expenseAddBtn" class="secondary expense-add-btn" type="button">Add</button>
       </div>
       <p id="expenseStatus" class="muted expense-status"></p>
-      ${expenses.length ? `
+      ${
+        expenses.length
+          ? `
         <div class="money-table-wrap">
           <table class="money-table">
             <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Unit cost</th><th></th></tr></thead>
             <tbody>
-              ${(expensesShowAll ? expenses : expenses.slice(0, 20)).map(e => `
+              ${(expensesShowAll ? expenses : expenses.slice(0, 20))
+                .map(
+                  (e) => `
                 <tr>
                   <td>${escapeHtml(String(e.expenseDate || ""))}</td>
                   <td>${escapeHtml(e.category || "")}</td>
                   <td>${escapeHtml(e.description || "")}</td>
                   <td>${escapeHtml(formatCurrency(e.amount))}</td>
-                  <td>${e.unitKind === "consumable" ? "burn" : (e.quantity > 0 && e.unitKind ? `${escapeHtml(formatCurrency(e.amount / e.quantity))}/ea` : "—")}</td>
+                  <td>${e.unitKind === "consumable" ? "burn" : e.quantity > 0 && e.unitKind ? `${escapeHtml(formatCurrency(e.amount / e.quantity))}/ea` : "—"}</td>
                   <td><button type="button" class="expense-delete-btn" data-expense-delete="${escapeAttr(e.id)}" aria-label="Delete expense">×</button></td>
                 </tr>
-              `).join("")}
+              `,
+                )
+                .join("")}
             </tbody>
           </table>
         </div>
         ${expenses.length > 20 ? `<button type="button" class="detail-show-on-map-link" id="expensesShowAllBtn">${expensesShowAll ? "Show fewer" : `Show all (${expenses.length})`}</button>` : ""}
-      ` : `<p class="muted">No expenses logged yet.</p>`}
+      `
+          : `<p class="muted">No expenses logged yet.</p>`
+      }
     </div>
   `;
 }
@@ -16970,24 +20608,35 @@ document.addEventListener("click", async (e) => {
 
   try {
     if (addBtn) {
-      const amount = parseFloat(String(document.getElementById("expenseAmount")?.value || "").replace(/[^0-9.]/g, ""));
+      const amount = parseFloat(
+        String(document.getElementById("expenseAmount")?.value || "").replace(
+          /[^0-9.]/g,
+          "",
+        ),
+      );
       const payload = {
         action: "createExpense",
         expenseDate: document.getElementById("expenseDate")?.value || "",
         category: document.getElementById("expenseCategory")?.value || "",
         description: document.getElementById("expenseDescription")?.value || "",
         amount,
-        quantity: parseFloat(document.getElementById("expenseQuantity")?.value || "") || null,
-        unitKind: document.getElementById("expenseUnitKind")?.value || ""
+        quantity:
+          parseFloat(document.getElementById("expenseQuantity")?.value || "") ||
+          null,
+        unitKind: document.getElementById("expenseUnitKind")?.value || "",
       };
       if (!payload.expenseDate || !Number.isFinite(amount) || amount <= 0) {
-        if (status) status.textContent = "Date and a positive amount are required.";
+        if (status)
+          status.textContent = "Date and a positive amount are required.";
         return;
       }
       await postJson(payload, true);
     } else {
       if (!window.confirm("Delete this expense?")) return;
-      await postJson({ action: "deleteExpense", id: delBtn.dataset.expenseDelete }, true);
+      await postJson(
+        { action: "deleteExpense", id: delBtn.dataset.expenseDelete },
+        true,
+      );
     }
     const data = await postJson({ action: "listExpenses" }, true);
     expensesCache = data.expenses || [];
@@ -17008,12 +20657,13 @@ document.addEventListener("click", async (e) => {
 
 function renderMonthlyPnlTable() {
   const months = new Map(); // YYYY-MM -> { revenue, materials, expenses }
-  const slot = key => {
-    if (!months.has(key)) months.set(key, { revenue: 0, materials: 0, expenses: 0 });
+  const slot = (key) => {
+    if (!months.has(key))
+      months.set(key, { revenue: 0, materials: 0, expenses: 0 });
     return months.get(key);
   };
 
-  allOrders.forEach(o => {
+  allOrders.forEach((o) => {
     if (String(o.paid || "").toLowerCase() !== "paid") return;
     const key = String(o.dateCompleted || "").slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(key)) return;
@@ -17025,7 +20675,7 @@ function renderMonthlyPnlTable() {
   /* Unit-tagged purchases (lace, cards, stickers, consumables) already
      reach the table as allocated Materials — counting the purchase too
      would double-dip. Only untagged expenses are overhead. */
-  (Array.isArray(expensesCache) ? expensesCache : []).forEach(e => {
+  (Array.isArray(expensesCache) ? expensesCache : []).forEach((e) => {
     if (e.unitKind) return;
     const key = String(e.expenseDate || "").slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(key)) return;
@@ -17033,7 +20683,9 @@ function renderMonthlyPnlTable() {
   });
 
   if (!months.size) return "";
-  const rows = [...months.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 14);
+  const rows = [...months.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, 14);
 
   return `
     <div class="dashboard-card money-card">
@@ -17044,11 +20696,18 @@ function renderMonthlyPnlTable() {
             <tr><th>Month</th><th>Collected</th><th>Materials</th><th>Overhead</th><th>Profit</th></tr>
           </thead>
           <tbody>
-            ${rows.map(([key, m]) => {
-              const profit = m.revenue - m.materials - m.expenses;
-              const label = new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, 1)
-                .toLocaleDateString(undefined, { month: "short", year: "numeric" });
-              return `
+            ${rows
+              .map(([key, m]) => {
+                const profit = m.revenue - m.materials - m.expenses;
+                const label = new Date(
+                  Number(key.slice(0, 4)),
+                  Number(key.slice(5, 7)) - 1,
+                  1,
+                ).toLocaleDateString(undefined, {
+                  month: "short",
+                  year: "numeric",
+                });
+                return `
                 <tr>
                   <td>${escapeHtml(label)}</td>
                   <td>${escapeHtml(formatCurrency(m.revenue))}</td>
@@ -17057,14 +20716,14 @@ function renderMonthlyPnlTable() {
                   <td class="${profit < 0 ? "pnl-negative" : "pnl-positive"}">${escapeHtml(formatCurrency(profit))}</td>
                 </tr>
               `;
-            }).join("")}
+              })
+              .join("")}
           </tbody>
         </table>
       </div>
     </div>
   `;
 }
-
 
 /* Tracking page (3.2): one-tap copy of the customer's tokenized link. */
 document.addEventListener("click", async (e) => {
@@ -17093,26 +20752,43 @@ document.addEventListener("click", async (e) => {
 
 const MAINTENANCE_DUE_MONTHS = 10;
 const MAINTENANCE_ACTIVE_STATUSES = new Set([
-  "Received", "Estimate Sent", "Pending Response", "Customer Approved",
-  "In Transit to Me", "In Progress", "Waiting on Lace/Parts", "On Hold", "Ready to Go"
+  "Received",
+  "Estimate Sent",
+  "Pending Response",
+  "Customer Approved",
+  "In Transit to Me",
+  "In Progress",
+  "Waiting on Lace/Parts",
+  "On Hold",
+  "Ready to Go",
 ]);
 
 function buildMaintenanceDue(customers) {
   const due = [];
   const now = Date.now();
 
-  customers.forEach(c => {
+  customers.forEach((c) => {
     const phone = [...c.phones.values()][0] || "";
     for (const glove of groupCustomerGloves(c.orders)) {
       /* skip gloves currently in the shop pipeline */
-      if (glove.orders.some(o => MAINTENANCE_ACTIVE_STATUSES.has(String(o.status || "")))) continue;
+      if (
+        glove.orders.some((o) =>
+          MAINTENANCE_ACTIVE_STATUSES.has(String(o.status || "")),
+        )
+      )
+        continue;
       const last = glove.orders[0];
-      const lastDate = new Date(last.dateCompleted || last.timestampSubmitted || 0).getTime();
+      const lastDate = new Date(
+        last.dateCompleted || last.timestampSubmitted || 0,
+      ).getTime();
       if (!lastDate) continue;
       const months = Math.floor((now - lastDate) / (30.44 * 86400000));
       if (months < MAINTENANCE_DUE_MONTHS) continue;
 
-      const firstName = String(c.name || "").trim().split(/\s+/)[0] || "";
+      const firstName =
+        String(c.name || "")
+          .trim()
+          .split(/\s+/)[0] || "";
       const body =
         `Hey ${firstName}, it's Brett with Murph's Mitt Maintenance. It's been about ` +
         `${months} months since your ${glove.label} came through the shop — leather dries out ` +
@@ -17125,7 +20801,9 @@ function buildMaintenanceDue(customers) {
         gloveLabel: glove.label,
         lastServices: getOrderSelectedServices(last).join(" + "),
         months,
-        smsHref: phone ? `sms:${phone.replace(/[^+\d]/g, "")}?&body=${encodeURIComponent(body)}` : ""
+        smsHref: phone
+          ? `sms:${phone.replace(/[^+\d]/g, "")}?&body=${encodeURIComponent(body)}`
+          : "",
       });
     }
   });
@@ -17140,12 +20818,24 @@ function buildMaintenanceDue(customers) {
 ========================= */
 function renderReachCard() {
   const counts = new Map();
-  allOrders.forEach(o => {
-    let st = String(o.state || "").trim().toUpperCase();
+  allOrders.forEach((o) => {
+    let st = String(o.state || "")
+      .trim()
+      .toUpperCase();
     if (!st && o.dropOffMethod && /local/i.test(o.dropOffMethod)) st = "NC";
     if (!st) return;
     if (st.length > 2) {
-      const ABBR = { "NORTH CAROLINA":"NC","TEXAS":"TX","VIRGINIA":"VA","PENNSYLVANIA":"PA","MICHIGAN":"MI","CALIFORNIA":"CA","ILLINOIS":"IL","LOUISIANA":"LA","COLORADO":"CO" };
+      const ABBR = {
+        "NORTH CAROLINA": "NC",
+        TEXAS: "TX",
+        VIRGINIA: "VA",
+        PENNSYLVANIA: "PA",
+        MICHIGAN: "MI",
+        CALIFORNIA: "CA",
+        ILLINOIS: "IL",
+        LOUISIANA: "LA",
+        COLORADO: "CO",
+      };
       st = ABBR[st] || st.slice(0, 2);
     }
     counts.set(st, (counts.get(st) || 0) + 1);
@@ -17181,5 +20871,7 @@ function renderReachCard() {
       (document.body || document.documentElement).appendChild(badge);
       document.documentElement.classList.add("mm-is-preview");
     })
-    .catch(() => { /* no badge if the signal is unavailable */ });
+    .catch(() => {
+      /* no badge if the signal is unavailable */
+    });
 })();
