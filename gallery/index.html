@@ -66,6 +66,12 @@ body_class: inner
   const galleryRoot = document.getElementById("dynamicGallery");
   const statusEl = document.getElementById("galleryStatus");
 
+  // Grid tiles use the pre-made 480px thumbnail (_thumbs/<path>); the lightbox
+  // reads full photos from data-photos. main.js falls back to data-full-src.
+  function galleryThumbUrl(url) {
+    return String(url || "").replace("/storage/v1/object/public/gallery/", "/storage/v1/object/public/gallery/_thumbs/");
+  }
+
   function escapeHtml(value) {
     return String(value || "")
       .replace(/&/g, "&amp;")
@@ -135,7 +141,8 @@ body_class: inner
         data-photos="${escapeHtml(JSON.stringify(album.photos))}"
         aria-label="Open image: ${escapeHtml(prettyAlt(label, album, index))}">
         <img
-          src="${escapeHtml(album.cover)}"
+          src="${escapeHtml(galleryThumbUrl(album.cover))}"
+          data-full-src="${escapeHtml(album.cover)}"
           alt="${escapeHtml(prettyAlt(label, album, index))}"
           loading="lazy"
           decoding="async">
@@ -244,7 +251,7 @@ body_class: inner
               data-gallery-group="glove-search" data-gallery-index="${startIndex + i}"
               data-photos="${escapeHtml(JSON.stringify(g.photos))}"
               aria-label="Open image: ${escapeHtml(g.brandModel || "glove")}">
-              <img src="${escapeHtml(url)}" alt="${escapeHtml(g.brandModel || "Glove")}" loading="lazy" decoding="async">
+              <img src="${escapeHtml(galleryThumbUrl(url))}" data-full-src="${escapeHtml(url)}" alt="${escapeHtml(g.brandModel || "Glove")}" loading="lazy" decoding="async">
               ${g.photos.length > 1 ? `<span class="gallery-thumb-count" aria-hidden="true">${g.photos.length}</span>` : ""}
             </button>
             <figcaption class="glove-search-caption">${escapeHtml([g.brandModel, g.webType, g.laceColors.join("/")].filter(Boolean).join(" · "))}</figcaption>

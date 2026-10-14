@@ -631,6 +631,11 @@ if (document.readyState === "loading") {
     });
   }
 
+  // Grid tiles use the pre-made 480px thumbnail; the lightbox gets the full photo.
+  function galleryThumbUrl(url) {
+    return String(url || "").replace("/storage/v1/object/public/gallery/", "/storage/v1/object/public/gallery/_thumbs/");
+  }
+
   function renderPreview(photos) {
     preview.innerHTML = photos.map((photo, index) => {
       const alt = `${photo.label} glove work photo ${index + 1}`;
@@ -640,9 +645,11 @@ if (document.readyState === "loading") {
           type="button"
           data-gallery-group="home-featured"
           data-gallery-index="${index}"
+          data-photos="${escapeHtml(JSON.stringify([photo.url]))}"
           aria-label="Open image: ${escapeHtml(alt)}">
           <img
-            src="${escapeHtml(photo.url)}"
+            src="${escapeHtml(galleryThumbUrl(photo.url))}"
+            data-full-src="${escapeHtml(photo.url)}"
             alt="${escapeHtml(alt)}"
             loading="lazy"
             decoding="async">
@@ -1497,3 +1504,14 @@ if (document.readyState === "loading") {
     })
     .catch(function () { /* no badge if the signal is unavailable */ });
 })();
+
+/* Gallery thumbnails: if a grid thumbnail is missing (older photo) or fails,
+   swap in the full photo once. Image errors don't bubble, so listen in capture. */
+document.addEventListener("error", (event) => {
+  const img = event.target;
+  if (!(img instanceof HTMLImageElement)) return;
+  const full = img.dataset.fullSrc;
+  if (!full || img.dataset.fullSrcTried === "true") return;
+  img.dataset.fullSrcTried = "true";
+  img.src = full;
+}, true);

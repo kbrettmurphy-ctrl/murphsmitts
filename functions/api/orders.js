@@ -1439,11 +1439,12 @@ async function handleUploadGalleryPhoto({ env, body, jsonHeaders }) {
   if (!contentType.startsWith("image/")) {
     return json({ ok: false, error: "Only image uploads are allowed." }, 200, jsonHeaders);
   }
-  const uploaded = await uploadGalleryPhoto(env, { section, filename, contentType, dataUrl });
+  const thumbDataUrl = cleanText(body.thumbDataUrl);
+  const uploaded = await uploadGalleryPhoto(env, { section, filename, contentType, dataUrl, thumbDataUrl });
   if (!uploaded.ok) {
     return json({ ok: false, error: "Gallery upload failed.", details: uploaded.error }, 200, jsonHeaders);
   }
-  return json({ ok: true, url: uploaded.url, path: uploaded.path }, 200, jsonHeaders);
+  return json({ ok: true, url: uploaded.url, path: uploaded.path, thumbUrl: uploaded.thumbUrl || "" }, 200, jsonHeaders);
 }
 
 async function handleListExpenses({ env, jsonHeaders }) {
@@ -5272,7 +5273,15 @@ function addAdjustment(map, color, amount) {
   map.set(cleanColor, (map.get(cleanColor) || 0) + qty);
 }
 
-async function uploadGalleryPhoto(env, { section, filename, contentType, dataUrl }) {
+/* Grid thumbnails live at _thumbs/<photo path> (e.g. _thumbs/_hidden/vintage/x.jpg),
+   mirroring the full photo so move/hide/restore/delete can follow it. Section
+   listings never see them (they list by section prefix). Clients derive the
+   thumb URL from the photo URL and fall back to the full photo if it's missing. */
+function galleryThumbPath(photoPath) {
+  return `_thumbs/${String(photoPath || "").replace(/^\/+/, "")}`;
+}
+
+async function uploadGalleryPhoto(env, { section, filename, contentType, dataUrl, thumbDataUrl }) {
   try {
     const base64 = String(dataUrl || "").split(",").pop();
     if (!base64) {
@@ -5318,10 +5327,38 @@ async function uploadGalleryPhoto(env, { section, filename, contentType, dataUrl
       };
     }
 
+    // Thumbnail is best-effort: a failure here never fails the photo upload —
+    // grids just fall back to the full photo.
+    let thumbUrl = "";
+    const thumbBase64 = String(thumbDataUrl || "").split(",").pop();
+    if (thumbBase64) {
+      try {
+        const thumbResp = await fetch(
+          `${env.SUPABASE_URL}/storage/v1/object/gallery/${galleryThumbPath(path)}`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+              apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+              "Content-Type": "image/jpeg",
+              "Cache-Control": "public, max-age=31536000, immutable",
+              "x-upsert": "true"
+            },
+            body: base64ToUint8Array(thumbBase64)
+          }
+        );
+        await thumbResp.text();
+        if (thumbResp.ok) {
+          thumbUrl = `${env.SUPABASE_URL}/storage/v1/object/public/gallery/${galleryThumbPath(path)}`;
+        }
+      } catch {}
+    }
+
     return {
       ok: true,
       path,
-      url: `${env.SUPABASE_URL}/storage/v1/object/public/gallery/${path}`
+      url: `${env.SUPABASE_URL}/storage/v1/object/public/gallery/${path}`,
+      thumbUrl
     };
   } catch (err) {
     return {
@@ -5421,6 +5458,12 @@ async function moveGalleryStorageObject(env, sourcePath, destinationPath) {
       };
     }
 
+    // Move the grid thumbnail along with the photo (best-effort; older photos
+    // may not have one).
+    if (!String(sourcePath).startsWith("_thumbs/")) {
+      await moveGalleryStorageObject(env, galleryThumbPath(sourcePath), galleryThumbPath(destinationPath));
+    }
+
     return { ok: true };
   } catch (err) {
     return {
@@ -5441,8 +5484,9 @@ async function deleteGalleryStorageObject(env, photoPath) {
           apikey: env.SUPABASE_SERVICE_ROLE_KEY,
           "Content-Type": "application/json"
         },
+        // Also remove the grid thumbnail; missing keys are ignored.
         body: JSON.stringify({
-          prefixes: [photoPath]
+          prefixes: [photoPath, galleryThumbPath(photoPath)]
         })
       }
     );

@@ -10378,15 +10378,15 @@ async function uploadOrderGalleryPhotos(order, files, section) {
 
   for (const file of files) {
     try {
-      const type = file.type || "image/jpeg";
-      const dataUrl = await fileToDataUrl(file);
+      const prepared = await prepareGalleryUpload(file);
       const result = await postJson(
         {
           action: "uploadGalleryPhoto",
           section,
-          filename: file.name,
-          contentType: type,
-          dataUrl,
+          filename: prepared.filename,
+          contentType: prepared.contentType,
+          dataUrl: prepared.dataUrl,
+          thumbDataUrl: prepared.thumbDataUrl,
         },
         true,
       );
@@ -15890,15 +15890,16 @@ function initUploadView() {
           throw new Error("Not an image file.");
         }
 
-        const dataUrl = await fileToDataUrl(file);
+        const prepared = await prepareGalleryUpload(file);
 
         const result = await postJson(
           {
             action: "uploadGalleryPhoto",
             section,
-            filename: file.name,
-            contentType: type,
-            dataUrl,
+            filename: prepared.filename,
+            contentType: prepared.contentType,
+            dataUrl: prepared.dataUrl,
+            thumbDataUrl: prepared.thumbDataUrl,
           },
           true,
         );
@@ -16011,13 +16012,9 @@ function getGalleryManagerThumbnailUrl(photoUrl) {
     const objectPrefix = "/storage/v1/object/public/gallery/";
     if (!url.pathname.includes(objectPrefix)) return original;
 
-    url.pathname = url.pathname.replace(
-      objectPrefix,
-      "/storage/v1/render/image/public/gallery/",
-    );
-    url.searchParams.set("width", "480");
-    url.searchParams.set("quality", "72");
-    url.searchParams.set("resize", "contain");
+    /* Pre-made 480px thumbnail stored at _thumbs/<photo path> (made at upload).
+       Supabase on-the-fly transforms aren't in the plan and rate-limit hard. */
+    url.pathname = url.pathname.replace(objectPrefix, `${objectPrefix}_thumbs/`);
     return url.toString();
   } catch {
     return original;
@@ -16044,7 +16041,22 @@ function wireGalleryManagerThumbnails(root) {
         pump();
       };
       image.addEventListener("load", finished, { once: true });
-      image.addEventListener("error", finished, { once: true });
+      /* Missing thumbnail (older photo) or a rate-limited request: fall back
+         to the full photo once instead of leaving a broken "?" tile. */
+      const fallback = image.dataset.galleryFullSrc;
+      image.addEventListener(
+        "error",
+        () => {
+          if (fallback && image.src !== fallback) {
+            // The "load" listener above is still pending and fires for the fallback.
+            image.addEventListener("error", finished, { once: true });
+            image.src = fallback;
+            return;
+          }
+          finished();
+        },
+        { once: true },
+      );
       image.src = src;
     }
   }
@@ -16191,7 +16203,7 @@ function renderGalleryManagerPhotos() {
           data-photo-url="${escapeAttr(photo.url)}"
           tabindex="0">
           <button class="gallery-manager-thumb" type="button" data-gallery-action="view">
-            <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-gallery-thumb-src="${escapeAttr(getGalleryManagerThumbnailUrl(photo.url))}" alt="${escapeAttr(photo.name || "Gallery photo")}" decoding="async" fetchpriority="low">
+            <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-gallery-thumb-src="${escapeAttr(getGalleryManagerThumbnailUrl(photo.url))}" data-gallery-full-src="${escapeAttr(photo.url)}" alt="${escapeAttr(photo.name || "Gallery photo")}" decoding="async" fetchpriority="low">
             ${photo.isCover ? `<span class="gallery-cover-star" aria-label="Album cover">★</span>` : ""}
           </button>
           <div class="gallery-manager-meta">
@@ -16975,6 +16987,69 @@ function fileToDataUrl(file) {
 
     reader.readAsDataURL(file);
   });
+}
+
+/* Gallery uploads: shrink the full photo (max 1600px) and make a 480px grid
+   thumbnail before upload. Quality steps down until each fits its size budget,
+   so Safari (ImageIO) and Chrome (libjpeg) land on similar files. Any failure
+   (e.g. a format the browser can't decode) uploads the original untouched with
+   no thumbnail — grids fall back to the full photo. */
+const GALLERY_UPLOAD_FULL_MAX = 1600;
+const GALLERY_UPLOAD_FULL_BUDGET = 480 * 1024;
+const GALLERY_UPLOAD_THUMB_MAX = 480;
+const GALLERY_UPLOAD_THUMB_BUDGET = 60 * 1024;
+const GALLERY_UPLOAD_QUALITIES = [0.72, 0.62, 0.52];
+
+async function encodeGalleryImage(img, maxSide, budget) {
+  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff"; // transparent PNGs flatten onto white, not black
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  let blob = null;
+  for (const quality of GALLERY_UPLOAD_QUALITIES) {
+    blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    if (!blob || blob.size <= budget) break;
+  }
+  if (!blob) throw new Error("Could not encode image.");
+  return blob;
+}
+
+async function prepareGalleryUpload(file) {
+  const original = {
+    dataUrl: "",
+    contentType: file.type || "image/jpeg",
+    filename: file.name,
+    thumbDataUrl: "",
+  };
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = objectUrl;
+    await img.decode();
+    const thumb = await encodeGalleryImage(img, GALLERY_UPLOAD_THUMB_MAX, GALLERY_UPLOAD_THUMB_BUDGET);
+    const alreadySmall =
+      original.contentType === "image/jpeg" &&
+      file.size <= GALLERY_UPLOAD_FULL_BUDGET &&
+      Math.max(img.naturalWidth, img.naturalHeight) <= GALLERY_UPLOAD_FULL_MAX;
+    const full = alreadySmall
+      ? null
+      : await encodeGalleryImage(img, GALLERY_UPLOAD_FULL_MAX, GALLERY_UPLOAD_FULL_BUDGET);
+    const useFull = full && !(original.contentType === "image/jpeg" && full.size >= file.size);
+    return {
+      dataUrl: await fileToDataUrl(useFull ? full : file),
+      contentType: useFull ? "image/jpeg" : original.contentType,
+      filename: useFull ? file.name.replace(/\.[a-z0-9]+$/i, "") + ".jpg" : file.name,
+      thumbDataUrl: await fileToDataUrl(thumb),
+    };
+  } catch {
+    return { ...original, dataUrl: await fileToDataUrl(file) };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 function closeOrderDetail() {
