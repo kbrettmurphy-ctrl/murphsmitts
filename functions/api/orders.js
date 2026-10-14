@@ -2451,8 +2451,14 @@ async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
     if (a.brandHit !== b.brandHit) return a.brandHit ? -1 : 1;
     return b.orderNum - a.orderNum;
   });
-  const ranked = gloves.slice(0, 24).map(({ orderNum, brandHit, ...g }) => g);
-  return json({ ok: true, gloves: ranked, source: "gallery" }, 200, jsonHeaders);
+  /* Paged: the gallery's "Show more" passes offset; total lets it know when to stop. */
+  const offset = Math.max(0, parseInt(body.offset, 10) || 0);
+  const limit = Math.min(48, Math.max(1, parseInt(body.limit, 10) || 24));
+  const ranked = gloves.slice(offset, offset + limit).map(({ orderNum, brandHit, ...g }) => g);
+  return json({
+    ok: true, gloves: ranked, total: gloves.length,
+    hasMore: offset + limit < gloves.length, source: "gallery"
+  }, 200, jsonHeaders);
 }
 
 async function handleListGalleryPhotos({ env, body, jsonHeaders }) {
