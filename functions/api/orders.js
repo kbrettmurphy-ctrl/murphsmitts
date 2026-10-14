@@ -5294,6 +5294,24 @@ async function uploadGalleryPhoto(env, { section, filename, contentType, dataUrl
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const safeSection = safeGallerySection(section);
     const path = `${safeSection}/${stamp}-${cleanName}.${ext}`;
+    const thumbPath = galleryThumbPath(path);
+
+    // Thumbnail is best-effort and uploads in parallel with the photo: a
+    // failure never fails the photo upload — grids fall back to the full photo.
+    const thumbBase64 = String(thumbDataUrl || "").split(",").pop();
+    const thumbTask = thumbDataUrl && thumbBase64
+      ? fetch(`${env.SUPABASE_URL}/storage/v1/object/gallery/${thumbPath}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+            "Content-Type": "image/jpeg",
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "x-upsert": "true"
+          },
+          body: base64ToUint8Array(thumbBase64)
+        }).then(async resp => { await resp.text(); return resp.ok; }).catch(() => false)
+      : Promise.resolve(false);
 
     const uploadResp = await fetch(
       `${env.SUPABASE_URL}/storage/v1/object/gallery/${path}`,
@@ -5314,8 +5332,11 @@ async function uploadGalleryPhoto(env, { section, filename, contentType, dataUrl
     );
 
     const uploadText = await uploadResp.text();
+    const thumbOk = await thumbTask;
 
     if (!uploadResp.ok) {
+      // Don't leave an orphan thumbnail behind a failed photo upload.
+      if (thumbOk) await deleteGalleryStorageObject(env, thumbPath);
       let error = uploadText;
       try {
         error = JSON.parse(uploadText);
@@ -5327,32 +5348,9 @@ async function uploadGalleryPhoto(env, { section, filename, contentType, dataUrl
       };
     }
 
-    // Thumbnail is best-effort: a failure here never fails the photo upload —
-    // grids just fall back to the full photo.
-    let thumbUrl = "";
-    const thumbBase64 = String(thumbDataUrl || "").split(",").pop();
-    if (thumbBase64) {
-      try {
-        const thumbResp = await fetch(
-          `${env.SUPABASE_URL}/storage/v1/object/gallery/${galleryThumbPath(path)}`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-              apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-              "Content-Type": "image/jpeg",
-              "Cache-Control": "public, max-age=31536000, immutable",
-              "x-upsert": "true"
-            },
-            body: base64ToUint8Array(thumbBase64)
-          }
-        );
-        await thumbResp.text();
-        if (thumbResp.ok) {
-          thumbUrl = `${env.SUPABASE_URL}/storage/v1/object/public/gallery/${galleryThumbPath(path)}`;
-        }
-      } catch {}
-    }
+    const thumbUrl = thumbOk
+      ? `${env.SUPABASE_URL}/storage/v1/object/public/gallery/${thumbPath}`
+      : "";
 
     return {
       ok: true,

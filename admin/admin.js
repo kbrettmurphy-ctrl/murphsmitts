@@ -10376,9 +10376,10 @@ async function uploadOrderGalleryPhotos(order, files, section) {
     `Uploading ${total} photo${total === 1 ? "" : "s"} to Gallery...`,
   );
 
-  for (const file of files) {
+  const prepareNext = createGalleryUploadPrefetcher(files);
+  for (const [fileIndex, file] of files.entries()) {
     try {
-      const prepared = await prepareGalleryUpload(file);
+      const prepared = await prepareNext(fileIndex);
       const result = await postJson(
         {
           action: "uploadGalleryPhoto",
@@ -15882,7 +15883,8 @@ function initUploadView() {
         ? crypto.randomUUID()
         : "";
 
-    for (const file of files) {
+    const prepareNext = createGalleryUploadPrefetcher(files);
+    for (const [fileIndex, file] of files.entries()) {
       try {
         const type = file.type || "image/jpeg";
 
@@ -15890,7 +15892,7 @@ function initUploadView() {
           throw new Error("Not an image file.");
         }
 
-        const prepared = await prepareGalleryUpload(file);
+        const prepared = await prepareNext(fileIndex);
 
         const result = await postJson(
           {
@@ -16989,33 +16991,56 @@ function fileToDataUrl(file) {
   });
 }
 
-/* Gallery uploads: shrink the full photo (max 1600px) and make a 480px grid
-   thumbnail before upload. Quality steps down until each fits its size budget,
-   so Safari (ImageIO) and Chrome (libjpeg) land on similar files. Any failure
-   (e.g. a format the browser can't decode) uploads the original untouched with
-   no thumbnail — grids fall back to the full photo. */
+/* Gallery uploads: shrink the full photo (max 1600px) and make an 800px grid
+   thumbnail before upload. Resizing halves in steps with high-quality
+   smoothing (one big jump looks jagged, especially in Safari). The full photo
+   is encoded once, re-encoded lower only if Safari's larger output overshoots
+   the size budget. Any failure (e.g. a format the browser can't decode)
+   uploads the original untouched with no thumbnail — grids fall back to the
+   full photo. */
 const GALLERY_UPLOAD_FULL_MAX = 1600;
-const GALLERY_UPLOAD_FULL_BUDGET = 480 * 1024;
-const GALLERY_UPLOAD_THUMB_MAX = 480;
-const GALLERY_UPLOAD_THUMB_BUDGET = 60 * 1024;
-const GALLERY_UPLOAD_QUALITIES = [0.72, 0.62, 0.52];
+const GALLERY_UPLOAD_FULL_BUDGET = 520 * 1024;
+const GALLERY_UPLOAD_FULL_QUALITY = 0.7;
+const GALLERY_UPLOAD_FULL_RETRY_QUALITY = 0.5;
+const GALLERY_UPLOAD_THUMB_MAX = 800;
+const GALLERY_UPLOAD_THUMB_QUALITY = 0.8;
 
-async function encodeGalleryImage(img, maxSide, budget) {
-  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#fff"; // transparent PNGs flatten onto white, not black
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  let blob = null;
-  for (const quality of GALLERY_UPLOAD_QUALITIES) {
-    blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-    if (!blob || blob.size <= budget) break;
-  }
-  if (!blob) throw new Error("Could not encode image.");
-  return blob;
+function drawGalleryCanvas(source, sourceWidth, sourceHeight, maxSide) {
+  const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+  const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+  const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+  let current = source;
+  let width = sourceWidth;
+  let height = sourceHeight;
+  do {
+    width = Math.max(targetWidth, Math.round(width / 2));
+    height = Math.max(targetHeight, Math.round(height / 2));
+    if (scale === 1) {
+      width = targetWidth;
+      height = targetHeight;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.fillStyle = "#fff"; // transparent PNGs flatten onto white, not black
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(current, 0, 0, width, height);
+    current = canvas;
+  } while (width > targetWidth || height > targetHeight);
+  return current;
+}
+
+function galleryCanvasToBlob(canvas, quality) {
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Could not encode image."))),
+      "image/jpeg",
+      quality,
+    ),
+  );
 }
 
 async function prepareGalleryUpload(file) {
@@ -17030,26 +17055,49 @@ async function prepareGalleryUpload(file) {
     const img = new Image();
     img.src = objectUrl;
     await img.decode();
-    const thumb = await encodeGalleryImage(img, GALLERY_UPLOAD_THUMB_MAX, GALLERY_UPLOAD_THUMB_BUDGET);
+    const fullCanvas = drawGalleryCanvas(img, img.naturalWidth, img.naturalHeight, GALLERY_UPLOAD_FULL_MAX);
+    const thumbCanvas = drawGalleryCanvas(fullCanvas, fullCanvas.width, fullCanvas.height, GALLERY_UPLOAD_THUMB_MAX);
+    const thumbPromise = galleryCanvasToBlob(thumbCanvas, GALLERY_UPLOAD_THUMB_QUALITY);
     const alreadySmall =
       original.contentType === "image/jpeg" &&
       file.size <= GALLERY_UPLOAD_FULL_BUDGET &&
       Math.max(img.naturalWidth, img.naturalHeight) <= GALLERY_UPLOAD_FULL_MAX;
-    const full = alreadySmall
-      ? null
-      : await encodeGalleryImage(img, GALLERY_UPLOAD_FULL_MAX, GALLERY_UPLOAD_FULL_BUDGET);
+    let full = null;
+    if (!alreadySmall) {
+      full = await galleryCanvasToBlob(fullCanvas, GALLERY_UPLOAD_FULL_QUALITY);
+      if (full.size > GALLERY_UPLOAD_FULL_BUDGET) {
+        full = await galleryCanvasToBlob(fullCanvas, GALLERY_UPLOAD_FULL_RETRY_QUALITY);
+      }
+    }
     const useFull = full && !(original.contentType === "image/jpeg" && full.size >= file.size);
     return {
       dataUrl: await fileToDataUrl(useFull ? full : file),
       contentType: useFull ? "image/jpeg" : original.contentType,
       filename: useFull ? file.name.replace(/\.[a-z0-9]+$/i, "") + ".jpg" : file.name,
-      thumbDataUrl: await fileToDataUrl(thumb),
+      thumbDataUrl: await fileToDataUrl(await thumbPromise),
     };
   } catch {
     return { ...original, dataUrl: await fileToDataUrl(file) };
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
+}
+
+/* Prepare photo N+1 while photo N uploads, so resizing never adds wait time.
+   Uploads themselves stay one at a time, in order. */
+function createGalleryUploadPrefetcher(files) {
+  const started = new Map();
+  const start = (index) => {
+    if (index >= files.length || started.has(index)) return;
+    const task = prepareGalleryUpload(files[index]);
+    task.catch(() => {});
+    started.set(index, task);
+  };
+  return (index) => {
+    start(index);
+    start(index + 1);
+    return started.get(index);
+  };
 }
 
 function closeOrderDetail() {
