@@ -16043,22 +16043,38 @@ function wireGalleryManagerThumbnails(root) {
         pump();
       };
       image.addEventListener("load", finished, { once: true });
-      /* Missing thumbnail (older photo) or a rate-limited request: fall back
-         to the full photo once instead of leaving a broken "?" tile. */
+      /* Supabase answers bursts of uncached images with 429 (rate limit),
+         which clears within a second or two. Retry the same URL twice with a
+         jittered delay, then fall back to the full photo (also retried twice)
+         instead of leaving a broken "?" tile. The "load" listener above stays
+         pending through retries and fires once, whichever attempt succeeds. */
+      const attempts = [src, src, src];
       const fallback = image.dataset.galleryFullSrc;
-      image.addEventListener(
-        "error",
-        () => {
-          if (fallback && image.src !== fallback) {
-            // The "load" listener above is still pending and fires for the fallback.
-            image.addEventListener("error", finished, { once: true });
-            image.src = fallback;
+      if (fallback && fallback !== src) attempts.push(fallback, fallback, fallback);
+      let attempt = 0;
+      const onError = () => {
+        attempt += 1;
+        if (attempt >= attempts.length || generation !== galleryThumbnailGeneration) {
+          image.removeEventListener("load", finished);
+          finished();
+          return;
+        }
+        const next = attempts[attempt];
+        const delay = next === attempts[attempt - 1] ? 700 * (attempt % 3) + Math.random() * 500 : 0;
+        image.removeAttribute("src");
+        window.setTimeout(() => {
+          if (image.isConnected && generation === galleryThumbnailGeneration) {
+            image.src = next;
             return;
           }
+          // Tile was re-rendered away mid-retry: release its loading slot.
+          image.removeEventListener("error", onError);
+          image.removeEventListener("load", finished);
           finished();
-        },
-        { once: true },
-      );
+        }, delay);
+      };
+      image.addEventListener("error", onError);
+      image.addEventListener("load", () => image.removeEventListener("error", onError), { once: true });
       image.src = src;
     }
   }

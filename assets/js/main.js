@@ -1505,13 +1505,27 @@ if (document.readyState === "loading") {
     .catch(function () { /* no badge if the signal is unavailable */ });
 })();
 
-/* Gallery thumbnails: if a grid thumbnail is missing (older photo) or fails,
-   swap in the full photo once. Image errors don't bubble, so listen in capture. */
+/* Gallery thumbnails: Supabase answers bursts of uncached images with 429
+   (rate limit), which clears within a second or two. Retry the same URL twice
+   with a jittered delay, then swap in the full photo (also retried twice).
+   Only tiles that carry data-full-src are handled. Image errors don't bubble,
+   so listen in capture. */
 document.addEventListener("error", (event) => {
   const img = event.target;
   if (!(img instanceof HTMLImageElement)) return;
   const full = img.dataset.fullSrc;
-  if (!full || img.dataset.fullSrcTried === "true") return;
+  if (!full) return;
+  const src = img.getAttribute("src") || "";
+  if (!src) return;
+  const retries = Number(img.dataset.loadRetries || 0);
+  if (retries < 2) {
+    img.dataset.loadRetries = String(retries + 1);
+    img.removeAttribute("src");
+    window.setTimeout(() => { img.src = src; }, 700 * (retries + 1) + Math.random() * 500);
+    return;
+  }
+  if (img.dataset.fullSrcTried === "true") return;
   img.dataset.fullSrcTried = "true";
+  img.dataset.loadRetries = "0";
   img.src = full;
 }, true);
