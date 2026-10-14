@@ -2361,6 +2361,25 @@ function expandGloveSearchAliases(value) {
   return [text, ...aliases].filter(Boolean).join(" ");
 }
 
+/* Every gallery_photo_links row. Supabase REST returns at most 1000 rows per
+   request, so page through in 1000-row batches (stable order by photo_url);
+   otherwise photos past the first 1000 silently drop out of search and the
+   gallery's order/cover/group data. Returns the supabaseFetch shape. */
+async function fetchAllGalleryPhotoLinks(env) {
+  const PAGE_SIZE = 1000;
+  let rows = [];
+  for (let offset = 0; offset < 50000; offset += PAGE_SIZE) {
+    const page = await supabaseFetch(
+      env,
+      `/rest/v1/gallery_photo_links?select=photo_url,order_number,is_cover,group_key,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&order=photo_url.asc&limit=${PAGE_SIZE}&offset=${offset}`
+    );
+    if (!page.ok || !Array.isArray(page.data)) return offset === 0 ? page : { ok: true, data: rows };
+    rows = rows.concat(page.data);
+    if (page.data.length < PAGE_SIZE) break;
+  }
+  return { ok: true, data: rows };
+}
+
 async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
   /* Public glove search returns only glove fields and curated gallery photos,
      never customer name, contact, address, or intake photos. */
@@ -2368,10 +2387,7 @@ async function handleSearchPublicGloves({ env, body, jsonHeaders }) {
   if (q.length < 2) return json({ ok: true, gloves: [] }, 200, jsonHeaders);
   const terms = q.split(/\s+/).filter(Boolean);
   const gloves = [];
-  const links = await supabaseFetch(
-    env,
-    `/rest/v1/gallery_photo_links?select=photo_url,order_number,is_cover,group_key,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
-  );
+  const links = await fetchAllGalleryPhotoLinks(env);
   const linkRows = (links.ok && Array.isArray(links.data)) ? links.data : [];
   const byOrder = new Map();
   const byGroup = new Map();
@@ -2477,10 +2493,7 @@ async function handleListGalleryPhotos({ env, body, jsonHeaders }) {
   let photoGloveMeta = {};
   let photoGroups = {};
   {
-    const links = await supabaseFetch(
-      env,
-      `/rest/v1/gallery_photo_links?select=photo_url,order_number,is_cover,group_key,brand_model,glove_type,web_type,primary_lace_color,secondary_lace_color&limit=1000`
-    );
+    const links = await fetchAllGalleryPhotoLinks(env);
     if (links.ok && Array.isArray(links.data)) {
       for (const l of links.data) {
         if (l.is_cover) photoCovers[l.photo_url] = true;
