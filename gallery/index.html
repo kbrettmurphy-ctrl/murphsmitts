@@ -232,18 +232,16 @@ body_class: inner
   const searchInput = document.getElementById("gloveSearchInput");
   const resultsEl = document.getElementById("gloveSearchResults");
   let searchTimer = null;
+  /* Paging state for "Show more". seq guards against a stale response from an
+     older query landing after the user has typed something new. */
+  const SEARCH_PAGE = 24;
+  let searchState = { q: "", shown: 0, seq: 0 };
 
-  function renderSearchResults(gloves, q) {
-    if (!gloves.length) {
-      resultsEl.innerHTML = `<p class="glove-search-empty">No matches for “${escapeHtml(q)}” yet — try a brand, web type, or lace color.</p>`;
-      return;
-    }
-    resultsEl.innerHTML = `
-      <div class="gallery-full-grid glove-search-grid" data-gallery-group="glove-search">
-        ${gloves.flatMap((g, gi) => g.photos.slice(0, 1).map(url => `
+  function renderSearchCards(gloves, startIndex) {
+    return gloves.flatMap((g, i) => g.photos.slice(0, 1).map(url => `
           <figure class="glove-search-card">
             <button class="gallery-thumb" type="button"
-              data-gallery-group="glove-search" data-gallery-index="${gi}"
+              data-gallery-group="glove-search" data-gallery-index="${startIndex + i}"
               data-photos="${escapeHtml(JSON.stringify(g.photos))}"
               aria-label="Open image: ${escapeHtml(g.brandModel || "glove")}">
               <img src="${escapeHtml(url)}" alt="${escapeHtml(g.brandModel || "Glove")}" loading="lazy" decoding="async">
@@ -251,11 +249,43 @@ body_class: inner
             </button>
             <figcaption class="glove-search-caption">${escapeHtml([g.brandModel, g.webType, g.laceColors.join("/")].filter(Boolean).join(" · "))}</figcaption>
           </figure>
-        `)).join("")}
-      </div>`;
+        `)).join("");
+  }
+
+  function renderSearchFooter(total, hasMore) {
+    const footer = resultsEl.querySelector(".glove-search-more");
+    if (!footer) return;
+    footer.innerHTML = `
+      <p class="glove-search-count">Showing ${searchState.shown} of ${total} gloves</p>
+      ${hasMore ? `<button class="btn btn-secondary glove-search-more-btn" type="button">Show more</button>` : ""}`;
+  }
+
+  function renderSearchResults(data, q) {
+    const gloves = data.gloves || [];
+    if (!gloves.length) {
+      resultsEl.innerHTML = `<p class="glove-search-empty">No matches for “${escapeHtml(q)}” yet — try a brand, web type, or lace color.</p>`;
+      return;
+    }
+    searchState.shown = gloves.length;
+    resultsEl.innerHTML = `
+      <div class="gallery-full-grid glove-search-grid" data-gallery-group="glove-search">
+        ${renderSearchCards(gloves, 0)}
+      </div>
+      <div class="glove-search-more"></div>`;
+    renderSearchFooter(data.total ?? gloves.length, !!data.hasMore);
+  }
+
+  async function fetchGloveSearch(q, offset) {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "searchPublicGloves", q, offset, limit: SEARCH_PAGE })
+    });
+    return res.json();
   }
 
   async function runGloveSearch(q) {
+    const seq = ++searchState.seq;
     if (q.length < 2) {
       resultsEl.hidden = true;
       resultsEl.innerHTML = "";
@@ -263,18 +293,39 @@ body_class: inner
       return;
     }
     try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "searchPublicGloves", q })
-      });
-      const data = await res.json();
-      if (!data.ok) return;
+      const data = await fetchGloveSearch(q, 0);
+      if (!data.ok || seq !== searchState.seq) return;
+      searchState.q = q;
       resultsEl.hidden = false;
       galleryRoot.style.display = "none";
-      renderSearchResults(data.gloves || [], q);
+      renderSearchResults(data, q);
     } catch { /* leave gallery as-is */ }
   }
+
+  async function loadMoreGloves(btn) {
+    const seq = searchState.seq;
+    btn.disabled = true;
+    btn.textContent = "Loading…";
+    try {
+      const data = await fetchGloveSearch(searchState.q, searchState.shown);
+      if (seq !== searchState.seq) return;
+      if (!data.ok) throw new Error(data.error || "search failed");
+      const gloves = data.gloves || [];
+      resultsEl.querySelector(".glove-search-grid")
+        ?.insertAdjacentHTML("beforeend", renderSearchCards(gloves, searchState.shown));
+      searchState.shown += gloves.length;
+      renderSearchFooter(data.total ?? searchState.shown, !!data.hasMore && gloves.length > 0);
+    } catch {
+      if (seq !== searchState.seq) return;
+      btn.disabled = false;
+      btn.textContent = "Show more";
+    }
+  }
+
+  resultsEl?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".glove-search-more-btn");
+    if (btn) loadMoreGloves(btn);
+  });
 
   searchInput?.addEventListener("input", () => {
     clearTimeout(searchTimer);
