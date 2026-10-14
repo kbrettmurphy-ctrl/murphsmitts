@@ -1855,12 +1855,22 @@ await test("gallery management preserves non-transactional request ordering", as
         });
         return new Response("", { status: 200 });
       }
+      if (callNumber === 2) {
+        // Grid thumbnail follows the photo; a missing thumb (404) is ignored.
+        ok(String(input).endsWith("/storage/v1/object/move"));
+        deepEqual(JSON.parse(init.body), {
+          bucketId: "gallery",
+          sourceKey: "_thumbs/fielding-gloves/a.jpg",
+          destinationKey: "_thumbs/catchers-mitts/a.jpg"
+        });
+        return new Response("not found", { status: 404 });
+      }
       ok(String(input).includes("/rest/v1/gallery_photo_links"));
       return new Response("ignored", { status: 500 });
     }
   });
   equal(moved.json.ok, true);
-  equal(moved.fetchCalls.length, 2);
+  equal(moved.fetchCalls.length, 3);
 
   for (const [action, path, sourceKey, destinationKey] of [
     ["hideGalleryPhoto", "fielding-gloves/a.jpg", "fielding-gloves/a.jpg", "_hidden/fielding-gloves/a.jpg"],
@@ -1868,14 +1878,18 @@ await test("gallery management preserves non-transactional request ordering", as
   ]) {
     const result = await invoke({
       body: { action, _token: owner, path },
-      fetchMock(input, init) {
+      fetchMock(input, init, callNumber) {
         ok(String(input).endsWith("/storage/v1/object/move"));
-        deepEqual(JSON.parse(init.body), { bucketId: "gallery", sourceKey, destinationKey });
+        // Call 2 mirrors the move onto the grid thumbnail at _thumbs/<path>.
+        const thumb = callNumber === 2 ? "_thumbs/" : "";
+        deepEqual(JSON.parse(init.body), {
+          bucketId: "gallery", sourceKey: thumb + sourceKey, destinationKey: thumb + destinationKey
+        });
         return new Response("", { status: 200 });
       }
     });
     equal(result.json.ok, true);
-    equal(result.fetchCalls.length, 1);
+    equal(result.fetchCalls.length, 2);
   }
 });
 

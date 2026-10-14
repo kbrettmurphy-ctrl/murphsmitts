@@ -631,6 +631,11 @@ if (document.readyState === "loading") {
     });
   }
 
+  // Grid tiles use the pre-made 480px thumbnail; the lightbox gets the full photo.
+  function galleryThumbUrl(url) {
+    return String(url || "").replace("/storage/v1/object/public/gallery/", "/storage/v1/object/public/gallery/_thumbs/");
+  }
+
   function renderPreview(photos) {
     preview.innerHTML = photos.map((photo, index) => {
       const alt = `${photo.label} glove work photo ${index + 1}`;
@@ -640,9 +645,11 @@ if (document.readyState === "loading") {
           type="button"
           data-gallery-group="home-featured"
           data-gallery-index="${index}"
+          data-photos="${escapeHtml(JSON.stringify([photo.url]))}"
           aria-label="Open image: ${escapeHtml(alt)}">
           <img
-            src="${escapeHtml(photo.url)}"
+            src="${escapeHtml(galleryThumbUrl(photo.url))}"
+            data-full-src="${escapeHtml(photo.url)}"
             alt="${escapeHtml(alt)}"
             loading="lazy"
             decoding="async">
@@ -1497,3 +1504,28 @@ if (document.readyState === "loading") {
     })
     .catch(function () { /* no badge if the signal is unavailable */ });
 })();
+
+/* Gallery thumbnails: Supabase answers bursts of uncached images with 429
+   (rate limit), which clears within a second or two. Retry the same URL twice
+   with a jittered delay, then swap in the full photo (also retried twice).
+   Only tiles that carry data-full-src are handled. Image errors don't bubble,
+   so listen in capture. */
+document.addEventListener("error", (event) => {
+  const img = event.target;
+  if (!(img instanceof HTMLImageElement)) return;
+  const full = img.dataset.fullSrc;
+  if (!full) return;
+  const src = img.getAttribute("src") || "";
+  if (!src) return;
+  const retries = Number(img.dataset.loadRetries || 0);
+  if (retries < 2) {
+    img.dataset.loadRetries = String(retries + 1);
+    img.removeAttribute("src");
+    window.setTimeout(() => { img.src = src; }, 700 * (retries + 1) + Math.random() * 500);
+    return;
+  }
+  if (img.dataset.fullSrcTried === "true") return;
+  img.dataset.fullSrcTried = "true";
+  img.dataset.loadRetries = "0";
+  img.src = full;
+}, true);

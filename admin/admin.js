@@ -10376,17 +10376,18 @@ async function uploadOrderGalleryPhotos(order, files, section) {
     `Uploading ${total} photo${total === 1 ? "" : "s"} to Gallery...`,
   );
 
-  for (const file of files) {
+  const prepareNext = createGalleryUploadPrefetcher(files);
+  for (const [fileIndex, file] of files.entries()) {
     try {
-      const type = file.type || "image/jpeg";
-      const dataUrl = await fileToDataUrl(file);
+      const prepared = await prepareNext(fileIndex);
       const result = await postJson(
         {
           action: "uploadGalleryPhoto",
           section,
-          filename: file.name,
-          contentType: type,
-          dataUrl,
+          filename: prepared.filename,
+          contentType: prepared.contentType,
+          dataUrl: prepared.dataUrl,
+          thumbDataUrl: prepared.thumbDataUrl,
         },
         true,
       );
@@ -15882,7 +15883,8 @@ function initUploadView() {
         ? crypto.randomUUID()
         : "";
 
-    for (const file of files) {
+    const prepareNext = createGalleryUploadPrefetcher(files);
+    for (const [fileIndex, file] of files.entries()) {
       try {
         const type = file.type || "image/jpeg";
 
@@ -15890,15 +15892,16 @@ function initUploadView() {
           throw new Error("Not an image file.");
         }
 
-        const dataUrl = await fileToDataUrl(file);
+        const prepared = await prepareNext(fileIndex);
 
         const result = await postJson(
           {
             action: "uploadGalleryPhoto",
             section,
-            filename: file.name,
-            contentType: type,
-            dataUrl,
+            filename: prepared.filename,
+            contentType: prepared.contentType,
+            dataUrl: prepared.dataUrl,
+            thumbDataUrl: prepared.thumbDataUrl,
           },
           true,
         );
@@ -16011,13 +16014,9 @@ function getGalleryManagerThumbnailUrl(photoUrl) {
     const objectPrefix = "/storage/v1/object/public/gallery/";
     if (!url.pathname.includes(objectPrefix)) return original;
 
-    url.pathname = url.pathname.replace(
-      objectPrefix,
-      "/storage/v1/render/image/public/gallery/",
-    );
-    url.searchParams.set("width", "480");
-    url.searchParams.set("quality", "72");
-    url.searchParams.set("resize", "contain");
+    /* Pre-made 480px thumbnail stored at _thumbs/<photo path> (made at upload).
+       Supabase on-the-fly transforms aren't in the plan and rate-limit hard. */
+    url.pathname = url.pathname.replace(objectPrefix, `${objectPrefix}_thumbs/`);
     return url.toString();
   } catch {
     return original;
@@ -16044,7 +16043,38 @@ function wireGalleryManagerThumbnails(root) {
         pump();
       };
       image.addEventListener("load", finished, { once: true });
-      image.addEventListener("error", finished, { once: true });
+      /* Supabase answers bursts of uncached images with 429 (rate limit),
+         which clears within a second or two. Retry the same URL twice with a
+         jittered delay, then fall back to the full photo (also retried twice)
+         instead of leaving a broken "?" tile. The "load" listener above stays
+         pending through retries and fires once, whichever attempt succeeds. */
+      const attempts = [src, src, src];
+      const fallback = image.dataset.galleryFullSrc;
+      if (fallback && fallback !== src) attempts.push(fallback, fallback, fallback);
+      let attempt = 0;
+      const onError = () => {
+        attempt += 1;
+        if (attempt >= attempts.length || generation !== galleryThumbnailGeneration) {
+          image.removeEventListener("load", finished);
+          finished();
+          return;
+        }
+        const next = attempts[attempt];
+        const delay = next === attempts[attempt - 1] ? 700 * (attempt % 3) + Math.random() * 500 : 0;
+        image.removeAttribute("src");
+        window.setTimeout(() => {
+          if (image.isConnected && generation === galleryThumbnailGeneration) {
+            image.src = next;
+            return;
+          }
+          // Tile was re-rendered away mid-retry: release its loading slot.
+          image.removeEventListener("error", onError);
+          image.removeEventListener("load", finished);
+          finished();
+        }, delay);
+      };
+      image.addEventListener("error", onError);
+      image.addEventListener("load", () => image.removeEventListener("error", onError), { once: true });
       image.src = src;
     }
   }
@@ -16191,7 +16221,7 @@ function renderGalleryManagerPhotos() {
           data-photo-url="${escapeAttr(photo.url)}"
           tabindex="0">
           <button class="gallery-manager-thumb" type="button" data-gallery-action="view">
-            <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-gallery-thumb-src="${escapeAttr(getGalleryManagerThumbnailUrl(photo.url))}" alt="${escapeAttr(photo.name || "Gallery photo")}" decoding="async" fetchpriority="low">
+            <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-gallery-thumb-src="${escapeAttr(getGalleryManagerThumbnailUrl(photo.url))}" data-gallery-full-src="${escapeAttr(photo.url)}" alt="${escapeAttr(photo.name || "Gallery photo")}" decoding="async" fetchpriority="low">
             ${photo.isCover ? `<span class="gallery-cover-star" aria-label="Album cover">★</span>` : ""}
           </button>
           <div class="gallery-manager-meta">
@@ -16975,6 +17005,115 @@ function fileToDataUrl(file) {
 
     reader.readAsDataURL(file);
   });
+}
+
+/* Gallery uploads: shrink the full photo (max 1600px) and make an 800px grid
+   thumbnail before upload. Resizing halves in steps with high-quality
+   smoothing (one big jump looks jagged, especially in Safari). The full photo
+   is encoded once, re-encoded lower only if Safari's larger output overshoots
+   the size budget. Any failure (e.g. a format the browser can't decode)
+   uploads the original untouched with no thumbnail — grids fall back to the
+   full photo. */
+const GALLERY_UPLOAD_FULL_MAX = 1600;
+const GALLERY_UPLOAD_FULL_BUDGET = 520 * 1024;
+const GALLERY_UPLOAD_FULL_QUALITY = 0.7;
+const GALLERY_UPLOAD_FULL_RETRY_QUALITY = 0.5;
+const GALLERY_UPLOAD_THUMB_MAX = 800;
+const GALLERY_UPLOAD_THUMB_QUALITY = 0.8;
+
+function drawGalleryCanvas(source, sourceWidth, sourceHeight, maxSide) {
+  const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+  const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+  const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+  let current = source;
+  let width = sourceWidth;
+  let height = sourceHeight;
+  do {
+    width = Math.max(targetWidth, Math.round(width / 2));
+    height = Math.max(targetHeight, Math.round(height / 2));
+    if (scale === 1) {
+      width = targetWidth;
+      height = targetHeight;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.fillStyle = "#fff"; // transparent PNGs flatten onto white, not black
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(current, 0, 0, width, height);
+    current = canvas;
+  } while (width > targetWidth || height > targetHeight);
+  return current;
+}
+
+function galleryCanvasToBlob(canvas, quality) {
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Could not encode image."))),
+      "image/jpeg",
+      quality,
+    ),
+  );
+}
+
+async function prepareGalleryUpload(file) {
+  const original = {
+    dataUrl: "",
+    contentType: file.type || "image/jpeg",
+    filename: file.name,
+    thumbDataUrl: "",
+  };
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = objectUrl;
+    await img.decode();
+    const fullCanvas = drawGalleryCanvas(img, img.naturalWidth, img.naturalHeight, GALLERY_UPLOAD_FULL_MAX);
+    const thumbCanvas = drawGalleryCanvas(fullCanvas, fullCanvas.width, fullCanvas.height, GALLERY_UPLOAD_THUMB_MAX);
+    const thumbPromise = galleryCanvasToBlob(thumbCanvas, GALLERY_UPLOAD_THUMB_QUALITY);
+    const alreadySmall =
+      original.contentType === "image/jpeg" &&
+      file.size <= GALLERY_UPLOAD_FULL_BUDGET &&
+      Math.max(img.naturalWidth, img.naturalHeight) <= GALLERY_UPLOAD_FULL_MAX;
+    let full = null;
+    if (!alreadySmall) {
+      full = await galleryCanvasToBlob(fullCanvas, GALLERY_UPLOAD_FULL_QUALITY);
+      if (full.size > GALLERY_UPLOAD_FULL_BUDGET) {
+        full = await galleryCanvasToBlob(fullCanvas, GALLERY_UPLOAD_FULL_RETRY_QUALITY);
+      }
+    }
+    const useFull = full && !(original.contentType === "image/jpeg" && full.size >= file.size);
+    return {
+      dataUrl: await fileToDataUrl(useFull ? full : file),
+      contentType: useFull ? "image/jpeg" : original.contentType,
+      filename: useFull ? file.name.replace(/\.[a-z0-9]+$/i, "") + ".jpg" : file.name,
+      thumbDataUrl: await fileToDataUrl(await thumbPromise),
+    };
+  } catch {
+    return { ...original, dataUrl: await fileToDataUrl(file) };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+/* Prepare photo N+1 while photo N uploads, so resizing never adds wait time.
+   Uploads themselves stay one at a time, in order. */
+function createGalleryUploadPrefetcher(files) {
+  const started = new Map();
+  const start = (index) => {
+    if (index >= files.length || started.has(index)) return;
+    const task = prepareGalleryUpload(files[index]);
+    task.catch(() => {});
+    started.set(index, task);
+  };
+  return (index) => {
+    start(index);
+    start(index + 1);
+    return started.get(index);
+  };
 }
 
 function closeOrderDetail() {
